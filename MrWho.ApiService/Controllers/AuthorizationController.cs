@@ -113,17 +113,7 @@ public class AuthorizationController : ControllerBase
         _logger.LogInformation("Authorization successful, creating authorization code for user: {UserId}", user.Id);
         _logger.LogInformation("=== AUTHORIZE SUCCESS ===");
 
-        // ? FIX: Check if this is a consent request or direct authorization
-        // For direct authorization without consent screen, we need to handle this properly
-        var claimsPrincipal = await CreatePrincipalAsync(user, scopes);
-        claimsPrincipal.SetScopes(scopes);
-        
-        // Set additional properties to prevent redirect loop
-        claimsPrincipal.SetDestinations(GetDestinations);
-        
-        _logger.LogInformation("Returning authorization response for user: {UserId}", user.Id);
-        
-        return SignIn(claimsPrincipal, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+        return SignIn(principal, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
     }
 
     [HttpPost("token")]
