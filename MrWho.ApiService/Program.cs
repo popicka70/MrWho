@@ -85,7 +85,7 @@ builder.Services.AddOpenIddict()
         options.AddDevelopmentEncryptionCertificate()
                .AddDevelopmentSigningCertificate();
 
-        // Enable Authorization Server passthrough for both endpoints to handle the complete flow
+        // Enable Authorization Server passthrough for both endpoints to properly handle OIDC flow
         options.UseAspNetCore()
                .EnableAuthorizationEndpointPassthrough()
                .EnableTokenEndpointPassthrough()

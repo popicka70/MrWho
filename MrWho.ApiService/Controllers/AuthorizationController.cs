@@ -121,12 +121,218 @@ public class AuthorizationController : ControllerBase
     [Produces("application/json")]
     public async Task<IActionResult> Exchange()
     {
-        // ? This method should not be called since EnableTokenEndpointPassthrough is disabled
-        // OpenIddict handles token exchange automatically
-        _logger.LogWarning("Exchange method called but token endpoint passthrough is disabled");
-        
-        // Return a 404 since this endpoint should not be handling requests manually
-        return NotFound("Token endpoint is handled automatically by OpenIddict");
+        var request = HttpContext.GetOpenIddictServerRequest() ??
+            throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
+
+        _logger.LogInformation("=== EXCHANGE TOKEN REQUEST ===");
+        _logger.LogInformation("Grant Type: {GrantType}", request.GrantType);
+        _logger.LogInformation("Client ID: {ClientId}", request.ClientId);
+        _logger.LogInformation("Request Method: {Method}", Request.Method);
+        _logger.LogInformation("Request Path: {Path}", Request.Path);
+
+        if (request.IsAuthorizationCodeGrantType())
+        {
+            _logger.LogInformation("Processing Authorization Code Grant Type");
+            
+            try
+            {
+                // Retrieve the claims principal stored in the authorization code
+                var authResult = await HttpContext.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+                _logger.LogInformation("Authentication result succeeded: {Succeeded}", authResult.Succeeded);
+                
+                if (!authResult.Succeeded)
+                {
+                    _logger.LogError("Failed to authenticate with OpenIddict scheme");
+                    return Forbid(
+                        authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
+                        properties: new AuthenticationProperties(new Dictionary<string, string?>
+                        {
+                            [OpenIddictServerAspNetCoreConstants.Properties.Error] = Errors.InvalidGrant,
+                            [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = "The authorization code is invalid or expired."
+                        }));
+                }
+                
+                var principal = authResult.Principal!;
+                var subjectClaim = principal.GetClaim(Claims.Subject);
+                _logger.LogInformation("Subject claim from principal: {Subject}", subjectClaim ?? "null");
+                
+                if (string.IsNullOrEmpty(subjectClaim))
+                {
+                    _logger.LogError("No subject claim found in principal");
+                    return Forbid(
+                        authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
+                        properties: new AuthenticationProperties(new Dictionary<string, string?>
+                        {
+                            [OpenIddictServerAspNetCoreConstants.Properties.Error] = Errors.InvalidGrant,
+                            [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = "The authorization code does not contain a valid subject claim."
+                        }));
+                }
+
+                // Retrieve the user profile corresponding to the authorization code
+                var user = await _userManager.FindByIdAsync(subjectClaim);
+                _logger.LogInformation("User found: {Found}, User ID: {UserId}, Active: {Active}", 
+                    user != null, user?.Id ?? "null", user?.IsActive ?? false);
+                
+                if (user == null)
+                {
+                    _logger.LogError("User not found for subject: {Subject}", subjectClaim);
+                    return Forbid(
+                        authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
+                        properties: new AuthenticationProperties(new Dictionary<string, string?>
+                        {
+                            [OpenIddictServerAspNetCoreConstants.Properties.Error] = Errors.InvalidGrant,
+                            [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = "The token is no longer valid."
+                        }));
+                }
+
+                if (!user.IsActive)
+                {
+                    _logger.LogWarning("User account is not active: {UserId}", user.Id);
+                    return Forbid(
+                        authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
+                        properties: new AuthenticationProperties(new Dictionary<string, string?>
+                        {
+                            [OpenIddictServerAspNetCoreConstants.Properties.Error] = Errors.InvalidGrant,
+                            [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = "The user account is not active."
+                        }));
+                }
+
+                // Create a new principal containing the updated claims
+                var scopes = principal.GetScopes();
+                _logger.LogInformation("Scopes from principal: {Scopes}", string.Join(", ", scopes));
+                
+                var newPrincipal = await CreatePrincipalAsync(user, scopes);
+                newPrincipal.SetScopes(scopes);
+
+                _logger.LogInformation("Successfully created new principal for user: {UserId}", user.Id);
+                _logger.LogInformation("=== EXCHANGE TOKEN SUCCESS ===");
+                
+                return SignIn(newPrincipal, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Exception during authorization code exchange");
+                return Forbid(
+                    authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
+                    properties: new AuthenticationProperties(new Dictionary<string, string?>
+                    {
+                        [OpenIddictServerAspNetCoreConstants.Properties.Error] = Errors.ServerError,
+                        [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = "An error occurred while processing the token request."
+                    }));
+            }
+        }
+
+        if (request.IsPasswordGrantType())
+        {
+            _logger.LogInformation("Processing Password Grant Type for username: {Username}", request.Username);
+            
+            var user = await _userManager.FindByEmailAsync(request.Username!) ??
+                       await _userManager.FindByNameAsync(request.Username!);
+
+            if (user == null || !user.IsActive)
+            {
+                _logger.LogWarning("Password grant failed: User not found or not active for username: {Username}", request.Username);
+                var properties = new AuthenticationProperties(new Dictionary<string, string?>
+                {
+                    [OpenIddictServerAspNetCoreConstants.Properties.Error] = Errors.InvalidGrant,
+                    [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] =
+                        "The username/password couple is invalid."
+                });
+
+                return Forbid(properties, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+            }
+
+            var result = await _signInManager.CheckPasswordSignInAsync(user, request.Password!, lockoutOnFailure: false);
+            if (!result.Succeeded)
+            {
+                _logger.LogWarning("Password grant failed: Invalid password for username: {Username}", request.Username);
+                var properties = new AuthenticationProperties(new Dictionary<string, string?>
+                {
+                    [OpenIddictServerAspNetCoreConstants.Properties.Error] = Errors.InvalidGrant,
+                    [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] =
+                        "The username/password couple is invalid."
+                });
+
+                return Forbid(properties, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+            }
+
+            var principal = await CreatePrincipalAsync(user, request.GetScopes());
+            _logger.LogInformation("Password grant successful for user: {UserId}", user.Id);
+            return SignIn(principal, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+        }
+
+        if (request.IsClientCredentialsGrantType())
+        {
+            _logger.LogInformation("Processing Client Credentials Grant Type");
+            
+            var application = await _applicationManager.FindByClientIdAsync(request.ClientId!);
+            if (application == null)
+            {
+                _logger.LogError("Client credentials grant failed: Application not found for client ID: {ClientId}", request.ClientId);
+                throw new InvalidOperationException("The application details cannot be found in the database.");
+            }
+
+            var identity = new ClaimsIdentity(
+                TokenValidationParameters.DefaultAuthenticationType,
+                Claims.Name,
+                Claims.Role);
+
+            var clientId = await _applicationManager.GetClientIdAsync(application);
+            var displayName = await _applicationManager.GetDisplayNameAsync(application) ?? "Unknown";
+
+            identity.AddClaim(new Claim(Claims.Subject, clientId!));
+            identity.AddClaim(new Claim(Claims.Name, displayName));
+
+            var principal = new ClaimsPrincipal(identity);
+            principal.SetScopes(request.GetScopes());
+
+            _logger.LogInformation("Client credentials grant successful for client: {ClientId}", clientId);
+            return SignIn(principal, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+        }
+
+        if (request.IsRefreshTokenGrantType())
+        {
+            _logger.LogInformation("Processing Refresh Token Grant Type");
+            
+            // Retrieve the claims principal stored in the refresh token
+            var principal = (await HttpContext.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme)).Principal!;
+
+            // Retrieve the user profile corresponding to the refresh token
+            var user = await _userManager.FindByIdAsync(principal.GetClaim(Claims.Subject)!);
+            if (user == null)
+            {
+                _logger.LogWarning("Refresh token grant failed: User not found");
+                return Forbid(
+                    authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
+                    properties: new AuthenticationProperties(new Dictionary<string, string?>
+                    {
+                        [OpenIddictServerAspNetCoreConstants.Properties.Error] = Errors.InvalidGrant,
+                        [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = "The refresh token is no longer valid."
+                    }));
+            }
+
+            if (!user.IsActive)
+            {
+                _logger.LogWarning("Refresh token grant failed: User account not active: {UserId}", user.Id);
+                return Forbid(
+                    authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
+                    properties: new AuthenticationProperties(new Dictionary<string, string?>
+                    {
+                        [OpenIddictServerAspNetCoreConstants.Properties.Error] = Errors.InvalidGrant,
+                        [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = "The user account is not active."
+                    }));
+            }
+
+            // Create a new principal containing the updated claims
+            var newPrincipal = await CreatePrincipalAsync(user, principal.GetScopes());
+            newPrincipal.SetScopes(principal.GetScopes());
+
+            _logger.LogInformation("Refresh token grant successful for user: {UserId}", user.Id);
+            return SignIn(newPrincipal, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+        }
+
+        _logger.LogError("Unsupported grant type: {GrantType}", request.GrantType);
+        throw new InvalidOperationException("The specified grant type is not supported.");
     }
 
     [HttpGet("logout")]
