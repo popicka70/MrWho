@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <PackageReference Include="Aspire.StackExchange.Redis.OutputCaching" Version="9.3.0" />
+    <PackageReference Include="Radzen.Blazor" Version="5.6.7" />
   </ItemGroup>
 
 </Project>

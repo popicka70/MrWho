@@ -1,0 +1,192 @@
+@page "/register"
+@rendermode InteractiveServer
+@inject IUserApiClient UserApiClient
+@inject NotificationService NotificationService
+@inject DialogService DialogService
+@inject NavigationManager Navigation
+@inject ILogger<Register> Logger
+
+<PageTitle>Register - MrWho</PageTitle>
+
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-5">
+            <RadzenCard Class="mt-4">
+                <RadzenText TextStyle="TextStyle.H3" TagName="TagName.H1" Class="mb-4 text-center">
+                    Create Your Account
+                </RadzenText>
+                
+                <RadzenText TextStyle="TextStyle.Body1" Class="mb-4 text-center text-muted">
+                    Join MrWho to access our services
+                </RadzenText>
+
+                <EditForm Model="@model" OnValidSubmit="@HandleValidSubmit">
+                    <DataAnnotationsValidator />
+                    
+                    <div class="mb-3">
+                        <RadzenFormField Text="Email Address" Variant="Variant.Outlined">
+                            <RadzenTextBox @bind-Value="@model.Email" 
+                                         Placeholder="Enter your email address"
+                                         MaxLength="256"
+                                         Style="width: 100%;" />
+                        </RadzenFormField>
+                        <ValidationMessage For="@(() => model.Email)" class="text-danger small" />
+                    </div>
+
+                    <div class="mb-3">
+                        <RadzenFormField Text="First Name" Variant="Variant.Outlined">
+                            <RadzenTextBox @bind-Value="@model.FirstName" 
+                                         Placeholder="Enter your first name"
+                                         MaxLength="50"
+                                         Style="width: 100%;" />
+                        </RadzenFormField>
+                        <ValidationMessage For="@(() => model.FirstName)" class="text-danger small" />
+                    </div>
+
+                    <div class="mb-3">
+                        <RadzenFormField Text="Last Name" Variant="Variant.Outlined">
+                            <RadzenTextBox @bind-Value="@model.LastName" 
+                                         Placeholder="Enter your last name"
+                                         MaxLength="50"
+                                         Style="width: 100%;" />
+                        </RadzenFormField>
+                        <ValidationMessage For="@(() => model.LastName)" class="text-danger small" />
+                    </div>
+
+                    <div class="mb-3">
+                        <RadzenFormField Text="Username (Optional)" Variant="Variant.Outlined">
+                            <RadzenTextBox @bind-Value="@model.UserName" 
+                                         Placeholder="Username (leave blank to use email)"
+                                         MaxLength="256"
+                                         Style="width: 100%;" />
+                        </RadzenFormField>
+                        <RadzenText TextStyle="TextStyle.Caption" Class="text-muted">
+                            If left blank, your email will be used as username
+                        </RadzenText>
+                    </div>
+
+                    <div class="mb-3">
+                        <RadzenFormField Text="Password" Variant="Variant.Outlined">
+                            <RadzenPassword @bind-Value="@model.Password" 
+                                          Placeholder="Enter your password"
+                                          MaxLength="100"
+                                          Style="width: 100%;" />
+                        </RadzenFormField>
+                        <ValidationMessage For="@(() => model.Password)" class="text-danger small" />
+                        <RadzenText TextStyle="TextStyle.Caption" Class="text-muted">
+                            Password must contain at least one uppercase letter, one lowercase letter, and one number
+                        </RadzenText>
+                    </div>
+
+                    <div class="mb-4">
+                        <RadzenFormField Text="Confirm Password" Variant="Variant.Outlined">
+                            <RadzenPassword @bind-Value="@model.ConfirmPassword" 
+                                          Placeholder="Confirm your password"
+                                          MaxLength="100"
+                                          Style="width: 100%;" />
+                        </RadzenFormField>
+                        <ValidationMessage For="@(() => model.ConfirmPassword)" class="text-danger small" />
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <RadzenButton ButtonType="ButtonType.Submit" 
+                                    ButtonStyle="ButtonStyle.Primary" 
+                                    IsBusy="@isSubmitting"
+                                    Text="@(isSubmitting ? "Creating Account..." : "Create Account")"
+                                    Style="width: 100%; height: 48px; font-size: 16px;" />
+                    </div>
+
+                    <div class="text-center mt-3">
+                        <RadzenText TextStyle="TextStyle.Body2" Class="text-muted">
+                            Already have an account? 
+                            <RadzenLink Path="/login" Text="Sign in here" />
+                        </RadzenText>
+                    </div>
+                </EditForm>
+            </RadzenCard>
+        </div>
+    </div>
+</div>
+
+@code {
+    private UserRegistrationModel model = new();
+    private bool isSubmitting = false;
+
+    private async Task HandleValidSubmit()
+    {
+        if (isSubmitting) return;
+
+        isSubmitting = true;
+        
+        try
+        {
+            Logger.LogInformation("Attempting to register user: {Email}", model.Email);
+            
+            var result = await UserApiClient.CreateUserAsync(model);
+            
+            if (result != null)
+            {
+                Logger.LogInformation("User registration successful for: {Email}", model.Email);
+                
+                // Show success notification
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Success,
+                    Summary = "Registration Successful",
+                    Detail = $"Welcome {result.FirstName}! Your account has been created successfully.",
+                    Duration = 5000
+                });
+
+                // Show success dialog
+                await ShowSuccessDialog(result);
+                
+                // Reset form
+                model = new UserRegistrationModel();
+            }
+            else
+            {
+                Logger.LogWarning("User registration failed for: {Email}", model.Email);
+                
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Registration Failed",
+                    Detail = "Unable to create your account. Please check your information and try again.",
+                    Duration = 5000
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Exception during user registration for: {Email}", model.Email);
+            
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Registration Error",
+                Detail = "An unexpected error occurred. Please try again later.",
+                Duration = 5000
+            });
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private async Task ShowSuccessDialog(UserRegistrationResponse user)
+    {
+        var result = await DialogService.OpenAsync<RegistrationSuccessDialog>("Registration Successful", 
+            new Dictionary<string, object>
+            {
+                { "User", user }
+            },
+            new DialogOptions
+            {
+                Width = "600px",
+                Height = "400px",
+                Resizable = false,
+                Draggable = false
+            });
+    }
+}}

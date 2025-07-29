@@ -1,5 +1,7 @@
 using MrWho.Web;
 using MrWho.Web.Components;
+using MrWho.Web.Services;
+using Radzen;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,7 +13,18 @@ builder.AddRedisOutputCache("cache");
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+// Add Radzen services
+builder.Services.AddRadzenComponents();
+
+// Configure API clients
 builder.Services.AddHttpClient<WeatherApiClient>(client =>
+    {
+        // This URL uses "https+http://" to indicate HTTPS is preferred over HTTP.
+        // Learn more about service discovery scheme resolution at https://aka.ms/dotnet/sdschemes.
+        client.BaseAddress = new("https+http://apiservice");
+    });
+
+builder.Services.AddHttpClient<IUserApiClient, UserApiClient>(client =>
     {
         // This URL uses "https+http://" to indicate HTTPS is preferred over HTTP.
         // Learn more about service discovery scheme resolution at https://aka.ms/dotnet/sdschemes.

@@ -1,7 +1,225 @@
 ﻿@page "/"
+@rendermode InteractiveServer
+@inject IUserApiClient UserApiClient
+@inject NavigationManager Navigation
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Home - MrWho</PageTitle>
 
-<h1>Hello, world!</h1>
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <!-- Hero Section -->
+            <RadzenCard Class="mt-4 text-center hero-card">
+                <RadzenText TextStyle="TextStyle.H2" TagName="TagName.H1" Class="mb-3">
+                    Welcome to MrWho
+                </RadzenText>
+                <RadzenText TextStyle="TextStyle.H6" Class="mb-4 text-muted">
+                    Your Complete OIDC Identity Provider Solution
+                </RadzenText>
+                <RadzenText TextStyle="TextStyle.Body1" Class="mb-4">
+                    MrWho is a modern, secure identity provider built with .NET 9, Blazor, and OpenIddict. 
+                    Manage users, authenticate applications, and provide seamless access control for your services.
+                </RadzenText>
+                <div class="d-flex gap-3 justify-content-center">
+                    <RadzenButton Text="Register New User" 
+                                ButtonStyle="ButtonStyle.Primary" 
+                                Icon="person_add"
+                                Style="padding: 12px 24px; font-size: 16px;"
+                                Click="@(() => Navigation.NavigateTo("/register"))" />
+                    <RadzenButton Text="View Users" 
+                                ButtonStyle="ButtonStyle.Secondary" 
+                                Icon="people"
+                                Style="padding: 12px 24px; font-size: 16px;"
+                                Click="@(() => Navigation.NavigateTo("/users"))" />
+                </div>
+            </RadzenCard>
+        </div>
+    </div>
 
-Welcome to your new app.
+    <div class="row mt-4">
+        <!-- Quick Stats -->
+        <div class="col-lg-4 col-md-6 mb-3">
+            <RadzenCard Class="stats-card">
+                <div class="d-flex align-items-center">
+                    <RadzenIcon Icon="people" IconStyle="IconStyle.Primary" Style="font-size: 2.5rem;" Class="me-3" />
+                    <div>
+                        <RadzenText TextStyle="TextStyle.H4" Class="mb-0">@totalUsers</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Body2" Class="text-muted">Total Users</RadzenText>
+                    </div>
+                </div>
+            </RadzenCard>
+        </div>
+
+        <div class="col-lg-4 col-md-6 mb-3">
+            <RadzenCard Class="stats-card">
+                <div class="d-flex align-items-center">
+                    <RadzenIcon Icon="security" IconStyle="IconStyle.Success" Style="font-size: 2.5rem;" Class="me-3" />
+                    <div>
+                        <RadzenText TextStyle="TextStyle.H4" Class="mb-0">OIDC</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Body2" Class="text-muted">Provider Active</RadzenText>
+                    </div>
+                </div>
+            </RadzenCard>
+        </div>
+
+        <div class="col-lg-4 col-md-6 mb-3">
+            <RadzenCard Class="stats-card">
+                <div class="d-flex align-items-center">
+                    <RadzenIcon Icon="cloud" IconStyle="IconStyle.Info" Style="font-size: 2.5rem;" Class="me-3" />
+                    <div>
+                        <RadzenText TextStyle="TextStyle.H4" Class="mb-0">Aspire</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Body2" Class="text-muted">Cloud Ready</RadzenText>
+                    </div>
+                </div>
+            </RadzenCard>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <!-- Features Section -->
+        <div class="col-lg-6 mb-3">
+            <RadzenCard Class="feature-card h-100">
+                <RadzenText TextStyle="TextStyle.H5" Class="mb-3">
+                    <RadzenIcon Icon="admin_panel_settings" Class="me-2" />
+                    User Management
+                </RadzenText>
+                <RadzenText TextStyle="TextStyle.Body1" Class="mb-3">
+                    Complete user lifecycle management with registration, profile updates, and secure authentication.
+                </RadzenText>
+                <ul class="feature-list">
+                    <li>✅ Secure user registration</li>
+                    <li>✅ Profile management</li>
+                    <li>✅ Password policies</li>
+                    <li>✅ Account activation</li>
+                </ul>
+                <RadzenButton Text="Manage Users" 
+                            ButtonStyle="ButtonStyle.Light" 
+                            Click="@(() => Navigation.NavigateTo("/users"))"
+                            Class="mt-3" />
+            </RadzenCard>
+        </div>
+
+        <div class="col-lg-6 mb-3">
+            <RadzenCard Class="feature-card h-100">
+                <RadzenText TextStyle="TextStyle.H5" Class="mb-3">
+                    <RadzenIcon Icon="api" Class="me-2" />
+                    OIDC Provider
+                </RadzenText>
+                <RadzenText TextStyle="TextStyle.Body1" Class="mb-3">
+                    Standards-compliant OpenID Connect provider for secure authentication and authorization.
+                </RadzenText>
+                <ul class="feature-list">
+                    <li>✅ OAuth 2.0 / OIDC compliance</li>
+                    <li>✅ JWT token generation</li>
+                    <li>✅ Multiple grant types</li>
+                    <li>✅ Scope-based access</li>
+                </ul>
+                <RadzenButton Text="API Documentation" 
+                            ButtonStyle="ButtonStyle.Light" 
+                            Click="@(() => Navigation.NavigateTo("/swagger"))"
+                            Class="mt-3" />
+            </RadzenCard>
+        </div>
+    </div>
+
+    @if (recentUsers.Any())
+    {
+        <div class="row mt-4">
+            <div class="col-12">
+                <RadzenCard>
+                    <RadzenText TextStyle="TextStyle.H5" Class="mb-3">
+                        Recently Registered Users
+                    </RadzenText>
+                    <RadzenDataList Data="@recentUsers" TItem="UserRegistrationResponse">
+                        <Template Context="user">
+                            <div class="d-flex align-items-center p-2 border-bottom">
+                                <RadzenIcon Icon="account_circle" IconStyle="IconStyle.Secondary" Style="font-size: 2rem;" Class="me-3" />
+                                <div class="flex-grow-1">
+                                    <RadzenText TextStyle="TextStyle.Body1" Class="mb-0">
+                                        @user.FirstName @user.LastName
+                                    </RadzenText>
+                                    <RadzenText TextStyle="TextStyle.Body2" Class="text-muted">
+                                        @user.Email
+                                    </RadzenText>
+                                </div>
+                                <div class="text-end">
+                                    <RadzenText TextStyle="TextStyle.Caption" Class="text-muted">
+                                        @user.CreatedAt.ToString("MMM dd")
+                                    </RadzenText>
+                                </div>
+                            </div>
+                        </Template>
+                    </RadzenDataList>
+                </RadzenCard>
+            </div>
+        </div>
+    }
+</div>
+
+<style>
+    .hero-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+    }
+    
+    .hero-card .rz-text {
+        color: white !important;
+    }
+
+    .stats-card {
+        border-left: 4px solid var(--rz-primary);
+        transition: transform 0.2s ease;
+    }
+
+    .stats-card:hover {
+        transform: translateY(-2px);
+    }
+
+    .feature-card {
+        transition: transform 0.2s ease;
+    }
+
+    .feature-card:hover {
+        transform: translateY(-2px);
+    }
+
+    .feature-list {
+        list-style: none;
+        padding: 0;
+    }
+
+    .feature-list li {
+        margin-bottom: 0.5rem;
+    }
+</style>
+
+@code {
+    private int totalUsers = 0;
+    private List<UserRegistrationResponse> recentUsers = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDashboardData();
+    }
+
+    private async Task LoadDashboardData()
+    {
+        try
+        {
+            var users = await UserApiClient.GetUsersAsync(0, 100);
+            var userList = users.ToList();
+            
+            totalUsers = userList.Count;
+            recentUsers = userList
+                .OrderByDescending(u => u.CreatedAt)
+                .Take(5)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            // Silently handle errors on dashboard
+            Console.WriteLine($"Error loading dashboard data: {ex.Message}");
+        }
+    }
+}
