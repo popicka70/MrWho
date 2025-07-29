@@ -8,6 +8,8 @@ public interface IUserApiClient
 {
     Task<UserRegistrationResponse?> CreateUserAsync(UserRegistrationModel model);
     Task<UserRegistrationResponse?> GetUserAsync(string id);
+    Task<UserRegistrationResponse?> UpdateUserAsync(string id, UpdateUserModel model);
+    Task<bool> AdminResetPasswordAsync(string id, AdminResetPasswordModel model);
     Task<IEnumerable<UserRegistrationResponse>> GetUsersAsync(int skip = 0, int take = 50);
     Task<bool> DeleteUserAsync(string id);
 }
@@ -101,6 +103,76 @@ public class UserApiClient : IUserApiClient
         {
             _logger.LogError(ex, "Exception occurred while getting user {UserId}", id);
             return null;
+        }
+    }
+
+    public async Task<UserRegistrationResponse?> UpdateUserAsync(string id, UpdateUserModel model)
+    {
+        try
+        {
+            var updateRequest = new
+            {
+                firstName = model.FirstName,
+                lastName = model.LastName,
+                email = model.Email,
+                isActive = model.IsActive
+            };
+
+            _logger.LogInformation("Attempting to update user {UserId}", id);
+            
+            var response = await _httpClient.PutAsJsonAsync($"/api/users/{id}", updateRequest);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var user = await response.Content.ReadFromJsonAsync<UserRegistrationResponse>();
+                _logger.LogInformation("User {UserId} updated successfully", id);
+                return user;
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                _logger.LogError("Failed to update user {UserId}. Status: {StatusCode}, Content: {Content}", 
+                    id, response.StatusCode, errorContent);
+                return null;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Exception occurred while updating user {UserId}", id);
+            return null;
+        }
+    }
+
+    public async Task<bool> AdminResetPasswordAsync(string id, AdminResetPasswordModel model)
+    {
+        try
+        {
+            var resetRequest = new
+            {
+                newPassword = model.NewPassword
+            };
+
+            _logger.LogInformation("Attempting admin password reset for user {UserId}", id);
+            
+            var response = await _httpClient.PostAsJsonAsync($"/api/users/{id}/admin-reset-password", resetRequest);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                _logger.LogInformation("Password reset successful for user {UserId}", id);
+                return true;
+            }
+            else
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                _logger.LogError("Failed to reset password for user {UserId}. Status: {StatusCode}, Content: {Content}", 
+                    id, response.StatusCode, errorContent);
+                return false;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Exception occurred while resetting password for user {UserId}", id);
+            return false;
         }
     }
 

@@ -102,10 +102,10 @@
                             <Template Context="user">
                                 <div class="d-flex gap-1">
                                     <RadzenButton ButtonStyle="ButtonStyle.Light" 
-                                                Icon="visibility"
+                                                Icon="edit"
                                                 Style="padding: 4px 8px;"
-                                                Click="@(() => ViewUser(user))"
-                                                Title="View Details" />
+                                                Click="@(() => EditUser(user))"
+                                                Title="Edit User" />
                                     <RadzenButton ButtonStyle="ButtonStyle.Danger" 
                                                 Icon="delete"
                                                 Style="padding: 4px 8px;"
@@ -172,20 +172,54 @@
         }
     }
 
-    private async Task ViewUser(UserRegistrationResponse user)
+    private async Task EditUser(UserRegistrationResponse user)
     {
-        await DialogService.OpenAsync<UserDetailsDialog>("User Details", 
-            new Dictionary<string, object>
+        try
+        {
+            Logger.LogInformation("Opening edit dialog for user {UserId}", user.Id);
+            
+            var result = await DialogService.OpenAsync<SimpleUserEditDialog>("Edit User", 
+                new Dictionary<string, object>
+                {
+                    { "User", user }
+                },
+                new DialogOptions
+                {
+                    Width = "800px",
+                    Height = "600px",
+                    Resizable = true,
+                    Draggable = true
+                });
+
+            // If a user was returned from the dialog, it means it was updated
+            if (result is UserRegistrationResponse updatedUser)
             {
-                { "User", user }
-            },
-            new DialogOptions
+                Logger.LogInformation("User updated, refreshing grid");
+                // Find and update the user in our list
+                var index = users.FindIndex(u => u.Id == updatedUser.Id);
+                if (index >= 0)
+                {
+                    users[index] = updatedUser;
+                    StateHasChanged();
+                    await usersGrid!.Reload();
+                }
+            }
+            else
             {
-                Width = "600px",
-                Height = "500px",
-                Resizable = true,
-                Draggable = true
+                Logger.LogInformation("Dialog closed without update");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error opening edit dialog for user {UserId}", user.Id);
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Dialog Error",
+                Detail = "Failed to open user edit dialog. Please try again.",
+                Duration = 4000
             });
+        }
     }
 
     private async Task DeleteUser(UserRegistrationResponse user)

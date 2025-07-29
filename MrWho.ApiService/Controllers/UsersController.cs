@@ -82,6 +82,19 @@ public class UsersController : ControllerBase
         return Ok();
     }
 
+    [HttpPost("{id}/admin-reset-password")]
+    public async Task<ActionResult> AdminResetPassword(string id, AdminResetPasswordRequest request)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
+
+        var success = await _userService.AdminResetPasswordAsync(id, request);
+        if (!success)
+            return BadRequest("Failed to reset password");
+
+        return Ok();
+    }
+
     [HttpDelete("{id}")]
     public async Task<ActionResult> DeleteUser(string id)
     {

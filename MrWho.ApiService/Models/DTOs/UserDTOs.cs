@@ -23,6 +23,11 @@ public class ChangePasswordRequest
     public required string NewPassword { get; set; }
 }
 
+public class AdminResetPasswordRequest
+{
+    public required string NewPassword { get; set; }
+}
+
 public class UserResponse
 {
     public required string Id { get; set; }

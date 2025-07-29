@@ -13,6 +13,7 @@ public interface IUserService
     Task<UserResponse?> CreateUserAsync(CreateUserRequest request);
     Task<UserResponse?> UpdateUserAsync(string userId, UpdateUserRequest request);
     Task<bool> ChangePasswordAsync(string userId, ChangePasswordRequest request);
+    Task<bool> AdminResetPasswordAsync(string userId, AdminResetPasswordRequest request);
     Task<bool> DeleteUserAsync(string userId);
     Task<bool> ValidateUserCredentialsAsync(string email, string password);
 }
@@ -100,6 +101,20 @@ public class UserService : IUserService
 
         var result = await _userManager.ChangePasswordAsync(user, request.CurrentPassword, request.NewPassword);
         return result.Succeeded;
+    }
+
+    public async Task<bool> AdminResetPasswordAsync(string userId, AdminResetPasswordRequest request)
+    {
+        var user = await _userManager.FindByIdAsync(userId);
+        if (user == null) return false;
+
+        // Remove the current password hash
+        var removePasswordResult = await _userManager.RemovePasswordAsync(user);
+        if (!removePasswordResult.Succeeded) return false;
+
+        // Add the new password
+        var addPasswordResult = await _userManager.AddPasswordAsync(user, request.NewPassword);
+        return addPasswordResult.Succeeded;
     }
 
     public async Task<bool> DeleteUserAsync(string userId)

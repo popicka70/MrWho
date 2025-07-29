@@ -1,0 +1,309 @@
+@inject IUserApiClient UserApiClient
+@inject NotificationService NotificationService
+@inject DialogService DialogService
+@inject ILogger<SimpleUserEditDialog> Logger
+
+<div class="p-4" style="min-height: 400px;">
+    <div class="row">
+        <div class="col-12">
+            <RadzenText TextStyle="TextStyle.H4" Class="mb-3">
+                Edit User: @User?.FirstName @User?.LastName
+            </RadzenText>
+        </div>
+    </div>
+
+    <EditForm Model="@profileModel" OnValidSubmit="@UpdateProfile">
+        <DataAnnotationsValidator />
+        
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <RadzenFormField Text="First Name" Variant="Variant.Outlined">
+                    <RadzenTextBox @bind-Value="@profileModel.FirstName" 
+                                 Placeholder="Enter first name"
+                                 MaxLength="50"
+                                 Style="width: 100%;" />
+                </RadzenFormField>
+                <ValidationMessage For="@(() => profileModel.FirstName)" class="text-danger small" />
+            </div>
+            
+            <div class="col-md-6 mb-3">
+                <RadzenFormField Text="Last Name" Variant="Variant.Outlined">
+                    <RadzenTextBox @bind-Value="@profileModel.LastName" 
+                                 Placeholder="Enter last name"
+                                 MaxLength="50"
+                                 Style="width: 100%;" />
+                </RadzenFormField>
+                <ValidationMessage For="@(() => profileModel.LastName)" class="text-danger small" />
+            </div>
+        </div>
+
+        <div class="mb-3">
+            <RadzenFormField Text="Email Address" Variant="Variant.Outlined">
+                <RadzenTextBox @bind-Value="@profileModel.Email" 
+                             Placeholder="Enter email address"
+                             MaxLength="256"
+                             Style="width: 100%;" />
+            </RadzenFormField>
+            <ValidationMessage For="@(() => profileModel.Email)" class="text-danger small" />
+        </div>
+
+        <div class="mb-3">
+            <RadzenCheckBox @bind-Value="@profileModel.IsActive" Name="IsActive" />
+            <RadzenLabel Text="Account Active" Component="IsActive" Class="ms-2" />
+        </div>
+
+        <div class="mb-4">
+            <RadzenFieldset Text="Account Information" Class="bg-light p-3">
+                <div class="row">
+                    <div class="col-md-6">
+                        <RadzenText TextStyle="TextStyle.Subtitle2" Class="mb-1">Username</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Body2" Class="text-muted">@User?.UserName</RadzenText>
+                    </div>
+                    <div class="col-md-6">
+                        <RadzenText TextStyle="TextStyle.Subtitle2" Class="mb-1">Created</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Body2">@User?.CreatedAt.ToString("MMM dd, yyyy")</RadzenText>
+                    </div>
+                </div>
+            </RadzenFieldset>
+        </div>
+
+        <div class="d-flex gap-2 justify-content-end">
+            <RadzenButton Text="Cancel" 
+                        ButtonStyle="ButtonStyle.Light" 
+                        Click="@CancelEdit" />
+            <RadzenButton Text="Save Changes" 
+                        ButtonType="ButtonType.Submit"
+                        ButtonStyle="ButtonStyle.Primary"
+                        IsBusy="@isUpdating"
+                        Disabled="@isUpdating" />
+            <RadzenButton Text="Reset Password" 
+                        ButtonStyle="ButtonStyle.Warning"
+                        Click="@ShowPasswordReset" 
+                        Disabled="@isUpdating" />
+        </div>
+    </EditForm>
+
+    @if (showPasswordSection)
+    {
+        <hr class="my-4" />
+        
+        <RadzenText TextStyle="TextStyle.H5" Class="mb-3">Reset Password</RadzenText>
+        
+        <RadzenAlert AlertStyle="AlertStyle.Info" Class="mb-3">
+            <RadzenText TextStyle="TextStyle.Body2">
+                As an administrator, you can reset this user's password without knowing their current password.
+            </RadzenText>
+        </RadzenAlert>
+
+        <EditForm Model="@passwordModel" OnValidSubmit="@ResetPassword">
+            <DataAnnotationsValidator />
+            
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <RadzenFormField Text="New Password" Variant="Variant.Outlined">
+                        <RadzenPassword @bind-Value="@passwordModel.NewPassword" 
+                                      Placeholder="Enter new password"
+                                      MaxLength="100"
+                                      Style="width: 100%;" />
+                    </RadzenFormField>
+                    <ValidationMessage For="@(() => passwordModel.NewPassword)" class="text-danger small" />
+                </div>
+
+                <div class="col-md-6 mb-3">
+                    <RadzenFormField Text="Confirm New Password" Variant="Variant.Outlined">
+                        <RadzenPassword @bind-Value="@passwordModel.ConfirmPassword" 
+                                      Placeholder="Confirm new password"
+                                      MaxLength="100"
+                                      Style="width: 100%;" />
+                    </RadzenFormField>
+                    <ValidationMessage For="@(() => passwordModel.ConfirmPassword)" class="text-danger small" />
+                </div>
+            </div>
+
+            <div class="d-flex gap-2 justify-content-end">
+                <RadzenButton Text="Cancel Password Reset" 
+                            ButtonStyle="ButtonStyle.Light" 
+                            Click="@HidePasswordReset" />
+                <RadzenButton Text="Reset Password" 
+                            ButtonType="ButtonType.Submit"
+                            ButtonStyle="ButtonStyle.Danger"
+                            IsBusy="@isResettingPassword"
+                            Disabled="@isResettingPassword" />
+            </div>
+        </EditForm>
+    }
+</div>
+
+<style>
+    .bg-light {
+        background-color: #f8f9fa !important;
+    }
+</style>
+
+@code {
+    [Parameter] public UserRegistrationResponse? User { get; set; }
+
+    private UpdateUserModel profileModel = new();
+    private AdminResetPasswordModel passwordModel = new();
+    private bool isUpdating = false;
+    private bool isResettingPassword = false;
+    private bool showPasswordSection = false;
+
+    protected override void OnInitialized()
+    {
+        Logger.LogInformation("SimpleUserEditDialog initialized for user {UserId}", User?.Id ?? "null");
+        
+        if (User != null)
+        {
+            profileModel = new UpdateUserModel
+            {
+                FirstName = User.FirstName ?? string.Empty,
+                LastName = User.LastName ?? string.Empty,
+                Email = User.Email,
+                IsActive = User.IsActive
+            };
+            
+            Logger.LogInformation("Profile model initialized for {Email}", User.Email);
+        }
+        else
+        {
+            Logger.LogWarning("SimpleUserEditDialog initialized with null user");
+        }
+    }
+
+    private void ShowPasswordReset()
+    {
+        showPasswordSection = true;
+        StateHasChanged();
+    }
+
+    private void HidePasswordReset()
+    {
+        showPasswordSection = false;
+        passwordModel = new AdminResetPasswordModel();
+        StateHasChanged();
+    }
+
+    private void CancelEdit()
+    {
+        DialogService.Close();
+    }
+
+    private async Task UpdateProfile()
+    {
+        if (isUpdating || User == null) return;
+
+        isUpdating = true;
+        
+        try
+        {
+            Logger.LogInformation("Updating profile for user {UserId}", User.Id);
+            
+            var updatedUser = await UserApiClient.UpdateUserAsync(User.Id, profileModel);
+            
+            if (updatedUser != null)
+            {
+                Logger.LogInformation("User profile updated successfully for {UserId}", User.Id);
+                
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Success,
+                    Summary = "Profile Updated",
+                    Detail = $"Profile for {updatedUser.FirstName} {updatedUser.LastName} has been updated successfully.",
+                    Duration = 4000
+                });
+
+                // Close dialog and return updated user
+                DialogService.Close(updatedUser);
+            }
+            else
+            {
+                Logger.LogWarning("Failed to update user profile for {UserId}", User.Id);
+                
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Update Failed",
+                    Detail = "Failed to update user profile. Please try again.",
+                    Duration = 4000
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Exception occurred while updating user profile for {UserId}", User.Id);
+            
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Update Error",
+                Detail = "An error occurred while updating the profile.",
+                Duration = 4000
+            });
+        }
+        finally
+        {
+            isUpdating = false;
+        }
+    }
+
+    private async Task ResetPassword()
+    {
+        if (isResettingPassword || User == null) return;
+
+        isResettingPassword = true;
+        
+        try
+        {
+            Logger.LogInformation("Resetting password for user {UserId}", User.Id);
+            
+            var success = await UserApiClient.AdminResetPasswordAsync(User.Id, passwordModel);
+            
+            if (success)
+            {
+                Logger.LogInformation("Password reset successful for user {UserId}", User.Id);
+                
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Success,
+                    Summary = "Password Reset",
+                    Detail = $"Password has been reset for {User.FirstName} {User.LastName}.",
+                    Duration = 5000
+                });
+
+                // Reset the form and hide password section
+                passwordModel = new AdminResetPasswordModel();
+                showPasswordSection = false;
+                StateHasChanged();
+            }
+            else
+            {
+                Logger.LogWarning("Failed to reset password for user {UserId}", User.Id);
+                
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Reset Failed",
+                    Detail = "Failed to reset password. Please try again.",
+                    Duration = 4000
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Exception occurred while resetting password for user {UserId}", User.Id);
+            
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Reset Error",
+                Detail = "An error occurred while resetting the password.",
+                Duration = 4000
+            });
+        }
+        finally
+        {
+            isResettingPassword = false;
+        }
+    }
+}
