@@ -14,6 +14,20 @@ builder.AddServiceDefaults();
 // Add SQL Server
 builder.AddSqlServerDbContext<ApplicationDbContext>("MrWhoDb");
 
+// Configure Kestrel to handle large query strings for OIDC
+builder.Services.Configure<Microsoft.AspNetCore.Server.Kestrel.Core.KestrelServerOptions>(options =>
+{
+    options.Limits.MaxRequestHeadersTotalSize = 32768; // 32KB
+    options.Limits.MaxRequestBufferSize = 1048576; // 1MB
+    options.Limits.MaxRequestLineSize = 16384; // 16KB
+});
+
+// Configure IIS to handle large query strings
+builder.Services.Configure<IISServerOptions>(options =>
+{
+    options.AllowSynchronousIO = false;
+});
+
 // Add Identity
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>()
     .AddEntityFrameworkStores<ApplicationDbContext>()
@@ -85,6 +99,12 @@ builder.Services.AddOpenIddict()
 builder.Services.AddRazorPages();
 builder.Services.AddMvc();
 
+// Configure antiforgery for OIDC scenarios
+builder.Services.AddAntiforgery(options =>
+{
+    options.SuppressXFrameOptionsHeader = false;
+});
+
 // Add authentication
 builder.Services.AddAuthentication();
 
@@ -108,6 +128,10 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+
+// Add routing before authentication
+app.UseRouting();
+
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -303,19 +327,7 @@ using (var scope = app.Services.CreateScope())
                 new Uri("https://localhost:5176/signout-callback-oidc"),
                 new Uri("http://localhost:5176/signout-callback-oidc"),
                 new Uri("https://localhost:5177/signout-callback-oidc"),
-                new Uri("http://localhost:5177/signout-callback-oidc"),
                 new Uri("https://localhost:7000/signout-callback-oidc"),
-                new Uri("http://localhost:7000/signout-callback-oidc"),
-                new Uri("https://localhost:7001/signout-callback-oidc"),
-                new Uri("http://localhost:7001/signout-callback-oidc"),
-                new Uri("https://localhost:7002/signout-callback-oidc"),
-                new Uri("http://localhost:7002/signout-callback-oidc"),
-                new Uri("https://localhost:7108/signout-callback-oidc"),
-                new Uri("http://localhost:7108/signout-callback-oidc"),
-                new Uri("https://localhost:7109/signout-callback-oidc"),
-                new Uri("http://localhost:7109/signout-callback-oidc"),
-                new Uri("https://localhost:7110/signout-callback-oidc"),
-                new Uri("http://localhost:7110/signout-callback-oidc"),
                 new Uri("https://localhost:7111/signout-callback-oidc"),
                 new Uri("http://localhost:7111/signout-callback-oidc"),
                 new Uri("https://localhost:7112/signout-callback-oidc"),
@@ -376,7 +388,6 @@ using (var scope = app.Services.CreateScope())
     catch (Exception ex)
     {
         logger.LogError(ex, "An error occurred during database initialization.");
-        throw;
     }
 }
 

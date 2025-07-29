@@ -7,6 +7,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace MrWho.ApiService.Pages.Account;
 
+[IgnoreAntiforgeryToken]
 public class LoginModel : PageModel
 {
     private readonly SignInManager<ApplicationUser> _signInManager;
@@ -51,29 +52,52 @@ public class LoginModel : PageModel
             ModelState.AddModelError(string.Empty, ErrorMessage);
         }
 
-        returnUrl ??= Url.Content("~/");
+        // Handle OIDC authorization requests properly
+        if (string.IsNullOrEmpty(returnUrl))
+        {
+            returnUrl = Url.Content("~/");
+        }
 
         // Clear the existing external cookie to ensure a clean login process
-        await HttpContext.SignOutAsync(IdentityConstants.ExternalScheme);
+        try
+        {
+            await HttpContext.SignOutAsync(IdentityConstants.ExternalScheme);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to sign out external scheme, continuing anyway");
+        }
 
         ReturnUrl = returnUrl;
+        
+        _logger.LogInformation("Login page accessed with ReturnUrl length: {Length}, starts with: {StartsWith}", 
+            returnUrl?.Length ?? 0, 
+            returnUrl?.Length > 0 ? returnUrl.Substring(0, Math.Min(100, returnUrl.Length)) : "null");
     }
 
     public async Task<IActionResult> OnPostAsync(string? returnUrl = null)
     {
-        returnUrl ??= Url.Content("~/");
+        if (string.IsNullOrEmpty(returnUrl))
+        {
+            returnUrl = Url.Content("~/");
+        }
+
+        _logger.LogInformation("Login attempt for email: {Email}, ReturnUrl length: {Length}", 
+            Input.Email, returnUrl?.Length ?? 0);
 
         if (ModelState.IsValid)
         {
             var user = await _userManager.FindByEmailAsync(Input.Email);
             if (user == null)
             {
+                _logger.LogWarning("Login failed: User not found for email: {Email}", Input.Email);
                 ModelState.AddModelError(string.Empty, "Invalid login attempt.");
                 return Page();
             }
 
             if (!user.IsActive)
             {
+                _logger.LogWarning("Login failed: Account not active for email: {Email}", Input.Email);
                 ModelState.AddModelError(string.Empty, "Account is not active.");
                 return Page();
             }
@@ -83,7 +107,15 @@ public class LoginModel : PageModel
 
             if (result.Succeeded)
             {
-                _logger.LogInformation("User logged in.");
+                _logger.LogInformation("User logged in successfully: {Email}", Input.Email);
+                
+                // For OIDC flow, redirect back to the authorization endpoint
+                if (returnUrl.Contains("/connect/authorize"))
+                {
+                    _logger.LogInformation("Redirecting to OIDC authorization endpoint");
+                    return LocalRedirect(returnUrl);
+                }
+                
                 return LocalRedirect(returnUrl);
             }
             
@@ -94,17 +126,22 @@ public class LoginModel : PageModel
             
             if (result.IsLockedOut)
             {
-                _logger.LogWarning("User account locked out.");
+                _logger.LogWarning("User account locked out: {Email}", Input.Email);
                 return RedirectToPage("./Lockout");
             }
             else
             {
+                _logger.LogWarning("Login failed: Invalid credentials for email: {Email}", Input.Email);
                 ModelState.AddModelError(string.Empty, "Invalid login attempt.");
                 return Page();
             }
         }
 
         // If we got this far, something failed, redisplay form
+        foreach (var modelError in ModelState.Values.SelectMany(v => v.Errors))
+        {
+            _logger.LogWarning("Model validation error: {Error}", modelError.ErrorMessage);
+        }
         return Page();
     }
 }
