@@ -237,72 +237,108 @@ using (var scope = app.Services.CreateScope())
         }
         
         // Create Blazor Web application client
-        if (await applicationManager.FindByClientIdAsync("mrwho-web-blazor") == null)
+        var existingBlazorClient = await applicationManager.FindByClientIdAsync("mrwho-web-blazor");
+        if (existingBlazorClient != null)
         {
-            logger.LogInformation("Creating Blazor Web application OIDC client...");
-            await applicationManager.CreateAsync(new OpenIddictApplicationDescriptor
-            {
-                ClientId = "mrwho-web-blazor",
-                ClientSecret = "mrwho-web-blazor-secret",
-                DisplayName = "MrWho Blazor Web Application",
-                RedirectUris =
-                {
-                    // Aspire development ports (common range)
-                    new Uri("https://localhost:5173/signin-oidc"),
-                    new Uri("http://localhost:5173/signin-oidc"),
-                    new Uri("https://localhost:7108/signin-oidc"),
-                    new Uri("http://localhost:7108/signin-oidc"),
-                    new Uri("https://localhost:5000/signin-oidc"),
-                    new Uri("http://localhost:5000/signin-oidc"),
-                    new Uri("https://localhost:5001/signin-oidc"),
-                    new Uri("http://localhost:5001/signin-oidc"),
-                    // Additional common Aspire ports
-                    new Uri("https://localhost:5174/signin-oidc"),
-                    new Uri("http://localhost:5174/signin-oidc"),
-                    new Uri("https://localhost:5175/signin-oidc"),
-                    new Uri("http://localhost:5175/signin-oidc"),
-                    new Uri("https://localhost:7109/signin-oidc"),
-                    new Uri("http://localhost:7109/signin-oidc"),
-                    new Uri("https://localhost:7110/signin-oidc"),
-                    new Uri("http://localhost:7110/signin-oidc")
-                },
-                PostLogoutRedirectUris =
-                {
-                    // Aspire development ports (common range)
-                    new Uri("https://localhost:5173/signout-callback-oidc"),
-                    new Uri("http://localhost:5173/signout-callback-oidc"),
-                    new Uri("https://localhost:7108/signout-callback-oidc"),
-                    new Uri("http://localhost:7108/signout-callback-oidc"),
-                    new Uri("https://localhost:5000/signout-callback-oidc"),
-                    new Uri("http://localhost:5000/signout-callback-oidc"),
-                    new Uri("https://localhost:5001/signout-callback-oidc"),
-                    new Uri("http://localhost:5001/signout-callback-oidc"),
-                    // Additional common Aspire ports
-                    new Uri("https://localhost:5174/signout-callback-oidc"),
-                    new Uri("http://localhost:5174/signout-callback-oidc"),
-                    new Uri("https://localhost:5175/signout-callback-oidc"),
-                    new Uri("http://localhost:5175/signout-callback-oidc"),
-                    new Uri("https://localhost:7109/signout-callback-oidc"),
-                    new Uri("http://localhost:7109/signout-callback-oidc"),
-                    new Uri("https://localhost:7110/signout-callback-oidc"),
-                    new Uri("http://localhost:7110/signout-callback-oidc")
-                },
-                Permissions =
-                {
-                    Permissions.Endpoints.Authorization,
-                    Permissions.Endpoints.Token,
-                    Permissions.Endpoints.Introspection,
-                    Permissions.Endpoints.Revocation,
-                    Permissions.GrantTypes.AuthorizationCode,
-                    Permissions.ResponseTypes.Code,
-                    Permissions.Scopes.Email,
-                    Permissions.Scopes.Profile,
-                    Permissions.Scopes.Roles
-                },
-                ApplicationType = ApplicationTypes.Web
-            });
-            logger.LogInformation("Blazor Web application OIDC client created successfully.");
+            logger.LogInformation("Updating existing Blazor Web application OIDC client with more redirect URIs...");
+            await applicationManager.DeleteAsync(existingBlazorClient);
         }
+        
+        logger.LogInformation("Creating Blazor Web application OIDC client...");
+        await applicationManager.CreateAsync(new OpenIddictApplicationDescriptor
+        {
+            ClientId = "mrwho-web-blazor",
+            ClientSecret = "mrwho-web-blazor-secret",
+            DisplayName = "MrWho Blazor Web Application",
+            RedirectUris =
+            {
+                // Comprehensive port range for Aspire and development
+                new Uri("https://localhost:5000/signin-oidc"),
+                new Uri("http://localhost:5000/signin-oidc"),
+                new Uri("https://localhost:5001/signin-oidc"),
+                new Uri("http://localhost:5001/signin-oidc"),
+                new Uri("https://localhost:5173/signin-oidc"),
+                new Uri("http://localhost:5173/signin-oidc"),
+                new Uri("https://localhost:5174/signin-oidc"),
+                new Uri("http://localhost:5174/signin-oidc"),
+                new Uri("https://localhost:5175/signin-oidc"),
+                new Uri("http://localhost:5175/signin-oidc"),
+                new Uri("https://localhost:5176/signin-oidc"),
+                new Uri("http://localhost:5176/signin-oidc"),
+                new Uri("https://localhost:5177/signin-oidc"),
+                new Uri("http://localhost:5177/signin-oidc"),
+                new Uri("https://localhost:7000/signin-oidc"),
+                new Uri("http://localhost:7000/signin-oidc"),
+                new Uri("https://localhost:7001/signin-oidc"),
+                new Uri("http://localhost:7001/signin-oidc"),
+                new Uri("https://localhost:7002/signin-oidc"),
+                new Uri("http://localhost:7002/signin-oidc"),
+                new Uri("https://localhost:7108/signin-oidc"),
+                new Uri("http://localhost:7108/signin-oidc"),
+                new Uri("https://localhost:7109/signin-oidc"),
+                new Uri("http://localhost:7109/signin-oidc"),
+                new Uri("https://localhost:7110/signin-oidc"),
+                new Uri("http://localhost:7110/signin-oidc"),
+                new Uri("https://localhost:7111/signin-oidc"),
+                new Uri("http://localhost:7111/signin-oidc"),
+                new Uri("https://localhost:7112/signin-oidc"),
+                new Uri("http://localhost:7112/signin-oidc"),
+                // Add the specific port 7225 for current Web app
+                new Uri("https://localhost:7225/signin-oidc"),
+                new Uri("http://localhost:7225/signin-oidc")
+            },
+            PostLogoutRedirectUris =
+            {
+                // Comprehensive port range for Aspire and development
+                new Uri("https://localhost:5000/signout-callback-oidc"),
+                new Uri("http://localhost:5000/signout-callback-oidc"),
+                new Uri("https://localhost:5001/signout-callback-oidc"),
+                new Uri("http://localhost:5001/signout-callback-oidc"),
+                new Uri("https://localhost:5173/signout-callback-oidc"),
+                new Uri("http://localhost:5173/signout-callback-oidc"),
+                new Uri("https://localhost:5174/signout-callback-oidc"),
+                new Uri("http://localhost:5174/signout-callback-oidc"),
+                new Uri("https://localhost:5175/signout-callback-oidc"),
+                new Uri("http://localhost:5175/signout-callback-oidc"),
+                new Uri("https://localhost:5176/signout-callback-oidc"),
+                new Uri("http://localhost:5176/signout-callback-oidc"),
+                new Uri("https://localhost:5177/signout-callback-oidc"),
+                new Uri("http://localhost:5177/signout-callback-oidc"),
+                new Uri("https://localhost:7000/signout-callback-oidc"),
+                new Uri("http://localhost:7000/signout-callback-oidc"),
+                new Uri("https://localhost:7001/signout-callback-oidc"),
+                new Uri("http://localhost:7001/signout-callback-oidc"),
+                new Uri("https://localhost:7002/signout-callback-oidc"),
+                new Uri("http://localhost:7002/signout-callback-oidc"),
+                new Uri("https://localhost:7108/signout-callback-oidc"),
+                new Uri("http://localhost:7108/signout-callback-oidc"),
+                new Uri("https://localhost:7109/signout-callback-oidc"),
+                new Uri("http://localhost:7109/signout-callback-oidc"),
+                new Uri("https://localhost:7110/signout-callback-oidc"),
+                new Uri("http://localhost:7110/signout-callback-oidc"),
+                new Uri("https://localhost:7111/signout-callback-oidc"),
+                new Uri("http://localhost:7111/signout-callback-oidc"),
+                new Uri("https://localhost:7112/signout-callback-oidc"),
+                new Uri("http://localhost:7112/signout-callback-oidc"),
+                // Add the specific port 7225 for current Web app
+                new Uri("https://localhost:7225/signout-callback-oidc"),
+                new Uri("http://localhost:7225/signout-callback-oidc")
+            },
+            Permissions =
+            {
+                Permissions.Endpoints.Authorization,
+                Permissions.Endpoints.Token,
+                Permissions.Endpoints.Introspection,
+                Permissions.Endpoints.Revocation,
+                Permissions.GrantTypes.AuthorizationCode,
+                Permissions.ResponseTypes.Code,
+                Permissions.Scopes.Email,
+                Permissions.Scopes.Profile,
+                Permissions.Scopes.Roles
+            },
+            ApplicationType = ApplicationTypes.Web
+        });
+        logger.LogInformation("Blazor Web application OIDC client created successfully.");
         
         // Seed default admin user
         logger.LogInformation("Checking for default admin user...");
