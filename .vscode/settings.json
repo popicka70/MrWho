@@ -1,0 +1,18 @@
+{
+    "terminal.integrated.defaultProfile.windows": "PowerShell",
+    "terminal.integrated.profiles.windows": {
+        "PowerShell": {
+            "source": "PowerShell",
+            "icon": "terminal-powershell"
+        }
+    },
+    "github.copilot.advanced": {
+        "debug.overrideProxyUrl": ""
+    },
+    "files.associations": {
+        "*.md": "markdown"
+    },
+    "[markdown]": {
+        "editor.wordWrap": "on"
+    }
+}

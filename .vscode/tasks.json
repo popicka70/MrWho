@@ -1,0 +1,46 @@
+# PowerShell task definitions for the MrWho project
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+                "${workspaceFolder}/MrWho.sln"
+            ],
+            "problemMatcher": "$msCompile",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "echo": true,
+                "reveal": "silent",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            }
+        },
+        {
+            "label": "run-apphost",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "run",
+                "--project",
+                "${workspaceFolder}/MrWho.AppHost/MrWho.AppHost.csproj"
+            ],
+            "problemMatcher": "$msCompile",
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "new"
+            }
+        }
+    ]
+}
