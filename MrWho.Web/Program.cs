@@ -31,6 +31,16 @@ builder.Services.AddHttpContextAccessor();
 // Add Authentication State Provider
 builder.Services.AddScoped<AuthenticationStateProvider, ServerAuthenticationStateProvider>();
 
+// Get OIDC configuration from appsettings with fallback
+var oidcAuthority = builder.Configuration["OIDC:Authority"] ?? "https://localhost:7320";
+var oidcClientId = builder.Configuration["OIDC:ClientId"] ?? "mrwho-web-blazor";
+var oidcClientSecret = builder.Configuration["OIDC:ClientSecret"] ?? "mrwho-web-blazor-secret";
+
+// Log the OIDC configuration for debugging
+var tempLogger = LoggerFactory.Create(config => config.AddConsole()).CreateLogger<Program>();
+tempLogger.LogInformation("OIDC Configuration - Authority: {Authority}, ClientId: {ClientId}", 
+    oidcAuthority, oidcClientId);
+
 // Configure OpenID Connect Authentication (Client)
 builder.Services.AddAuthentication(options =>
 {
@@ -50,10 +60,10 @@ builder.Services.AddAuthentication(options =>
 })
 .AddOpenIdConnect(OpenIdConnectDefaults.AuthenticationScheme, options =>
 {
-    // Configure to use ApiService as the authorization server
-    options.Authority = "https://localhost:7153"; // ApiService URL
-    options.ClientId = "mrwho-web-blazor";  // Use the correct client ID from ApiService
-    options.ClientSecret = "mrwho-web-blazor-secret";  // Use the correct secret
+    // Use direct localhost URL for OIDC (doesn't support service discovery schemes)
+    options.Authority = oidcAuthority;
+    options.ClientId = oidcClientId;
+    options.ClientSecret = oidcClientSecret;
     options.ResponseType = "code";
     options.SaveTokens = true;
     
@@ -65,8 +75,8 @@ builder.Services.AddAuthentication(options =>
     options.Scope.Add("roles");
     
     // Configure endpoints to match what ApiService expects
-    options.CallbackPath = "/signin-oidc";  // Match ApiService redirect URI
-    options.SignedOutCallbackPath = "/signout-callback-oidc";  // Match ApiService post logout redirect URI
+    options.CallbackPath = "/signin-oidc";
+    options.SignedOutCallbackPath = "/signout-callback-oidc";
     
     // Skip HTTPS requirement for development
     options.RequireHttpsMetadata = false;
@@ -77,7 +87,8 @@ builder.Services.AddAuthentication(options =>
         OnAuthenticationFailed = context =>
         {
             var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-            logger.LogError(context.Exception, "OIDC Authentication failed");
+            logger.LogError(context.Exception, "OIDC Authentication failed. Authority: {Authority}, ClientId: {ClientId}", 
+                oidcAuthority, oidcClientId);
             context.HandleResponse();
             context.Response.Redirect("/account/error?message=" + Uri.EscapeDataString(context.Exception?.Message ?? "Authentication failed"));
             return Task.CompletedTask;
@@ -85,7 +96,8 @@ builder.Services.AddAuthentication(options =>
         OnRedirectToIdentityProvider = context =>
         {
             var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-            logger.LogInformation("Redirecting to identity provider: {Authority}", context.ProtocolMessage.IssuerAddress);
+            logger.LogInformation("Redirecting to identity provider: {Authority}, IssuerAddress: {IssuerAddress}", 
+                oidcAuthority, context.ProtocolMessage.IssuerAddress);
             return Task.CompletedTask;
         },
         OnTokenValidated = context =>
@@ -93,17 +105,23 @@ builder.Services.AddAuthentication(options =>
             var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
             logger.LogInformation("Token validated for user: {Name}", context.Principal?.Identity?.Name);
             return Task.CompletedTask;
+        },
+        OnMessageReceived = context =>
+        {
+            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+            logger.LogInformation("OIDC message received: {MessageType}", context.ProtocolMessage?.GetType().Name);
+            return Task.CompletedTask;
         }
     };
 });
 
 builder.Services.AddAuthorization();
 
-// Configure API clients with proper lifetime
+// Configure API clients with proper lifetime using service discovery
 builder.Services.AddHttpClient<IUserApiClient, UserApiClient>(client =>
 {
     // This URL uses "https+http://" to indicate HTTPS is preferred over HTTP.
-    // Learn more about service discovery scheme resolution at https://aka.ms/dotnet/sdschemes.
+    // Learn more about service discovery scheme resolution at https://aka.ms/dotnet/sdsschemes.
     client.BaseAddress = new("https+http://apiservice");
     client.Timeout = TimeSpan.FromSeconds(30);
 });

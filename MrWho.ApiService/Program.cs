@@ -247,17 +247,45 @@ using (var scope = app.Services.CreateScope())
                 DisplayName = "MrWho Blazor Web Application",
                 RedirectUris =
                 {
+                    // Aspire development ports (common range)
                     new Uri("https://localhost:5173/signin-oidc"),
                     new Uri("http://localhost:5173/signin-oidc"),
                     new Uri("https://localhost:7108/signin-oidc"),
-                    new Uri("http://localhost:7108/signin-oidc")
+                    new Uri("http://localhost:7108/signin-oidc"),
+                    new Uri("https://localhost:5000/signin-oidc"),
+                    new Uri("http://localhost:5000/signin-oidc"),
+                    new Uri("https://localhost:5001/signin-oidc"),
+                    new Uri("http://localhost:5001/signin-oidc"),
+                    // Additional common Aspire ports
+                    new Uri("https://localhost:5174/signin-oidc"),
+                    new Uri("http://localhost:5174/signin-oidc"),
+                    new Uri("https://localhost:5175/signin-oidc"),
+                    new Uri("http://localhost:5175/signin-oidc"),
+                    new Uri("https://localhost:7109/signin-oidc"),
+                    new Uri("http://localhost:7109/signin-oidc"),
+                    new Uri("https://localhost:7110/signin-oidc"),
+                    new Uri("http://localhost:7110/signin-oidc")
                 },
                 PostLogoutRedirectUris =
                 {
+                    // Aspire development ports (common range)
                     new Uri("https://localhost:5173/signout-callback-oidc"),
                     new Uri("http://localhost:5173/signout-callback-oidc"),
                     new Uri("https://localhost:7108/signout-callback-oidc"),
-                    new Uri("http://localhost:7108/signout-callback-oidc")
+                    new Uri("http://localhost:7108/signout-callback-oidc"),
+                    new Uri("https://localhost:5000/signout-callback-oidc"),
+                    new Uri("http://localhost:5000/signout-callback-oidc"),
+                    new Uri("https://localhost:5001/signout-callback-oidc"),
+                    new Uri("http://localhost:5001/signout-callback-oidc"),
+                    // Additional common Aspire ports
+                    new Uri("https://localhost:5174/signout-callback-oidc"),
+                    new Uri("http://localhost:5174/signout-callback-oidc"),
+                    new Uri("https://localhost:5175/signout-callback-oidc"),
+                    new Uri("http://localhost:5175/signout-callback-oidc"),
+                    new Uri("https://localhost:7109/signout-callback-oidc"),
+                    new Uri("http://localhost:7109/signout-callback-oidc"),
+                    new Uri("https://localhost:7110/signout-callback-oidc"),
+                    new Uri("http://localhost:7110/signout-callback-oidc")
                 },
                 Permissions =
                 {
