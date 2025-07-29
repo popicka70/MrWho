@@ -47,9 +47,11 @@ builder.Services.AddOpenIddict()
     })
     .AddServer(options =>
     {
-        // Set authorization and token endpoint URIs
+        // Set all standard OIDC endpoint URIs (only those supported in OpenIddict 6.0)
         options.SetAuthorizationEndpointUris("/connect/authorize")
-               .SetTokenEndpointUris("/connect/token");
+               .SetTokenEndpointUris("/connect/token")
+               .SetIntrospectionEndpointUris("/connect/introspect")
+               .SetRevocationEndpointUris("/connect/revoke");
 
         // Enable the authorization code, password and client credentials flows
         options.AllowAuthorizationCodeFlow()
@@ -62,15 +64,16 @@ builder.Services.AddOpenIddict()
 
         // Register claims
         options.RegisterClaims(Claims.Email, Claims.Name, Claims.PreferredUsername, 
-                              Claims.GivenName, Claims.FamilyName, Claims.Role);
+                              Claims.GivenName, Claims.FamilyName, Claims.Role, Claims.Subject);
 
         options.AddDevelopmentEncryptionCertificate()
                .AddDevelopmentSigningCertificate();
 
-        // Enable Authorization Server passthrough for authorization endpoint
+        // Enable Authorization Server passthrough for supported endpoints
         options.UseAspNetCore()
                .EnableAuthorizationEndpointPassthrough()
-               .EnableTokenEndpointPassthrough();
+               .EnableTokenEndpointPassthrough()
+               .EnableStatusCodePagesIntegration();
     })
     .AddValidation(options =>
     {
@@ -181,6 +184,8 @@ using (var scope = app.Services.CreateScope())
                 {
                     Permissions.Endpoints.Authorization,
                     Permissions.Endpoints.Token,
+                    Permissions.Endpoints.Introspection,
+                    Permissions.Endpoints.Revocation,
                     Permissions.GrantTypes.AuthorizationCode,
                     Permissions.ResponseTypes.Code,
                     Permissions.Scopes.Email,
@@ -218,6 +223,8 @@ using (var scope = app.Services.CreateScope())
                 {
                     Permissions.Endpoints.Authorization,
                     Permissions.Endpoints.Token,
+                    Permissions.Endpoints.Introspection,
+                    Permissions.Endpoints.Revocation,
                     Permissions.GrantTypes.AuthorizationCode,
                     Permissions.ResponseTypes.Code,
                     Permissions.Scopes.Email,

@@ -249,6 +249,57 @@ public class AuthorizationController : ControllerBase
             });
     }
 
+    [HttpGet("userinfo")]
+    [HttpPost("userinfo")]
+    [IgnoreAntiforgeryToken]
+    [Authorize(AuthenticationSchemes = OpenIddictServerAspNetCoreDefaults.AuthenticationScheme)]
+    [Produces("application/json")]
+    public async Task<IActionResult> Userinfo()
+    {
+        var user = await _userManager.FindByIdAsync(User.GetClaim(Claims.Subject)!);
+        if (user == null)
+        {
+            return BadRequest(new
+            {
+                error = "invalid_token",
+                error_description = "The specified access token is invalid."
+            });
+        }
+
+        var claims = new Dictionary<string, object>(StringComparer.Ordinal)
+        {
+            [Claims.Subject] = user.Id
+        };
+
+        if (User.HasScope(Scopes.Email))
+        {
+            claims[Claims.Email] = user.Email!;
+            claims[Claims.EmailVerified] = user.EmailConfirmed;
+        }
+
+        if (User.HasScope(Scopes.Profile))
+        {
+            if (!string.IsNullOrEmpty(user.FirstName))
+                claims[Claims.GivenName] = user.FirstName;
+            
+            if (!string.IsNullOrEmpty(user.LastName))
+                claims[Claims.FamilyName] = user.LastName;
+
+            var fullName = $"{user.FirstName} {user.LastName}".Trim();
+            if (!string.IsNullOrEmpty(fullName))
+                claims[Claims.Name] = fullName;
+
+            claims[Claims.PreferredUsername] = user.UserName!;
+        }
+
+        if (User.HasScope(Scopes.Roles))
+        {
+            claims[Claims.Role] = "user";
+        }
+
+        return Ok(claims);
+    }
+
     private async Task<ClaimsPrincipal> CreatePrincipalAsync(ApplicationUser user, ImmutableArray<string> scopes)
     {
         var identity = new ClaimsIdentity(

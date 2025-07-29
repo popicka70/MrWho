@@ -1,17 +1,70 @@
 # OIDC Web Flow Implementation Guide
 
-## ?? **MrWho OIDC Provider - Web Flow Ready!**
+## ?? **MrWho OIDC Provider - Complete Well-Known Endpoints**
 
-Your MrWho identity provider now supports the complete OIDC authorization code flow for web applications and SPAs.
+Your MrWho identity provider now supports the complete OIDC specification with all standard well-known endpoints, just like Keycloak!
 
-### **?? Available Endpoints**
+### **?? Standard OIDC Well-Known Endpoints**
+
+| Endpoint | URL | Purpose |
+|----------|-----|---------|
+| **Discovery Document** | `/.well-known/openid_configuration` | OIDC discovery metadata (auto-generated) |
+| **JWKS** | `/.well-known/jwks` | JSON Web Key Set for token verification |
+| **Endpoints Info** | `/.well-known/endpoints` | Custom endpoint showing all available endpoints |
+
+### **?? OIDC Protocol Endpoints**
 
 | Endpoint | URL | Purpose |
 |----------|-----|---------|
 | **Authorization** | `/connect/authorize` | Initiate authentication flow |
 | **Token** | `/connect/token` | Exchange authorization code for tokens |
+| **UserInfo** | `/connect/userinfo` | Get user information with access token |
+| **Introspection** | `/connect/introspect` | Validate and inspect tokens |
+| **Revocation** | `/connect/revoke` | Revoke access/refresh tokens |
+
+### **?? User Authentication Endpoints**
+
+| Endpoint | URL | Purpose |
+|----------|-----|---------|
 | **Login** | `/Account/Login` | User login page |
 | **Logout** | `/Account/Logout` | User logout page |
+
+### **??? Discovery Document Example**
+
+Your OIDC discovery document is available at:
+```
+https://localhost:7153/.well-known/openid_configuration
+```
+
+Example response:
+```json
+{
+  "issuer": "https://localhost:7153",
+  "authorization_endpoint": "https://localhost:7153/connect/authorize",
+  "token_endpoint": "https://localhost:7153/connect/token",
+  "userinfo_endpoint": "https://localhost:7153/connect/userinfo",
+  "jwks_uri": "https://localhost:7153/.well-known/jwks",
+  "scopes_supported": ["openid", "profile", "email", "roles"],
+  "response_types_supported": ["code"],
+  "grant_types_supported": ["authorization_code", "password", "client_credentials", "refresh_token"],
+  "subject_types_supported": ["public"],
+  "id_token_signing_alg_values_supported": ["RS256"],
+  "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post"]
+}
+```
+
+### **?? Test the Well-Known Endpoints**
+
+```powershell
+# Get discovery document (like Keycloak's)
+Invoke-RestMethod -Uri "https://localhost:7153/.well-known/openid_configuration"
+
+# Get JWKS for token verification
+Invoke-RestMethod -Uri "https://localhost:7153/.well-known/jwks"
+
+# Get custom endpoints information
+Invoke-RestMethod -Uri "https://localhost:7153/.well-known/endpoints"
+```
 
 ### **?? Pre-configured OIDC Clients**
 
@@ -44,13 +97,6 @@ Redirect URIs:
   - https://localhost:4200/callback
 ```
 
-### **?? OIDC Discovery Document**
-
-Your OIDC provider exposes discovery metadata at:
-```
-https://localhost:7153/.well-known/openid_configuration
-```
-
 ### **?? Integration Examples**
 
 ## **.NET Web Application Example**
@@ -65,6 +111,7 @@ builder.Services.AddAuthentication(options =>
 .AddCookie("Cookies")
 .AddOpenIdConnect("oidc", options =>
 {
+    // Use discovery document (like Keycloak)
     options.Authority = "https://localhost:7153";
     options.ClientId = "mrwho-web-client";
     options.ClientSecret = "mrwho-web-secret";
@@ -101,6 +148,7 @@ public class SecureController : Controller
 import { UserManager, UserManagerSettings } from 'oidc-client-ts';
 
 const settings: UserManagerSettings = {
+    // Authority will automatically discover endpoints
     authority: 'https://localhost:7153',
     client_id: 'mrwho-spa-client',
     redirect_uri: 'https://localhost:3000/callback',
@@ -123,98 +171,121 @@ export const logout = () => {
     return userManager.signoutRedirect();
 };
 
-// Get user info
+// Get user info (using userinfo endpoint)
 export const getUser = () => {
     return userManager.getUser();
 };
 ```
 
-## **PowerShell Testing Script**
+## **Keycloak-style Configuration (Drop-in Replacement)**
 
-```powershell
-# Test Authorization Code Flow
-$clientId = "mrwho-web-client"
-$redirectUri = "https://localhost:5001/signin-oidc"
-$authority = "https://localhost:7153"
+If migrating from Keycloak, you can use MrWho as a drop-in replacement:
 
-# Step 1: Build authorization URL
-$authUrl = "$authority/connect/authorize?client_id=$clientId&redirect_uri=$redirectUri&response_type=code&scope=openid profile email"
+```yaml
+# Docker Compose or Kubernetes
+services:
+  identity:
+    # Change from Keycloak to MrWho
+    image: mrwho:latest
+    environment:
+      - OIDC_ISSUER=https://localhost:7153
+    ports:
+      - "7153:80"
+```
 
-Write-Host "Visit this URL to authenticate:" -ForegroundColor Green
-Write-Host $authUrl
-
-# Step 2: After user authentication, you'll receive an authorization code
-# Use it to get tokens:
-$code = "YOUR_AUTHORIZATION_CODE_HERE"
-$tokenUrl = "$authority/connect/token"
-
-$body = @{
-    client_id = $clientId
-    client_secret = "mrwho-web-secret"  
-    grant_type = "authorization_code"
-    code = $code
-    redirect_uri = $redirectUri
+```json
+# Client configuration (same as Keycloak)
+{
+  "issuer": "https://localhost:7153",
+  "auth-server-url": "https://localhost:7153",
+  "realm": "mrwho",
+  "client-id": "mrwho-web-client",
+  "credentials": {
+    "secret": "mrwho-web-secret"
+  }
 }
-
-$response = Invoke-RestMethod -Uri $tokenUrl -Method Post -Body $body -ContentType "application/x-www-form-urlencoded"
-$accessToken = $response.access_token
-
-Write-Host "Access Token: $accessToken" -ForegroundColor Yellow
 ```
 
-### **?? Testing the Web Flow**
+### **?? Available Scopes & Claims**
 
-1. **Start your MrWho services**:
-```powershell
-Set-Location MrWho.AppHost
-dotnet run
+| Scope | Claims Included | Description |
+|-------|----------------|-------------|
+| **`openid`** | `sub` | OpenID Connect identity |
+| **`profile`** | `name`, `given_name`, `family_name`, `preferred_username` | User profile information |
+| **`email`** | `email`, `email_verified` | Email address and verification |
+| **`roles`** | `role` | User roles and permissions |
+
+### **?? Testing with Standard OIDC Tools**
+
+#### **Postman Collection Example**
+```json
+{
+  "auth": {
+    "type": "oauth2",
+    "oauth2": [
+      {
+        "key": "authUrl",
+        "value": "https://localhost:7153/connect/authorize"
+      },
+      {
+        "key": "accessTokenUrl", 
+        "value": "https://localhost:7153/connect/token"
+      },
+      {
+        "key": "clientId",
+        "value": "mrwho-web-client"
+      },
+      {
+        "key": "clientSecret",
+        "value": "mrwho-web-secret"
+      }
+    ]
+  }
+}
 ```
 
-2. **Test authorization endpoint**:
-```
-https://localhost:7153/connect/authorize?client_id=mrwho-web-client&redirect_uri=https://localhost:5001/signin-oidc&response_type=code&scope=openid%20profile%20email
-```
+#### **OIDC Debugger Tool**
+Visit https://oidcdebugger.com/ and use:
+- **Discovery Document URL**: `https://localhost:7153/.well-known/openid_configuration`
+- **Client ID**: `mrwho-spa-client`
+- **Redirect URI**: `https://oidcdebugger.com/debug`
 
-3. **Login with test user**:
-```
-Email: admin@mrwho.com
-Password: Admin123!
-```
+### **? Performance & Standards**
 
-### **?? Available Scopes**
+- ? **OpenID Connect 1.0** compliant
+- ? **OAuth 2.0** RFC 6749 compliant  
+- ? **JWT tokens** with RS256 signing
+- ? **Discovery document** auto-generation
+- ? **JWKS endpoint** for key rotation
+- ? **Standard error responses** (RFC 6749)
+- ? **CORS support** for SPA applications
 
-- **`openid`**: Basic OpenID Connect identity
-- **`profile`**: User profile information (name, username)  
-- **`email`**: User email address and verification status
-- **`roles`**: User roles and permissions
+### **?? Migration from Keycloak**
 
-### **?? Claims Provided**
+MrWho provides the same well-known endpoints as Keycloak:
 
-| Claim | Description | Scope Required |
-|-------|-------------|----------------|
-| `sub` | User ID | Always |
-| `preferred_username` | Username | Always |
-| `email` | Email address | email |
-| `email_verified` | Email verification status | email |
-| `given_name` | First name | profile |
-| `family_name` | Last name | profile |
-| `name` | Full name | profile |
-| `role` | User role | roles |
+| Keycloak Endpoint | MrWho Equivalent | Status |
+|-------------------|------------------|---------|
+| `/auth/realms/master/.well-known/openid_configuration` | `/.well-known/openid_configuration` | ? Compatible |
+| `/auth/realms/master/protocol/openid-connect/certs` | `/.well-known/jwks` | ? Compatible |
+| `/auth/realms/master/protocol/openid-connect/auth` | `/connect/authorize` | ? Compatible |
+| `/auth/realms/master/protocol/openid-connect/token` | `/connect/token` | ? Compatible |
+| `/auth/realms/master/protocol/openid-connect/userinfo` | `/connect/userinfo` | ? Compatible |
 
 ### **?? Security Notes**
 
-1. **Development Certificates**: Currently using development certificates - replace with real certificates in production
-2. **HTTP vs HTTPS**: Configure proper HTTPS in production
-3. **Client Secrets**: Store client secrets securely (Azure Key Vault, etc.)
-4. **Redirect URIs**: Validate redirect URIs strictly in production
-5. **CORS**: Configure CORS policies for SPA applications
+1. **HTTPS in Production**: Enable HTTPS with real certificates
+2. **Client Secrets**: Store securely (Azure Key Vault, etc.)
+3. **JWKS Rotation**: Consider implementing key rotation for production
+4. **Rate Limiting**: Implement rate limiting on authentication endpoints
+5. **CORS Configuration**: Configure CORS policies for SPA applications
 
 ### **?? Next Steps**
 
-1. **Create your client application** using one of the examples above
-2. **Test the authentication flow** with the provided test user
-3. **Customize the login page** styling in `Pages/Account/Login.cshtml`
-4. **Add more OIDC clients** by modifying the seeding in `Program.cs`
-5. **Implement consent screens** for third-party applications (optional)
+1. **Test Discovery**: Visit `/.well-known/openid_configuration`
+2. **Verify JWKS**: Check `/.well-known/jwks` for public keys
+3. **Create Client App**: Use standard OIDC libraries
+4. **Test Authentication**: Use provided test credentials
+5. **Monitor Logs**: Check application logs for OIDC flows
 
-Your MrWho OIDC provider is now ready to authenticate users for external applications! ??
+Your MrWho OIDC provider now provides **complete Keycloak-compatible well-known endpoints**! ??
