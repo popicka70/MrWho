@@ -1,0 +1,107 @@
+@page "/account/access-denied"
+@rendermode InteractiveServer
+@inject NavigationManager Navigation
+
+<PageTitle>Access Denied - MrWho</PageTitle>
+
+<div class="access-denied-container">
+    <div class="container-fluid h-100">
+        <div class="row h-100 justify-content-center align-items-center">
+            <div class="col-md-6 col-lg-5 col-xl-4">
+                <RadzenCard Class="access-denied-card shadow-lg text-center">
+                    <div class="access-denied-content">
+                        <div class="access-denied-icon mb-4">
+                            <RadzenIcon Icon="block" Style="font-size: 5rem; color: var(--rz-danger);" />
+                        </div>
+
+                        <RadzenText TextStyle="TextStyle.H4" Class="mb-3 text-danger">Access Denied</RadzenText>
+                        
+                        <RadzenText TextStyle="TextStyle.Body1" Class="mb-4">
+                            You don't have permission to access this resource.
+                        </RadzenText>
+                        
+                        <RadzenText TextStyle="TextStyle.Body2" Class="text-muted mb-4">
+                            This could be because:
+                        </RadzenText>
+                        
+                        <div class="reasons-list mb-4">
+                            <div class="reason-item">
+                                <RadzenIcon Icon="person_off" Class="me-2" Style="color: var(--rz-warning);" />
+                                <span>You're not signed in</span>
+                            </div>
+                            <div class="reason-item">
+                                <RadzenIcon Icon="security" Class="me-2" Style="color: var(--rz-warning);" />
+                                <span>You don't have the required permissions</span>
+                            </div>
+                            <div class="reason-item">
+                                <RadzenIcon Icon="schedule" Class="me-2" Style="color: var(--rz-warning);" />
+                                <span>Your session has expired</span>
+                            </div>
+                        </div>
+                        
+                        <div class="d-grid gap-2">
+                            <RadzenButton Text="Sign In" 
+                                        ButtonStyle="ButtonStyle.Primary"
+                                        Size="ButtonSize.Large"
+                                        Icon="login"
+                                        Click="@(() => Navigation.NavigateTo("/account/login"))"
+                                        Style="height: 48px;" />
+                            
+                            <RadzenButton Text="Go Back" 
+                                        ButtonStyle="ButtonStyle.Light"
+                                        Size="ButtonSize.Medium"
+                                        Icon="arrow_back"
+                                        Click="@GoBack" />
+                        </div>
+                    </div>
+                </RadzenCard>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .access-denied-container {
+        min-height: 100vh;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 20px 0;
+    }
+
+    .access-denied-card {
+        background: white;
+        border-radius: 12px;
+        border: none;
+        padding: 2rem;
+    }
+
+    .access-denied-content {
+        opacity: 1;
+    }
+
+    .access-denied-icon {
+        opacity: 0.9;
+    }
+
+    .reasons-list {
+        text-align: left;
+        max-width: 300px;
+        margin: 0 auto;
+    }
+
+    .reason-item {
+        display: flex;
+        align-items: center;
+        margin-bottom: 0.75rem;
+        padding: 0.5rem;
+        background: #f8f9fa;
+        border-radius: 6px;
+        font-size: 0.9rem;
+    }
+</style>
+
+@code {
+    private void GoBack()
+    {
+        Navigation.NavigateTo("/");
+    }
+}

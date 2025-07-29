@@ -1,0 +1,52 @@
+@inherits ErrorBoundaryBase
+@inject ILogger<AppErrorBoundary> Logger
+
+@if (CurrentException is null)
+{
+    @ChildContent
+}
+else
+{
+    <div class="error-boundary">
+        <div class="container mt-4">
+            <RadzenCard>
+                <RadzenAlert AlertStyle="AlertStyle.Danger">
+                    <RadzenText TextStyle="TextStyle.H5" Class="mb-2">
+                        <RadzenIcon Icon="error" Class="me-2" />
+                        Something went wrong
+                    </RadzenText>
+                    <RadzenText TextStyle="TextStyle.Body1" Class="mb-3">
+                        An unexpected error occurred. The error has been logged and we're working to fix it.
+                    </RadzenText>
+                    @if (CurrentException != null)
+                    {
+                        <RadzenText TextStyle="TextStyle.Body2" Class="text-muted">
+                            Error: @CurrentException.Message
+                        </RadzenText>
+                    }
+                </RadzenAlert>
+                <div class="mt-3">
+                    <RadzenButton Text="Try Again" 
+                                ButtonStyle="ButtonStyle.Primary"
+                                Icon="refresh"
+                                Click="@Recover" />
+                    <RadzenButton Text="Go to Home" 
+                                ButtonStyle="ButtonStyle.Light"
+                                Icon="home"
+                                Click="@(() => Navigation.NavigateTo("/", forceLoad: true))"
+                                Class="ms-2" />
+                </div>
+            </RadzenCard>
+        </div>
+    </div>
+}
+
+@code {
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+
+    protected override Task OnErrorAsync(Exception exception)
+    {
+        Logger.LogError(exception, "Unhandled exception in error boundary");
+        return Task.CompletedTask;
+    }
+}

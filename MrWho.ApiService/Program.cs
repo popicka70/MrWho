@@ -236,6 +236,46 @@ using (var scope = app.Services.CreateScope())
             logger.LogInformation("SPA OIDC client created successfully.");
         }
         
+        // Create Blazor Web application client
+        if (await applicationManager.FindByClientIdAsync("mrwho-web-blazor") == null)
+        {
+            logger.LogInformation("Creating Blazor Web application OIDC client...");
+            await applicationManager.CreateAsync(new OpenIddictApplicationDescriptor
+            {
+                ClientId = "mrwho-web-blazor",
+                ClientSecret = "mrwho-web-blazor-secret",
+                DisplayName = "MrWho Blazor Web Application",
+                RedirectUris =
+                {
+                    new Uri("https://localhost:5173/signin-oidc"),
+                    new Uri("http://localhost:5173/signin-oidc"),
+                    new Uri("https://localhost:7108/signin-oidc"),
+                    new Uri("http://localhost:7108/signin-oidc")
+                },
+                PostLogoutRedirectUris =
+                {
+                    new Uri("https://localhost:5173/signout-callback-oidc"),
+                    new Uri("http://localhost:5173/signout-callback-oidc"),
+                    new Uri("https://localhost:7108/signout-callback-oidc"),
+                    new Uri("http://localhost:7108/signout-callback-oidc")
+                },
+                Permissions =
+                {
+                    Permissions.Endpoints.Authorization,
+                    Permissions.Endpoints.Token,
+                    Permissions.Endpoints.Introspection,
+                    Permissions.Endpoints.Revocation,
+                    Permissions.GrantTypes.AuthorizationCode,
+                    Permissions.ResponseTypes.Code,
+                    Permissions.Scopes.Email,
+                    Permissions.Scopes.Profile,
+                    Permissions.Scopes.Roles
+                },
+                ApplicationType = ApplicationTypes.Web
+            });
+            logger.LogInformation("Blazor Web application OIDC client created successfully.");
+        }
+        
         // Seed default admin user
         logger.LogInformation("Checking for default admin user...");
         if (await userManager.FindByEmailAsync("admin@mrwho.com") == null)

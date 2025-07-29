@@ -1,30 +1,88 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
+﻿@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@inject NavigationManager Navigation
+@inject ILogger<NavMenu> Logger
+
+<div class="top-row ps-3 navbar navbar-dark">
     <div class="container-fluid">
-        <a class="navbar-brand" href="">MrWho</a>
+        <a class="navbar-brand" href="">
+            <RadzenIcon Icon="account_circle" Class="me-2" />
+            MrWho
+        </a>
     </div>
 </div>
 
 <input type="checkbox" title="Navigation menu" class="navbar-toggler" />
 
 <div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
-    <nav class="nav flex-column">
+    <nav class="flex-column">
         <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill" aria-hidden="true"></span> Home
+            <NavLink class="nav-link" href="/" Match="NavLinkMatch.All">
+                <RadzenIcon Icon="home" Class="me-2" />
+                Home
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="/users">
+                <RadzenIcon Icon="people" Class="me-2" />
+                Users
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="/register">
+                <RadzenIcon Icon="person_add" Class="me-2" />
+                Register
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="/test-auth">
+                <RadzenIcon Icon="security" Class="me-2" />
+                Auth Test
+            </NavLink>
+        </div>
+
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="/test-error">
+                <RadzenIcon Icon="bug_report" Class="me-2" />
+                Error Test
             </NavLink>
         </div>
 
         <hr class="nav-divider" />
-        
+
+        <!-- Authentication Section -->
         <div class="nav-item px-3">
-            <NavLink class="nav-link" href="register">
-                <span class="bi bi-person-plus-fill" aria-hidden="true"></span> Register
-            </NavLink>
+            <RadzenText TextStyle="TextStyle.Caption" Class="nav-section-title">Account</RadzenText>
         </div>
 
+        <!-- Temporarily simplified navigation without AuthorizeView -->
         <div class="nav-item px-3">
-            <NavLink class="nav-link" href="users">
-                <span class="bi bi-people-fill" aria-hidden="true"></span> User Management
+            <NavLink class="nav-link" href="/account/login">
+                <RadzenIcon Icon="login" Class="me-2" />
+                Sign In
+            </NavLink>
+        </div>
+        
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="/account/logout">
+                <RadzenIcon Icon="logout" Class="me-2" />
+                Sign Out
+            </NavLink>
+        </div>
+        
+        <hr class="nav-divider" />
+        
+        <!-- Static navigation items -->
+        <div class="nav-item px-3">
+            <RadzenText TextStyle="TextStyle.Caption" Class="nav-section-title">General</RadzenText>
+        </div>
+        
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="/users">
+                <RadzenIcon Icon="admin_panel_settings" Class="me-2" />
+                User Management
             </NavLink>
         </div>
     </nav>
@@ -32,8 +90,47 @@
 
 <style>
     .nav-divider {
-        border: none;
-        border-top: 1px solid rgba(255, 255, 255, 0.1);
-        margin: 0.5rem 1rem;
+        margin: 1rem 0;
+        border-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .nav-section-title {
+        color: rgba(255, 255, 255, 0.6);
+        text-transform: uppercase;
+        font-weight: 600;
+        letter-spacing: 0.5px;
+        margin-bottom: 0.5rem;
+        display: block;
+    }
+
+    .navbar-brand {
+        font-size: 1.2rem;
+        font-weight: 600;
+    }
+
+    .nav-link {
+        display: flex;
+        align-items: center;
+        padding: 0.75rem 0.5rem;
+        color: rgba(255, 255, 255, 0.85);
+        text-decoration: none;
+        border-radius: 6px;
+        margin-bottom: 0.25rem;
+        transition: all 0.2s ease;
+    }
+
+    .nav-link:hover {
+        background: rgba(255, 255, 255, 0.1);
+        color: white;
+    }
+
+    .nav-link.active {
+        background: rgba(255, 255, 255, 0.2);
+        color: white;
+        font-weight: 600;
+    }
+
+    .nav-link .rz-icon {
+        margin-right: 0.5rem;
     }
 </style>

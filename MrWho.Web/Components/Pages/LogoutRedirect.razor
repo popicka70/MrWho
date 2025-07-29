@@ -1,0 +1,13 @@
+@page "/account/logout"
+@inject NavigationManager Navigation
+@inject ILogger<LogoutRedirect> Logger
+
+@code {
+    protected override void OnInitialized()
+    {
+        Logger.LogInformation("Redirecting to OpenID Connect logout");
+        
+        // Trigger OpenID Connect logout
+        Navigation.NavigateTo("/account/signout", forceLoad: true);
+    }
+}

@@ -1,0 +1,27 @@
+@page "/test-error"
+@rendermode InteractiveServer
+
+<PageTitle>Error Test - MrWho</PageTitle>
+
+<div class="container mt-4">
+    <RadzenCard>
+        <RadzenText TextStyle="TextStyle.H3" Class="mb-4">Error Boundary Test</RadzenText>
+        
+        <RadzenText TextStyle="TextStyle.Body1" Class="mb-3">
+            Click the button below to trigger an intentional error and test the error boundary.
+        </RadzenText>
+        
+        <RadzenButton Text="Trigger Error" 
+                    ButtonStyle="ButtonStyle.Danger"
+                    Icon="warning"
+                    Click="@TriggerError" />
+    </RadzenCard>
+</div>
+
+@code {
+    private void TriggerError()
+    {
+        // Intentionally throw an exception to test the error boundary
+        throw new InvalidOperationException("This is a test error to verify the error boundary works correctly.");
+    }
+}

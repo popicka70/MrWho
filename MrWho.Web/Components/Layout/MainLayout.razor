@@ -1,6 +1,6 @@
 ﻿@inherits LayoutComponentBase
 
-<RadzenComponents @rendermode="InteractiveServer" />
+<RadzenComponents @rendermode="@(new InteractiveServerRenderMode(prerender: false))" />
 
 <div class="page">
     <div class="sidebar">
@@ -9,7 +9,10 @@
 
     <main>
         <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+            <!-- Temporarily remove AuthorizeView to prevent cascading issues -->
+            <span class="text-white">
+                MrWho Application
+            </span>
         </div>
 
         <article class="content px-4">
