@@ -7,7 +7,6 @@ using System.ComponentModel.DataAnnotations;
 
 namespace MrWho.ApiService.Pages.Account;
 
-[IgnoreAntiforgeryToken]
 public class LoginModel : PageModel
 {
     private readonly SignInManager<ApplicationUser> _signInManager;
@@ -45,7 +44,7 @@ public class LoginModel : PageModel
         public bool RememberMe { get; set; }
     }
 
-    public async Task OnGetAsync(string? returnUrl = null)
+    public async Task<IActionResult> OnGetAsync(string? returnUrl = null)
     {
         if (!string.IsNullOrEmpty(ErrorMessage))
         {
@@ -56,6 +55,23 @@ public class LoginModel : PageModel
         if (string.IsNullOrEmpty(returnUrl))
         {
             returnUrl = Url.Content("~/");
+        }
+
+        // Check if user is already authenticated
+        if (_signInManager.IsSignedIn(User))
+        {
+            _logger.LogInformation("User is already authenticated, redirecting to: {ReturnUrl}", returnUrl);
+
+            // If the user is already authenticated and this is an OIDC authorization request,
+            // redirect them back to complete the authorization flow
+            if (returnUrl.Contains("/connect/authorize"))
+            {
+                _logger.LogInformation("Redirecting authenticated user to OIDC authorization endpoint");
+                return LocalRedirect(returnUrl);
+            }
+
+            // For non-OIDC requests, redirect to the return URL or home
+            return LocalRedirect(returnUrl);
         }
 
         // Clear the existing external cookie to ensure a clean login process
@@ -69,10 +85,13 @@ public class LoginModel : PageModel
         }
 
         ReturnUrl = returnUrl;
-        
-        _logger.LogInformation("Login page accessed with ReturnUrl length: {Length}, starts with: {StartsWith}", 
-            returnUrl?.Length ?? 0, 
+
+        _logger.LogInformation("Login page accessed with ReturnUrl length: {Length}, starts with: {StartsWith}",
+            returnUrl?.Length ?? 0,
             returnUrl?.Length > 0 ? returnUrl.Substring(0, Math.Min(100, returnUrl.Length)) : "null");
+
+        // Return the page for unauthenticated users
+        return Page();
     }
 
     public async Task<IActionResult> OnPostAsync(string? returnUrl = null)
@@ -82,66 +101,121 @@ public class LoginModel : PageModel
             returnUrl = Url.Content("~/");
         }
 
-        _logger.LogInformation("Login attempt for email: {Email}, ReturnUrl length: {Length}", 
-            Input.Email, returnUrl?.Length ?? 0);
-
-        if (ModelState.IsValid)
+        _logger.LogInformation("Login POST attempt - ReturnUrl length: {Length}", returnUrl?.Length ?? 0);
+        
+        // Log request details for debugging
+        _logger.LogInformation("Request Method: {Method}", Request.Method);
+        _logger.LogInformation("Request ContentType: {ContentType}", Request.ContentType ?? "null");
+        _logger.LogInformation("Request ContentLength: {ContentLength}", Request.ContentLength ?? 0);
+        _logger.LogInformation("Request HasFormContentType: {HasFormContentType}", Request.HasFormContentType);
+        
+        // Try to access the form and log any errors
+        try
         {
-            var user = await _userManager.FindByEmailAsync(Input.Email);
-            if (user == null)
+            var formCount = Request.Form.Count;
+            _logger.LogInformation("Form collection count: {Count}", formCount);
+            
+            if (formCount > 0)
             {
-                _logger.LogWarning("Login failed: User not found for email: {Email}", Input.Email);
-                ModelState.AddModelError(string.Empty, "Invalid login attempt.");
-                return Page();
-            }
-
-            if (!user.IsActive)
-            {
-                _logger.LogWarning("Login failed: Account not active for email: {Email}", Input.Email);
-                ModelState.AddModelError(string.Empty, "Account is not active.");
-                return Page();
-            }
-
-            var result = await _signInManager.PasswordSignInAsync(
-                user, Input.Password, Input.RememberMe, lockoutOnFailure: false);
-
-            if (result.Succeeded)
-            {
-                _logger.LogInformation("User logged in successfully: {Email}", Input.Email);
-                
-                // For OIDC flow, redirect back to the authorization endpoint
-                if (returnUrl.Contains("/connect/authorize"))
+                _logger.LogInformation("Form data received:");
+                foreach (var item in Request.Form)
                 {
-                    _logger.LogInformation("Redirecting to OIDC authorization endpoint");
-                    return LocalRedirect(returnUrl);
+                    _logger.LogInformation("  {Key}: {Value}", item.Key,
+                        item.Key.Contains("password", StringComparison.OrdinalIgnoreCase) ? "[HIDDEN]" : item.Value.ToString());
                 }
-                
-                return LocalRedirect(returnUrl);
-            }
-            
-            if (result.RequiresTwoFactor)
-            {
-                return RedirectToPage("./LoginWith2fa", new { ReturnUrl = returnUrl, RememberMe = Input.RememberMe });
-            }
-            
-            if (result.IsLockedOut)
-            {
-                _logger.LogWarning("User account locked out: {Email}", Input.Email);
-                return RedirectToPage("./Lockout");
             }
             else
             {
-                _logger.LogWarning("Login failed: Invalid credentials for email: {Email}", Input.Email);
-                ModelState.AddModelError(string.Empty, "Invalid login attempt.");
-                return Page();
+                _logger.LogWarning("Form collection is empty!");
             }
         }
-
-        // If we got this far, something failed, redisplay form
-        foreach (var modelError in ModelState.Values.SelectMany(v => v.Errors))
+        catch (Exception ex)
         {
-            _logger.LogWarning("Model validation error: {Error}", modelError.ErrorMessage);
+            _logger.LogError(ex, "Error accessing Request.Form");
         }
+        
+        _logger.LogInformation("Input.Email: '{Email}', Input.Password length: {PasswordLength}",
+            Input.Email ?? "null", Input.Password?.Length ?? 0);
+        _logger.LogInformation("ModelState.IsValid: {IsValid}", ModelState.IsValid);
+        _logger.LogInformation("ModelState.ErrorCount: {ErrorCount}", ModelState.ErrorCount);
+
+        // Log model binding details
+        _logger.LogInformation("Model binding details:");
+        _logger.LogInformation("  Input object is null: {IsNull}", Input == null);
+        if (Input != null)
+        {
+            _logger.LogInformation("  Input.Email is null or empty: {IsNullOrEmpty}", string.IsNullOrEmpty(Input.Email));
+            _logger.LogInformation("  Input.Password is null or empty: {IsNullOrEmpty}", string.IsNullOrEmpty(Input.Password));
+            _logger.LogInformation("  Input.RememberMe value: {RememberMe}", Input.RememberMe);
+        }
+
+        // Log specific validation errors
+        if (!ModelState.IsValid)
+        {
+            _logger.LogWarning("ModelState validation failed:");
+            foreach (var key in ModelState.Keys)
+            {
+                var state = ModelState[key];
+                if (state?.Errors.Count > 0)
+                {
+                    foreach (var error in state.Errors)
+                    {
+                        _logger.LogWarning("  Field '{Field}': {Error}", key, error.ErrorMessage);
+                    }
+                }
+            }
+            return Page();
+        }
+
+        var user = await _userManager.FindByEmailAsync(Input.Email);
+        if (user == null)
+        {
+            _logger.LogWarning("Login failed: User not found for email: {Email}", Input.Email);
+            ModelState.AddModelError(string.Empty, "Invalid login attempt.");
+            return Page();
+        }
+
+        if (!user.IsActive)
+        {
+            _logger.LogWarning("Login failed: Account not active for email: {Email}", Input.Email);
+            ModelState.AddModelError(string.Empty, "Account is not active.");
+            return Page();
+        }
+
+        var result = await _signInManager.PasswordSignInAsync(
+            user, Input.Password, Input.RememberMe, lockoutOnFailure: false);
+
+        if (result.Succeeded)
+        {
+            _logger.LogInformation("User logged in successfully: {Email}", Input.Email);
+
+            // For OIDC flow, redirect back to the authorization endpoint to complete the flow
+            if (returnUrl.Contains("/connect/authorize"))
+            {
+                _logger.LogInformation("Redirecting to OIDC authorization endpoint: {ReturnUrl}", returnUrl);
+                return LocalRedirect(returnUrl);
+            }
+
+            // For non-OIDC requests, redirect to the return URL or home
+            _logger.LogInformation("Redirecting to return URL: {ReturnUrl}", returnUrl);
+            return LocalRedirect(returnUrl);
+        }
+
+        if (result.RequiresTwoFactor)
+        {
+            _logger.LogInformation("Two-factor authentication required for: {Email}", Input.Email);
+            return RedirectToPage("./LoginWith2fa", new { ReturnUrl = returnUrl, RememberMe = Input.RememberMe });
+        }
+
+        if (result.IsLockedOut)
+        {
+            _logger.LogWarning("User account locked out: {Email}", Input.Email);
+            return RedirectToPage("./Lockout");
+        }
+
+        // Login failed - invalid credentials
+        _logger.LogWarning("Login failed: Invalid credentials for email: {Email}", Input.Email);
+        ModelState.AddModelError(string.Empty, "Invalid login attempt.");
         return Page();
     }
 }

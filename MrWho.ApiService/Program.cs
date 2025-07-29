@@ -14,6 +14,8 @@ builder.AddServiceDefaults();
 // Add SQL Server
 builder.AddSqlServerDbContext<ApplicationDbContext>("MrWhoDb");
 
+builder.Services.AddHttpContextAccessor();
+
 // Configure Kestrel to handle large query strings for OIDC
 builder.Services.Configure<Microsoft.AspNetCore.Server.Kestrel.Core.KestrelServerOptions>(options =>
 {
@@ -95,14 +97,18 @@ builder.Services.AddOpenIddict()
         options.UseAspNetCore();
     });
 
-// Add Razor Pages and MVC for login UI
-builder.Services.AddRazorPages();
+// Add Razor Pages and MVC for login UI - ANTIFORGERY DISABLED FOR TESTING
+builder.Services.AddRazorPages(options =>
+{
+    // Disable antiforgery validation globally for testing model binding
+    options.Conventions.ConfigureFilter(new Microsoft.AspNetCore.Mvc.IgnoreAntiforgeryTokenAttribute());
+});
 builder.Services.AddMvc();
 
-// Configure antiforgery for OIDC scenarios
+// Completely disable antiforgery for testing model binding issues
 builder.Services.AddAntiforgery(options =>
 {
-    options.SuppressXFrameOptionsHeader = false;
+    options.SuppressXFrameOptionsHeader = true;
 });
 
 // Add authentication
