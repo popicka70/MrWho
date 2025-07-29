@@ -92,49 +92,87 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapDefaultEndpoints();
 
-// Ensure database is created and seed initial data
+// Apply database migrations and seed initial data
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
     var applicationManager = scope.ServiceProvider.GetRequiredService<IOpenIddictApplicationManager>();
+    var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
     
-    await context.Database.EnsureCreatedAsync();
-    
-    // Seed OIDC application
-    if (await applicationManager.FindByClientIdAsync("mrwho-client") == null)
+    try
     {
-        await applicationManager.CreateAsync(new OpenIddictApplicationDescriptor
-        {
-            ClientId = "mrwho-client",
-            ClientSecret = "mrwho-secret",
-            DisplayName = "MrWho Client Application",
-            Permissions =
-            {
-                Permissions.Endpoints.Token,
-                Permissions.GrantTypes.Password,
-                Permissions.GrantTypes.ClientCredentials,
-                Permissions.Scopes.Email,
-                Permissions.Scopes.Profile,
-                Permissions.Scopes.Roles
-            }
-        });
-    }
-    
-    // Seed default admin user
-    if (await userManager.FindByEmailAsync("admin@mrwho.com") == null)
-    {
-        var adminUser = new ApplicationUser
-        {
-            UserName = "admin@mrwho.com",
-            Email = "admin@mrwho.com",
-            FirstName = "Admin",
-            LastName = "User",
-            EmailConfirmed = true,
-            IsActive = true
-        };
+        logger.LogInformation("Applying database migrations...");
         
-        await userManager.CreateAsync(adminUser, "Admin123!");
+        // Apply any pending migrations
+        await context.Database.MigrateAsync();
+        
+        logger.LogInformation("Database migrations applied successfully.");
+        
+        // Seed OIDC application
+        logger.LogInformation("Checking for OIDC client configuration...");
+        if (await applicationManager.FindByClientIdAsync("mrwho-client") == null)
+        {
+            logger.LogInformation("Creating default OIDC client...");
+            await applicationManager.CreateAsync(new OpenIddictApplicationDescriptor
+            {
+                ClientId = "mrwho-client",
+                ClientSecret = "mrwho-secret",
+                DisplayName = "MrWho Client Application",
+                Permissions =
+                {
+                    Permissions.Endpoints.Token,
+                    Permissions.GrantTypes.Password,
+                    Permissions.GrantTypes.ClientCredentials,
+                    Permissions.Scopes.Email,
+                    Permissions.Scopes.Profile,
+                    Permissions.Scopes.Roles
+                }
+            });
+            logger.LogInformation("Default OIDC client created successfully.");
+        }
+        else
+        {
+            logger.LogInformation("OIDC client already exists, skipping creation.");
+        }
+        
+        // Seed default admin user
+        logger.LogInformation("Checking for default admin user...");
+        if (await userManager.FindByEmailAsync("admin@mrwho.com") == null)
+        {
+            logger.LogInformation("Creating default admin user...");
+            var adminUser = new ApplicationUser
+            {
+                UserName = "admin@mrwho.com",
+                Email = "admin@mrwho.com",
+                FirstName = "Admin",
+                LastName = "User",
+                EmailConfirmed = true,
+                IsActive = true
+            };
+            
+            var result = await userManager.CreateAsync(adminUser, "Admin123!");
+            if (result.Succeeded)
+            {
+                logger.LogInformation("Default admin user created successfully.");
+            }
+            else
+            {
+                logger.LogError("Failed to create default admin user: {Errors}", 
+                    string.Join(", ", result.Errors.Select(e => e.Description)));
+            }
+        }
+        else
+        {
+            logger.LogInformation("Default admin user already exists, skipping creation.");
+        }
+        
+        logger.LogInformation("Database initialization completed successfully.");
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "An error occurred during database initialization.");
+        throw;
     }
 }
 

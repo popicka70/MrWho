@@ -14,6 +14,9 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
     {
         base.OnModelCreating(builder);
 
+        // Configure OpenIddict entities
+        builder.UseOpenIddict();
+
         // Configure ApplicationUser
         builder.Entity<ApplicationUser>(entity =>
         {
