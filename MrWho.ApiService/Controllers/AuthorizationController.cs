@@ -20,15 +20,70 @@ public class AuthorizationController : ControllerBase
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly SignInManager<ApplicationUser> _signInManager;
     private readonly IOpenIddictApplicationManager _applicationManager;
+    private readonly ILogger<AuthorizationController> _logger;
 
     public AuthorizationController(
         UserManager<ApplicationUser> userManager, 
         SignInManager<ApplicationUser> signInManager,
-        IOpenIddictApplicationManager applicationManager)
+        IOpenIddictApplicationManager applicationManager,
+        ILogger<AuthorizationController> logger)
     {
         _userManager = userManager;
         _signInManager = signInManager;
         _applicationManager = applicationManager;
+        _logger = logger;
+    }
+
+    [HttpGet("authorize")]
+    [HttpPost("authorize")]
+    [IgnoreAntiforgeryToken]
+    public async Task<IActionResult> Authorize()
+    {
+        var request = HttpContext.GetOpenIddictServerRequest() ??
+            throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
+
+        // Retrieve the user principal stored in the authentication cookie
+        var result = await HttpContext.AuthenticateAsync(IdentityConstants.ApplicationScheme);
+
+        // If the user principal can't be extracted or the cookie is too old, redirect to login
+        if (!result.Succeeded)
+        {
+            // Redirect to login page
+            return Challenge(
+                authenticationSchemes: IdentityConstants.ApplicationScheme,
+                properties: new AuthenticationProperties
+                {
+                    RedirectUri = Request.PathBase + Request.Path + QueryString.Create(
+                        Request.HasFormContentType ? Request.Form.ToList() : Request.Query.ToList())
+                });
+        }
+
+        // Retrieve the profile of the logged in user
+        var user = await _userManager.GetUserAsync(result.Principal!) ??
+            throw new InvalidOperationException("The user details cannot be retrieved.");
+
+        if (!user.IsActive)
+        {
+            return Forbid(
+                authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
+                properties: new AuthenticationProperties(new Dictionary<string, string?>
+                {
+                    [OpenIddictServerAspNetCoreConstants.Properties.Error] = Errors.InvalidGrant,
+                    [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = "The user account is not active."
+                }));
+        }
+
+        // Retrieve the application details from the database
+        var application = await _applicationManager.FindByClientIdAsync(request.ClientId!) ??
+            throw new InvalidOperationException("Details concerning the calling client application cannot be found.");
+
+        // Create the claims principal that will be used to create the authorization code/access token
+        var principal = await CreatePrincipalAsync(user, request.GetScopes());
+
+        // Set the list of scopes granted to the client application
+        principal.SetScopes(request.GetScopes());
+
+        return SignIn(principal, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
     }
 
     [HttpPost("token")]
@@ -38,6 +93,42 @@ public class AuthorizationController : ControllerBase
     {
         var request = HttpContext.GetOpenIddictServerRequest() ??
             throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
+
+        if (request.IsAuthorizationCodeGrantType())
+        {
+            // Retrieve the claims principal stored in the authorization code
+            var principal = (await HttpContext.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme)).Principal!;
+
+            // Retrieve the user profile corresponding to the authorization code
+            var user = await _userManager.FindByIdAsync(principal.GetClaim(Claims.Subject)!);
+            if (user == null)
+            {
+                return Forbid(
+                    authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
+                    properties: new AuthenticationProperties(new Dictionary<string, string?>
+                    {
+                        [OpenIddictServerAspNetCoreConstants.Properties.Error] = Errors.InvalidGrant,
+                        [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = "The token is no longer valid."
+                    }));
+            }
+
+            if (!user.IsActive)
+            {
+                return Forbid(
+                    authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
+                    properties: new AuthenticationProperties(new Dictionary<string, string?>
+                    {
+                        [OpenIddictServerAspNetCoreConstants.Properties.Error] = Errors.InvalidGrant,
+                        [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = "The user account is not active."
+                    }));
+            }
+
+            // Create a new principal containing the updated claims
+            var newPrincipal = await CreatePrincipalAsync(user, principal.GetScopes());
+            newPrincipal.SetScopes(principal.GetScopes());
+
+            return SignIn(newPrincipal, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+        }
 
         if (request.IsPasswordGrantType())
         {
@@ -98,7 +189,64 @@ public class AuthorizationController : ControllerBase
             return SignIn(principal, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
         }
 
+        if (request.IsRefreshTokenGrantType())
+        {
+            // Retrieve the claims principal stored in the refresh token
+            var principal = (await HttpContext.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme)).Principal!;
+
+            // Retrieve the user profile corresponding to the refresh token
+            var user = await _userManager.FindByIdAsync(principal.GetClaim(Claims.Subject)!);
+            if (user == null)
+            {
+                return Forbid(
+                    authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
+                    properties: new AuthenticationProperties(new Dictionary<string, string?>
+                    {
+                        [OpenIddictServerAspNetCoreConstants.Properties.Error] = Errors.InvalidGrant,
+                        [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = "The refresh token is no longer valid."
+                    }));
+            }
+
+            if (!user.IsActive)
+            {
+                return Forbid(
+                    authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
+                    properties: new AuthenticationProperties(new Dictionary<string, string?>
+                    {
+                        [OpenIddictServerAspNetCoreConstants.Properties.Error] = Errors.InvalidGrant,
+                        [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = "The user account is not active."
+                    }));
+            }
+
+            // Create a new principal containing the updated claims
+            var newPrincipal = await CreatePrincipalAsync(user, principal.GetScopes());
+            newPrincipal.SetScopes(principal.GetScopes());
+
+            return SignIn(newPrincipal, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+        }
+
         throw new InvalidOperationException("The specified grant type is not supported.");
+    }
+
+    [HttpGet("logout")]
+    [HttpPost("logout")]
+    [IgnoreAntiforgeryToken]
+    public async Task<IActionResult> Logout()
+    {
+        var request = HttpContext.GetOpenIddictServerRequest() ??
+            throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
+
+        await _signInManager.SignOutAsync();
+
+        // Returning a SignOutResult will ask OpenIddict to redirect the user agent
+        // to the post_logout_redirect_uri specified by the client application or to
+        // the RedirectUri specified in the authentication properties
+        return SignOut(
+            authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
+            properties: new AuthenticationProperties
+            {
+                RedirectUri = request.PostLogoutRedirectUri
+            });
     }
 
     private async Task<ClaimsPrincipal> CreatePrincipalAsync(ApplicationUser user, ImmutableArray<string> scopes)
@@ -130,7 +278,10 @@ public class AuthorizationController : ControllerBase
                 identity.AddClaim(new Claim(Claims.Name, fullName));
         }
 
-        identity.AddClaim(new Claim(Claims.Role, "user"));
+        if (scopes.Contains(Scopes.Roles))
+        {
+            identity.AddClaim(new Claim(Claims.Role, "user"));
+        }
 
         var principal = new ClaimsPrincipal(identity);
         principal.SetScopes(scopes);

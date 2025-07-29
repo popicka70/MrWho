@@ -47,22 +47,40 @@ builder.Services.AddOpenIddict()
     })
     .AddServer(options =>
     {
-        options.SetTokenEndpointUris("/connect/token");
+        // Set authorization and token endpoint URIs
+        options.SetAuthorizationEndpointUris("/connect/authorize")
+               .SetTokenEndpointUris("/connect/token");
 
-        options.AllowPasswordFlow()
-            .AllowClientCredentialsFlow();
+        // Enable the authorization code, password and client credentials flows
+        options.AllowAuthorizationCodeFlow()
+               .AllowPasswordFlow()
+               .AllowClientCredentialsFlow()
+               .AllowRefreshTokenFlow();
+
+        // Mark the "email", "profile" and "roles" scopes as supported scopes
+        options.RegisterScopes(Scopes.Email, Scopes.Profile, Scopes.Roles);
+
+        // Register claims
+        options.RegisterClaims(Claims.Email, Claims.Name, Claims.PreferredUsername, 
+                              Claims.GivenName, Claims.FamilyName, Claims.Role);
 
         options.AddDevelopmentEncryptionCertificate()
-            .AddDevelopmentSigningCertificate();
+               .AddDevelopmentSigningCertificate();
 
+        // Enable Authorization Server passthrough for authorization endpoint
         options.UseAspNetCore()
-            .EnableTokenEndpointPassthrough();
+               .EnableAuthorizationEndpointPassthrough()
+               .EnableTokenEndpointPassthrough();
     })
     .AddValidation(options =>
     {
         options.UseLocalServer();
         options.UseAspNetCore();
     });
+
+// Add Razor Pages and MVC for login UI
+builder.Services.AddRazorPages();
+builder.Services.AddMvc();
 
 // Add authentication
 builder.Services.AddAuthentication();
@@ -86,10 +104,12 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseStaticFiles();
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapRazorPages();
 app.MapDefaultEndpoints();
 
 // Apply database migrations and seed initial data
@@ -109,11 +129,13 @@ using (var scope = app.Services.CreateScope())
         
         logger.LogInformation("Database migrations applied successfully.");
         
-        // Seed OIDC application
-        logger.LogInformation("Checking for OIDC client configuration...");
+        // Seed OIDC clients
+        logger.LogInformation("Checking for OIDC client configurations...");
+        
+        // Create server-to-server client (existing)
         if (await applicationManager.FindByClientIdAsync("mrwho-client") == null)
         {
-            logger.LogInformation("Creating default OIDC client...");
+            logger.LogInformation("Creating server-to-server OIDC client...");
             await applicationManager.CreateAsync(new OpenIddictApplicationDescriptor
             {
                 ClientId = "mrwho-client",
@@ -129,11 +151,82 @@ using (var scope = app.Services.CreateScope())
                     Permissions.Scopes.Roles
                 }
             });
-            logger.LogInformation("Default OIDC client created successfully.");
+            logger.LogInformation("Server-to-server OIDC client created successfully.");
         }
-        else
+        
+        // Create web application client (new for web flow)
+        if (await applicationManager.FindByClientIdAsync("mrwho-web-client") == null)
         {
-            logger.LogInformation("OIDC client already exists, skipping creation.");
+            logger.LogInformation("Creating web application OIDC client...");
+            await applicationManager.CreateAsync(new OpenIddictApplicationDescriptor
+            {
+                ClientId = "mrwho-web-client",
+                ClientSecret = "mrwho-web-secret",
+                DisplayName = "MrWho Web Application",
+                RedirectUris =
+                {
+                    new Uri("https://localhost:5000/signin-oidc"),
+                    new Uri("https://localhost:5001/signin-oidc"),
+                    new Uri("http://localhost:5000/signin-oidc"),
+                    new Uri("http://localhost:5001/signin-oidc")
+                },
+                PostLogoutRedirectUris =
+                {
+                    new Uri("https://localhost:5000/signout-oidc"),
+                    new Uri("https://localhost:5001/signout-oidc"),
+                    new Uri("http://localhost:5000/signout-oidc"),
+                    new Uri("http://localhost:5001/signout-oidc")
+                },
+                Permissions =
+                {
+                    Permissions.Endpoints.Authorization,
+                    Permissions.Endpoints.Token,
+                    Permissions.GrantTypes.AuthorizationCode,
+                    Permissions.ResponseTypes.Code,
+                    Permissions.Scopes.Email,
+                    Permissions.Scopes.Profile,
+                    Permissions.Scopes.Roles
+                },
+                ApplicationType = ApplicationTypes.Web
+            });
+            logger.LogInformation("Web application OIDC client created successfully.");
+        }
+        
+        // Create public SPA client (for JavaScript apps)
+        if (await applicationManager.FindByClientIdAsync("mrwho-spa-client") == null)
+        {
+            logger.LogInformation("Creating SPA OIDC client...");
+            await applicationManager.CreateAsync(new OpenIddictApplicationDescriptor
+            {
+                ClientId = "mrwho-spa-client",
+                DisplayName = "MrWho SPA Application",
+                RedirectUris =
+                {
+                    new Uri("https://localhost:3000/callback"),
+                    new Uri("http://localhost:3000/callback"),
+                    new Uri("https://localhost:4200/callback"),
+                    new Uri("http://localhost:4200/callback")
+                },
+                PostLogoutRedirectUris =
+                {
+                    new Uri("https://localhost:3000/"),
+                    new Uri("http://localhost:3000/"),
+                    new Uri("https://localhost:4200/"),
+                    new Uri("http://localhost:4200/")
+                },
+                Permissions =
+                {
+                    Permissions.Endpoints.Authorization,
+                    Permissions.Endpoints.Token,
+                    Permissions.GrantTypes.AuthorizationCode,
+                    Permissions.ResponseTypes.Code,
+                    Permissions.Scopes.Email,
+                    Permissions.Scopes.Profile,
+                    Permissions.Scopes.Roles
+                },
+                ApplicationType = ApplicationTypes.Native
+            });
+            logger.LogInformation("SPA OIDC client created successfully.");
         }
         
         // Seed default admin user
