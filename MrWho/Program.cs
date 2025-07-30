@@ -41,6 +41,9 @@ builder.Services.Configure<IdentityOptions>(options =>
 // Register token handler
 builder.Services.AddScoped<ITokenHandler, MrWho.Handlers.TokenHandler>();
 
+// Register userinfo handler
+builder.Services.AddScoped<IUserInfoHandler, MrWho.Handlers.UserInfoHandler>();
+
 // Configure OpenIddict
 builder.Services.AddOpenIddict()
     .AddCore(options =>
@@ -50,13 +53,16 @@ builder.Services.AddOpenIddict()
     })
     .AddServer(options =>
     {
-        // Enable the token endpoint
-        options.SetTokenEndpointUris("/connect/token");
+        // Enable the authorization and token endpoints
+        options.SetAuthorizationEndpointUris("/connect/authorize")
+               .SetTokenEndpointUris("/connect/token")
+               .SetEndSessionEndpointUris("/connect/logout");
 
         // Enable grant types
-        options.AllowClientCredentialsFlow();
-        options.AllowPasswordFlow();
-        options.AllowRefreshTokenFlow();
+        options.AllowAuthorizationCodeFlow()
+               .AllowClientCredentialsFlow()
+               .AllowPasswordFlow()
+               .AllowRefreshTokenFlow();
 
         // Register scopes
         options.RegisterScopes(OpenIddictConstants.Scopes.Email,
@@ -69,7 +75,9 @@ builder.Services.AddOpenIddict()
 
         // Register the ASP.NET Core host and configure the ASP.NET Core options
         options.UseAspNetCore()
-               .EnableTokenEndpointPassthrough();
+               .EnableAuthorizationEndpointPassthrough()
+               .EnableTokenEndpointPassthrough()
+               .EnableEndSessionEndpointPassthrough();
     })
     .AddValidation(options =>
     {
@@ -132,17 +140,27 @@ using (var scope = app.Services.CreateScope())
             DisplayName = "Postman Test Client",
             Permissions =
             {
+                OpenIddictConstants.Permissions.Endpoints.Authorization,
                 OpenIddictConstants.Permissions.Endpoints.Token,
+                OpenIddictConstants.Permissions.GrantTypes.AuthorizationCode,
                 OpenIddictConstants.Permissions.GrantTypes.ClientCredentials,
                 OpenIddictConstants.Permissions.GrantTypes.Password,
                 OpenIddictConstants.Permissions.GrantTypes.RefreshToken,
                 OpenIddictConstants.Permissions.Scopes.Email,
                 OpenIddictConstants.Permissions.Scopes.Profile,
-                OpenIddictConstants.Permissions.Scopes.Roles
-            }
+                OpenIddictConstants.Permissions.Scopes.Roles,
+                OpenIddictConstants.Permissions.ResponseTypes.Code
+            },
+            RedirectUris = { new Uri("https://localhost:7001/callback"), new Uri("http://localhost:5001/callback") },
+            PostLogoutRedirectUris = { new Uri("https://localhost:7001/"), new Uri("http://localhost:5001/") }
         });
     }
 }
+
+// Configure routing for controllers
+app.MapControllerRoute(
+    name: "default",
+    pattern: "{controller=Home}/{action=Index}/{id?}");
 
 // OIDC Token endpoint - now uses injected TokenHandler
 app.MapPost("/connect/token", async (HttpContext context, ITokenHandler tokenHandler) =>
@@ -171,7 +189,7 @@ app.MapGet("/connect/userinfo", [Authorize] async (HttpContext context) =>
     });
 });
 
-app.MapGet("/", () => "MrWho OIDC Service is running. Core functionality initialized.");
+app.MapGet("/", () => "MrWho OIDC Service is running. Core functionality initialized.<br/><a href='/connect/login'>Login</a>");
 
 app.Run();
 
