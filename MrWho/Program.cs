@@ -16,6 +16,13 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container
 builder.Services.AddControllersWithViews();
 
+// Add antiforgery services
+builder.Services.AddAntiforgery(options =>
+{
+    options.HeaderName = "X-CSRF-TOKEN";
+    options.SuppressXFrameOptionsHeader = false;
+});
+
 // Configure Entity Framework with SQLite (persistent database)
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {

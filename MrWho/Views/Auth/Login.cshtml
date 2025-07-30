@@ -1,4 +1,4 @@
-@model MrWho.Controllers.LoginViewModel
+@model LoginViewModel
 @{
     ViewData["Title"] = "Login";
 }
@@ -10,19 +10,23 @@
                 <h4 class="text-center">Sign In</h4>
             </div>
             <div class="card-body">
-                <form asp-action="Login" method="post">
+                <form action="/connect/login" method="post">
                     <div asp-validation-summary="All" class="text-danger"></div>
-                    <input type="hidden" asp-for="@ViewData["ReturnUrl"]" />
+                    
+                    @if (!string.IsNullOrEmpty(ViewData["ReturnUrl"] as string))
+                    {
+                        <input type="hidden" name="returnUrl" value="@ViewData["ReturnUrl"]" />
+                    }
                     
                     <div class="mb-3">
                         <label asp-for="Email" class="form-label">Email</label>
-                        <input asp-for="Email" class="form-control" type="email" placeholder="Enter your email" />
+                        <input asp-for="Email" class="form-control" type="email" placeholder="Enter your email" required />
                         <span asp-validation-for="Email" class="text-danger"></span>
                     </div>
                     
                     <div class="mb-3">
                         <label asp-for="Password" class="form-label">Password</label>
-                        <input asp-for="Password" class="form-control" type="password" placeholder="Enter your password" />
+                        <input asp-for="Password" class="form-control" type="password" placeholder="Enter your password" required />
                         <span asp-validation-for="Password" class="text-danger"></span>
                     </div>
                     
@@ -49,5 +53,5 @@
 </div>
 
 @section Scripts {
-    <partial name="_ValidationScriptsPartial" />
+    <partial name="_LoginPartial" />
 }
