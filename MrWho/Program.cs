@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MrWho.Data;
+using MrWho.Handlers;
 using OpenIddict.Abstractions;
 using OpenIddict.Server.AspNetCore;
 using static OpenIddict.Abstractions.OpenIddictConstants;
@@ -36,6 +37,9 @@ builder.Services.Configure<IdentityOptions>(options =>
     options.Password.RequireUppercase = false;
     options.Password.RequireLowercase = false;
 });
+
+// Register token handler
+builder.Services.AddScoped<ITokenHandler, MrWho.Handlers.TokenHandler>();
 
 // Configure OpenIddict
 builder.Services.AddOpenIddict()
@@ -140,46 +144,10 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-// OIDC Token endpoint - handles password and client credentials grants
-app.MapPost("/connect/token", async (HttpContext context) =>
+// OIDC Token endpoint - now uses injected TokenHandler
+app.MapPost("/connect/token", async (HttpContext context, ITokenHandler tokenHandler) =>
 {
-    var request = context.GetOpenIddictServerRequest() ??
-                  throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
-
-    if (request.IsPasswordGrantType())
-    {
-        var userManager = context.RequestServices.GetRequiredService<UserManager<IdentityUser>>();
-        var user = await userManager.FindByNameAsync(request.Username!);
-
-        if (user != null && await userManager.CheckPasswordAsync(user, request.Password!))
-        {
-            var identity = new ClaimsIdentity(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
-            identity.AddClaim(OpenIddictConstants.Claims.Subject, user.Id);
-            identity.AddClaim(OpenIddictConstants.Claims.Email, user.Email!);
-            identity.AddClaim(OpenIddictConstants.Claims.Name, user.UserName!);
-            identity.AddClaim(OpenIddictConstants.Claims.PreferredUsername, user.UserName!);
-
-            var principal = new ClaimsPrincipal(identity);
-            principal.SetScopes(request.GetScopes());
-
-            return Results.SignIn(principal, authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
-        }
-
-        return Results.Forbid(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
-    }
-
-    if (request.IsClientCredentialsGrantType())
-    {
-        var identity = new ClaimsIdentity(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
-        identity.AddClaim(OpenIddictConstants.Claims.Subject, request.ClientId!);
-
-        var principal = new ClaimsPrincipal(identity);
-        principal.SetScopes(request.GetScopes());
-
-        return Results.SignIn(principal, authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
-    }
-
-    throw new InvalidOperationException("The specified grant type is not supported.");
+    return await tokenHandler.HandleTokenRequestAsync(context);
 });
 
 // UserInfo endpoint (optional but recommended)
@@ -206,3 +174,63 @@ app.MapGet("/connect/userinfo", [Authorize] async (HttpContext context) =>
 app.MapGet("/", () => "MrWho OIDC Service is running. Core functionality initialized.");
 
 app.Run();
+
+/// <summary>
+/// Static class to handle token endpoint requests
+/// </summary>
+public static class TokenHandler
+{
+    /// <summary>
+    /// Handles token requests including password and client credentials grant types
+    /// </summary>
+    public static async Task<IResult> HandleTokenRequest(HttpContext context)
+    {
+        var request = context.GetOpenIddictServerRequest() ??
+                      throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
+
+        if (request.IsPasswordGrantType())
+        {
+            return await HandlePasswordGrantAsync(context, request);
+        }
+
+        if (request.IsClientCredentialsGrantType())
+        {
+            return HandleClientCredentialsGrant(request);
+        }
+
+        throw new InvalidOperationException("The specified grant type is not supported.");
+    }
+
+    private static async Task<IResult> HandlePasswordGrantAsync(HttpContext context, OpenIddictRequest request)
+    {
+        var userManager = context.RequestServices.GetRequiredService<UserManager<IdentityUser>>();
+        var user = await userManager.FindByNameAsync(request.Username!);
+
+        if (user != null && await userManager.CheckPasswordAsync(user, request.Password!))
+        {
+            var identity = new ClaimsIdentity(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+            identity.AddClaim(OpenIddictConstants.Claims.Subject, user.Id);
+            identity.AddClaim(OpenIddictConstants.Claims.Email, user.Email!);
+            identity.AddClaim(OpenIddictConstants.Claims.Name, user.UserName!);
+            identity.AddClaim(OpenIddictConstants.Claims.PreferredUsername, user.UserName!);
+
+            var principal = new ClaimsPrincipal(identity);
+            principal.SetScopes(request.GetScopes());
+
+            return Results.SignIn(principal, authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+        }
+
+        return Results.Forbid(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
+    }
+
+    private static IResult HandleClientCredentialsGrant(OpenIddictRequest request)
+    {
+        var identity = new ClaimsIdentity(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+        identity.AddClaim(OpenIddictConstants.Claims.Subject, request.ClientId!);
+
+        var principal = new ClaimsPrincipal(identity);
+        principal.SetScopes(request.GetScopes());
+
+        return Results.SignIn(principal, authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+    }
+}
