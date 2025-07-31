@@ -1,0 +1,1 @@
+@if (User.Identity?.IsAuthenticated == true) { <span class="navbar-text text-light">Welcome, @User.Identity.Name! <a href="/connect/logout" class="text-light">Logout</a></span> } else { <a class="nav-link text-light" href="/connect/login">Login</a> }

@@ -267,8 +267,6 @@ app.MapGet("/debug/db-client-config", async (IOpenIddictApplicationManager appli
     });
 });
 
-app.MapGet("/", () => "MrWho OIDC Service is running. Core functionality initialized.<br/><a href='/connect/login'>Login</a><br/><a href='/debug/client-info'>Client Info</a><br/><a href='/debug/db-client-config'>DB Client Config</a>");
-
 app.Run();
 
 /// <summary>

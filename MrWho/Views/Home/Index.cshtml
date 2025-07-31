@@ -1,1 +1,92 @@
-<h1>MrWho OIDC Service</h1><p>Welcome to the OIDC authentication service.</p><a href="/connect/login" class="btn btn-primary">Login</a>
+@{
+    ViewData["Title"] = "Home";
+}
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="jumbotron bg-primary text-white p-5 rounded mb-4">
+            <h1 class="display-4">MrWho OIDC Service</h1>
+            <p class="lead">Welcome to the OpenID Connect authentication service.</p>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Authentication</h5>
+                    </div>
+                    <div class="card-body">
+                        <p>Secure login and logout functionality.</p>
+                        <a href="@Url.Action("Login", "Auth")" class="btn btn-primary">Login</a>
+                        @if (User.Identity?.IsAuthenticated == true)
+                        {
+                            <a href="@Url.Action("Logout", "Auth")" class="btn btn-outline-secondary">Logout</a>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6 mb-3">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Debug Tools</h5>
+                    </div>
+                    <div class="card-body">
+                        <p>Development and debugging endpoints.</p>
+                        <a href="/debug/client-info" class="btn btn-info">Client Info</a>
+                        <a href="/debug/db-client-config" class="btn btn-info">DB Config</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>OIDC Endpoints</h5>
+                    </div>
+                    <div class="card-body">
+                        <p>OpenID Connect protocol endpoints.</p>
+                        <a href="/connect/authorize" class="btn btn-outline-primary btn-sm">Authorization Endpoint</a>
+                        <a href="/.well-known/openid_configuration" class="btn btn-outline-primary btn-sm">Discovery Document</a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6 mb-3">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>User Info</h5>
+                    </div>
+                    <div class="card-body">
+                        @if (User.Identity?.IsAuthenticated == true)
+                        {
+                            <p class="card-text">Welcome back, <strong>@User.Identity.Name</strong>!</p>
+                            <a href="/connect/userinfo" class="btn btn-success">View User Info</a>
+                        }
+                        else
+                        {
+                            <p class="card-text">Please log in to access user information.</p>
+                            <a href="@Url.Action("Login", "Auth")" class="btn btn-primary">Login</a>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5>Test Accounts</h5>
+            </div>
+            <div class="card-body">
+                <p><strong>User:</strong> test@example.com</p>
+                <p><strong>Password:</strong> Test123!</p>
+                <p><strong>Admin:</strong> admin@example.com</p>
+                <p><strong>Password:</strong> Admin123!</p>
+            </div>
+        </div>
+    </div>
+</div>
