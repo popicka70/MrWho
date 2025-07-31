@@ -112,6 +112,9 @@ app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
 
+// Add antiforgery middleware
+app.UseAntiforgery();
+
 app.UseAuthentication();
 app.UseAuthorization();
 

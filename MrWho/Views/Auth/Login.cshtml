@@ -10,7 +10,8 @@
                 <h4 class="text-center">Sign In</h4>
             </div>
             <div class="card-body">
-                <form action="/connect/login" method="post">
+                <form method="post">
+                    @Html.AntiForgeryToken()
                     <div asp-validation-summary="All" class="text-danger"></div>
                     
                     @if (!string.IsNullOrEmpty(ViewData["ReturnUrl"] as string))
