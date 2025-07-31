@@ -94,3 +94,28 @@ main {
         right: 0.75rem;
         top: 0.5rem;
     }
+
+.rz-layout {
+    min-height: 100vh;
+}
+
+.rz-sidebar {
+    box-shadow: 2px 0 4px rgba(0,0,0,0.1);
+}
+
+.rz-header {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    z-index: 1000;
+}
+
+.rz-footer {
+    border-top: 1px solid var(--rz-border-color);
+    background-color: var(--rz-background-color);
+}
+
+@media (max-width: 768px) {
+    .rz-sidebar {
+        position: fixed;
+        z-index: 1001;
+    }
+}

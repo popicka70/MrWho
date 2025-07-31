@@ -1,29 +1,67 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="">MrWhoAdmin</a>
-    </div>
-</div>
+﻿@using Microsoft.AspNetCore.Components.Authorization
 
-<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+<RadzenPanelMenu DisplayStyle="MenuItemDisplayStyle.IconAndText" Multiple="false" class="rz-background-color-base-100">
+    
+    <!-- Main Dashboard -->
+    <RadzenPanelMenuItem Text="Dashboard" Icon="dashboard" Path="/" />
+    
+    <!-- User Management Section -->
+    <RadzenPanelMenuItem Text="User Management" Icon="people">
+        <RadzenPanelMenuItem Text="All Users" Icon="person" Path="/users" />
+        <RadzenPanelMenuItem Text="Add User" Icon="person_add" Path="/users/add" />
+        <RadzenPanelMenuItem Text="User Roles" Icon="security" Path="/users/roles" />
+        <RadzenPanelMenuItem Text="Permissions" Icon="admin_panel_settings" Path="/users/permissions" />
+    </RadzenPanelMenuItem>
+    
+    <!-- Identity Server Management -->
+    <RadzenPanelMenuItem Text="Identity Server" Icon="verified_user">
+        <RadzenPanelMenuItem Text="Applications" Icon="apps" Path="/identity/applications" />
+        <RadzenPanelMenuItem Text="API Resources" Icon="api" Path="/identity/api-resources" />
+        <RadzenPanelMenuItem Text="Identity Resources" Icon="fingerprint" Path="/identity/identity-resources" />
+        <RadzenPanelMenuItem Text="Scopes" Icon="tune" Path="/identity/scopes" />
+    </RadzenPanelMenuItem>
+    
+    <!-- Reports & Analytics -->
+    <RadzenPanelMenuItem Text="Reports" Icon="analytics">
+        <RadzenPanelMenuItem Text="User Activity" Icon="trending_up" Path="/reports/activity" />
+        <RadzenPanelMenuItem Text="Login Statistics" Icon="bar_chart" Path="/reports/logins" />
+        <RadzenPanelMenuItem Text="API Usage" Icon="api" Path="/reports/api-usage" />
+        <RadzenPanelMenuItem Text="Audit Log" Icon="history" Path="/reports/audit" />
+    </RadzenPanelMenuItem>
+    
+    <!-- System Administration -->
+    <RadzenPanelMenuItem Text="System" Icon="settings">
+        <RadzenPanelMenuItem Text="Configuration" Icon="tune" Path="/system/config" />
+        <RadzenPanelMenuItem Text="Health Check" Icon="health_and_safety" Path="/system/health" />
+        <RadzenPanelMenuItem Text="System Logs" Icon="description" Path="/system/logs" />
+        <RadzenPanelMenuItem Text="Backup & Restore" Icon="backup" Path="/system/backup" />
+    </RadzenPanelMenuItem>
+    
+    <!-- Development Tools -->
+    <RadzenPanelMenuItem Text="Developer Tools" Icon="code">
+        <RadzenPanelMenuItem Text="API Documentation" Icon="description" Path="/dev/api-docs" />
+        <RadzenPanelMenuItem Text="Token Inspector" Icon="token" Path="/dev/token-inspector" />
+        <RadzenPanelMenuItem Text="Test Clients" Icon="bug_report" Path="/dev/test-clients" />
+    </RadzenPanelMenuItem>
 
-<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
-    <nav class="nav flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill" aria-hidden="true"></span> Home
-            </NavLink>
-        </div>
+</RadzenPanelMenu>
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="counter">
-                <span class="bi bi-plus-square-fill" aria-hidden="true"></span> Counter
-            </NavLink>
-        </div>
+@code {
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
 
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="weather">
-                <span class="bi bi-list-nested" aria-hidden="true"></span> Weather
-            </NavLink>
-        </div>
-    </nav>
-</div>
+    private string GetUserDisplayName(System.Security.Claims.ClaimsPrincipal user)
+    {
+        return user.FindFirst("name")?.Value ??
+               user.FindFirst("preferred_username")?.Value ??
+               user.FindFirst("given_name")?.Value ??
+               user.FindFirst("email")?.Value ??
+               user.FindFirst("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier")?.Value ??
+               user.Identity?.Name ??
+               "User";
+    }
+
+    private void NavigateToLogin()
+    {
+        Navigation.NavigateTo("/login");
+    }
+}

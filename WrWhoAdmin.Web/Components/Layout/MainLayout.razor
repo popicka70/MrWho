@@ -1,50 +1,136 @@
 ﻿@inherits LayoutComponentBase
 
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
-
-    <main>
-        <div class="top-row px-4 d-flex justify-content-between align-items-center">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
-            <div>
+<RadzenLayout>
+    <RadzenHeader>
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0" class="rz-px-4">
+            <RadzenSidebarToggle Click="@(() => sidebarExpanded = !sidebarExpanded)" />
+            <RadzenLabel Text="MrWho Administration" class="rz-font-weight-bold rz-font-size-h5 rz-color-primary rz-m-0" />
+            <RadzenSpacer />
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="12px">
                 <AuthorizeView>
                     <Authorized>
-                        <span class="navbar-text me-2">
-                            Hello, @GetUserDisplayName(context.User)!
-                        </span>
-                        <a href="/logout" class="btn btn-outline-secondary btn-sm">Logout</a>
+                        <!-- Quick Actions Dropdown (hidden on mobile) -->
+                        <RadzenDropDown TValue="string" class="rz-display-none rz-display-md-inline-flex"
+                                        Style="width: 200px;" Placeholder="Quick Actions" AllowClear="true"
+                                        Change="@OnQuickActionChange">
+                            <Items>
+                                <RadzenDropDownItem TValue="string" Text="Add New User" Value="add-user" />
+                                <RadzenDropDownItem TValue="string" Text="View Reports" Value="reports" />
+                                <RadzenDropDownItem TValue="string" Text="System Health" Value="health" />
+                                <RadzenDropDownItem TValue="string" Text="API Documentation" Value="api-docs" />
+                            </Items>
+                        </RadzenDropDown>
+                        
+                        <!-- Notifications Button -->
+                        <RadzenButton Icon="notifications" ButtonStyle="ButtonStyle.Light" Variant="Variant.Text" 
+                                      Click="@ShowNotifications" class="rz-border-radius-50 rz-p-2" />
+                        
+                        <!-- User Profile Menu -->
+                        <RadzenProfileMenu>
+                            <Template>
+                                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="8px">
+                                    <RadzenGravatar Email="@GetUserEmail(context.User)" />
+                                    <div class="rz-display-none rz-display-md-block">
+                                        <div class="rz-font-weight-bold">@GetUserDisplayName(context.User)</div>
+                                        <div class="rz-font-size-sm rz-color-secondary">Administrator</div>
+                                    </div>
+                                </RadzenStack>
+                            </Template>
+                            <ChildContent>
+                                <RadzenProfileMenuItem Text="My Profile" Icon="person" Path="/profile" />
+                                <RadzenProfileMenuItem Text="Account Settings" Icon="settings" Path="/account/settings" />
+                                <RadzenProfileMenuItem Text="Change Password" Icon="lock" Path="/account/change-password" />
+                                <RadzenProfileMenuSeparator />
+                                <RadzenProfileMenuItem Text="Help & Support" Icon="help" Path="/help" />
+                                <RadzenProfileMenuItem Text="About" Icon="info" Path="/about" />
+                                <RadzenProfileMenuSeparator />
+                                <RadzenProfileMenuItem Text="Logout" Icon="logout" Path="/logout" />
+                            </ChildContent>
+                        </RadzenProfileMenu>
                     </Authorized>
                     <NotAuthorized>
-                        <a href="/login" class="btn btn-primary btn-sm">Login</a>
+                        <RadzenButton Text="Login" Icon="login" ButtonStyle="ButtonStyle.Primary" 
+                                      Click="@(() => Navigation.NavigateTo("/login"))" />
                     </NotAuthorized>
                 </AuthorizeView>
-            </div>
-        </div>
-
-        <article class="content px-4">
+            </RadzenStack>
+        </RadzenStack>
+    </RadzenHeader>
+    
+    <RadzenSidebar @bind-Expanded="sidebarExpanded" Responsive="true" style="width: 300px;">
+        <NavMenu />
+    </RadzenSidebar>
+    
+    <RadzenBody>
+        <RadzenContentContainer Name="main" class="rz-p-4">
             @Body
-        </article>
-    </main>
-</div>
-
-<div id="blazor-error-ui" data-nosnippet>
-    An unhandled error has occurred.
-    <a href="." class="reload">Reload</a>
-    <span class="dismiss">🗙</span>
-</div>
+        </RadzenContentContainer>
+    </RadzenBody>
+    
+    <RadzenFooter>
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" 
+                     JustifyContent="JustifyContent.SpaceBetween" class="rz-px-4 rz-py-2">
+            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                © @DateTime.Now.Year MrWho Administration. All rights reserved.
+            </RadzenText>
+            <RadzenStack Orientation="Orientation.Horizontal" Gap="16px" class="rz-display-none rz-display-md-flex">
+                <RadzenLink Text="Privacy Policy" Path="/privacy" class="rz-font-size-sm" />
+                <RadzenLink Text="Terms of Service" Path="/terms" class="rz-font-size-sm" />
+                <RadzenLink Text="Support" Path="/support" class="rz-font-size-sm" />
+            </RadzenStack>
+        </RadzenStack>
+    </RadzenFooter>
+</RadzenLayout>
 
 @code {
+    private bool sidebarExpanded = true;
+
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+    [Inject] private NotificationService NotificationService { get; set; } = default!;
+
     private string GetUserDisplayName(System.Security.Claims.ClaimsPrincipal user)
     {
-        // Try different claim types for the user's name
         return user.FindFirst("name")?.Value ??
                user.FindFirst("preferred_username")?.Value ??
                user.FindFirst("given_name")?.Value ??
                user.FindFirst("email")?.Value ??
                user.FindFirst("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier")?.Value ??
                user.Identity?.Name ??
-               "User";
+               "Admin User";
+    }
+
+    private string GetUserEmail(System.Security.Claims.ClaimsPrincipal user)
+    {
+        return user.FindFirst("email")?.Value ??
+               user.FindFirst("preferred_username")?.Value ??
+               "admin@mrwho.com";
+    }
+
+    private void ShowNotifications()
+    {
+        NotificationService.Notify(NotificationSeverity.Info, "Notifications", 
+            "You have no new notifications at this time.", duration: 4000);
+    }
+
+    private void OnQuickActionChange(object value)
+    {
+        if (value?.ToString() is string action)
+        {
+            switch (action)
+            {
+                case "add-user":
+                    Navigation.NavigateTo("/users/add");
+                    break;
+                case "reports":
+                    Navigation.NavigateTo("/reports");
+                    break;
+                case "health":
+                    Navigation.NavigateTo("/system/health");
+                    break;
+                case "api-docs":
+                    Navigation.NavigateTo("/dev/api-docs");
+                    break;
+            }
+        }
     }
 }

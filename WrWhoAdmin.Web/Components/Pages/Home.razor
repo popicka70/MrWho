@@ -1,7 +1,105 @@
 ﻿@page "/"
+@attribute [Authorize]
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Dashboard - MrWho Administration</PageTitle>
 
-<h1>Hello, world!</h1>
+<RadzenText TextStyle="TextStyle.H2" class="rz-mb-4">Dashboard</RadzenText>
 
-Welcome to your new app.
+<RadzenRow Gap="2rem">
+    <RadzenColumn Size="12" SizeMD="6" SizeLG="3">
+        <RadzenCard class="rz-text-align-center">
+            <RadzenIcon Icon="people" class="rz-color-primary" Style="font-size: 3rem;" />
+            <RadzenText TextStyle="TextStyle.H4" class="rz-mt-2">1,247</RadzenText>
+            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Total Users</RadzenText>
+        </RadzenCard>
+    </RadzenColumn>
+    
+    <RadzenColumn Size="12" SizeMD="6" SizeLG="3">
+        <RadzenCard class="rz-text-align-center">
+            <RadzenIcon Icon="apps" class="rz-color-success" Style="font-size: 3rem;" />
+            <RadzenText TextStyle="TextStyle.H4" class="rz-mt-2">12</RadzenText>
+            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Applications</RadzenText>
+        </RadzenCard>
+    </RadzenColumn>
+    
+    <RadzenColumn Size="12" SizeMD="6" SizeLG="3">
+        <RadzenCard class="rz-text-align-center">
+            <RadzenIcon Icon="login" class="rz-color-info" Style="font-size: 3rem;" />
+            <RadzenText TextStyle="TextStyle.H4" class="rz-mt-2">3,891</RadzenText>
+            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Logins Today</RadzenText>
+        </RadzenCard>
+    </RadzenColumn>
+    
+    <RadzenColumn Size="12" SizeMD="6" SizeLG="3">
+        <RadzenCard class="rz-text-align-center">
+            <RadzenIcon Icon="security" class="rz-color-warning" Style="font-size: 3rem;" />
+            <RadzenText TextStyle="TextStyle.H4" class="rz-mt-2">99.9%</RadzenText>
+            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Uptime</RadzenText>
+        </RadzenCard>
+    </RadzenColumn>
+</RadzenRow>
+
+<RadzenRow Gap="2rem" class="rz-mt-4">
+    <RadzenColumn Size="12" SizeLG="8">
+        <RadzenCard>
+            <RadzenText TextStyle="TextStyle.H5" class="rz-mb-3">Recent Activity</RadzenText>
+            <RadzenDataGrid AllowFiltering="false" AllowColumnResize="false" AllowSorting="false" 
+                           Data="@recentActivities" TItem="ActivityLog" Density="Density.Compact">
+                <Columns>
+                    <RadzenDataGridColumn TItem="ActivityLog" Property="Time" Title="Time" Width="120px" />
+                    <RadzenDataGridColumn TItem="ActivityLog" Property="User" Title="User" Width="150px" />
+                    <RadzenDataGridColumn TItem="ActivityLog" Property="Action" Title="Action" />
+                    <RadzenDataGridColumn TItem="ActivityLog" Property="Status" Title="Status" Width="100px">
+                        <Template Context="data">
+                            <RadzenBadge BadgeStyle="@(data.Status == "Success" ? BadgeStyle.Success : BadgeStyle.Danger)" 
+                                        Text="@data.Status" />
+                        </Template>
+                    </RadzenDataGridColumn>
+                </Columns>
+            </RadzenDataGrid>
+        </RadzenCard>
+    </RadzenColumn>
+    
+    <RadzenColumn Size="12" SizeLG="4">
+        <RadzenCard>
+            <RadzenText TextStyle="TextStyle.H5" class="rz-mb-3">System Status</RadzenText>
+            <RadzenStack Gap="1rem">
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
+                    <RadzenText>Identity Server</RadzenText>
+                    <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="Online" />
+                </RadzenStack>
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
+                    <RadzenText>Database</RadzenText>
+                    <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="Connected" />
+                </RadzenStack>
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
+                    <RadzenText>API Services</RadzenText>
+                    <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="Running" />
+                </RadzenStack>
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
+                    <RadzenText>Background Jobs</RadzenText>
+                    <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text="Degraded" />
+                </RadzenStack>
+            </RadzenStack>
+        </RadzenCard>
+    </RadzenColumn>
+</RadzenRow>
+
+@code {
+    private List<ActivityLog> recentActivities = new()
+    {
+        new ActivityLog { Time = "10:30 AM", User = "john.doe@company.com", Action = "User login", Status = "Success" },
+        new ActivityLog { Time = "10:25 AM", User = "admin@mrwho.com", Action = "Created new user", Status = "Success" },
+        new ActivityLog { Time = "10:20 AM", User = "jane.smith@company.com", Action = "Password reset", Status = "Success" },
+        new ActivityLog { Time = "10:15 AM", User = "bob.wilson@company.com", Action = "Failed login attempt", Status = "Failed" },
+        new ActivityLog { Time = "10:10 AM", User = "admin@mrwho.com", Action = "Updated application settings", Status = "Success" }
+    };
+
+    public class ActivityLog
+    {
+        public string Time { get; set; } = "";
+        public string User { get; set; } = "";
+        public string Action { get; set; } = "";
+        public string Status { get; set; } = "";
+    }
+}
