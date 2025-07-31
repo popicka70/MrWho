@@ -1,9 +1,19 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.14.36327.8 d17.14
+VisualStudioVersion = 17.14.36327.8
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MrWho", "MrWho\MrWho.csproj", "{9B158CF4-86D0-4200-BB7E-23C65E491304}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WrWhoAdmin.AppHost", "WrWhoAdmin\WrWhoAdmin.AppHost\WrWhoAdmin.AppHost.csproj", "{ABBC3523-7A4E-45CE-B5BD-1D7C7636B32A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WrWhoAdmin.ServiceDefaults", "WrWhoAdmin\WrWhoAdmin.ServiceDefaults\WrWhoAdmin.ServiceDefaults.csproj", "{B58C1D3E-BAF0-2028-F629-1E699BE12DD1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WrWhoAdmin.ApiService", "WrWhoAdmin\WrWhoAdmin.ApiService\WrWhoAdmin.ApiService.csproj", "{7CF4F411-23FF-6585-79B5-2CC6656107AF}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WrWhoAdmin.Web", "WrWhoAdmin\WrWhoAdmin.Web\WrWhoAdmin.Web.csproj", "{BFA34AF9-E963-A6FF-C22C-8B41FBCFA2E9}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WrWhoAdmin.Tests", "WrWhoAdmin\WrWhoAdmin.Tests\WrWhoAdmin.Tests.csproj", "{71BF738B-9DE2-A251-932F-1886D6C6AF44}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +25,26 @@ Global
 		{9B158CF4-86D0-4200-BB7E-23C65E491304}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9B158CF4-86D0-4200-BB7E-23C65E491304}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9B158CF4-86D0-4200-BB7E-23C65E491304}.Release|Any CPU.Build.0 = Release|Any CPU
+		{ABBC3523-7A4E-45CE-B5BD-1D7C7636B32A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{ABBC3523-7A4E-45CE-B5BD-1D7C7636B32A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{ABBC3523-7A4E-45CE-B5BD-1D7C7636B32A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{ABBC3523-7A4E-45CE-B5BD-1D7C7636B32A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B58C1D3E-BAF0-2028-F629-1E699BE12DD1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B58C1D3E-BAF0-2028-F629-1E699BE12DD1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B58C1D3E-BAF0-2028-F629-1E699BE12DD1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B58C1D3E-BAF0-2028-F629-1E699BE12DD1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7CF4F411-23FF-6585-79B5-2CC6656107AF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7CF4F411-23FF-6585-79B5-2CC6656107AF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7CF4F411-23FF-6585-79B5-2CC6656107AF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7CF4F411-23FF-6585-79B5-2CC6656107AF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BFA34AF9-E963-A6FF-C22C-8B41FBCFA2E9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BFA34AF9-E963-A6FF-C22C-8B41FBCFA2E9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BFA34AF9-E963-A6FF-C22C-8B41FBCFA2E9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BFA34AF9-E963-A6FF-C22C-8B41FBCFA2E9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{71BF738B-9DE2-A251-932F-1886D6C6AF44}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{71BF738B-9DE2-A251-932F-1886D6C6AF44}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{71BF738B-9DE2-A251-932F-1886D6C6AF44}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{71BF738B-9DE2-A251-932F-1886D6C6AF44}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
