@@ -148,69 +148,59 @@ using (var scope = app.Services.CreateScope())
     }
     
     // Seed OpenIddict applications for testing
-    var existingClient = await applicationManager.FindByClientIdAsync("postman_client");
-    if (existingClient != null)
+    try
     {
-        // Update existing client with new redirect URIs
-        await applicationManager.DeleteAsync(existingClient);
-    }
-    
-    // Create or recreate the client with updated configuration
-    await applicationManager.CreateAsync(new OpenIddictApplicationDescriptor
-    {
-        ClientId = "postman_client",
-        ClientSecret = "postman_secret",
-        DisplayName = "Postman Test Client",
-        Permissions =
+        // Clear all existing clients to ensure clean state
+        var existingClient = await applicationManager.FindByClientIdAsync("postman_client");
+        if (existingClient != null)
         {
-            OpenIddictConstants.Permissions.Endpoints.Authorization,
-            OpenIddictConstants.Permissions.Endpoints.Token,
-            OpenIddictConstants.Permissions.GrantTypes.AuthorizationCode,
-            OpenIddictConstants.Permissions.GrantTypes.ClientCredentials,
-            OpenIddictConstants.Permissions.GrantTypes.Password,
-            OpenIddictConstants.Permissions.GrantTypes.RefreshToken,
-            "oidc:scope:openid",
-            OpenIddictConstants.Permissions.Scopes.Email,
-            OpenIddictConstants.Permissions.Scopes.Profile,
-            OpenIddictConstants.Permissions.Scopes.Roles,
-            OpenIddictConstants.Permissions.ResponseTypes.Code
-        },
-        RedirectUris = { 
-            new Uri("https://localhost:7001/callback"), 
-            new Uri("http://localhost:5001/callback"),
-
-            // Comprehensive localhost:7002 redirect URIs
-            new Uri("https://localhost:7002/"),
-            new Uri("https://localhost:7002/callback"),
-            new Uri("https://localhost:7002/signin-oidc"),
-            new Uri("https://localhost:7002/auth/callback"),
-            new Uri("https://localhost:7002/authentication/callback"),
-            new Uri("https://localhost:7002/oidc/callback"),
-            new Uri("https://localhost:7002/oauth/callback"),
-            new Uri("https://localhost:7002/login/callback"),
-            new Uri("https://localhost:7002/account/callback"),
-            new Uri("https://localhost:7002/signin"),
-            new Uri("https://localhost:7002/login"),
-            new Uri("https://localhost:7002/auth"),
-            new Uri("https://localhost:7002/connect/callback")
-        },
-        PostLogoutRedirectUris = { 
-            new Uri("https://localhost:7001/"), 
-            new Uri("http://localhost:5001/"),
-
-            // Comprehensive localhost:7002 post-logout redirect URIs
-            new Uri("https://localhost:7002/"),
-            new Uri("https://localhost:7002/signout-callback-oidc"),
-            new Uri("https://localhost:7002/logout"),
-            new Uri("https://localhost:7002/signout"),
-            new Uri("https://localhost:7002/auth/logout"),
-            new Uri("https://localhost:7002/authentication/logout"),
-            new Uri("https://localhost:7002/oidc/logout"),
-            new Uri("https://localhost:7002/oauth/logout"),
-            new Uri("https://localhost:7002/account/logout"),
-            new Uri("https://localhost:7002/connect/logout")
+            await applicationManager.DeleteAsync(existingClient);
         }
-    });
+        
+        // Create fresh client with complete configuration
+        var descriptor = new OpenIddictApplicationDescriptor
+        {
+            ClientId = "postman_client",
+            ClientSecret = "postman_secret",
+            DisplayName = "Postman Test Client",
+            Permissions =
+            {
+                OpenIddictConstants.Permissions.Endpoints.Authorization,
+                OpenIddictConstants.Permissions.Endpoints.Token,
+                OpenIddictConstants.Permissions.Endpoints.EndSession,
+                OpenIddictConstants.Permissions.GrantTypes.AuthorizationCode,
+                OpenIddictConstants.Permissions.GrantTypes.ClientCredentials,
+                OpenIddictConstants.Permissions.GrantTypes.Password,
+                OpenIddictConstants.Permissions.GrantTypes.RefreshToken,
+                "oidc:scope:openid",
+                OpenIddictConstants.Permissions.Scopes.Email,
+                OpenIddictConstants.Permissions.Scopes.Profile,
+                OpenIddictConstants.Permissions.Scopes.Roles,
+                OpenIddictConstants.Permissions.ResponseTypes.Code
+            }
+        };
+
+        // Add redirect URIs
+        descriptor.RedirectUris.Add(new Uri("https://localhost:7001/callback"));
+        descriptor.RedirectUris.Add(new Uri("http://localhost:5001/callback"));
+        descriptor.RedirectUris.Add(new Uri("https://localhost:7002/"));
+        descriptor.RedirectUris.Add(new Uri("https://localhost:7002/callback"));
+        descriptor.RedirectUris.Add(new Uri("https://localhost:7002/signin-oidc"));
+
+        // Add post-logout redirect URIs
+        descriptor.PostLogoutRedirectUris.Add(new Uri("https://localhost:7001/"));
+        descriptor.PostLogoutRedirectUris.Add(new Uri("http://localhost:5001/"));
+        descriptor.PostLogoutRedirectUris.Add(new Uri("https://localhost:7002/"));
+        descriptor.PostLogoutRedirectUris.Add(new Uri("https://localhost:7002/signout-callback-oidc"));
+
+        await applicationManager.CreateAsync(descriptor);
+        Console.WriteLine("OpenIddict client created successfully with EndSession permission and post-logout URIs");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error setting up OpenIddict client: {ex.Message}");
+        throw;
+    }
 }
 
 // Configure routing for controllers
