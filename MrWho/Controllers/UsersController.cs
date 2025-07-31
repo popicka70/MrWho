@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 using MrWho.Models;
+using MrWho.Handlers.Users;
 
 namespace MrWho.Controllers;
 
@@ -11,12 +11,35 @@ namespace MrWho.Controllers;
 [Authorize]
 public class UsersController : ControllerBase
 {
-    private readonly UserManager<IdentityUser> _userManager;
+    private readonly IGetUsersHandler _getUsersHandler;
+    private readonly IGetUserHandler _getUserHandler;
+    private readonly ICreateUserHandler _createUserHandler;
+    private readonly IUpdateUserHandler _updateUserHandler;
+    private readonly IDeleteUserHandler _deleteUserHandler;
+    private readonly IChangePasswordHandler _changePasswordHandler;
+    private readonly IResetPasswordHandler _resetPasswordHandler;
+    private readonly ISetLockoutHandler _setLockoutHandler;
     private readonly ILogger<UsersController> _logger;
 
-    public UsersController(UserManager<IdentityUser> userManager, ILogger<UsersController> logger)
+    public UsersController(
+        IGetUsersHandler getUsersHandler,
+        IGetUserHandler getUserHandler,
+        ICreateUserHandler createUserHandler,
+        IUpdateUserHandler updateUserHandler,
+        IDeleteUserHandler deleteUserHandler,
+        IChangePasswordHandler changePasswordHandler,
+        IResetPasswordHandler resetPasswordHandler,
+        ISetLockoutHandler setLockoutHandler,
+        ILogger<UsersController> logger)
     {
-        _userManager = userManager;
+        _getUsersHandler = getUsersHandler;
+        _getUserHandler = getUserHandler;
+        _createUserHandler = createUserHandler;
+        _updateUserHandler = updateUserHandler;
+        _deleteUserHandler = deleteUserHandler;
+        _changePasswordHandler = changePasswordHandler;
+        _resetPasswordHandler = resetPasswordHandler;
+        _setLockoutHandler = setLockoutHandler;
         _logger = logger;
     }
 
@@ -29,44 +52,7 @@ public class UsersController : ControllerBase
         [FromQuery] int pageSize = 10,
         [FromQuery] string? search = null)
     {
-        if (page < 1) page = 1;
-        if (pageSize < 1 || pageSize > 100) pageSize = 10;
-
-        var query = _userManager.Users.AsQueryable();
-
-        if (!string.IsNullOrWhiteSpace(search))
-        {
-            query = query.Where(u => u.UserName!.Contains(search) || u.Email!.Contains(search));
-        }
-
-        var totalCount = await query.CountAsync();
-        var users = await query
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .Select(u => new UserDto
-            {
-                Id = u.Id,
-                UserName = u.UserName!,
-                Email = u.Email!,
-                EmailConfirmed = u.EmailConfirmed,
-                PhoneNumber = u.PhoneNumber,
-                PhoneNumberConfirmed = u.PhoneNumberConfirmed,
-                TwoFactorEnabled = u.TwoFactorEnabled,
-                LockoutEnabled = u.LockoutEnabled,
-                LockoutEnd = u.LockoutEnd,
-                AccessFailedCount = u.AccessFailedCount
-            })
-            .ToListAsync();
-
-        var result = new PagedResult<UserDto>
-        {
-            Items = users,
-            TotalCount = totalCount,
-            Page = page,
-            PageSize = pageSize,
-            TotalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
-        };
-
+        var result = await _getUsersHandler.HandleAsync(page, pageSize, search);
         return Ok(result);
     }
 
@@ -76,27 +62,12 @@ public class UsersController : ControllerBase
     [HttpGet("{id}")]
     public async Task<ActionResult<UserDto>> GetUser(string id)
     {
-        var user = await _userManager.FindByIdAsync(id);
+        var user = await _getUserHandler.HandleAsync(id);
         if (user == null)
         {
             return NotFound($"User with ID '{id}' not found.");
         }
-
-        var userDto = new UserDto
-        {
-            Id = user.Id,
-            UserName = user.UserName!,
-            Email = user.Email!,
-            EmailConfirmed = user.EmailConfirmed,
-            PhoneNumber = user.PhoneNumber,
-            PhoneNumberConfirmed = user.PhoneNumberConfirmed,
-            TwoFactorEnabled = user.TwoFactorEnabled,
-            LockoutEnabled = user.LockoutEnabled,
-            LockoutEnd = user.LockoutEnd,
-            AccessFailedCount = user.AccessFailedCount
-        };
-
-        return Ok(userDto);
+        return Ok(user);
     }
 
     /// <summary>
@@ -110,44 +81,19 @@ public class UsersController : ControllerBase
             return BadRequest(ModelState);
         }
 
-        var user = new IdentityUser
-        {
-            UserName = request.UserName,
-            Email = request.Email,
-            EmailConfirmed = request.EmailConfirmed ?? false,
-            PhoneNumber = request.PhoneNumber,
-            PhoneNumberConfirmed = request.PhoneNumberConfirmed ?? false,
-            TwoFactorEnabled = request.TwoFactorEnabled ?? false
-        };
+        var (success, user, errors) = await _createUserHandler.HandleAsync(request);
 
-        var result = await _userManager.CreateAsync(user, request.Password);
-
-        if (!result.Succeeded)
+        if (!success)
         {
-            foreach (var error in result.Errors)
+            foreach (var error in errors)
             {
-                ModelState.AddModelError(error.Code, error.Description);
+                ModelState.AddModelError("", error);
             }
             return BadRequest(ModelState);
         }
 
-        _logger.LogInformation("User {UserName} created successfully with ID {UserId}", user.UserName, user.Id);
-
-        var userDto = new UserDto
-        {
-            Id = user.Id,
-            UserName = user.UserName,
-            Email = user.Email,
-            EmailConfirmed = user.EmailConfirmed,
-            PhoneNumber = user.PhoneNumber,
-            PhoneNumberConfirmed = user.PhoneNumberConfirmed,
-            TwoFactorEnabled = user.TwoFactorEnabled,
-            LockoutEnabled = user.LockoutEnabled,
-            LockoutEnd = user.LockoutEnd,
-            AccessFailedCount = user.AccessFailedCount
-        };
-
-        return CreatedAtAction(nameof(GetUser), new { id = user.Id }, userDto);
+        _logger.LogInformation("User {UserName} created successfully with ID {UserId}", user!.UserName, user.Id);
+        return CreatedAtAction(nameof(GetUser), new { id = user.Id }, user);
     }
 
     /// <summary>
@@ -161,54 +107,24 @@ public class UsersController : ControllerBase
             return BadRequest(ModelState);
         }
 
-        var user = await _userManager.FindByIdAsync(id);
-        if (user == null)
+        var (success, user, errors) = await _updateUserHandler.HandleAsync(id, request);
+
+        if (!success)
         {
-            return NotFound($"User with ID '{id}' not found.");
-        }
-
-        // Update user properties
-        user.UserName = request.UserName ?? user.UserName;
-        user.Email = request.Email ?? user.Email;
-        user.PhoneNumber = request.PhoneNumber;
-        
-        if (request.EmailConfirmed.HasValue)
-            user.EmailConfirmed = request.EmailConfirmed.Value;
-        
-        if (request.PhoneNumberConfirmed.HasValue)
-            user.PhoneNumberConfirmed = request.PhoneNumberConfirmed.Value;
-        
-        if (request.TwoFactorEnabled.HasValue)
-            user.TwoFactorEnabled = request.TwoFactorEnabled.Value;
-
-        var result = await _userManager.UpdateAsync(user);
-
-        if (!result.Succeeded)
-        {
-            foreach (var error in result.Errors)
+            if (user == null)
             {
-                ModelState.AddModelError(error.Code, error.Description);
+                return NotFound($"User with ID '{id}' not found.");
+            }
+
+            foreach (var error in errors)
+            {
+                ModelState.AddModelError("", error);
             }
             return BadRequest(ModelState);
         }
 
-        _logger.LogInformation("User {UserName} updated successfully", user.UserName);
-
-        var userDto = new UserDto
-        {
-            Id = user.Id,
-            UserName = user.UserName,
-            Email = user.Email,
-            EmailConfirmed = user.EmailConfirmed,
-            PhoneNumber = user.PhoneNumber,
-            PhoneNumberConfirmed = user.PhoneNumberConfirmed,
-            TwoFactorEnabled = user.TwoFactorEnabled,
-            LockoutEnabled = user.LockoutEnabled,
-            LockoutEnd = user.LockoutEnd,
-            AccessFailedCount = user.AccessFailedCount
-        };
-
-        return Ok(userDto);
+        _logger.LogInformation("User {UserName} updated successfully", user!.UserName);
+        return Ok(user);
     }
 
     /// <summary>
@@ -217,25 +133,24 @@ public class UsersController : ControllerBase
     [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteUser(string id)
     {
-        var user = await _userManager.FindByIdAsync(id);
-        if (user == null)
-        {
-            return NotFound($"User with ID '{id}' not found.");
-        }
+        var (success, errors) = await _deleteUserHandler.HandleAsync(id);
 
-        var result = await _userManager.DeleteAsync(user);
-
-        if (!result.Succeeded)
+        if (!success)
         {
-            foreach (var error in result.Errors)
+            var errorsList = errors.ToList();
+            if (errorsList.Any(e => e.Contains("not found")))
             {
-                ModelState.AddModelError(error.Code, error.Description);
+                return NotFound($"User with ID '{id}' not found.");
+            }
+
+            foreach (var error in errorsList)
+            {
+                ModelState.AddModelError("", error);
             }
             return BadRequest(ModelState);
         }
 
-        _logger.LogInformation("User {UserName} deleted successfully", user.UserName);
-
+        _logger.LogInformation("User with ID {UserId} deleted successfully", id);
         return NoContent();
     }
 
@@ -250,25 +165,24 @@ public class UsersController : ControllerBase
             return BadRequest(ModelState);
         }
 
-        var user = await _userManager.FindByIdAsync(id);
-        if (user == null)
-        {
-            return NotFound($"User with ID '{id}' not found.");
-        }
+        var (success, errors) = await _changePasswordHandler.HandleAsync(id, request);
 
-        var result = await _userManager.ChangePasswordAsync(user, request.CurrentPassword, request.NewPassword);
-
-        if (!result.Succeeded)
+        if (!success)
         {
-            foreach (var error in result.Errors)
+            var errorsList = errors.ToList();
+            if (errorsList.Any(e => e.Contains("not found")))
             {
-                ModelState.AddModelError(error.Code, error.Description);
+                return NotFound($"User with ID '{id}' not found.");
+            }
+
+            foreach (var error in errorsList)
+            {
+                ModelState.AddModelError("", error);
             }
             return BadRequest(ModelState);
         }
 
-        _logger.LogInformation("Password changed successfully for user {UserName}", user.UserName);
-
+        _logger.LogInformation("Password changed successfully for user with ID {UserId}", id);
         return Ok(new { message = "Password changed successfully" });
     }
 
@@ -283,26 +197,24 @@ public class UsersController : ControllerBase
             return BadRequest(ModelState);
         }
 
-        var user = await _userManager.FindByIdAsync(id);
-        if (user == null)
-        {
-            return NotFound($"User with ID '{id}' not found.");
-        }
+        var (success, errors) = await _resetPasswordHandler.HandleAsync(id, request);
 
-        var token = await _userManager.GeneratePasswordResetTokenAsync(user);
-        var result = await _userManager.ResetPasswordAsync(user, token, request.NewPassword);
-
-        if (!result.Succeeded)
+        if (!success)
         {
-            foreach (var error in result.Errors)
+            var errorsList = errors.ToList();
+            if (errorsList.Any(e => e.Contains("not found")))
             {
-                ModelState.AddModelError(error.Code, error.Description);
+                return NotFound($"User with ID '{id}' not found.");
+            }
+
+            foreach (var error in errorsList)
+            {
+                ModelState.AddModelError("", error);
             }
             return BadRequest(ModelState);
         }
 
-        _logger.LogInformation("Password reset successfully for user {UserName}", user.UserName);
-
+        _logger.LogInformation("Password reset successfully for user with ID {UserId}", id);
         return Ok(new { message = "Password reset successfully" });
     }
 
@@ -317,26 +229,24 @@ public class UsersController : ControllerBase
             return BadRequest(ModelState);
         }
 
-        var user = await _userManager.FindByIdAsync(id);
-        if (user == null)
-        {
-            return NotFound($"User with ID '{id}' not found.");
-        }
+        var (success, action, errors) = await _setLockoutHandler.HandleAsync(id, request);
 
-        var result = await _userManager.SetLockoutEndDateAsync(user, request.LockoutEnd);
-
-        if (!result.Succeeded)
+        if (!success)
         {
-            foreach (var error in result.Errors)
+            var errorsList = errors.ToList();
+            if (errorsList.Any(e => e.Contains("not found")))
             {
-                ModelState.AddModelError(error.Code, error.Description);
+                return NotFound($"User with ID '{id}' not found.");
+            }
+
+            foreach (var error in errorsList)
+            {
+                ModelState.AddModelError("", error);
             }
             return BadRequest(ModelState);
         }
 
-        var action = request.LockoutEnd.HasValue && request.LockoutEnd > DateTimeOffset.UtcNow ? "locked" : "unlocked";
-        _logger.LogInformation("User {UserName} {Action} successfully", user.UserName, action);
-
+        _logger.LogInformation("User with ID {UserId} {Action} successfully", id, action);
         return Ok(new { message = $"User {action} successfully" });
     }
 }

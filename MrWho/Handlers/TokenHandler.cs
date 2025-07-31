@@ -105,6 +105,8 @@ public class TokenHandler : ITokenHandler
         var principal = new ClaimsPrincipal(identity);
         principal.SetScopes(request.GetScopes());
 
+        await Task.CompletedTask; // Simulate async operation if needed
+
         return Results.SignIn(principal, authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
     }
 
