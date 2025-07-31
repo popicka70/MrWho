@@ -5,10 +5,10 @@ var sqlServer = builder.AddSqlServer("sqlserver")
     .WithDataVolume()
     .AddDatabase("mrwhodb");
 
-var apiService = builder.AddProject<Projects.WrWhoAdmin_ApiService>("apiservice")
+var apiService = builder.AddProject<Projects.MrWhoAdmin_ApiService>("apiservice")
     .WithHttpHealthCheck("/health");
 
-builder.AddProject<Projects.WrWhoAdmin_Web>("webfrontend")
+builder.AddProject<Projects.MrWhoAdmin_Web>("webfrontend")
     .WithExternalHttpEndpoints()
     .WithHttpHealthCheck("/health")
     .WithReference(apiService)

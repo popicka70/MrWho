@@ -20,7 +20,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\WrWhoAdmin\WrWhoAdmin.ServiceDefaults\WrWhoAdmin.ServiceDefaults.csproj" />
+    <ProjectReference Include="..\WrWhoAdmin.ServiceDefaults\MrWhoAdmin.ServiceDefaults.csproj" />
   </ItemGroup>
 
 </Project>

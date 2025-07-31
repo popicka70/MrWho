@@ -1,4 +1,4 @@
-namespace WrWhoAdmin.Web;
+namespace MrWhoAdmin.Web;
 
 public class WeatherApiClient(HttpClient httpClient)
 {

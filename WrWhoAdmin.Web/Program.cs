@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
-using WrWhoAdmin.Web;
-using WrWhoAdmin.Web.Components;
+using MrWhoAdmin.Web;
+using MrWhoAdmin.Web.Components;
 
 var builder = WebApplication.CreateBuilder(args);
 

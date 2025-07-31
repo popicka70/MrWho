@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Logging;
 
-namespace WrWhoAdmin.Tests;
+namespace MrWhoAdmin.Tests;
 
 [TestClass]
 public class WebTests
@@ -13,7 +13,7 @@ public class WebTests
         // Arrange
         var cancellationToken = new CancellationTokenSource(DefaultTimeout).Token;
 
-        var appHost = await DistributedApplicationTestingBuilder.CreateAsync<Projects.WrWhoAdmin_AppHost>(cancellationToken);
+        var appHost = await DistributedApplicationTestingBuilder.CreateAsync<Projects.MrWhoAdmin_AppHost>(cancellationToken);
         appHost.Services.AddLogging(logging =>
         {
             logging.SetMinimumLevel(LogLevel.Debug);
