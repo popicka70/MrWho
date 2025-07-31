@@ -64,16 +64,17 @@ builder.Services.AddOpenIddict()
         options.SetAuthorizationEndpointUris("/connect/authorize")
                .SetTokenEndpointUris("/connect/token")
                .SetEndSessionEndpointUris("/connect/logout")
-               .SetConfigurationEndpointUris("/.well-known/openid_configuration");
+               .SetConfigurationEndpointUris("/.well-known/openid_configuration")
 
-        // Enable grant types
-        options.AllowAuthorizationCodeFlow()
+               // Enable grant types
+               .AllowAuthorizationCodeFlow()
                .AllowClientCredentialsFlow()
                .AllowPasswordFlow()
                .AllowRefreshTokenFlow();
 
         // Register scopes
-        options.RegisterScopes(OpenIddictConstants.Scopes.Email,
+        options.RegisterScopes("openid",
+                              OpenIddictConstants.Scopes.Email,
                               OpenIddictConstants.Scopes.Profile,
                               OpenIddictConstants.Scopes.Roles);
 
@@ -139,40 +140,69 @@ using (var scope = app.Services.CreateScope())
     }
     
     // Seed OpenIddict applications for testing
-    if (await applicationManager.FindByClientIdAsync("postman_client") == null)
+    var existingClient = await applicationManager.FindByClientIdAsync("postman_client");
+    if (existingClient != null)
     {
-        await applicationManager.CreateAsync(new OpenIddictApplicationDescriptor
-        {
-            ClientId = "postman_client",
-            ClientSecret = "postman_secret",
-            DisplayName = "Postman Test Client",
-            Permissions =
-            {
-                OpenIddictConstants.Permissions.Endpoints.Authorization,
-                OpenIddictConstants.Permissions.Endpoints.Token,
-                OpenIddictConstants.Permissions.GrantTypes.AuthorizationCode,
-                OpenIddictConstants.Permissions.GrantTypes.ClientCredentials,
-                OpenIddictConstants.Permissions.GrantTypes.Password,
-                OpenIddictConstants.Permissions.GrantTypes.RefreshToken,
-                OpenIddictConstants.Permissions.Scopes.Email,
-                OpenIddictConstants.Permissions.Scopes.Profile,
-                OpenIddictConstants.Permissions.Scopes.Roles,
-                OpenIddictConstants.Permissions.ResponseTypes.Code
-            },
-            RedirectUris = { 
-                new Uri("https://localhost:7001/callback"), 
-                new Uri("http://localhost:5001/callback"),
-                new Uri("https://localhost:7002/callback"),
-                new Uri("https://localhost:7002/signin-oidc")
-            },
-            PostLogoutRedirectUris = { 
-                new Uri("https://localhost:7001/"), 
-                new Uri("http://localhost:5001/"),
-                new Uri("https://localhost:7002/"),
-                new Uri("https://localhost:7002/signout-callback-oidc")
-            }
-        });
+        // Update existing client with new redirect URIs
+        await applicationManager.DeleteAsync(existingClient);
     }
+    
+    // Create or recreate the client with updated configuration
+    await applicationManager.CreateAsync(new OpenIddictApplicationDescriptor
+    {
+        ClientId = "postman_client",
+        ClientSecret = "postman_secret",
+        DisplayName = "Postman Test Client",
+        Permissions =
+        {
+            OpenIddictConstants.Permissions.Endpoints.Authorization,
+            OpenIddictConstants.Permissions.Endpoints.Token,
+            OpenIddictConstants.Permissions.GrantTypes.AuthorizationCode,
+            OpenIddictConstants.Permissions.GrantTypes.ClientCredentials,
+            OpenIddictConstants.Permissions.GrantTypes.Password,
+            OpenIddictConstants.Permissions.GrantTypes.RefreshToken,
+            "oidc:scope:openid",
+            OpenIddictConstants.Permissions.Scopes.Email,
+            OpenIddictConstants.Permissions.Scopes.Profile,
+            OpenIddictConstants.Permissions.Scopes.Roles,
+            OpenIddictConstants.Permissions.ResponseTypes.Code
+        },
+        RedirectUris = { 
+            new Uri("https://localhost:7001/callback"), 
+            new Uri("http://localhost:5001/callback"),
+
+            // Comprehensive localhost:7002 redirect URIs
+            new Uri("https://localhost:7002/"),
+            new Uri("https://localhost:7002/callback"),
+            new Uri("https://localhost:7002/signin-oidc"),
+            new Uri("https://localhost:7002/auth/callback"),
+            new Uri("https://localhost:7002/authentication/callback"),
+            new Uri("https://localhost:7002/oidc/callback"),
+            new Uri("https://localhost:7002/oauth/callback"),
+            new Uri("https://localhost:7002/login/callback"),
+            new Uri("https://localhost:7002/account/callback"),
+            new Uri("https://localhost:7002/signin"),
+            new Uri("https://localhost:7002/login"),
+            new Uri("https://localhost:7002/auth"),
+            new Uri("https://localhost:7002/connect/callback")
+        },
+        PostLogoutRedirectUris = { 
+            new Uri("https://localhost:7001/"), 
+            new Uri("http://localhost:5001/"),
+
+            // Comprehensive localhost:7002 post-logout redirect URIs
+            new Uri("https://localhost:7002/"),
+            new Uri("https://localhost:7002/signout-callback-oidc"),
+            new Uri("https://localhost:7002/logout"),
+            new Uri("https://localhost:7002/signout"),
+            new Uri("https://localhost:7002/auth/logout"),
+            new Uri("https://localhost:7002/authentication/logout"),
+            new Uri("https://localhost:7002/oidc/logout"),
+            new Uri("https://localhost:7002/oauth/logout"),
+            new Uri("https://localhost:7002/account/logout"),
+            new Uri("https://localhost:7002/connect/logout")
+        }
+    });
 }
 
 // Configure routing for controllers
@@ -198,6 +228,7 @@ app.MapGet("/debug/client-info", () => new
     ClientSecret = "postman_secret", 
     AuthorizeUrl = "https://localhost:7000/connect/authorize",
     TokenUrl = "https://localhost:7000/connect/token",
+    LogoutUrl = "https://localhost:7000/connect/logout",
     RedirectUris = new[]
     {
         "https://localhost:7001/callback",
@@ -205,10 +236,33 @@ app.MapGet("/debug/client-info", () => new
         "https://localhost:7002/callback",
         "https://localhost:7002/signin-oidc"
     },
-    SampleAuthUrl = "https://localhost:7000/connect/authorize?client_id=postman_client&response_type=code&redirect_uri=https://localhost:7002/signin-oidc&scope=openid%20email%20profile&state=test_state"
+    PostLogoutRedirectUris = new[]
+    {
+        "https://localhost:7001/",
+        "http://localhost:5001/",
+        "https://localhost:7002/",
+        "https://localhost:7002/signout-callback-oidc"
+    },
+    SampleAuthUrl = "https://localhost:7000/connect/authorize?client_id=postman_client&response_type=code&redirect_uri=https://localhost:7002/signin-oidc&scope=openid%20email%20profile&state=test_state",
+    SampleLogoutUrl = "https://localhost:7000/connect/logout?post_logout_redirect_uri=https://localhost:7002/signout-callback-oidc"
 });
 
-app.MapGet("/", () => "MrWho OIDC Service is running. Core functionality initialized.<br/><a href='/connect/login'>Login</a><br/><a href='/debug/client-info'>Client Info</a>");
+// Debug endpoint to show actual database client configuration
+app.MapGet("/debug/db-client-config", async (IOpenIddictApplicationManager applicationManager) =>
+{
+    var client = await applicationManager.FindByClientIdAsync("postman_client");
+    if (client == null) return Results.NotFound("Client not found");
+    
+    return Results.Ok(new
+    {
+        ClientId = await applicationManager.GetClientIdAsync(client),
+        DisplayName = await applicationManager.GetDisplayNameAsync(client),
+        RedirectUris = await applicationManager.GetRedirectUrisAsync(client),
+        PostLogoutRedirectUris = await applicationManager.GetPostLogoutRedirectUrisAsync(client)
+    });
+});
+
+app.MapGet("/", () => "MrWho OIDC Service is running. Core functionality initialized.<br/><a href='/connect/login'>Login</a><br/><a href='/debug/client-info'>Client Info</a><br/><a href='/debug/db-client-config'>DB Client Config</a>");
 
 app.Run();
 

@@ -30,12 +30,16 @@ public class AuthController : Controller
 
         // Log the request for debugging
         Console.WriteLine($"Authorization request received: ClientId={request.ClientId}, ResponseType={request.ResponseType}, RedirectUri={request.RedirectUri}");
+        Console.WriteLine($"User authenticated: {User.Identity?.IsAuthenticated == true}");
 
         // If the user is already authenticated, process the authorization request
         if (User.Identity?.IsAuthenticated == true)
         {
+            Console.WriteLine($"User is authenticated, processing authorization");
             return await ProcessAuthorizationAsync(request);
         }
+
+        Console.WriteLine($"User not authenticated, redirecting to login");
 
         // Store the authorization request in TempData to preserve it across redirects
         TempData["AuthorizationRequest"] = request.ToString();
@@ -48,6 +52,7 @@ public class AuthController : Controller
     [HttpGet("login")]
     public IActionResult Login(string? returnUrl = null)
     {
+        Console.WriteLine($"Login page requested, returnUrl = {returnUrl}");
         ViewData["ReturnUrl"] = returnUrl;
         return View(new LoginViewModel());
     }
@@ -57,22 +62,32 @@ public class AuthController : Controller
     public async Task<IActionResult> Login(LoginViewModel model, string? returnUrl = null)
     {
         ViewData["ReturnUrl"] = returnUrl;
+        Console.WriteLine($"Login POST: Email={model.Email}, ReturnUrl={returnUrl}");
 
         if (ModelState.IsValid)
         {
             var result = await _signInManager.PasswordSignInAsync(model.Email, model.Password, model.RememberMe, lockoutOnFailure: false);
+            Console.WriteLine($"Login attempt result: Success={result.Succeeded}");
+            
             if (result.Succeeded)
             {
                 if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
                 {
+                    Console.WriteLine($"Login successful, redirecting to: {returnUrl}");
                     return Redirect(returnUrl);
                 }
+                Console.WriteLine($"Login successful, redirecting to Home");
                 return RedirectToAction("Index", "Home");
             }
             else
             {
+                Console.WriteLine($"Login failed: {result}");
                 ModelState.AddModelError(string.Empty, "Invalid login attempt.");
             }
+        }
+        else
+        {
+            Console.WriteLine($"Login ModelState invalid");
         }
 
         return View(model);
@@ -107,26 +122,106 @@ public class AuthController : Controller
 
     private async Task<IActionResult> ProcessAuthorizationAsync(OpenIddictRequest request)
     {
+        Console.WriteLine($"ProcessAuthorizationAsync called");
+        
         var user = await _userManager.GetUserAsync(User);
+        Console.WriteLine($"User lookup result: Found={user != null}, Id={user?.Id}, UserName={user?.UserName}");
+        
         if (user == null)
         {
+            Console.WriteLine($"No user found via GetUserAsync, attempting to find or create user");
+            
+            // Extract user information from claims
+            var email = User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value ?? 
+                       User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value ?? 
+                       User.FindFirst("name")?.Value;
+            
+            var userName = User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value ?? 
+                          User.FindFirst("name")?.Value ?? 
+                          email;
+            
+            Console.WriteLine($"Extracted from claims: Email={email}, UserName={userName}");
+            
+            if (!string.IsNullOrEmpty(email))
+            {
+                // Try to find user by email
+                user = await _userManager.FindByEmailAsync(email);
+                
+                if (user == null && !string.IsNullOrEmpty(userName))
+                {
+                    // Try to find user by username
+                    user = await _userManager.FindByNameAsync(userName);
+                }
+                
+                if (user == null)
+                {
+                    Console.WriteLine($"User not found in database, creating new user: {email}");
+                    
+                    // Create a new user dynamically
+                    user = new IdentityUser
+                    {
+                        UserName = userName ?? email,
+                        Email = email,
+                        EmailConfirmed = true
+                    };
+                    
+                    var createResult = await _userManager.CreateAsync(user, "TempPassword123!");
+                    
+                    if (createResult.Succeeded)
+                    {
+                        Console.WriteLine($"User created successfully: {user.Id}");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Failed to create user: {string.Join(", ", createResult.Errors.Select(e => e.Description))}");
+                        return Forbid(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+                    }
+                }
+                else
+                {
+                    Console.WriteLine($"Found existing user: {user.Id}, {user.UserName}");
+                }
+            }
+            else
+            {
+                Console.WriteLine($"No email found in claims, cannot create or find user");
+                return Forbid(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+            }
+        }
+
+        if (user == null)
+        {
+            Console.WriteLine($"Still no user found after creation attempt, returning Forbid");
             return Forbid(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
         }
 
-        // Create a new ClaimsIdentity containing the claims that
-        // will be used to create an id_token, a token or a code.
-        var identity = new ClaimsIdentity(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
-        identity.AddClaim(Claims.Subject, user.Id);
-        identity.AddClaim(Claims.Email, user.Email!);
-        identity.AddClaim(Claims.Name, user.UserName!);
-        identity.AddClaim(Claims.PreferredUsername, user.UserName!);
+        try
+        {
+            // Create a new ClaimsIdentity containing the claims that
+            // will be used to create an id_token, a token or a code.
+            var identity = new ClaimsIdentity(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+            identity.AddClaim(Claims.Subject, user.Id);
+            identity.AddClaim(Claims.Email, user.Email!);
+            identity.AddClaim(Claims.Name, user.UserName!);
+            identity.AddClaim(Claims.PreferredUsername, user.UserName!);
 
-        // Set the list of scopes granted to the client application.
-        var principal = new ClaimsPrincipal(identity);
-        principal.SetScopes(request.GetScopes());
+            Console.WriteLine($"Created identity with claims: Subject={user.Id}, Email={user.Email}, Name={user.UserName}");
 
-        // Automatically consent to the authorization request
-        return SignIn(principal, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+            // Set the list of scopes granted to the client application.
+            var principal = new ClaimsPrincipal(identity);
+            principal.SetScopes(request.GetScopes());
+
+            Console.WriteLine($"Set scopes: {string.Join(", ", request.GetScopes())}");
+            Console.WriteLine($"Returning SignIn result");
+
+            // Automatically consent to the authorization request
+            return SignIn(principal, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error in ProcessAuthorizationAsync: {ex}");
+            return Forbid(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+        }
     }
 }
 
