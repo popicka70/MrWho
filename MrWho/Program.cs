@@ -25,11 +25,10 @@ builder.Services.AddAntiforgery(options =>
     options.SuppressXFrameOptionsHeader = false;
 });
 
-// Configure Entity Framework with SQLite (persistent database)
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
+// Configure Entity Framework with SQL Server (via Aspire)
+builder.AddSqlServerDbContext<ApplicationDbContext>("mrwhodb", null, optionsBuilder =>
 {
-    options.UseSqlite("Data Source=MrWho.db");
-    options.UseOpenIddict();
+    optionsBuilder.UseOpenIddict();
 });
 
 // Configure Identity
@@ -129,6 +128,7 @@ using (var scope = app.Services.CreateScope())
     var userManager = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
     var applicationManager = scope.ServiceProvider.GetRequiredService<IOpenIddictApplicationManager>();
     
+    // Ensure database is created (works for both development and production)
     await context.Database.EnsureCreatedAsync();
     
     // Seed test users
