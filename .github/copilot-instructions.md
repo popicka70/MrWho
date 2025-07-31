@@ -9,6 +9,7 @@
 
 ## Terminal Commands
 When executing terminal commands, use the correct PowerShell syntax for Visual Studio 2022 Developer PowerShell v17.14.10. Examples:
+**CRITICAL: Always append `; echo ""` to PowerShell commands when using `run_in_terminal`**
 
 - Use `dotnet` commands for .NET operations
 - Use PowerShell cmdlets like `Get-ChildItem`, `New-Item`, etc.

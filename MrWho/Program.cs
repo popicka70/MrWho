@@ -10,6 +10,7 @@ using MrWho.Handlers;
 using OpenIddict.Abstractions;
 using OpenIddict.Server.AspNetCore;
 using static OpenIddict.Abstractions.OpenIddictConstants;
+using System.ComponentModel.DataAnnotations;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -229,6 +230,264 @@ app.MapGet("/connect/userinfo", [Authorize] async (HttpContext context, IUserInf
     return await userInfoHandler.HandleUserInfoRequestAsync(context);
 });
 
+// ================================
+// USERS CRUD API ENDPOINTS
+// =================??===============
+
+// Get all users with pagination
+app.MapGet("/api/users", [Authorize] async (
+    [FromQuery] int page,
+    [FromQuery] int pageSize,
+    [FromQuery] string? search,
+    UserManager<IdentityUser> userManager) =>
+{
+    if (page < 1) page = 1;
+    if (pageSize < 1 || pageSize > 100) pageSize = 10;
+
+    var query = userManager.Users.AsQueryable();
+
+    if (!string.IsNullOrWhiteSpace(search))
+    {
+        query = query.Where(u => u.UserName!.Contains(search) || u.Email!.Contains(search));
+    }
+
+    var totalCount = await query.CountAsync();
+    var users = await query
+        .Skip((page - 1) * pageSize)
+        .Take(pageSize)
+        .Select(u => new UserDto
+        {
+            Id = u.Id,
+            UserName = u.UserName!,
+            Email = u.Email!,
+            EmailConfirmed = u.EmailConfirmed,
+            PhoneNumber = u.PhoneNumber,
+            PhoneNumberConfirmed = u.PhoneNumberConfirmed,
+            TwoFactorEnabled = u.TwoFactorEnabled,
+            LockoutEnabled = u.LockoutEnabled,
+            LockoutEnd = u.LockoutEnd,
+            AccessFailedCount = u.AccessFailedCount
+        })
+        .ToListAsync();
+
+    var result = new PagedResult<UserDto>
+    {
+        Items = users,
+        TotalCount = totalCount,
+        Page = page,
+        PageSize = pageSize,
+        TotalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
+    };
+
+    return Results.Ok(result);
+});
+
+// Get user by ID
+app.MapGet("/api/users/{id}", [Authorize] async (string id, UserManager<IdentityUser> userManager) =>
+{
+    var user = await userManager.FindByIdAsync(id);
+    if (user == null)
+    {
+        return Results.NotFound($"User with ID '{id}' not found.");
+    }
+
+    var userDto = new UserDto
+    {
+        Id = user.Id,
+        UserName = user.UserName!,
+        Email = user.Email!,
+        EmailConfirmed = user.EmailConfirmed,
+        PhoneNumber = user.PhoneNumber,
+        PhoneNumberConfirmed = user.PhoneNumberConfirmed,
+        TwoFactorEnabled = user.TwoFactorEnabled,
+        LockoutEnabled = user.LockoutEnabled,
+        LockoutEnd = user.LockoutEnd,
+        AccessFailedCount = user.AccessFailedCount
+    };
+
+    return Results.Ok(userDto);
+});
+
+// Create new user
+app.MapPost("/api/users", [Authorize] async (CreateUserRequest request, UserManager<IdentityUser> userManager, ILogger<Program> logger) =>
+{
+    var user = new IdentityUser
+    {
+        UserName = request.UserName,
+        Email = request.Email,
+        EmailConfirmed = request.EmailConfirmed ?? false,
+        PhoneNumber = request.PhoneNumber,
+        PhoneNumberConfirmed = request.PhoneNumberConfirmed ?? false,
+        TwoFactorEnabled = request.TwoFactorEnabled ?? false
+    };
+
+    var result = await userManager.CreateAsync(user, request.Password);
+
+    if (!result.Succeeded)
+    {
+        var errors = result.Errors.ToDictionary(e => e.Code, e => e.Description);
+        return Results.BadRequest(new { errors });
+    }
+
+    logger.LogInformation("User {UserName} created successfully with ID {UserId}", user.UserName, user.Id);
+
+    var userDto = new UserDto
+    {
+        Id = user.Id,
+        UserName = user.UserName,
+        Email = user.Email,
+        EmailConfirmed = user.EmailConfirmed,
+        PhoneNumber = user.PhoneNumber,
+        PhoneNumberConfirmed = user.PhoneNumberConfirmed,
+        TwoFactorEnabled = user.TwoFactorEnabled,
+        LockoutEnabled = user.LockoutEnabled,
+        LockoutEnd = user.LockoutEnd,
+        AccessFailedCount = user.AccessFailedCount
+    };
+
+    return Results.Created($"/api/users/{user.Id}", userDto);
+});
+
+// Update user
+app.MapPut("/api/users/{id}", [Authorize] async (string id, UpdateUserRequest request, UserManager<IdentityUser> userManager, ILogger<Program> logger) =>
+{
+    var user = await userManager.FindByIdAsync(id);
+    if (user == null)
+    {
+        return Results.NotFound($"User with ID '{id}' not found.");
+    }
+
+    // Update user properties
+    user.UserName = request.UserName ?? user.UserName;
+    user.Email = request.Email ?? user.Email;
+    user.PhoneNumber = request.PhoneNumber;
+    
+    if (request.EmailConfirmed.HasValue)
+        user.EmailConfirmed = request.EmailConfirmed.Value;
+    
+    if (request.PhoneNumberConfirmed.HasValue)
+        user.PhoneNumberConfirmed = request.PhoneNumberConfirmed.Value;
+    
+    if (request.TwoFactorEnabled.HasValue)
+        user.TwoFactorEnabled = request.TwoFactorEnabled.Value;
+
+    var result = await userManager.UpdateAsync(user);
+
+    if (!result.Succeeded)
+    {
+        var errors = result.Errors.ToDictionary(e => e.Code, e => e.Description);
+        return Results.BadRequest(new { errors });
+    }
+
+    logger.LogInformation("User {UserName} updated successfully", user.UserName);
+
+    var userDto = new UserDto
+    {
+        Id = user.Id,
+        UserName = user.UserName,
+        Email = user.Email,
+        EmailConfirmed = user.EmailConfirmed,
+        PhoneNumber = user.PhoneNumber,
+        PhoneNumberConfirmed = user.PhoneNumberConfirmed,
+        TwoFactorEnabled = user.TwoFactorEnabled,
+        LockoutEnabled = user.LockoutEnabled,
+        LockoutEnd = user.LockoutEnd,
+        AccessFailedCount = user.AccessFailedCount
+    };
+
+    return Results.Ok(userDto);
+});
+
+// Delete user
+app.MapDelete("/api/users/{id}", [Authorize] async (string id, UserManager<IdentityUser> userManager, ILogger<Program> logger) =>
+{
+    var user = await userManager.FindByIdAsync(id);
+    if (user == null)
+    {
+        return Results.NotFound($"User with ID '{id}' not found.");
+    }
+
+    var result = await userManager.DeleteAsync(user);
+
+    if (!result.Succeeded)
+    {
+        var errors = result.Errors.ToDictionary(e => e.Code, e => e.Description);
+        return Results.BadRequest(new { errors });
+    }
+
+    logger.LogInformation("User {UserName} deleted successfully", user.UserName);
+
+    return Results.NoContent();
+});
+
+// Change user password
+app.MapPost("/api/users/{id}/change-password", [Authorize] async (string id, ChangePasswordRequest request, UserManager<IdentityUser> userManager, ILogger<Program> logger) =>
+{
+    var user = await userManager.FindByIdAsync(id);
+    if (user == null)
+    {
+        return Results.NotFound($"User with ID '{id}' not found.");
+    }
+
+    var result = await userManager.ChangePasswordAsync(user, request.CurrentPassword, request.NewPassword);
+
+    if (!result.Succeeded)
+    {
+        var errors = result.Errors.ToDictionary(e => e.Code, e => e.Description);
+        return Results.BadRequest(new { errors });
+    }
+
+    logger.LogInformation("Password changed successfully for user {UserName}", user.UserName);
+
+    return Results.Ok(new { message = "Password changed successfully" });
+});
+
+// Reset user password (admin function)
+app.MapPost("/api/users/{id}/reset-password", [Authorize] async (string id, ResetPasswordRequest request, UserManager<IdentityUser> userManager, ILogger<Program> logger) =>
+{
+    var user = await userManager.FindByIdAsync(id);
+    if (user == null)
+    {
+        return Results.NotFound($"User with ID '{id}' not found.");
+    }
+
+    var token = await userManager.GeneratePasswordResetTokenAsync(user);
+    var result = await userManager.ResetPasswordAsync(user, token, request.NewPassword);
+
+    if (!result.Succeeded)
+    {
+        var errors = result.Errors.ToDictionary(e => e.Code, e => e.Description);
+        return Results.BadRequest(new { errors });
+    }
+
+    logger.LogInformation("Password reset successfully for user {UserName}", user.UserName);
+
+    return Results.Ok(new { message = "Password reset successfully" });
+});
+
+// Lock/unlock user account
+app.MapPost("/api/users/{id}/lockout", [Authorize] async (string id, SetLockoutRequest request, UserManager<IdentityUser> userManager, ILogger<Program> logger) =>
+{
+    var user = await userManager.FindByIdAsync(id);
+    if (user == null)
+    {
+        return Results.NotFound($"User with ID '{id}' not found.");
+    }
+
+    var result = await userManager.SetLockoutEndDateAsync(user, request.LockoutEnd);
+
+    if (!result.Succeeded)
+    {
+        var errors = result.Errors.ToDictionary(e => e.Code, e => e.Description);
+        return Results.BadRequest(new { errors });
+    }
+
+    var action = request.LockoutEnd.HasValue && request.LockoutEnd > DateTimeOffset.UtcNow ? "locked" : "unlocked";
+    logger.LogInformation("User {UserName} {Action} successfully", user.UserName, action);
+
+    return Results.Ok(new { message = $"User {action} successfully" });
+});
+
 app.MapGet("/debug/client-info", () => new
 {
     ClientId = "postman_client",
@@ -270,6 +529,86 @@ app.MapGet("/debug/db-client-config", async (IOpenIddictApplicationManager appli
 });
 
 app.Run();
+
+// ================================
+// DTOs AND MODELS
+// ================================
+
+public class UserDto
+{
+    public string Id { get; set; } = string.Empty;
+    public string UserName { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
+    public bool EmailConfirmed { get; set; }
+    public string? PhoneNumber { get; set; }
+    public bool PhoneNumberConfirmed { get; set; }
+    public bool TwoFactorEnabled { get; set; }
+    public bool LockoutEnabled { get; set; }
+    public DateTimeOffset? LockoutEnd { get; set; }
+    public int AccessFailedCount { get; set; }
+}
+
+public class CreateUserRequest
+{
+    [Required]
+    [EmailAddress]
+    public string Email { get; set; } = string.Empty;
+
+    [Required]
+    public string UserName { get; set; } = string.Empty;
+
+    [Required]
+    [MinLength(6)]
+    public string Password { get; set; } = string.Empty;
+
+    public string? PhoneNumber { get; set; }
+    public bool? EmailConfirmed { get; set; }
+    public bool? PhoneNumberConfirmed { get; set; }
+    public bool? TwoFactorEnabled { get; set; }
+}
+
+public class UpdateUserRequest
+{
+    [EmailAddress]
+    public string? Email { get; set; }
+
+    public string? UserName { get; set; }
+    public string? PhoneNumber { get; set; }
+    public bool? EmailConfirmed { get; set; }
+    public bool? PhoneNumberConfirmed { get; set; }
+    public bool? TwoFactorEnabled { get; set; }
+}
+
+public class ChangePasswordRequest
+{
+    [Required]
+    public string CurrentPassword { get; set; } = string.Empty;
+
+    [Required]
+    [MinLength(6)]
+    public string NewPassword { get; set; } = string.Empty;
+}
+
+public class ResetPasswordRequest
+{
+    [Required]
+    [MinLength(6)]
+    public string NewPassword { get; set; } = string.Empty;
+}
+
+public class SetLockoutRequest
+{
+    public DateTimeOffset? LockoutEnd { get; set; }
+}
+
+public class PagedResult<T>
+{
+    public List<T> Items { get; set; } = new();
+    public int TotalCount { get; set; }
+    public int Page { get; set; }
+    public int PageSize { get; set; }
+    public int TotalPages { get; set; }
+}
 
 /// <summary>
 /// Static class to handle token endpoint requests
