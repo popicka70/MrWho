@@ -63,7 +63,8 @@ builder.Services.AddOpenIddict()
         // Enable the authorization and token endpoints
         options.SetAuthorizationEndpointUris("/connect/authorize")
                .SetTokenEndpointUris("/connect/token")
-               .SetEndSessionEndpointUris("/connect/logout");
+               .SetEndSessionEndpointUris("/connect/logout")
+               .SetConfigurationEndpointUris("/.well-known/openid_configuration");
 
         // Enable grant types
         options.AllowAuthorizationCodeFlow()
@@ -158,8 +159,18 @@ using (var scope = app.Services.CreateScope())
                 OpenIddictConstants.Permissions.Scopes.Roles,
                 OpenIddictConstants.Permissions.ResponseTypes.Code
             },
-            RedirectUris = { new Uri("https://localhost:7001/callback"), new Uri("http://localhost:5001/callback") },
-            PostLogoutRedirectUris = { new Uri("https://localhost:7001/"), new Uri("http://localhost:5001/") }
+            RedirectUris = { 
+                new Uri("https://localhost:7001/callback"), 
+                new Uri("http://localhost:5001/callback"),
+                new Uri("https://localhost:7002/callback"),
+                new Uri("https://localhost:7002/signin-oidc")
+            },
+            PostLogoutRedirectUris = { 
+                new Uri("https://localhost:7001/"), 
+                new Uri("http://localhost:5001/"),
+                new Uri("https://localhost:7002/"),
+                new Uri("https://localhost:7002/signout-callback-oidc")
+            }
         });
     }
 }
@@ -176,27 +187,28 @@ app.MapPost("/connect/token", async (HttpContext context, ITokenHandler tokenHan
 });
 
 // UserInfo endpoint (optional but recommended)
-app.MapGet("/connect/userinfo", [Authorize] async (HttpContext context) =>
+app.MapGet("/connect/userinfo", [Authorize] async (HttpContext context, IUserInfoHandler userInfoHandler) =>
 {
-    var userManager = context.RequestServices.GetRequiredService<UserManager<IdentityUser>>();
-    var user = await userManager.GetUserAsync(context.User);
-
-    if (user == null)
-    {
-        return Results.Challenge(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
-    }
-
-    return Results.Ok(new
-    {
-        sub = user.Id,
-        email = user.Email,
-        name = user.UserName,
-        preferred_username = user.UserName,
-        email_verified = user.EmailConfirmed
-    });
+    return await userInfoHandler.HandleUserInfoRequestAsync(context);
 });
 
-app.MapGet("/", () => "MrWho OIDC Service is running. Core functionality initialized.<br/><a href='/connect/login'>Login</a>");
+app.MapGet("/debug/client-info", () => new
+{
+    ClientId = "postman_client",
+    ClientSecret = "postman_secret", 
+    AuthorizeUrl = "https://localhost:7000/connect/authorize",
+    TokenUrl = "https://localhost:7000/connect/token",
+    RedirectUris = new[]
+    {
+        "https://localhost:7001/callback",
+        "http://localhost:5001/callback", 
+        "https://localhost:7002/callback",
+        "https://localhost:7002/signin-oidc"
+    },
+    SampleAuthUrl = "https://localhost:7000/connect/authorize?client_id=postman_client&response_type=code&redirect_uri=https://localhost:7002/signin-oidc&scope=openid%20email%20profile&state=test_state"
+});
+
+app.MapGet("/", () => "MrWho OIDC Service is running. Core functionality initialized.<br/><a href='/connect/login'>Login</a><br/><a href='/debug/client-info'>Client Info</a>");
 
 app.Run();
 

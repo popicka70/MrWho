@@ -18,7 +18,7 @@ When executing terminal commands, use the correct PowerShell syntax for Visual S
 ## Project Structure
 This is a Razor Pages project with:
 - OpenIddict OIDC Server implementation
-- Entity Framework Core with SQLite
+- Entity Framework Core with SQLite  
 - ASP.NET Core Identity
 - Bootstrap 5 for UI styling
 

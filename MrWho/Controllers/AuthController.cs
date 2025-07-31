@@ -28,6 +28,9 @@ public class AuthController : Controller
         var request = HttpContext.GetOpenIddictServerRequest() ??
                       throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
 
+        // Log the request for debugging
+        Console.WriteLine($"Authorization request received: ClientId={request.ClientId}, ResponseType={request.ResponseType}, RedirectUri={request.RedirectUri}");
+
         // If the user is already authenticated, process the authorization request
         if (User.Identity?.IsAuthenticated == true)
         {
@@ -37,8 +40,9 @@ public class AuthController : Controller
         // Store the authorization request in TempData to preserve it across redirects
         TempData["AuthorizationRequest"] = request.ToString();
 
-        // Redirect to login page
-        return RedirectToAction(nameof(Login), new { returnUrl = Url.Action(nameof(Authorize)) });
+        // Preserve query parameters when redirecting to login
+        var returnUrl = Url.Action(nameof(Authorize)) + HttpContext.Request.QueryString;
+        return RedirectToAction(nameof(Login), new { returnUrl });
     }
 
     [HttpGet("login")]
