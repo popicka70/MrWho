@@ -190,12 +190,17 @@ using (var scope = app.Services.CreateScope())
         descriptor.RedirectUris.Add(new Uri("https://localhost:7002/"));
         descriptor.RedirectUris.Add(new Uri("https://localhost:7002/callback"));
         descriptor.RedirectUris.Add(new Uri("https://localhost:7002/signin-oidc"));
+        descriptor.RedirectUris.Add(new Uri("https://localhost:7257/"));
+        descriptor.RedirectUris.Add(new Uri("https://localhost:7257/callback"));
+        descriptor.RedirectUris.Add(new Uri("https://localhost:7257/signin-oidc"));
 
         // Add post-logout redirect URIs
         descriptor.PostLogoutRedirectUris.Add(new Uri("https://localhost:7001/"));
         descriptor.PostLogoutRedirectUris.Add(new Uri("http://localhost:5001/"));
         descriptor.PostLogoutRedirectUris.Add(new Uri("https://localhost:7002/"));
         descriptor.PostLogoutRedirectUris.Add(new Uri("https://localhost:7002/signout-callback-oidc"));
+        descriptor.PostLogoutRedirectUris.Add(new Uri("https://localhost:7257/"));
+        descriptor.PostLogoutRedirectUris.Add(new Uri("https://localhost:7257/signout-callback-oidc"));
 
         await applicationManager.CreateAsync(descriptor);
         Console.WriteLine("OpenIddict client created successfully with EndSession permission and post-logout URIs");

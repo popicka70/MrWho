@@ -1,4 +1,4 @@
-# GitHub Copilot Instructions
+﻿# GitHub Copilot Instructions
 
 ## Development Environment
 - **Operating System**: Windows
@@ -14,6 +14,12 @@ When executing terminal commands, use the correct PowerShell syntax for Visual S
 - Use PowerShell cmdlets like `Get-ChildItem`, `New-Item`, etc.
 - File paths should use Windows conventions (`\` separators)
 - Use proper PowerShell escaping and quoting
+- [ ] Use `;` instead of `&&` for command chaining
+- [ ] Properly quote file paths for Windows
+- [ ] Example: `cd "v:\path"; command` NOT `cd "v:\path" && command`
+- [ ] Do not use `grep` in powershell commands
+- [ ] Empty pipe elements are not allowed
+- [ ] `lua -e "print('Testing...'); print('✅ Test passed!')"` is an example of an unnecessary command. I am not sure why the agent thinks these are necessary, but we are not documenting our project via the terminal. Do not use terminal commands to mark milestones.
 
 ## Project Structure
 This is a Razor Pages project with:

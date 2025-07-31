@@ -1,0 +1,15 @@
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager Navigation
+
+<AuthorizeView>
+    <Authorized>
+        <span class="navbar-text">
+            Hello, @context.User.Identity?.Name!
+            <a href="/logout" class="btn btn-outline-secondary btn-sm ms-2">Logout</a>
+        </span>
+    </Authorized>
+    <NotAuthorized>
+        <a href="/login" class="btn btn-primary btn-sm">Login</a>
+    </NotAuthorized>
+</AuthorizeView>
