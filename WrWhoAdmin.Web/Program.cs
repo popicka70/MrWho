@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using MrWhoAdmin.Web;
 using MrWhoAdmin.Web.Components;
+using Radzen;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,6 +15,9 @@ builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
 builder.Services.AddOutputCache();
+
+// Add Radzen services
+builder.Services.AddRadzenComponents();
 
 builder.Services.AddHttpClient<WeatherApiClient>(client =>
     {
@@ -70,36 +74,34 @@ builder.Services.AddAuthentication(options =>
     options.ClaimActions.MapJsonKey("given_name", "given_name");
     options.ClaimActions.MapJsonKey("family_name", "family_name");
     options.ClaimActions.MapJsonKey("email", "email");
-    options.ClaimActions.MapJsonKey("preferred_username", "preferred_username");
 
-    // Add events for debugging
+    // Comprehensive event logging for debugging
     options.Events = new OpenIdConnectEvents
     {
         OnRedirectToIdentityProvider = context =>
         {
-            // Log the redirect URL for debugging
             var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-            logger.LogInformation("Redirecting to identity provider: {RedirectUri}", context.ProtocolMessage.RedirectUri);
-            logger.LogInformation("Client ID being sent: {ClientId}", context.ProtocolMessage.ClientId);
-            logger.LogInformation("Full authorization URL: {AuthorizationEndpoint}", context.ProtocolMessage.BuildRedirectUrl());
-            return Task.CompletedTask;
-        },
-        OnAuthenticationFailed = context =>
-        {
-            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-            logger.LogError(context.Exception, "Authentication failed: {Error}", context.Exception.Message);
+            logger.LogInformation("Redirecting to identity provider: {Authority}", context.ProtocolMessage.IssuerAddress);
+            logger.LogInformation("Client ID: {ClientId}", context.ProtocolMessage.ClientId);
+            logger.LogInformation("Redirect URI: {RedirectUri}", context.ProtocolMessage.RedirectUri);
+            logger.LogInformation("Response Type: {ResponseType}", context.ProtocolMessage.ResponseType);
+            logger.LogInformation("Scope: {Scope}", context.ProtocolMessage.Scope);
+            logger.LogInformation("State: {State}", context.ProtocolMessage.State);
             return Task.CompletedTask;
         },
         OnAuthorizationCodeReceived = context =>
         {
             var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-            logger.LogInformation("Authorization code received, about to exchange for tokens");
+            logger.LogInformation("Authorization code received from identity provider");
+            logger.LogInformation("Code: {Code}", context.ProtocolMessage.Code?.Substring(0, Math.Min(10, context.ProtocolMessage.Code.Length)) + "...");
             return Task.CompletedTask;
         },
         OnTokenResponseReceived = context =>
         {
             var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-            logger.LogInformation("Token response received. Access token present: {HasAccessToken}", !string.IsNullOrEmpty(context.TokenEndpointResponse.AccessToken));
+            logger.LogInformation("Token response received from identity provider");
+            logger.LogInformation("Access token present: {HasAccessToken}", !string.IsNullOrEmpty(context.TokenEndpointResponse.AccessToken));
+            logger.LogInformation("Refresh token present: {HasRefreshToken}", !string.IsNullOrEmpty(context.TokenEndpointResponse.RefreshToken));
             logger.LogInformation("ID token present: {HasIdToken}", !string.IsNullOrEmpty(context.TokenEndpointResponse.IdToken));
             return Task.CompletedTask;
         },
