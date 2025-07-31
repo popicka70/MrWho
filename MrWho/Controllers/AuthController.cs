@@ -129,69 +129,8 @@ public class AuthController : Controller
         
         if (user == null)
         {
-            Console.WriteLine($"No user found via GetUserAsync, attempting to find or create user");
-            
-            // Extract user information from claims
-            var email = User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value ?? 
-                       User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value ?? 
-                       User.FindFirst("name")?.Value;
-            
-            var userName = User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value ?? 
-                          User.FindFirst("name")?.Value ?? 
-                          email;
-            
-            Console.WriteLine($"Extracted from claims: Email={email}, UserName={userName}");
-            
-            if (!string.IsNullOrEmpty(email))
-            {
-                // Try to find user by email
-                user = await _userManager.FindByEmailAsync(email);
-                
-                if (user == null && !string.IsNullOrEmpty(userName))
-                {
-                    // Try to find user by username
-                    user = await _userManager.FindByNameAsync(userName);
-                }
-                
-                if (user == null)
-                {
-                    Console.WriteLine($"User not found in database, creating new user: {email}");
-                    
-                    // Create a new user dynamically
-                    user = new IdentityUser
-                    {
-                        UserName = userName ?? email,
-                        Email = email,
-                        EmailConfirmed = true
-                    };
-                    
-                    var createResult = await _userManager.CreateAsync(user, "TempPassword123!");
-                    
-                    if (createResult.Succeeded)
-                    {
-                        Console.WriteLine($"User created successfully: {user.Id}");
-                    }
-                    else
-                    {
-                        Console.WriteLine($"Failed to create user: {string.Join(", ", createResult.Errors.Select(e => e.Description))}");
-                        return Forbid(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
-                    }
-                }
-                else
-                {
-                    Console.WriteLine($"Found existing user: {user.Id}, {user.UserName}");
-                }
-            }
-            else
-            {
-                Console.WriteLine($"No email found in claims, cannot create or find user");
-                return Forbid(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
-            }
-        }
-
-        if (user == null)
-        {
-            Console.WriteLine($"Still no user found after creation attempt, returning Forbid");
+            Console.WriteLine($"No user found via GetUserAsync - Identity claim configuration may be incorrect");
+            Console.WriteLine($"Available claims: {string.Join(", ", User.Claims.Select(c => $"{c.Type}={c.Value}"))}");
             return Forbid(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
         }
 
