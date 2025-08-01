@@ -27,7 +27,7 @@ This is a Razor Pages project with:
 - OpenIddict OIDC Server implementation
 - Entity Framework Core with SQLite
 - ASP.NET Core Identity
-- Bootstrap 5 for UI styling
+- Radzen components for Blazor applications
 
 ## Code Style
 - Use C# 13.0 syntax features
@@ -35,6 +35,8 @@ This is a Razor Pages project with:
 - Use dependency injection patterns
 - Implement proper error handling
 - Follow security best practices for OIDC/OAuth2
+- Use mediator pattern for controllers
+- Private instance fields start with underscore
 
 ## Development Workflow
 - Use Visual Studio 2022 for development
