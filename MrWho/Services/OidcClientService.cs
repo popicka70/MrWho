@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using OpenIddict.Abstractions;
 using MrWho.Data;
 using MrWho.Models;
+using Microsoft.AspNetCore.Identity;
 
 namespace MrWho.Services;
 
@@ -10,6 +11,7 @@ namespace MrWho.Services;
 /// </summary>
 public interface IOidcClientService
 {
+    Task InitializeEssentialDataAsync();
     Task InitializeDefaultRealmAndClientsAsync();
     Task<IEnumerable<Client>> GetEnabledClientsAsync();
     Task SyncClientWithOpenIddictAsync(Client client);
@@ -30,16 +32,172 @@ public class OidcClientService : IOidcClientService
 {
     private readonly ApplicationDbContext _context;
     private readonly IOpenIddictApplicationManager _applicationManager;
+    private readonly UserManager<IdentityUser> _userManager;
     private readonly ILogger<OidcClientService> _logger;
 
     public OidcClientService(
         ApplicationDbContext context,
         IOpenIddictApplicationManager applicationManager,
+        UserManager<IdentityUser> userManager,
         ILogger<OidcClientService> logger)
     {
         _context = context;
         _applicationManager = applicationManager;
+        _userManager = userManager;
         _logger = logger;
+    }
+
+    /// <summary>
+    /// Initialize essential data that must always be present (admin realm, admin client, admin user)
+    /// </summary>
+    public async Task InitializeEssentialDataAsync()
+    {
+        // 1. Create admin realm if it doesn't exist
+        var adminRealm = await _context.Realms.FirstOrDefaultAsync(r => r.Name == "admin");
+        if (adminRealm == null)
+        {
+            adminRealm = new Realm
+            {
+                Name = "admin",
+                DisplayName = "MrWho Administration",
+                Description = "Administrative realm for MrWho OIDC server management",
+                IsEnabled = true,
+                AccessTokenLifetime = TimeSpan.FromMinutes(60),
+                RefreshTokenLifetime = TimeSpan.FromDays(30),
+                AuthorizationCodeLifetime = TimeSpan.FromMinutes(10),
+                CreatedBy = "System"
+            };
+            _context.Realms.Add(adminRealm);
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Created admin realm");
+        }
+
+        // 2. Create admin client for MrWhoAdmin.Web if it doesn't exist
+        var adminClient = await _context.Clients
+            .Include(c => c.RedirectUris)
+            .Include(c => c.PostLogoutUris)
+            .Include(c => c.Scopes)
+            .Include(c => c.Permissions)
+            .FirstOrDefaultAsync(c => c.ClientId == "mrwho_admin_web");
+
+        if (adminClient == null)
+        {
+            adminClient = new Client
+            {
+                ClientId = "mrwho_admin_web",
+                ClientSecret = "MrWhoAdmin2024!SecretKey",
+                Name = "MrWho Admin Web Application",
+                Description = "Official web administration interface for MrWho OIDC server",
+                RealmId = adminRealm.Id,
+                IsEnabled = true,
+                ClientType = ClientType.Confidential,
+                AllowAuthorizationCodeFlow = true,
+                AllowClientCredentialsFlow = false,
+                AllowPasswordFlow = false,
+                AllowRefreshTokenFlow = true,
+                RequirePkce = true,
+                RequireClientSecret = true,
+                CreatedBy = "System"
+            };
+
+            _context.Clients.Add(adminClient);
+            await _context.SaveChangesAsync();
+
+            // Add redirect URIs for MrWhoAdmin.Web (port 7257)
+            var redirectUris = new[]
+            {
+                "https://localhost:7257/signin-oidc",
+                "https://localhost:7257/callback"
+            };
+
+            foreach (var uri in redirectUris)
+            {
+                _context.ClientRedirectUris.Add(new ClientRedirectUri
+                {
+                    ClientId = adminClient.Id,
+                    Uri = uri
+                });
+            }
+
+            // Add post-logout URIs
+            var postLogoutUris = new[]
+            {
+                "https://localhost:7257/",
+                "https://localhost:7257/signout-callback-oidc"
+            };
+
+            foreach (var uri in postLogoutUris)
+            {
+                _context.ClientPostLogoutUris.Add(new ClientPostLogoutUri
+                {
+                    ClientId = adminClient.Id,
+                    Uri = uri
+                });
+            }
+
+            // Add scopes
+            var scopes = new[] { "openid", "email", "profile", "roles" };
+            foreach (var scope in scopes)
+            {
+                _context.ClientScopes.Add(new ClientScope
+                {
+                    ClientId = adminClient.Id,
+                    Scope = scope
+                });
+            }
+
+            // Add permissions
+            var permissions = new[]
+            {
+                OpenIddictConstants.Permissions.Endpoints.Authorization,
+                OpenIddictConstants.Permissions.Endpoints.Token,
+                OpenIddictConstants.Permissions.Endpoints.EndSession,
+                OpenIddictConstants.Permissions.GrantTypes.AuthorizationCode,
+                OpenIddictConstants.Permissions.GrantTypes.RefreshToken,
+                "oidc:scope:openid",
+                OpenIddictConstants.Permissions.Scopes.Email,
+                OpenIddictConstants.Permissions.Scopes.Profile,
+                OpenIddictConstants.Permissions.Scopes.Roles,
+                OpenIddictConstants.Permissions.ResponseTypes.Code
+            };
+
+            foreach (var permission in permissions)
+            {
+                _context.ClientPermissions.Add(new ClientPermission
+                {
+                    ClientId = adminClient.Id,
+                    Permission = permission
+                });
+            }
+
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Created admin client 'mrwho_admin_web'");
+        }
+
+        // 3. Create admin user if it doesn't exist
+        var adminUser = await _userManager.FindByNameAsync("admin@mrwho.local");
+        if (adminUser == null)
+        {
+            adminUser = new IdentityUser
+            {
+                UserName = "admin@mrwho.local",
+                Email = "admin@mrwho.local",
+                EmailConfirmed = true
+            };
+
+            var result = await _userManager.CreateAsync(adminUser, "MrWhoAdmin2024!");
+            if (result.Succeeded)
+            {
+                _logger.LogInformation("Created admin user 'admin@mrwho.local'");
+            }
+            else
+            {
+                _logger.LogError("Failed to create admin user: {Errors}", string.Join(", ", result.Errors.Select(e => e.Description)));
+            }
+        }
+
+        // Sync the admin client with OpenIddict
+        await SyncClientWithOpenIddictAsync(adminClient);
     }
 
     public async Task InitializeDefaultRealmAndClientsAsync()
@@ -53,14 +211,15 @@ public class OidcClientService : IOidcClientService
                 Name = "default",
                 DisplayName = "Default Realm",
                 Description = "Default realm for OIDC clients",
-                IsEnabled = true
+                IsEnabled = true,
+                CreatedBy = "System"
             };
             _context.Realms.Add(defaultRealm);
             await _context.SaveChangesAsync();
             _logger.LogInformation("Created default realm");
         }
 
-        // Create default client if it doesn't exist
+        // Create default client if it doesn't exist (keeping existing postman_client for backwards compatibility)
         var defaultClient = await _context.Clients
             .Include(c => c.RedirectUris)
             .Include(c => c.PostLogoutUris)
@@ -84,7 +243,8 @@ public class OidcClientService : IOidcClientService
                 AllowPasswordFlow = true,
                 AllowRefreshTokenFlow = true,
                 RequirePkce = false,
-                RequireClientSecret = true
+                RequireClientSecret = true,
+                CreatedBy = "System"
             };
 
             _context.Clients.Add(defaultClient);
@@ -97,10 +257,7 @@ public class OidcClientService : IOidcClientService
                 "http://localhost:5001/callback",
                 "https://localhost:7002/",
                 "https://localhost:7002/callback",
-                "https://localhost:7002/signin-oidc",
-                "https://localhost:7257/",
-                "https://localhost:7257/callback",
-                "https://localhost:7257/signin-oidc"
+                "https://localhost:7002/signin-oidc"
             };
 
             foreach (var uri in redirectUris)
@@ -118,9 +275,7 @@ public class OidcClientService : IOidcClientService
                 "https://localhost:7001/",
                 "http://localhost:5001/",
                 "https://localhost:7002/",
-                "https://localhost:7002/signout-callback-oidc",
-                "https://localhost:7257/",
-                "https://localhost:7257/signout-callback-oidc"
+                "https://localhost:7002/signout-callback-oidc"
             };
 
             foreach (var uri in postLogoutUris)

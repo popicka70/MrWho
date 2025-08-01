@@ -127,7 +127,7 @@ app.UseAntiforgery();
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Initialize database and seed data using the new dynamic approach
+// Initialize database and seed essential data
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -137,27 +137,32 @@ using (var scope = app.Services.CreateScope())
     // Ensure database is created (works for both development and production)
     await context.Database.EnsureCreatedAsync();
     
-    // Seed test users
-    if (!context.Users.Any())
+    // Initialize essential data (admin realm, admin client, admin user)
+    try
     {
-        var user1 = new IdentityUser 
+        await oidcClientService.InitializeEssentialDataAsync();
+        Console.WriteLine("Essential OIDC data initialized successfully");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error initializing essential OIDC data: {ex.Message}");
+        throw;
+    }
+    
+    // Seed additional test users for development
+    if (!await context.Users.AnyAsync(u => u.UserName == "test@example.com"))
+    {
+        var testUser = new IdentityUser 
         { 
             UserName = "test@example.com", 
             Email = "test@example.com", 
             EmailConfirmed = true 
         };
-        await userManager.CreateAsync(user1, "Test123!");
-        
-        var user2 = new IdentityUser 
-        { 
-            UserName = "admin@example.com", 
-            Email = "admin@example.com", 
-            EmailConfirmed = true 
-        };
-        await userManager.CreateAsync(user2, "Admin123!");
+        await userManager.CreateAsync(testUser, "Test123!");
+        Console.WriteLine("Created test user");
     }
     
-    // Initialize default realm and clients using the dynamic service
+    // Initialize default realm and clients using the dynamic service (keeping for backwards compatibility)
     try
     {
         await oidcClientService.InitializeDefaultRealmAndClientsAsync();
@@ -244,6 +249,90 @@ app.MapGet("/debug/db-client-config", async (IOpenIddictApplicationManager appli
     }
     
     return Results.Ok(clientConfigs);
+});
+
+app.MapGet("/debug/admin-client-info", async (IOidcClientService oidcClientService) =>
+{
+    var clients = await oidcClientService.GetEnabledClientsAsync();
+    var adminClient = clients.FirstOrDefault(c => c.ClientId == "mrwho_admin_web");
+    
+    if (adminClient == null)
+    {
+        return Results.NotFound("Admin client not found");
+    }
+    
+    return Results.Ok(new
+    {
+        ClientId = adminClient.ClientId,
+        ClientSecret = adminClient.ClientSecret,
+        Name = adminClient.Name,
+        RealmName = adminClient.Realm.Name,
+        IsEnabled = adminClient.IsEnabled,
+        AuthorizeUrl = "https://localhost:7113/connect/authorize",
+        TokenUrl = "https://localhost:7113/connect/token",
+        LogoutUrl = "https://localhost:7113/connect/logout",
+        RedirectUris = adminClient.RedirectUris.Select(ru => ru.Uri).ToArray(),
+        PostLogoutRedirectUris = adminClient.PostLogoutUris.Select(plu => plu.Uri).ToArray(),
+        Scopes = adminClient.Scopes.Select(s => s.Scope).ToArray(),
+        SampleAuthUrl = $"https://localhost:7113/connect/authorize?client_id={adminClient.ClientId}&response_type=code&redirect_uri=https://localhost:7257/signin-oidc&scope=openid%20email%20profile%20roles&state=admin_test",
+        SampleLogoutUrl = "https://localhost:7113/connect/logout?post_logout_redirect_uri=https://localhost:7257/signout-callback-oidc",
+        AdminCredentials = new
+        {
+            Username = "admin@mrwho.local",
+            Password = "MrWhoAdmin2024!"
+        }
+    });
+});
+
+// Debug endpoint for all essential data
+app.MapGet("/debug/essential-data", async (IOidcClientService oidcClientService, ApplicationDbContext context) =>
+{
+    var adminRealm = await context.Realms.FirstOrDefaultAsync(r => r.Name == "admin");
+    var adminClient = await context.Clients
+        .Include(c => c.RedirectUris)
+        .Include(c => c.PostLogoutUris)
+        .Include(c => c.Scopes)
+        .FirstOrDefaultAsync(c => c.ClientId == "mrwho_admin_web");
+    var adminUser = await context.Users.FirstOrDefaultAsync(u => u.UserName == "admin@mrwho.local");
+    
+    return Results.Ok(new
+    {
+        AdminRealm = adminRealm != null ? new
+        {
+            adminRealm.Id,
+            adminRealm.Name,
+            adminRealm.DisplayName,
+            adminRealm.Description,
+            adminRealm.IsEnabled
+        } : null,
+        AdminClient = adminClient != null ? new
+        {
+            adminClient.Id,
+            adminClient.ClientId,
+            adminClient.Name,
+            adminClient.IsEnabled,
+            adminClient.RealmId,
+            RedirectUris = adminClient.RedirectUris.Select(ru => ru.Uri).ToArray(),
+            PostLogoutUris = adminClient.PostLogoutUris.Select(plu => plu.Uri).ToArray(),
+            Scopes = adminClient.Scopes.Select(s => s.Scope).ToArray()
+        } : null,
+        AdminUser = adminUser != null ? new
+        {
+            adminUser.Id,
+            adminUser.UserName,
+            adminUser.Email,
+            adminUser.EmailConfirmed
+        } : null,
+        SetupInstructions = new
+        {
+            LoginUrl = "https://localhost:7257/login",
+            AdminCredentials = new
+            {
+                Username = "admin@mrwho.local",
+                Password = "MrWhoAdmin2024!"
+            }
+        }
+    });
 });
 
 app.Run();

@@ -70,15 +70,16 @@ builder.Services.AddAuthentication(options =>
 .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme)
 .AddOpenIdConnect(OpenIdConnectDefaults.AuthenticationScheme, options =>
 {
+    // Use the dedicated admin client created by the seeding process
     options.Authority = "https://localhost:7113/";
-    options.ClientId = "postman_client";
-    options.ClientSecret = "postman_secret";
+    options.ClientId = "mrwho_admin_web";
+    options.ClientSecret = "MrWhoAdmin2024!SecretKey";
     options.ResponseType = "code";
     options.SaveTokens = true;
     options.GetClaimsFromUserInfoEndpoint = true;
     options.RequireHttpsMetadata = false; // Only for development
 
-    // Set explicit callback paths based on your app's URL
+    // Set explicit callback paths for the admin web app (port 7257)
     options.CallbackPath = "/signin-oidc";
     options.SignedOutCallbackPath = "/signout-callback-oidc";
 
@@ -91,6 +92,7 @@ builder.Services.AddAuthentication(options =>
     options.Scope.Add("openid");
     options.Scope.Add("profile");
     options.Scope.Add("email");
+    options.Scope.Add("roles");
 
     // Force UserInfo endpoint call by removing ALL claims from ID token processing
     options.ClaimActions.Clear();
@@ -102,7 +104,7 @@ builder.Services.AddAuthentication(options =>
     options.ClaimActions.DeleteClaim("at_hash");
     options.ClaimActions.DeleteClaim("azp");
     options.ClaimActions.DeleteClaim("oi_au_id");
-    options.ClaimActions.DeleteClaim("oi_tkn_id");
+    options.ClaimActions.DeleteClaim("oi_tnk_id");
 
     // Only map claims from UserInfo endpoint
     options.ClaimActions.MapJsonKey("name", "name");
