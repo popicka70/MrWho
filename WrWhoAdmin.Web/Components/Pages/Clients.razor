@@ -1,0 +1,320 @@
+@page "/clients"
+@attribute [Authorize]
+@inject NavigationManager Navigation
+@inject ILogger<Clients> Logger
+@rendermode InteractiveServer
+
+<PageTitle>Clients - MrWho Admin</PageTitle>
+
+<RadzenText TextStyle="TextStyle.H3" TagName="TagName.H1" class="rz-pt-8">
+    <RadzenIcon Icon="apps" class="rz-me-1" />
+    Clients Management
+</RadzenText>
+
+<RadzenCard class="rz-my-4">
+    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" class="rz-mb-4">
+        <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem">
+            <RadzenTextBox @bind-Value="@searchTerm" Placeholder="Search clients..." Style="width: 300px;" />
+            <RadzenDropDown @bind-Value="@selectedRealm" Data="@realms" TextProperty="DisplayName" ValueProperty="Id" 
+                           Placeholder="Filter by realm..." Style="width: 200px;" AllowClear="true" />
+            <RadzenButton Click="@LoadClients" Icon="search" ButtonStyle="ButtonStyle.Secondary" />
+        </RadzenStack>
+        <RadzenButton Click="@(() => Navigation.NavigateTo("/clients/add"))" Icon="add" ButtonStyle="ButtonStyle.Primary" Text="Add Client" />
+    </RadzenStack>
+
+    @if (isLoading)
+    {
+        <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+    }
+    else if (clients.Any())
+    {
+        <RadzenDataGrid Data="@clients" TItem="ClientDto" AllowPaging="true" PageSize="10" AllowSorting="true">
+            <Columns>
+                <RadzenDataGridColumn TItem="ClientDto" Property="ClientId" Title="Client ID" Width="200px">
+                    <Template Context="client">
+                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
+                            <RadzenIcon Icon="@GetClientTypeIcon(client.ClientType)" 
+                                       Style="@($"color: {GetClientTypeColor(client.ClientType)}")" />
+                            <RadzenText Text="@client.ClientId" />
+                        </RadzenStack>
+                    </Template>
+                </RadzenDataGridColumn>
+                
+                <RadzenDataGridColumn TItem="ClientDto" Property="Name" Title="Name" />
+                
+                <RadzenDataGridColumn TItem="ClientDto" Property="RealmName" Title="Realm" Width="150px">
+                    <Template Context="client">
+                        <RadzenBadge BadgeStyle="BadgeStyle.Secondary" Text="@client.RealmName" />
+                    </Template>
+                </RadzenDataGridColumn>
+                
+                <RadzenDataGridColumn TItem="ClientDto" Property="ClientType" Title="Type" Width="120px">
+                    <Template Context="client">
+                        <RadzenBadge BadgeStyle="@GetClientTypeBadgeStyle(client.ClientType)" 
+                                    Text="@client.ClientType.ToString()" />
+                    </Template>
+                </RadzenDataGridColumn>
+                
+                <RadzenDataGridColumn TItem="ClientDto" Property="IsEnabled" Title="Status" Width="100px">
+                    <Template Context="client">
+                        <RadzenBadge BadgeStyle="@(client.IsEnabled ? BadgeStyle.Success : BadgeStyle.Danger)" 
+                                    Text="@(client.IsEnabled ? "Enabled" : "Disabled")" />
+                    </Template>
+                </RadzenDataGridColumn>
+                
+                <RadzenDataGridColumn TItem="ClientDto" Title="Flows" Width="150px" Sortable="false">
+                    <Template Context="client">
+                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.25rem" class="rz-flex-wrap">
+                            @if (client.AllowAuthorizationCodeFlow)
+                            {
+                                <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="Auth Code" />
+                            }
+                            @if (client.AllowClientCredentialsFlow)
+                            {
+                                <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="Client Creds" />
+                            }
+                            @if (client.AllowPasswordFlow)
+                            {
+                                <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text="Password" />
+                            }
+                            @if (client.AllowRefreshTokenFlow)
+                            {
+                                <RadzenBadge BadgeStyle="BadgeStyle.Light" Text="Refresh" />
+                            }
+                        </RadzenStack>
+                    </Template>
+                </RadzenDataGridColumn>
+                
+                <RadzenDataGridColumn TItem="ClientDto" Title="Actions" Width="200px" Sortable="false">
+                    <Template Context="client">
+                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                            <RadzenButton Click="@(() => EditClient(client.Id))" Icon="edit" Size="ButtonSize.Small" 
+                                         ButtonStyle="ButtonStyle.Light" Text="Edit" />
+                            <RadzenButton Click="@(() => ViewDetails(client.Id))" Icon="visibility" Size="ButtonSize.Small" 
+                                         ButtonStyle="ButtonStyle.Info" Text="Details" />
+                        </RadzenStack>
+                    </Template>
+                </RadzenDataGridColumn>
+            </Columns>
+        </RadzenDataGrid>
+    }
+    else
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Info">
+            <RadzenText>No clients found. Click "Add Client" to create your first client.</RadzenText>
+        </RadzenAlert>
+    }
+</RadzenCard>
+
+@code {
+    private List<ClientDto> clients = new();
+    private List<RealmDto> realms = new();
+    private bool isLoading = false;
+    private string searchTerm = "";
+    private string? selectedRealm;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await InitializeRealms();
+        await LoadClients();
+    }
+
+    private async Task InitializeRealms()
+    {
+        realms = new List<RealmDto>
+        {
+            new() { Id = "1", Name = "default", DisplayName = "Default Realm" },
+            new() { Id = "2", Name = "sample-development", DisplayName = "Development Environment" },
+            new() { Id = "3", Name = "sample-staging", DisplayName = "Staging Environment" },
+            new() { Id = "4", Name = "sample-production", DisplayName = "Production Environment" },
+        };
+        await Task.CompletedTask;
+    }
+
+    private async Task LoadClients()
+    {
+        isLoading = true;
+        try
+        {
+            // For now, use mock data until API integration is complete
+            await Task.Delay(500); // Simulate API call
+            
+            clients = new List<ClientDto>
+            {
+                new() { 
+                    Id = "1", 
+                    ClientId = "postman_client", 
+                    Name = "Postman Test Client",
+                    Description = "Default test client for development",
+                    RealmId = "1",
+                    RealmName = "Default Realm",
+                    IsEnabled = true, 
+                    ClientType = ClientType.Confidential,
+                    AllowAuthorizationCodeFlow = true,
+                    AllowClientCredentialsFlow = true,
+                    AllowPasswordFlow = true,
+                    AllowRefreshTokenFlow = true,
+                    RequirePkce = false,
+                    RequireClientSecret = true
+                },
+                new() { 
+                    Id = "2", 
+                    ClientId = "spa-dev-app", 
+                    Name = "SPA Development App",
+                    Description = "Single Page Application for development",
+                    RealmId = "2",
+                    RealmName = "Development Environment",
+                    IsEnabled = true, 
+                    ClientType = ClientType.Public,
+                    AllowAuthorizationCodeFlow = true,
+                    AllowClientCredentialsFlow = false,
+                    AllowPasswordFlow = false,
+                    AllowRefreshTokenFlow = true,
+                    RequirePkce = true,
+                    RequireClientSecret = false
+                },
+                new() { 
+                    Id = "3", 
+                    ClientId = "web-staging-app", 
+                    Name = "Web Staging Application",
+                    Description = "Server-side web application for staging environment",
+                    RealmId = "3",
+                    RealmName = "Staging Environment",
+                    IsEnabled = true, 
+                    ClientType = ClientType.Confidential,
+                    AllowAuthorizationCodeFlow = true,
+                    AllowClientCredentialsFlow = false,
+                    AllowPasswordFlow = false,
+                    AllowRefreshTokenFlow = true,
+                    RequirePkce = false,
+                    RequireClientSecret = true
+                },
+                new() { 
+                    Id = "4", 
+                    ClientId = "api-service-client", 
+                    Name = "API Service Client",
+                    Description = "Machine-to-machine client for API services",
+                    RealmId = "2",
+                    RealmName = "Development Environment",
+                    IsEnabled = true, 
+                    ClientType = ClientType.Machine,
+                    AllowAuthorizationCodeFlow = false,
+                    AllowClientCredentialsFlow = true,
+                    AllowPasswordFlow = false,
+                    AllowRefreshTokenFlow = false,
+                    RequirePkce = false,
+                    RequireClientSecret = true
+                },
+                new() { 
+                    Id = "5", 
+                    ClientId = "mobile-demo-app", 
+                    Name = "Mobile Demo Application",
+                    Description = "Mobile application for demonstration purposes",
+                    RealmId = "2",
+                    RealmName = "Development Environment",
+                    IsEnabled = true, 
+                    ClientType = ClientType.Public,
+                    AllowAuthorizationCodeFlow = true,
+                    AllowClientCredentialsFlow = false,
+                    AllowPasswordFlow = false,
+                    AllowRefreshTokenFlow = true,
+                    RequirePkce = true,
+                    RequireClientSecret = false
+                },
+            };
+
+            // Apply filters
+            var filteredClients = clients.AsEnumerable();
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                filteredClients = filteredClients.Where(c => 
+                    c.ClientId.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                    c.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                    c.Description?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) == true
+                );
+            }
+
+            if (!string.IsNullOrWhiteSpace(selectedRealm))
+            {
+                filteredClients = filteredClients.Where(c => c.RealmId == selectedRealm);
+            }
+
+            clients = filteredClients.ToList();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading clients");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void EditClient(string clientId)
+    {
+        Navigation.NavigateTo($"/clients/edit/{clientId}");
+    }
+
+    private void ViewDetails(string clientId)
+    {
+        Navigation.NavigateTo($"/clients/details/{clientId}");
+    }
+
+    private string GetClientTypeIcon(ClientType clientType) => clientType switch
+    {
+        ClientType.Public => "public",
+        ClientType.Confidential => "security",
+        ClientType.Machine => "precision_manufacturing",
+        _ => "apps"
+    };
+
+    private string GetClientTypeColor(ClientType clientType) => clientType switch
+    {
+        ClientType.Public => "var(--rz-info)",
+        ClientType.Confidential => "var(--rz-success)",
+        ClientType.Machine => "var(--rz-warning)",
+        _ => "var(--rz-text-color)"
+    };
+
+    private BadgeStyle GetClientTypeBadgeStyle(ClientType clientType) => clientType switch
+    {
+        ClientType.Public => BadgeStyle.Info,
+        ClientType.Confidential => BadgeStyle.Success,
+        ClientType.Machine => BadgeStyle.Warning,
+        _ => BadgeStyle.Secondary
+    };
+
+    public enum ClientType
+    {
+        Confidential = 0,
+        Public = 1,
+        Machine = 2
+    }
+
+    public class ClientDto
+    {
+        public string Id { get; set; } = string.Empty;
+        public string ClientId { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public bool IsEnabled { get; set; }
+        public ClientType ClientType { get; set; }
+        public bool AllowAuthorizationCodeFlow { get; set; }
+        public bool AllowClientCredentialsFlow { get; set; }
+        public bool AllowPasswordFlow { get; set; }
+        public bool AllowRefreshTokenFlow { get; set; }
+        public bool RequirePkce { get; set; }
+        public bool RequireClientSecret { get; set; }
+        public string RealmId { get; set; } = string.Empty;
+        public string RealmName { get; set; } = string.Empty;
+    }
+
+    public class RealmDto
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string? DisplayName { get; set; }
+    }
+}

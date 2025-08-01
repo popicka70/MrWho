@@ -1,0 +1,186 @@
+@page "/realms"
+@attribute [Authorize]
+@inject NavigationManager Navigation
+@inject ILogger<Realms> Logger
+@rendermode InteractiveServer
+
+<PageTitle>Realms - MrWho Admin</PageTitle>
+
+<RadzenText TextStyle="TextStyle.H3" TagName="TagName.H1" class="rz-pt-8">
+    <RadzenIcon Icon="domain" class="rz-me-1" />
+    Realms Management
+</RadzenText>
+
+<RadzenCard class="rz-my-4">
+    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" class="rz-mb-4">
+        <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem">
+            <RadzenTextBox @bind-Value="@searchTerm" Placeholder="Search realms..." Style="width: 300px;" />
+            <RadzenButton Click="@LoadRealms" Icon="search" ButtonStyle="ButtonStyle.Secondary" />
+        </RadzenStack>
+        <RadzenButton Click="@(() => Navigation.NavigateTo("/realms/add"))" Icon="add" ButtonStyle="ButtonStyle.Primary" Text="Add Realm" />
+    </RadzenStack>
+
+    @if (isLoading)
+    {
+        <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+    }
+    else if (realms.Any())
+    {
+        <RadzenDataGrid Data="@realms" TItem="RealmDto" AllowPaging="true" PageSize="10" AllowSorting="true">
+            <Columns>
+                <RadzenDataGridColumn TItem="RealmDto" Property="Name" Title="Name" Width="200px">
+                    <Template Context="realm">
+                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
+                            <RadzenIcon Icon="@(realm.IsEnabled ? "domain" : "domain_disabled")" 
+                                       Style="@($"color: {(realm.IsEnabled ? "var(--rz-success)" : "var(--rz-danger)")}")" />
+                            <RadzenText Text="@realm.Name" />
+                        </RadzenStack>
+                    </Template>
+                </RadzenDataGridColumn>
+                
+                <RadzenDataGridColumn TItem="RealmDto" Property="DisplayName" Title="Display Name" />
+                
+                <RadzenDataGridColumn TItem="RealmDto" Property="Description" Title="Description">
+                    <Template Context="realm">
+                        <RadzenText Text="@(realm.Description ?? "-")" Style="@(string.IsNullOrEmpty(realm.Description) ? "color: var(--rz-text-disabled-color)" : "")" />
+                    </Template>
+                </RadzenDataGridColumn>
+                
+                <RadzenDataGridColumn TItem="RealmDto" Property="IsEnabled" Title="Status" Width="100px">
+                    <Template Context="realm">
+                        <RadzenBadge BadgeStyle="@(realm.IsEnabled ? BadgeStyle.Success : BadgeStyle.Danger)" 
+                                    Text="@(realm.IsEnabled ? "Enabled" : "Disabled")" />
+                    </Template>
+                </RadzenDataGridColumn>
+                
+                <RadzenDataGridColumn TItem="RealmDto" Property="ClientCount" Title="Clients" Width="80px">
+                    <Template Context="realm">
+                        <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="@realm.ClientCount.ToString()" />
+                    </Template>
+                </RadzenDataGridColumn>
+                
+                <RadzenDataGridColumn TItem="RealmDto" Title="Actions" Width="200px" Sortable="false">
+                    <Template Context="realm">
+                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                            <RadzenButton Click="@(() => EditRealm(realm.Id))" Icon="edit" Size="ButtonSize.Small" 
+                                         ButtonStyle="ButtonStyle.Light" Text="Edit" />
+                            <RadzenButton Click="@(() => ViewClients(realm.Id))" Icon="apps" Size="ButtonSize.Small" 
+                                         ButtonStyle="ButtonStyle.Info" Text="Clients" />
+                        </RadzenStack>
+                    </Template>
+                </RadzenDataGridColumn>
+            </Columns>
+        </RadzenDataGrid>
+    }
+    else
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Info">
+            <RadzenText>No realms found. Click "Add Realm" to create your first realm.</RadzenText>
+        </RadzenAlert>
+    }
+</RadzenCard>
+
+@code {
+    private List<RealmDto> realms = new();
+    private bool isLoading = false;
+    private string searchTerm = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRealms();
+    }
+
+    private async Task LoadRealms()
+    {
+        isLoading = true;
+        try
+        {
+            // For now, use mock data until API integration is complete
+            await Task.Delay(500); // Simulate API call
+            
+            realms = new List<RealmDto>
+            {
+                new() { 
+                    Id = "1", 
+                    Name = "default", 
+                    DisplayName = "Default Realm", 
+                    Description = "Default realm for OIDC clients", 
+                    IsEnabled = true, 
+                    ClientCount = 3,
+                    CreatedAt = DateTime.Now.AddDays(-30)
+                },
+                new() { 
+                    Id = "2", 
+                    Name = "sample-development", 
+                    DisplayName = "Development Environment", 
+                    Description = "Sample realm for development and testing purposes", 
+                    IsEnabled = true, 
+                    ClientCount = 5,
+                    CreatedAt = DateTime.Now.AddDays(-15)
+                },
+                new() { 
+                    Id = "3", 
+                    Name = "sample-staging", 
+                    DisplayName = "Staging Environment", 
+                    Description = "Sample realm for staging and pre-production testing", 
+                    IsEnabled = true, 
+                    ClientCount = 2,
+                    CreatedAt = DateTime.Now.AddDays(-10)
+                },
+                new() { 
+                    Id = "4", 
+                    Name = "sample-production", 
+                    DisplayName = "Production Environment", 
+                    Description = "Sample realm for production-like configuration", 
+                    IsEnabled = false, 
+                    ClientCount = 1,
+                    CreatedAt = DateTime.Now.AddDays(-5)
+                },
+            };
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                realms = realms.Where(r => 
+                    r.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                    r.DisplayName?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) == true ||
+                    r.Description?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) == true
+                ).ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading realms");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void EditRealm(string realmId)
+    {
+        Navigation.NavigateTo($"/realms/edit/{realmId}");
+    }
+
+    private void ViewClients(string realmId)
+    {
+        Navigation.NavigateTo($"/clients?realmId={realmId}");
+    }
+
+    public class RealmDto
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public bool IsEnabled { get; set; } = true;
+        public string? DisplayName { get; set; }
+        public TimeSpan AccessTokenLifetime { get; set; } = TimeSpan.FromMinutes(60);
+        public TimeSpan RefreshTokenLifetime { get; set; } = TimeSpan.FromDays(30);
+        public TimeSpan AuthorizationCodeLifetime { get; set; } = TimeSpan.FromMinutes(10);
+        public DateTime CreatedAt { get; set; }
+        public DateTime UpdatedAt { get; set; }
+        public string? CreatedBy { get; set; }
+        public string? UpdatedBy { get; set; }
+        public int ClientCount { get; set; }
+    }
+}

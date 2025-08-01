@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using MrWhoAdmin.Web;
 using MrWhoAdmin.Web.Components;
+using MrWhoAdmin.Web.Services;
 using Radzen;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -19,12 +20,46 @@ builder.Services.AddOutputCache();
 // Add Radzen services
 builder.Services.AddRadzenComponents();
 
+// Add HTTP context accessor for authentication handler
+builder.Services.AddHttpContextAccessor();
+
+// Add HTTP clients for APIs
 builder.Services.AddHttpClient<WeatherApiClient>(client =>
     {
         // This URL uses "https+http://" to indicate HTTPS is preferred over HTTP.
         // Learn more about service discovery scheme resolution at https://aka.ms/dotnet/sdschemes.
         client.BaseAddress = new("https+http://apiservice");
     });
+
+// Add MrWho API clients with authentication
+builder.Services.AddHttpClient<IRealmsApiService, RealmsApiService>("MrWhoApi", client =>
+{
+    client.BaseAddress = new Uri("https://localhost:7113/"); // MrWho API base URL
+    client.DefaultRequestHeaders.Add("Accept", "application/json");
+})
+.AddHttpMessageHandler<AuthenticationDelegatingHandler>();
+
+builder.Services.AddHttpClient<IClientsApiService, ClientsApiService>("MrWhoApi", client =>
+{
+    client.BaseAddress = new Uri("https://localhost:7113/");
+    client.DefaultRequestHeaders.Add("Accept", "application/json");
+})
+.AddHttpMessageHandler<AuthenticationDelegatingHandler>();
+
+builder.Services.AddHttpClient<IUsersApiService, UsersApiService>("MrWhoApi", client =>
+{
+    client.BaseAddress = new Uri("https://localhost:7113/");
+    client.DefaultRequestHeaders.Add("Accept", "application/json");
+})
+.AddHttpMessageHandler<AuthenticationDelegatingHandler>();
+
+// Register API services
+builder.Services.AddScoped<IRealmsApiService, RealmsApiService>();
+builder.Services.AddScoped<IClientsApiService, ClientsApiService>();
+builder.Services.AddScoped<IUsersApiService, UsersApiService>();
+
+// Add authentication delegating handler
+builder.Services.AddTransient<AuthenticationDelegatingHandler>();
 
 // Add Authentication services
 builder.Services.AddAuthentication(options =>
@@ -190,3 +225,31 @@ app.MapRazorComponents<App>()
 app.MapDefaultEndpoints();
 
 app.Run();
+
+/// <summary>
+/// Delegating handler to add authentication token to API requests
+/// </summary>
+public class AuthenticationDelegatingHandler : DelegatingHandler
+{
+    private readonly IHttpContextAccessor _httpContextAccessor;
+
+    public AuthenticationDelegatingHandler(IHttpContextAccessor httpContextAccessor)
+    {
+        _httpContextAccessor = httpContextAccessor;
+    }
+
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        var httpContext = _httpContextAccessor.HttpContext;
+        if (httpContext?.User.Identity?.IsAuthenticated == true)
+        {
+            var accessToken = await httpContext.GetTokenAsync("access_token");
+            if (!string.IsNullOrEmpty(accessToken))
+            {
+                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+            }
+        }
+
+        return await base.SendAsync(request, cancellationToken);
+    }
+}

@@ -1,40 +1,59 @@
 ﻿@page "/"
 @attribute [Authorize]
+@inject IRealmsApiService RealmsApi
+@inject IClientsApiService ClientsApi
+@inject IUsersApiService UsersApi
+@inject ILogger<Home> Logger
 
 <PageTitle>Dashboard - MrWho Administration</PageTitle>
 
-<RadzenText TextStyle="TextStyle.H2" class="rz-mb-4">Dashboard</RadzenText>
+<RadzenText TextStyle="TextStyle.H2" class="rz-mb-4">
+    <RadzenIcon Icon="dashboard" class="rz-me-2" />
+    MrWho Administration Dashboard
+</RadzenText>
 
 <RadzenRow Gap="2rem">
     <RadzenColumn Size="12" SizeMD="6" SizeLG="3">
-        <RadzenCard class="rz-text-align-center">
-            <RadzenIcon Icon="people" class="rz-color-primary" Style="font-size: 3rem;" />
-            <RadzenText TextStyle="TextStyle.H4" class="rz-mt-2">1,247</RadzenText>
-            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Total Users</RadzenText>
+        <RadzenCard class="rz-text-align-center rz-p-4" Style="min-height: 150px;">
+            <RadzenIcon Icon="domain" class="rz-color-primary" Style="font-size: 3rem;" />
+            <RadzenText TextStyle="TextStyle.H4" class="rz-mt-2">@totalRealms</RadzenText>
+            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Active Realms</RadzenText>
+            <RadzenButton Click="@(() => Navigation.NavigateTo("/realms"))" 
+                         ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" 
+                         Text="Manage" class="rz-mt-2" />
         </RadzenCard>
     </RadzenColumn>
     
     <RadzenColumn Size="12" SizeMD="6" SizeLG="3">
-        <RadzenCard class="rz-text-align-center">
+        <RadzenCard class="rz-text-align-center rz-p-4" Style="min-height: 150px;">
             <RadzenIcon Icon="apps" class="rz-color-success" Style="font-size: 3rem;" />
-            <RadzenText TextStyle="TextStyle.H4" class="rz-mt-2">12</RadzenText>
-            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Applications</RadzenText>
+            <RadzenText TextStyle="TextStyle.H4" class="rz-mt-2">@totalClients</RadzenText>
+            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">OIDC Clients</RadzenText>
+            <RadzenButton Click="@(() => Navigation.NavigateTo("/clients"))" 
+                         ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" 
+                         Text="Manage" class="rz-mt-2" />
         </RadzenCard>
     </RadzenColumn>
     
     <RadzenColumn Size="12" SizeMD="6" SizeLG="3">
-        <RadzenCard class="rz-text-align-center">
-            <RadzenIcon Icon="login" class="rz-color-info" Style="font-size: 3rem;" />
-            <RadzenText TextStyle="TextStyle.H4" class="rz-mt-2">3,891</RadzenText>
-            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Logins Today</RadzenText>
+        <RadzenCard class="rz-text-align-center rz-p-4" Style="min-height: 150px;">
+            <RadzenIcon Icon="people" class="rz-color-info" Style="font-size: 3rem;" />
+            <RadzenText TextStyle="TextStyle.H4" class="rz-mt-2">@totalUsers</RadzenText>
+            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Registered Users</RadzenText>
+            <RadzenButton Click="@(() => Navigation.NavigateTo("/users"))" 
+                         ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" 
+                         Text="Manage" class="rz-mt-2" />
         </RadzenCard>
     </RadzenColumn>
     
     <RadzenColumn Size="12" SizeMD="6" SizeLG="3">
-        <RadzenCard class="rz-text-align-center">
+        <RadzenCard class="rz-text-align-center rz-p-4" Style="min-height: 150px;">
             <RadzenIcon Icon="security" class="rz-color-warning" Style="font-size: 3rem;" />
             <RadzenText TextStyle="TextStyle.H4" class="rz-mt-2">99.9%</RadzenText>
-            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Uptime</RadzenText>
+            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">System Uptime</RadzenText>
+            <RadzenButton Click="@(() => Navigation.NavigateTo("/system/health"))" 
+                         ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" 
+                         Text="Details" class="rz-mt-2" />
         </RadzenCard>
     </RadzenColumn>
 </RadzenRow>
@@ -42,27 +61,40 @@
 <RadzenRow Gap="2rem" class="rz-mt-4">
     <RadzenColumn Size="12" SizeLG="8">
         <RadzenCard>
-            <RadzenText TextStyle="TextStyle.H5" class="rz-mb-3">Recent Activity</RadzenText>
-            <RadzenDataGrid AllowFiltering="false" AllowColumnResize="false" AllowSorting="false" 
-                           Data="@recentActivities" TItem="ActivityLog" Density="Density.Compact">
-                <Columns>
-                    <RadzenDataGridColumn TItem="ActivityLog" Property="Time" Title="Time" Width="120px" />
-                    <RadzenDataGridColumn TItem="ActivityLog" Property="User" Title="User" Width="150px" />
-                    <RadzenDataGridColumn TItem="ActivityLog" Property="Action" Title="Action" />
-                    <RadzenDataGridColumn TItem="ActivityLog" Property="Status" Title="Status" Width="100px">
-                        <Template Context="data">
-                            <RadzenBadge BadgeStyle="@(data.Status == "Success" ? BadgeStyle.Success : BadgeStyle.Danger)" 
-                                        Text="@data.Status" />
-                        </Template>
-                    </RadzenDataGridColumn>
-                </Columns>
-            </RadzenDataGrid>
+            <RadzenText TextStyle="TextStyle.H5" class="rz-mb-3">
+                <RadzenIcon Icon="history" class="rz-me-2" />
+                Recent Activity
+            </RadzenText>
+            @if (isLoading)
+            {
+                <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.Small" />
+            }
+            else
+            {
+                <RadzenDataGrid AllowFiltering="false" AllowColumnResize="false" AllowSorting="false" 
+                               Data="@recentActivities" TItem="ActivityLog" Density="Density.Compact" PageSize="5">
+                    <Columns>
+                        <RadzenDataGridColumn TItem="ActivityLog" Property="Time" Title="Time" Width="120px" />
+                        <RadzenDataGridColumn TItem="ActivityLog" Property="User" Title="User" Width="180px" />
+                        <RadzenDataGridColumn TItem="ActivityLog" Property="Action" Title="Action" />
+                        <RadzenDataGridColumn TItem="ActivityLog" Property="Status" Title="Status" Width="100px">
+                            <Template Context="data">
+                                <RadzenBadge BadgeStyle="@(data.Status == "Success" ? BadgeStyle.Success : BadgeStyle.Danger)" 
+                                            Text="@data.Status" />
+                            </Template>
+                        </RadzenDataGridColumn>
+                    </Columns>
+                </RadzenDataGrid>
+            }
         </RadzenCard>
     </RadzenColumn>
     
     <RadzenColumn Size="12" SizeLG="4">
         <RadzenCard>
-            <RadzenText TextStyle="TextStyle.H5" class="rz-mb-3">System Status</RadzenText>
+            <RadzenText TextStyle="TextStyle.H5" class="rz-mb-3">
+                <RadzenIcon Icon="health_and_safety" class="rz-me-2" />
+                System Status
+            </RadzenText>
             <RadzenStack Gap="1rem">
                 <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
                     <RadzenText>Identity Server</RadzenText>
@@ -77,8 +109,33 @@
                     <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="Running" />
                 </RadzenStack>
                 <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
-                    <RadzenText>Background Jobs</RadzenText>
-                    <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text="Degraded" />
+                    <RadzenText>OpenIddict</RadzenText>
+                    <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="Active" />
+                </RadzenStack>
+            </RadzenStack>
+        </RadzenCard>
+
+        <RadzenCard class="rz-mt-4">
+            <RadzenText TextStyle="TextStyle.H5" class="rz-mb-3">
+                <RadzenIcon Icon="trending_up" class="rz-me-2" />
+                Quick Stats
+            </RadzenText>
+            <RadzenStack Gap="1rem">
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
+                    <RadzenText>Active Sessions</RadzenText>
+                    <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="42" />
+                </RadzenStack>
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
+                    <RadzenText>Tokens Issued Today</RadzenText>
+                    <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="1,247" />
+                </RadzenStack>
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
+                    <RadzenText>Failed Logins</RadzenText>
+                    <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text="3" />
+                </RadzenStack>
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
+                    <RadzenText>API Calls/Hour</RadzenText>
+                    <RadzenBadge BadgeStyle="BadgeStyle.Light" Text="~890" />
                 </RadzenStack>
             </RadzenStack>
         </RadzenCard>
@@ -86,14 +143,48 @@
 </RadzenRow>
 
 @code {
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+
+    private int totalRealms = 0;
+    private int totalClients = 0;
+    private int totalUsers = 0;
+    private bool isLoading = true;
+
     private List<ActivityLog> recentActivities = new()
     {
         new ActivityLog { Time = "10:30 AM", User = "john.doe@company.com", Action = "User login", Status = "Success" },
-        new ActivityLog { Time = "10:25 AM", User = "admin@mrwho.com", Action = "Created new user", Status = "Success" },
-        new ActivityLog { Time = "10:20 AM", User = "jane.smith@company.com", Action = "Password reset", Status = "Success" },
+        new ActivityLog { Time = "10:25 AM", User = "admin@mrwho.com", Action = "Created new client 'webapp-prod'", Status = "Success" },
+        new ActivityLog { Time = "10:20 AM", User = "jane.smith@company.com", Action = "Updated realm settings", Status = "Success" },
         new ActivityLog { Time = "10:15 AM", User = "bob.wilson@company.com", Action = "Failed login attempt", Status = "Failed" },
-        new ActivityLog { Time = "10:10 AM", User = "admin@mrwho.com", Action = "Updated application settings", Status = "Success" }
+        new ActivityLog { Time = "10:10 AM", User = "admin@mrwho.com", Action = "Disabled client 'test-app'", Status = "Success" }
     };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDashboardData();
+    }
+
+    private async Task LoadDashboardData()
+    {
+        isLoading = true;
+        try
+        {
+            // For now, use mock data until API integration is complete
+            await Task.Delay(1000); // Simulate API calls
+            
+            totalRealms = 4;
+            totalClients = 12;
+            totalUsers = 1247;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading dashboard data");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
 
     public class ActivityLog
     {

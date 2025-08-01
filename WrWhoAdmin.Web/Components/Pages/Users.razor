@@ -1,0 +1,212 @@
+@page "/users"
+@attribute [Authorize]
+@inject NavigationManager Navigation
+@inject ILogger<Users> Logger
+@rendermode InteractiveServer
+
+<PageTitle>Users - MrWho Admin</PageTitle>
+
+<RadzenText TextStyle="TextStyle.H3" TagName="TagName.H1" class="rz-pt-8">
+    <RadzenIcon Icon="people" class="rz-me-1" />
+    Users Management
+</RadzenText>
+
+<RadzenCard class="rz-my-4">
+    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" class="rz-mb-4">
+        <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem">
+            <RadzenTextBox @bind-Value="@searchTerm" Placeholder="Search users..." Style="width: 300px;" />
+            <RadzenButton Click="@LoadUsers" Icon="search" ButtonStyle="ButtonStyle.Secondary" />
+        </RadzenStack>
+        <RadzenButton Click="@(() => Navigation.NavigateTo("/users/add"))" Icon="person_add" ButtonStyle="ButtonStyle.Primary" Text="Add User" />
+    </RadzenStack>
+
+    @if (isLoading)
+    {
+        <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+    }
+    else if (users.Any())
+    {
+        <RadzenDataGrid Data="@users" TItem="UserDto" AllowPaging="true" PageSize="10" AllowSorting="true">
+            <Columns>
+                <RadzenDataGridColumn TItem="UserDto" Property="UserName" Title="Username" Width="200px">
+                    <Template Context="user">
+                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
+                            <RadzenIcon Icon="person" Style="color: var(--rz-primary);" />
+                            <RadzenText Text="@user.UserName" />
+                        </RadzenStack>
+                    </Template>
+                </RadzenDataGridColumn>
+                
+                <RadzenDataGridColumn TItem="UserDto" Property="Email" Title="Email" />
+                
+                <RadzenDataGridColumn TItem="UserDto" Property="EmailConfirmed" Title="Email Status" Width="120px">
+                    <Template Context="user">
+                        <RadzenBadge BadgeStyle="@(user.EmailConfirmed ? BadgeStyle.Success : BadgeStyle.Warning)" 
+                                    Text="@(user.EmailConfirmed ? "Confirmed" : "Pending")" />
+                    </Template>
+                </RadzenDataGridColumn>
+                
+                <RadzenDataGridColumn TItem="UserDto" Property="TwoFactorEnabled" Title="2FA" Width="80px">
+                    <Template Context="user">
+                        <RadzenIcon Icon="@(user.TwoFactorEnabled ? "security" : "no_encryption")" 
+                                   Style="@($"color: {(user.TwoFactorEnabled ? "var(--rz-success)" : "var(--rz-text-disabled-color)")}")" />
+                    </Template>
+                </RadzenDataGridColumn>
+                
+                <RadzenDataGridColumn TItem="UserDto" Property="LockoutEnd" Title="Status" Width="100px">
+                    <Template Context="user">
+                        @if (user.LockoutEnd.HasValue && user.LockoutEnd > DateTimeOffset.UtcNow)
+                        {
+                            <RadzenBadge BadgeStyle="BadgeStyle.Danger" Text="Locked" />
+                        }
+                        else
+                        {
+                            <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="Active" />
+                        }
+                    </Template>
+                </RadzenDataGridColumn>
+                
+                <RadzenDataGridColumn TItem="UserDto" Property="AccessFailedCount" Title="Failed Logins" Width="120px">
+                    <Template Context="user">
+                        @if (user.AccessFailedCount > 0)
+                        {
+                            <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text="@user.AccessFailedCount.ToString()" />
+                        }
+                        else
+                        {
+                            <RadzenText Text="0" Style="color: var(--rz-text-disabled-color);" />
+                        }
+                    </Template>
+                </RadzenDataGridColumn>
+                
+                <RadzenDataGridColumn TItem="UserDto" Title="Actions" Width="200px" Sortable="false">
+                    <Template Context="user">
+                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                            <RadzenButton Click="@(() => EditUser(user.Id))" Icon="edit" Size="ButtonSize.Small" 
+                                         ButtonStyle="ButtonStyle.Light" Text="Edit" />
+                            <RadzenButton Click="@(() => ResetPassword(user.Id))" Icon="lock_reset" Size="ButtonSize.Small" 
+                                         ButtonStyle="ButtonStyle.Warning" Text="Reset" />
+                        </RadzenStack>
+                    </Template>
+                </RadzenDataGridColumn>
+            </Columns>
+        </RadzenDataGrid>
+    }
+    else
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Info">
+            <RadzenText>No users found. Click "Add User" to create your first user.</RadzenText>
+        </RadzenAlert>
+    }
+</RadzenCard>
+
+@code {
+    private List<UserDto> users = new();
+    private bool isLoading = false;
+    private string searchTerm = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUsers();
+    }
+
+    private async Task LoadUsers()
+    {
+        isLoading = true;
+        try
+        {
+            // For now, use mock data until API integration is complete
+            await Task.Delay(500); // Simulate API call
+            
+            users = new List<UserDto>
+            {
+                new() { 
+                    Id = "1", 
+                    UserName = "admin@mrwho.com", 
+                    Email = "admin@mrwho.com",
+                    EmailConfirmed = true,
+                    TwoFactorEnabled = true,
+                    LockoutEnabled = true,
+                    AccessFailedCount = 0
+                },
+                new() { 
+                    Id = "2", 
+                    UserName = "test@example.com", 
+                    Email = "test@example.com",
+                    EmailConfirmed = true,
+                    TwoFactorEnabled = false,
+                    LockoutEnabled = true,
+                    AccessFailedCount = 0
+                },
+                new() { 
+                    Id = "3", 
+                    UserName = "john.doe@company.com", 
+                    Email = "john.doe@company.com",
+                    EmailConfirmed = true,
+                    TwoFactorEnabled = true,
+                    LockoutEnabled = true,
+                    AccessFailedCount = 0
+                },
+                new() { 
+                    Id = "4", 
+                    UserName = "jane.smith@company.com", 
+                    Email = "jane.smith@company.com",
+                    EmailConfirmed = false,
+                    TwoFactorEnabled = false,
+                    LockoutEnabled = true,
+                    AccessFailedCount = 0
+                },
+                new() { 
+                    Id = "5", 
+                    UserName = "bob.wilson@company.com", 
+                    Email = "bob.wilson@company.com",
+                    EmailConfirmed = true,
+                    TwoFactorEnabled = false,
+                    LockoutEnabled = true,
+                    LockoutEnd = DateTimeOffset.UtcNow.AddHours(2), // Currently locked
+                    AccessFailedCount = 3
+                },
+            };
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                users = users.Where(u => 
+                    u.UserName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                    u.Email.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)
+                ).ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading users");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void EditUser(string userId)
+    {
+        Navigation.NavigateTo($"/users/edit/{userId}");
+    }
+
+    private void ResetPassword(string userId)
+    {
+        Navigation.NavigateTo($"/users/reset-password/{userId}");
+    }
+
+    public class UserDto
+    {
+        public string Id { get; set; } = string.Empty;
+        public string UserName { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public bool EmailConfirmed { get; set; }
+        public string? PhoneNumber { get; set; }
+        public bool PhoneNumberConfirmed { get; set; }
+        public bool TwoFactorEnabled { get; set; }
+        public bool LockoutEnabled { get; set; }
+        public DateTimeOffset? LockoutEnd { get; set; }
+        public int AccessFailedCount { get; set; }
+    }
+}
