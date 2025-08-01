@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MrWho.Data;
 using MrWho.Handlers;
+using MrWho.Services;
 using OpenIddict.Abstractions;
 using OpenIddict.Server.AspNetCore;
 using static OpenIddict.Abstractions.OpenIddictConstants;
@@ -51,6 +52,9 @@ builder.Services.Configure<IdentityOptions>(options =>
     options.ClaimsIdentity.UserNameClaimType = OpenIddictConstants.Claims.Name;
     options.ClaimsIdentity.EmailClaimType = OpenIddictConstants.Claims.Email;
 });
+
+// Register custom services
+builder.Services.AddScoped<IOidcClientService, OidcClientService>();
 
 // Register token handler
 builder.Services.AddScoped<ITokenHandler, MrWho.Handlers.TokenHandler>();
@@ -122,12 +126,12 @@ app.UseAntiforgery();
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Initialize database and seed data
+// Initialize database and seed data using the new dynamic approach
 using (var scope = app.Services.CreateScope())
 {
     var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     var userManager = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
-    var applicationManager = scope.ServiceProvider.GetRequiredService<IOpenIddictApplicationManager>();
+    var oidcClientService = scope.ServiceProvider.GetRequiredService<IOidcClientService>();
     
     // Ensure database is created (works for both development and production)
     await context.Database.EnsureCreatedAsync();
@@ -152,63 +156,15 @@ using (var scope = app.Services.CreateScope())
         await userManager.CreateAsync(user2, "Admin123!");
     }
     
-    // Seed OpenIddict applications for testing
+    // Initialize default realm and clients using the dynamic service
     try
     {
-        // Clear all existing clients to ensure clean state
-        var existingClient = await applicationManager.FindByClientIdAsync("postman_client");
-        if (existingClient != null)
-        {
-            await applicationManager.DeleteAsync(existingClient);
-        }
-        
-        // Create fresh client with complete configuration
-        var descriptor = new OpenIddictApplicationDescriptor
-        {
-            ClientId = "postman_client",
-            ClientSecret = "postman_secret",
-            DisplayName = "Postman Test Client",
-            Permissions =
-            {
-                OpenIddictConstants.Permissions.Endpoints.Authorization,
-                OpenIddictConstants.Permissions.Endpoints.Token,
-                OpenIddictConstants.Permissions.Endpoints.EndSession,
-                OpenIddictConstants.Permissions.GrantTypes.AuthorizationCode,
-                OpenIddictConstants.Permissions.GrantTypes.ClientCredentials,
-                OpenIddictConstants.Permissions.GrantTypes.Password,
-                OpenIddictConstants.Permissions.GrantTypes.RefreshToken,
-                "oidc:scope:openid",
-                OpenIddictConstants.Permissions.Scopes.Email,
-                OpenIddictConstants.Permissions.Scopes.Profile,
-                OpenIddictConstants.Permissions.Scopes.Roles,
-                OpenIddictConstants.Permissions.ResponseTypes.Code
-            }
-        };
-
-        // Add redirect URIs
-        descriptor.RedirectUris.Add(new Uri("https://localhost:7001/callback"));
-        descriptor.RedirectUris.Add(new Uri("http://localhost:5001/callback"));
-        descriptor.RedirectUris.Add(new Uri("https://localhost:7002/"));
-        descriptor.RedirectUris.Add(new Uri("https://localhost:7002/callback"));
-        descriptor.RedirectUris.Add(new Uri("https://localhost:7002/signin-oidc"));
-        descriptor.RedirectUris.Add(new Uri("https://localhost:7257/"));
-        descriptor.RedirectUris.Add(new Uri("https://localhost:7257/callback"));
-        descriptor.RedirectUris.Add(new Uri("https://localhost:7257/signin-oidc"));
-
-        // Add post-logout redirect URIs
-        descriptor.PostLogoutRedirectUris.Add(new Uri("https://localhost:7001/"));
-        descriptor.PostLogoutRedirectUris.Add(new Uri("http://localhost:5001/"));
-        descriptor.PostLogoutRedirectUris.Add(new Uri("https://localhost:7002/"));
-        descriptor.PostLogoutRedirectUris.Add(new Uri("https://localhost:7002/signout-callback-oidc"));
-        descriptor.PostLogoutRedirectUris.Add(new Uri("https://localhost:7257/"));
-        descriptor.PostLogoutRedirectUris.Add(new Uri("https://localhost:7257/signout-callback-oidc"));
-
-        await applicationManager.CreateAsync(descriptor);
-        Console.WriteLine("OpenIddict client created successfully with EndSession permission and post-logout URIs");
+        await oidcClientService.InitializeDefaultRealmAndClientsAsync();
+        Console.WriteLine("Dynamic OIDC client configuration initialized successfully");
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"Error setting up OpenIddict client: {ex.Message}");
+        Console.WriteLine($"Error initializing dynamic OIDC client configuration: {ex.Message}");
         throw;
     }
 }
@@ -231,8 +187,157 @@ app.MapGet("/connect/userinfo", [Authorize] async (HttpContext context, IUserInf
 });
 
 // ================================
-// USERS CRUD API ENDPOINTS
-// =================??===============
+// REALM AND CLIENT MANAGEMENT API ENDPOINTS
+// ================================
+
+// Get all realms with basic CRUD operations
+app.MapGet("/api/realms", [Authorize] async (
+    [FromQuery] int page,
+    [FromQuery] int pageSize,
+    [FromQuery] string? search,
+    ApplicationDbContext context) =>
+{
+    if (page < 1) page = 1;
+    if (pageSize < 1 || pageSize > 100) pageSize = 10;
+
+    var query = context.Realms.AsQueryable();
+
+    if (!string.IsNullOrWhiteSpace(search))
+    {
+        query = query.Where(r => r.Name.Contains(search) || 
+                               (r.DisplayName != null && r.DisplayName.Contains(search)) ||
+                               (r.Description != null && r.Description.Contains(search)));
+    }
+
+    var totalCount = await query.CountAsync();
+    var realms = await query
+        .Skip((page - 1) * pageSize)
+        .Take(pageSize)
+        .Select(r => new
+        {
+            r.Id,
+            r.Name,
+            r.Description,
+            r.IsEnabled,
+            r.DisplayName,
+            r.AccessTokenLifetime,
+            r.RefreshTokenLifetime,
+            r.AuthorizationCodeLifetime,
+            r.CreatedAt,
+            r.UpdatedAt,
+            r.CreatedBy,
+            r.UpdatedBy,
+            ClientCount = r.Clients.Count
+        })
+        .ToListAsync();
+
+    return Results.Ok(new
+    {
+        Items = realms,
+        TotalCount = totalCount,
+        Page = page,
+        PageSize = pageSize,
+        TotalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
+    });
+});
+
+// Get all clients with filtering by realm
+app.MapGet("/api/clients", [Authorize] async (
+    [FromQuery] int page,
+    [FromQuery] int pageSize,
+    [FromQuery] string? search,
+    [FromQuery] string? realmId,
+    ApplicationDbContext context) =>
+{
+    if (page < 1) page = 1;
+    if (pageSize < 1 || pageSize > 100) pageSize = 10;
+
+    var query = context.Clients
+        .Include(c => c.Realm)
+        .Include(c => c.RedirectUris)
+        .Include(c => c.PostLogoutUris)
+        .Include(c => c.Scopes)
+        .Include(c => c.Permissions)
+        .AsQueryable();
+
+    if (!string.IsNullOrWhiteSpace(realmId))
+    {
+        query = query.Where(c => c.RealmId == realmId);
+    }
+
+    if (!string.IsNullOrWhiteSpace(search))
+    {
+        query = query.Where(c => c.ClientId.Contains(search) || 
+                               c.Name.Contains(search) ||
+                               (c.Description != null && c.Description.Contains(search)));
+    }
+
+    var totalCount = await query.CountAsync();
+    var clients = await query
+        .Skip((page - 1) * pageSize)
+        .Take(pageSize)
+        .Select(c => new
+        {
+            c.Id,
+            c.ClientId,
+            c.Name,
+            c.Description,
+            c.IsEnabled,
+            c.ClientType,
+            c.AllowAuthorizationCodeFlow,
+            c.AllowClientCredentialsFlow,
+            c.AllowPasswordFlow,
+            c.AllowRefreshTokenFlow,
+            c.RequirePkce,
+            c.RequireClientSecret,
+            c.AccessTokenLifetime,
+            c.RefreshTokenLifetime,
+            c.AuthorizationCodeLifetime,
+            c.RealmId,
+            RealmName = c.Realm.Name,
+            c.CreatedAt,
+            c.UpdatedAt,
+            c.CreatedBy,
+            c.UpdatedBy,
+            RedirectUris = c.RedirectUris.Select(ru => ru.Uri).ToList(),
+            PostLogoutUris = c.PostLogoutUris.Select(plu => plu.Uri).ToList(),
+            Scopes = c.Scopes.Select(s => s.Scope).ToList(),
+            Permissions = c.Permissions.Select(p => p.Permission).ToList()
+        })
+        .ToListAsync();
+
+    return Results.Ok(new
+    {
+        Items = clients,
+        TotalCount = totalCount,
+        Page = page,
+        PageSize = pageSize,
+        TotalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
+    });
+});
+
+// Get all clients for dynamic configuration display
+app.MapGet("/api/clients/enabled", [Authorize] async (IOidcClientService oidcClientService) =>
+{
+    var clients = await oidcClientService.GetEnabledClientsAsync();
+    return Results.Ok(clients.Select(c => new
+    {
+        c.Id,
+        c.ClientId,
+        c.Name,
+        c.Description,
+        c.IsEnabled,
+        RealmName = c.Realm.Name,
+        RedirectUris = c.RedirectUris.Select(ru => ru.Uri).ToList(),
+        PostLogoutUris = c.PostLogoutUris.Select(plu => plu.Uri).ToList(),
+        Scopes = c.Scopes.Select(s => s.Scope).ToList(),
+        Permissions = c.Permissions.Select(p => p.Permission).ToList()
+    }));
+});
+
+// ================================
+// USERS CRUD API ENDPOINTS (keeping existing for compatibility)
+// ================================
 
 // Get all users with pagination
 app.MapGet("/api/users", [Authorize] async (
@@ -488,50 +593,69 @@ app.MapPost("/api/users/{id}/lockout", [Authorize] async (string id, SetLockoutR
     return Results.Ok(new { message = $"User {action} successfully" });
 });
 
-app.MapGet("/debug/client-info", () => new
+app.MapGet("/debug/client-info", async (IOidcClientService oidcClientService) =>
 {
-    ClientId = "postman_client",
-    ClientSecret = "postman_secret", 
-    AuthorizeUrl = "https://localhost:7000/connect/authorize",
-    TokenUrl = "https://localhost:7000/connect/token",
-    LogoutUrl = "https://localhost:7000/connect/logout",
-    RedirectUris = new[]
+    var clients = await oidcClientService.GetEnabledClientsAsync();
+    var postmanClient = clients.FirstOrDefault(c => c.ClientId == "postman_client");
+    
+    if (postmanClient == null)
     {
-        "https://localhost:7001/callback",
-        "http://localhost:5001/callback", 
-        "https://localhost:7002/callback",
-        "https://localhost:7002/signin-oidc"
-    },
-    PostLogoutRedirectUris = new[]
-    {
-        "https://localhost:7001/",
-        "http://localhost:5001/",
-        "https://localhost:7002/",
-        "https://localhost:7002/signout-callback-oidc"
-    },
-    SampleAuthUrl = "https://localhost:7000/connect/authorize?client_id=postman_client&response_type=code&redirect_uri=https://localhost:7002/signin-oidc&scope=openid%20email%20profile&state=test_state",
-    SampleLogoutUrl = "https://localhost:7000/connect/logout?post_logout_redirect_uri=https://localhost:7002/signout-callback-oidc"
-});
-
-// Debug endpoint to show actual database client configuration
-app.MapGet("/debug/db-client-config", async (IOpenIddictApplicationManager applicationManager) =>
-{
-    var client = await applicationManager.FindByClientIdAsync("postman_client");
-    if (client == null) return Results.NotFound("Client not found");
+        return Results.NotFound("Postman client not found");
+    }
     
     return Results.Ok(new
     {
-        ClientId = await applicationManager.GetClientIdAsync(client),
-        DisplayName = await applicationManager.GetDisplayNameAsync(client),
-        RedirectUris = await applicationManager.GetRedirectUrisAsync(client),
-        PostLogoutRedirectUris = await applicationManager.GetPostLogoutRedirectUrisAsync(client)
+        ClientId = postmanClient.ClientId,
+        ClientSecret = postmanClient.ClientSecret,
+        AuthorizeUrl = "https://localhost:7000/connect/authorize",
+        TokenUrl = "https://localhost:7000/connect/token",
+        LogoutUrl = "https://localhost:7000/connect/logout",
+        RedirectUris = postmanClient.RedirectUris.Select(ru => ru.Uri).ToArray(),
+        PostLogoutRedirectUris = postmanClient.PostLogoutUris.Select(plu => plu.Uri).ToArray(),
+        SampleAuthUrl = $"https://localhost:7000/connect/authorize?client_id={postmanClient.ClientId}&response_type=code&redirect_uri=https://localhost:7002/signin-oidc&scope=openid%20email%20profile&state=test_state",
+        SampleLogoutUrl = "https://localhost:7000/connect/logout?post_logout_redirect_uri=https://localhost:7002/signout-callback-oidc"
     });
+});
+
+// Debug endpoint to show actual database client configuration
+app.MapGet("/debug/db-client-config", async (IOpenIddictApplicationManager applicationManager, IOidcClientService oidcClientService) =>
+{
+    var clients = await oidcClientService.GetEnabledClientsAsync();
+    var clientConfigs = new List<object>();
+    
+    foreach (var client in clients)
+    {
+        var openIddictClient = await applicationManager.FindByClientIdAsync(client.ClientId);
+        if (openIddictClient != null)
+        {
+            clientConfigs.Add(new
+            {
+                ClientId = await applicationManager.GetClientIdAsync(openIddictClient),
+                DisplayName = await applicationManager.GetDisplayNameAsync(openIddictClient),
+                RedirectUris = await applicationManager.GetRedirectUrisAsync(openIddictClient),
+                PostLogoutRedirectUris = await applicationManager.GetPostLogoutRedirectUrisAsync(openIddictClient),
+                DatabaseConfiguration = new
+                {
+                    client.ClientId,
+                    client.Name,
+                    client.IsEnabled,
+                    RealmName = client.Realm.Name,
+                    client.AllowAuthorizationCodeFlow,
+                    client.AllowClientCredentialsFlow,
+                    client.AllowPasswordFlow,
+                    client.AllowRefreshTokenFlow
+                }
+            });
+        }
+    }
+    
+    return Results.Ok(clientConfigs);
 });
 
 app.Run();
 
 // ================================
-// DTOs AND MODELS
+// DTOs AND MODELS (keeping existing for compatibility)
 // ================================
 
 public class UserDto
