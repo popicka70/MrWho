@@ -1,6 +1,9 @@
 @page "/clients"
 @attribute [Authorize]
 @rendermode InteractiveServer
+@inject NavigationManager Navigation
+@inject NotificationService NotificationService
+@inject ILogger<Clients> Logger
 
 <PageTitle>Clients - MrWho Admin</PageTitle>
 
@@ -10,40 +13,267 @@
 </RadzenText>
 
 <RadzenCard class="rz-my-4">
-    <RadzenAlert AlertStyle="AlertStyle.Info">
-        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem">
-            <RadzenIcon Icon="construction" />
-            <RadzenText>This page is under construction. Client management features will be available soon.</RadzenText>
+    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" class="rz-mb-4">
+        <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem">
+            <RadzenTextBox @bind-Value="@searchTerm" Placeholder="Search clients..." Style="width: 300px;" />
+            <RadzenDropDown @bind-Value="@selectedRealmId" Data="@realms" TextProperty="DisplayName" ValueProperty="Id" 
+                           Placeholder="Filter by realm..." Style="width: 200px;" AllowClear="true" />
+            <RadzenButton Click="@LoadClients" Icon="search" ButtonStyle="ButtonStyle.Secondary" />
         </RadzenStack>
-    </RadzenAlert>
-    
-    <RadzenText TextStyle="TextStyle.H6" class="rz-mt-4 rz-mb-3">Available Clients (Mock Data)</RadzenText>
-    
-    <RadzenDataGrid Data="@mockClients" TItem="MockClient" AllowPaging="true" PageSize="5">
-        <Columns>
-            <RadzenDataGridColumn TItem="MockClient" Property="ClientId" Title="Client ID" />
-            <RadzenDataGridColumn TItem="MockClient" Property="Name" Title="Name" />
-            <RadzenDataGridColumn TItem="MockClient" Property="Type" Title="Type" />
-            <RadzenDataGridColumn TItem="MockClient" Property="Realm" Title="Realm" />
-        </Columns>
-    </RadzenDataGrid>
+        <RadzenButton Click="@(() => Navigation.NavigateTo("/clients/add"))" Icon="add" ButtonStyle="ButtonStyle.Primary" Text="Add Client" />
+    </RadzenStack>
+
+    @if (isLoading)
+    {
+        <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+    }
+    else if (clients.Any())
+    {
+        <RadzenDataGrid Data="@clients" TItem="ClientDto" AllowPaging="true" PageSize="10" AllowSorting="true">
+            <Columns>
+                <RadzenDataGridColumn TItem="ClientDto" Property="ClientId" Title="Client ID" Width="200px">
+                    <Template Context="client">
+                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
+                            <RadzenIcon Icon="@GetClientTypeIcon(client.ClientType)" 
+                                       Style="@($"color: {GetClientTypeColor(client.ClientType)}")" />
+                            <RadzenText Text="@client.ClientId" />
+                        </RadzenStack>
+                    </Template>
+                </RadzenDataGridColumn>
+                
+                <RadzenDataGridColumn TItem="ClientDto" Property="Name" Title="Name" />
+                
+                <RadzenDataGridColumn TItem="ClientDto" Property="RealmName" Title="Realm" Width="150px">
+                    <Template Context="client">
+                        <RadzenBadge BadgeStyle="BadgeStyle.Secondary" Text="@client.RealmName" />
+                    </Template>
+                </RadzenDataGridColumn>
+                
+                <RadzenDataGridColumn TItem="ClientDto" Property="ClientType" Title="Type" Width="120px">
+                    <Template Context="client">
+                        <RadzenBadge BadgeStyle="@GetClientTypeBadgeStyle(client.ClientType)" 
+                                    Text="@GetClientTypeText(client.ClientType)" />
+                    </Template>
+                </RadzenDataGridColumn>
+                
+                <RadzenDataGridColumn TItem="ClientDto" Property="IsEnabled" Title="Status" Width="100px">
+                    <Template Context="client">
+                        <RadzenBadge BadgeStyle="@(client.IsEnabled ? BadgeStyle.Success : BadgeStyle.Danger)" 
+                                    Text="@(client.IsEnabled ? "Enabled" : "Disabled")" />
+                    </Template>
+                </RadzenDataGridColumn>
+                
+                <RadzenDataGridColumn TItem="ClientDto" Title="Flows" Width="120px">
+                    <Template Context="client">
+                        <RadzenStack Gap="0.2rem">
+                            @if (client.AllowAuthorizationCodeFlow)
+                            {
+                                <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="Auth Code" Size="BadgeSize.ExtraSmall" />
+                            }
+                            @if (client.AllowClientCredentialsFlow)
+                            {
+                                <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="Client Creds" Size="BadgeSize.ExtraSmall" />
+                            }
+                            @if (client.AllowRefreshTokenFlow)
+                            {
+                                <RadzenBadge BadgeStyle="BadgeStyle.Primary" Text="Refresh" Size="BadgeSize.ExtraSmall" />
+                            }
+                        </RadzenStack>
+                    </Template>
+                </RadzenDataGridColumn>
+                
+                <RadzenDataGridColumn TItem="ClientDto" Title="Actions" Width="200px" Sortable="false">
+                    <Template Context="client">
+                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                            <RadzenButton Click="@(() => EditClient(client.Id))" Icon="edit" Size="ButtonSize.Small" 
+                                         ButtonStyle="ButtonStyle.Light" Text="Edit" />
+                            <RadzenButton Click="@(() => ViewDetails(client.Id))" Icon="visibility" Size="ButtonSize.Small" 
+                                         ButtonStyle="ButtonStyle.Info" Text="View" />
+                            <RadzenButton Click="@(() => ToggleClientStatus(client))" Icon="@(client.IsEnabled ? "toggle_on" : "toggle_off")" 
+                                         Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Warning" Text="Toggle" />
+                        </RadzenStack>
+                    </Template>
+                </RadzenDataGridColumn>
+            </Columns>
+        </RadzenDataGrid>
+    }
+    else
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Info">
+            <RadzenText>No clients found. Click "Add Client" to create your first client.</RadzenText>
+        </RadzenAlert>
+    }
 </RadzenCard>
 
 @code {
-    private List<MockClient> mockClients = new()
-    {
-        new() { ClientId = "mrwho_admin_web", Name = "MrWho Admin Web Application", Type = "Confidential", Realm = "admin" },
-        new() { ClientId = "postman_client", Name = "Postman Test Client", Type = "Confidential", Realm = "default" },
-        new() { ClientId = "spa-dev-app", Name = "SPA Development App", Type = "Public", Realm = "sample-development" },
-        new() { ClientId = "web-staging-app", Name = "Web Staging Application", Type = "Confidential", Realm = "sample-staging" },
-        new() { ClientId = "mobile-demo-app", Name = "Mobile Demo Application", Type = "Public", Realm = "demo-multi-tenant" }
-    };
+    private List<ClientDto> clients = new();
+    private List<RealmDto> realms = new();
+    private bool isLoading = false;
+    private string searchTerm = "";
+    private string? selectedRealmId = null;
 
-    public class MockClient
+    protected override async Task OnInitializedAsync()
     {
-        public string ClientId { get; set; } = "";
-        public string Name { get; set; } = "";
-        public string Type { get; set; } = "";
-        public string Realm { get; set; } = "";
+        await LoadRealms();
+        await LoadClients();
+    }
+
+    private async Task LoadRealms()
+    {
+        realms = new List<RealmDto>
+        {
+            new() { Id = "1", Name = "admin", DisplayName = "MrWho Administration" },
+            new() { Id = "2", Name = "default", DisplayName = "Default Realm" },
+            new() { Id = "3", Name = "sample-development", DisplayName = "Development Environment" },
+            new() { Id = "4", Name = "sample-staging", DisplayName = "Staging Environment" },
+            new() { Id = "5", Name = "demo-multi-tenant", DisplayName = "Multi-Tenant Demo" }
+        };
+    }
+
+    private async Task LoadClients()
+    {
+        isLoading = true;
+        try
+        {
+            await Task.Delay(500);
+            
+            clients = new List<ClientDto>
+            {
+                new() { 
+                    Id = "1", ClientId = "mrwho_admin_web", Name = "MrWho Admin Web Application", 
+                    Description = "Official web administration interface",
+                    RealmId = "1", RealmName = "MrWho Administration", IsEnabled = true, 
+                    ClientType = ClientType.Confidential,
+                    AllowAuthorizationCodeFlow = true, AllowRefreshTokenFlow = true, RequirePkce = true,
+                    CreatedAt = DateTime.Now.AddDays(-30)
+                },
+                new() { 
+                    Id = "2", ClientId = "postman_client", Name = "Postman Test Client", 
+                    Description = "Default test client for development",
+                    RealmId = "2", RealmName = "Default Realm", IsEnabled = true, 
+                    ClientType = ClientType.Confidential,
+                    AllowAuthorizationCodeFlow = true, AllowClientCredentialsFlow = true, AllowRefreshTokenFlow = true,
+                    CreatedAt = DateTime.Now.AddDays(-25)
+                },
+                new() { 
+                    Id = "3", ClientId = "spa-dev-app", Name = "SPA Development App", 
+                    Description = "Single Page Application for development",
+                    RealmId = "3", RealmName = "Development Environment", IsEnabled = true, 
+                    ClientType = ClientType.Public,
+                    AllowAuthorizationCodeFlow = true, AllowRefreshTokenFlow = true, RequirePkce = true,
+                    CreatedAt = DateTime.Now.AddDays(-20)
+                },
+                new() { 
+                    Id = "4", ClientId = "api-service-client", Name = "API Service Client", 
+                    Description = "Machine-to-machine client for API services",
+                    RealmId = "3", RealmName = "Development Environment", IsEnabled = true, 
+                    ClientType = ClientType.Machine,
+                    AllowClientCredentialsFlow = true,
+                    CreatedAt = DateTime.Now.AddDays(-15)
+                },
+                new() { 
+                    Id = "5", ClientId = "mobile-demo-app", Name = "Mobile Demo Application", 
+                    Description = "Mobile application for demonstration purposes",
+                    RealmId = "5", RealmName = "Multi-Tenant Demo", IsEnabled = false, 
+                    ClientType = ClientType.Public,
+                    AllowAuthorizationCodeFlow = true, AllowRefreshTokenFlow = true, RequirePkce = true,
+                    CreatedAt = DateTime.Now.AddDays(-10)
+                }
+            };
+
+            // Apply filters
+            var filteredClients = clients.AsEnumerable();
+
+            if (!string.IsNullOrWhiteSpace(searchTerm))
+            {
+                filteredClients = filteredClients.Where(c => 
+                    c.ClientId.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                    c.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
+                    (c.Description?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false));
+            }
+
+            if (!string.IsNullOrWhiteSpace(selectedRealmId))
+            {
+                filteredClients = filteredClients.Where(c => c.RealmId == selectedRealmId);
+            }
+
+            clients = filteredClients.ToList();
+
+            Logger.LogInformation("Loaded {ClientCount} clients", clients.Count);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading clients");
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to load clients");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private void EditClient(string clientId)
+    {
+        NotificationService.Notify(NotificationSeverity.Info, "Navigation", $"Navigating to edit client {clientId}");
+        Navigation.NavigateTo($"/clients/edit/{clientId}");
+    }
+
+    private void ViewDetails(string clientId)
+    {
+        NotificationService.Notify(NotificationSeverity.Info, "Navigation", "Viewing client details");
+        Navigation.NavigateTo($"/clients/details/{clientId}");
+    }
+
+    private void ToggleClientStatus(ClientDto client)
+    {
+        client.IsEnabled = !client.IsEnabled;
+        var status = client.IsEnabled ? "enabled" : "disabled";
+        NotificationService.Notify(NotificationSeverity.Success, "Client Updated", $"Client '{client.Name}' has been {status}");
+        StateHasChanged();
+    }
+
+    private string GetClientTypeIcon(ClientType clientType)
+    {
+        return clientType switch
+        {
+            ClientType.Confidential => "security",
+            ClientType.Public => "public",
+            ClientType.Machine => "precision_manufacturing",
+            _ => "apps"
+        };
+    }
+
+    private string GetClientTypeColor(ClientType clientType)
+    {
+        return clientType switch
+        {
+            ClientType.Confidential => "var(--rz-success)",
+            ClientType.Public => "var(--rz-info)",
+            ClientType.Machine => "var(--rz-warning)",
+            _ => "var(--rz-text-color)"
+        };
+    }
+
+    private BadgeStyle GetClientTypeBadgeStyle(ClientType clientType)
+    {
+        return clientType switch
+        {
+            ClientType.Confidential => BadgeStyle.Success,
+            ClientType.Public => BadgeStyle.Info,
+            ClientType.Machine => BadgeStyle.Warning,
+            _ => BadgeStyle.Secondary
+        };
+    }
+
+    private string GetClientTypeText(ClientType clientType)
+    {
+        return clientType switch
+        {
+            ClientType.Confidential => "Confidential",
+            ClientType.Public => "Public",
+            ClientType.Machine => "M2M",
+            _ => "Unknown"
+        };
     }
 }

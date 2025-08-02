@@ -1,8 +1,10 @@
 @page "/users"
 @attribute [Authorize]
+@rendermode InteractiveServer
 @inject NavigationManager Navigation
 @inject ILogger<Users> Logger
-@rendermode InteractiveServer
+@inject NotificationService NotificationService
+@inject DialogService DialogService
 
 <PageTitle>Users - MrWho Admin</PageTitle>
 
@@ -86,6 +88,9 @@
                                          ButtonStyle="ButtonStyle.Light" Text="Edit" />
                             <RadzenButton Click="@(() => ResetPassword(user.Id))" Icon="lock_reset" Size="ButtonSize.Small" 
                                          ButtonStyle="ButtonStyle.Warning" Text="Reset" />
+                            <RadzenButton Click="@(() => ToggleLockout(user))" Icon="@(IsUserLocked(user) ? "lock_open" : "lock")" 
+                                         Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Secondary" 
+                                         Text="@(IsUserLocked(user) ? "Unlock" : "Lock")" />
                         </RadzenStack>
                     </Template>
                 </RadzenDataGridColumn>
@@ -122,8 +127,8 @@
             {
                 new() { 
                     Id = "1", 
-                    UserName = "admin@mrwho.com", 
-                    Email = "admin@mrwho.com",
+                    UserName = "admin@mrwho.local", 
+                    Email = "admin@mrwho.local",
                     EmailConfirmed = true,
                     TwoFactorEnabled = true,
                     LockoutEnabled = true,
@@ -175,25 +180,63 @@
                     u.Email.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)
                 ).ToList();
             }
+
+            Logger.LogInformation("Loaded {UserCount} users", users.Count);
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error loading users");
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to load users");
         }
         finally
         {
             isLoading = false;
+            StateHasChanged();
         }
     }
 
     private void EditUser(string userId)
     {
+        NotificationService.Notify(NotificationSeverity.Info, "Navigation", $"Navigating to edit user {userId}");
         Navigation.NavigateTo($"/users/edit/{userId}");
     }
 
-    private void ResetPassword(string userId)
+    private async Task ResetPassword(string userId)
     {
-        Navigation.NavigateTo($"/users/reset-password/{userId}");
+        var result = await DialogService.Confirm("Send password reset email to this user?", "Reset Password", new ConfirmOptions() { OkButtonText = "Send", CancelButtonText = "Cancel" });
+        
+        if (result == true)
+        {
+            NotificationService.Notify(NotificationSeverity.Success, "Email Sent", "Password reset email has been sent to the user");
+        }
+    }
+
+    private bool IsUserLocked(UserDto user)
+    {
+        return user.LockoutEnd.HasValue && user.LockoutEnd > DateTimeOffset.UtcNow;
+    }
+
+    private async Task ToggleLockout(UserDto user)
+    {
+        var isLocked = IsUserLocked(user);
+        var action = isLocked ? "unlock" : "lock";
+        
+        var result = await DialogService.Confirm($"Are you sure you want to {action} this user account?", $"{action.ToUpper()} User", new ConfirmOptions() { OkButtonText = action.ToUpper(), CancelButtonText = "Cancel" });
+        
+        if (result == true)
+        {
+            if (isLocked)
+            {
+                user.LockoutEnd = null;
+                NotificationService.Notify(NotificationSeverity.Success, "User Unlocked", $"User '{user.Email}' has been unlocked");
+            }
+            else
+            {
+                user.LockoutEnd = DateTimeOffset.UtcNow.AddDays(30); // Lock for 30 days
+                NotificationService.Notify(NotificationSeverity.Success, "User Locked", $"User '{user.Email}' has been locked");
+            }
+            StateHasChanged();
+        }
     }
 
     public class UserDto

@@ -1,0 +1,377 @@
+@page "/clients/add"
+@page "/clients/edit/{Id}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject NavigationManager Navigation
+@inject NotificationService NotificationService
+@inject DialogService DialogService
+@inject ILogger<EditClient> Logger
+
+<PageTitle>@(IsEdit ? "Edit Client" : "Add Client") - MrWho Admin</PageTitle>
+
+<RadzenStack>
+    <RadzenBreadCrumb>
+        <RadzenBreadCrumbItem Path="/clients" Text="Clients" />
+        <RadzenBreadCrumbItem Text="@(IsEdit ? "Edit" : "Add")" />
+    </RadzenBreadCrumb>
+
+    <RadzenText TextStyle="TextStyle.H3" TagName="TagName.H1" class="rz-pt-4">
+        <RadzenIcon Icon="@(IsEdit ? "edit" : "add_circle")" class="rz-me-1" />
+        @(IsEdit ? "Edit Client" : "Add New Client")
+    </RadzenText>
+</RadzenStack>
+
+<RadzenCard class="rz-my-4">
+    @if (isLoading)
+    {
+        <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+        <RadzenText class="rz-mt-3">Loading client data...</RadzenText>
+    }
+    else
+    {
+        <RadzenTemplateForm Data="@model" TItem="CreateClientRequest" Submit="@OnSave">
+            <RadzenStack Gap="2rem">
+                <!-- Basic Information -->
+                <RadzenFieldset Text="Basic Information">
+                    <RadzenStack Gap="1rem">
+                        <RadzenRow>
+                            <RadzenColumn Size="12" SizeMD="6">
+                                <RadzenFormField Text="Client ID" Variant="Variant.Outlined">
+                                    <RadzenTextBox @bind-Value="@model.ClientId" 
+                                                  Placeholder="Enter unique client ID" 
+                                                  Style="width: 100%;" 
+                                                  Disabled="@IsEdit" />
+                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                        @(IsEdit ? "Client ID cannot be changed after creation" : "Must be unique across all realms")
+                                    </RadzenText>
+                                </RadzenFormField>
+                            </RadzenColumn>
+                            <RadzenColumn Size="12" SizeMD="6">
+                                <RadzenFormField Text="Name" Variant="Variant.Outlined">
+                                    <RadzenTextBox @bind-Value="@model.Name" 
+                                                  Placeholder="Enter client display name" 
+                                                  Style="width: 100%;" />
+                                </RadzenFormField>
+                            </RadzenColumn>
+                        </RadzenRow>
+                        
+                        <RadzenFormField Text="Description" Variant="Variant.Outlined">
+                            <RadzenTextArea @bind-Value="@model.Description" 
+                                           Placeholder="Enter client description..." 
+                                           Rows="2" Style="width: 100%;" />
+                        </RadzenFormField>
+
+                        <RadzenRow>
+                            <RadzenColumn Size="12" SizeMD="6">
+                                <RadzenFormField Text="Realm" Variant="Variant.Outlined">
+                                    <RadzenDropDown @bind-Value="@model.RealmId" 
+                                                   Data="@availableRealms" 
+                                                   TextProperty="DisplayName" 
+                                                   ValueProperty="Id" 
+                                                   Placeholder="Select realm..." 
+                                                   Style="width: 100%;" />
+                                </RadzenFormField>
+                            </RadzenColumn>
+                            <RadzenColumn Size="12" SizeMD="6">
+                                <RadzenFormField Text="Client Type" Variant="Variant.Outlined">
+                                    <RadzenDropDown @bind-Value="@model.ClientType" 
+                                                   Data="@clientTypes" 
+                                                   TextProperty="Text" 
+                                                   ValueProperty="Value" 
+                                                   Style="width: 100%;" />
+                                </RadzenFormField>
+                            </RadzenColumn>
+                        </RadzenRow>
+
+                        <RadzenFormField Text="Status" Variant="Variant.Outlined">
+                            <RadzenCheckBox @bind-Value="@model.IsEnabled" />
+                            <RadzenLabel Text="Client is enabled" class="rz-ml-2" />
+                        </RadzenFormField>
+                    </RadzenStack>
+                </RadzenFieldset>
+
+                <!-- Authentication Settings -->
+                <RadzenFieldset Text="Authentication Settings">
+                    <RadzenStack Gap="1rem">
+                        @if (model.ClientType != ClientType.Public)
+                        {
+                            <RadzenFormField Text="Client Secret" Variant="Variant.Outlined">
+                                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Stretch">
+                                    <RadzenTextBox @bind-Value="@model.ClientSecret" 
+                                                  Type="@(showSecret ? "text" : "password")"
+                                                  Placeholder="Enter client secret" 
+                                                  Style="flex: 1;" />
+                                    <RadzenButton Icon="@(showSecret ? "visibility_off" : "visibility")" 
+                                                 ButtonStyle="ButtonStyle.Light" 
+                                                 Click="@(() => showSecret = !showSecret)" />
+                                    <RadzenButton Icon="refresh" 
+                                                 ButtonStyle="ButtonStyle.Secondary" 
+                                                 Text="Generate" 
+                                                 Click="@GenerateSecret" />
+                                </RadzenStack>
+                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                    Keep this secret secure. It's like a password for your application.
+                                </RadzenText>
+                            </RadzenFormField>
+                        }
+
+                        <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-mb-2">OAuth 2.0 Flow Settings</RadzenText>
+                        <RadzenStack Gap="0.5rem">
+                            <RadzenCheckBox @bind-Value="@model.AllowAuthorizationCodeFlow" />
+                            <RadzenLabel Text="Authorization Code Flow" class="rz-ml-2" />
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary rz-ml-6">
+                                Most secure flow for web applications and SPAs
+                            </RadzenText>
+                        </RadzenStack>
+
+                        <RadzenStack Gap="0.5rem">
+                            <RadzenCheckBox @bind-Value="@model.AllowClientCredentialsFlow" />
+                            <RadzenLabel Text="Client Credentials Flow" class="rz-ml-2" />
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary rz-ml-6">
+                                For machine-to-machine authentication
+                            </RadzenText>
+                        </RadzenStack>
+
+                        <RadzenStack Gap="0.5rem">
+                            <RadzenCheckBox @bind-Value="@model.AllowRefreshTokenFlow" />
+                            <RadzenLabel Text="Refresh Token Flow" class="rz-ml-2" />
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary rz-ml-6">
+                                Allows obtaining new access tokens without re-authentication
+                            </RadzenText>
+                        </RadzenStack>
+
+                        <RadzenStack Gap="0.5rem">
+                            <RadzenCheckBox @bind-Value="@model.RequirePkce" />
+                            <RadzenLabel Text="Require PKCE" class="rz-ml-2" />
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary rz-ml-6">
+                                Proof Key for Code Exchange - recommended for public clients
+                            </RadzenText>
+                        </RadzenStack>
+                    </RadzenStack>
+                </RadzenFieldset>
+
+                <!-- Redirect URIs -->
+                <RadzenFieldset Text="Redirect URIs">
+                    <RadzenStack Gap="1rem">
+                        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
+                            URLs where users will be redirected after authentication
+                        </RadzenText>
+                        
+                        @for (int i = 0; i < model.RedirectUris.Count; i++)
+                        {
+                            var index = i; // Capture for closure
+                            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Stretch">
+                                <RadzenTextBox @bind-Value="@model.RedirectUris[index]" 
+                                              Placeholder="https://your-app.com/callback" 
+                                              Style="flex: 1;" />
+                                <RadzenButton Icon="delete" 
+                                             ButtonStyle="ButtonStyle.Danger" 
+                                             Size="ButtonSize.Small"
+                                             Click="@(() => model.RedirectUris.RemoveAt(index))" />
+                            </RadzenStack>
+                        }
+                        
+                        <RadzenButton Icon="add" ButtonStyle="ButtonStyle.Light" Text="Add Redirect URI" 
+                                     Click="@(() => model.RedirectUris.Add(""))" />
+                    </RadzenStack>
+                </RadzenFieldset>
+
+                <!-- Action Buttons -->
+                <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" class="rz-mt-4">
+                    <RadzenButton Click="@Cancel" Icon="cancel" ButtonStyle="ButtonStyle.Light" Text="Cancel" />
+                    <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem">
+                        @if (IsEdit)
+                        {
+                            <RadzenButton Click="@DeleteClient" Icon="delete" ButtonStyle="ButtonStyle.Danger" 
+                                         Text="Delete" Disabled="@isSaving" />
+                        }
+                        <RadzenButton ButtonType="ButtonType.Submit" Icon="save" ButtonStyle="ButtonStyle.Primary" 
+                                     Text="@(IsEdit ? "Update Client" : "Create Client")" 
+                                     IsBusy="@isSaving" Disabled="@isSaving" />
+                    </RadzenStack>
+                </RadzenStack>
+            </RadzenStack>
+        </RadzenTemplateForm>
+    }
+</RadzenCard>
+
+@code {
+    [Parameter] public string? Id { get; set; }
+
+    private bool IsEdit => !string.IsNullOrEmpty(Id);
+    private bool isLoading = false;
+    private bool isSaving = false;
+    private bool showSecret = false;
+    
+    private CreateClientRequest model = new();
+    
+    private List<RealmDto> availableRealms = new();
+    private List<dynamic> clientTypes = new()
+    {
+        new { Text = "Confidential (Server-side apps)", Value = ClientType.Confidential },
+        new { Text = "Public (SPAs, Mobile apps)", Value = ClientType.Public },
+        new { Text = "Machine-to-Machine", Value = ClientType.Machine }
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRealms();
+        
+        if (IsEdit)
+        {
+            await LoadClient();
+        }
+        else
+        {
+            // Set defaults for new client
+            model.IsEnabled = true;
+            model.ClientType = ClientType.Confidential;
+            model.AllowAuthorizationCodeFlow = true;
+            model.AllowRefreshTokenFlow = true;
+            model.RequirePkce = true;
+            model.RequireClientSecret = true;
+            model.RedirectUris.Add("");
+            model.PostLogoutUris.Add("");
+        }
+    }
+
+    private async Task LoadRealms()
+    {
+        // Mock realms data
+        availableRealms = new List<RealmDto>
+        {
+            new() { Id = "1", Name = "admin", DisplayName = "MrWho Administration" },
+            new() { Id = "2", Name = "default", DisplayName = "Default Realm" },
+            new() { Id = "3", Name = "sample-development", DisplayName = "Development Environment" }
+        };
+    }
+
+    private async Task LoadClient()
+    {
+        isLoading = true;
+        try
+        {
+            await Task.Delay(500);
+            
+            // Mock client data
+            var mockClient = GetMockClient(Id!);
+            if (mockClient != null)
+            {
+                model.ClientId = mockClient.ClientId;
+                model.Name = mockClient.Name;
+                model.Description = mockClient.Description;
+                model.RealmId = mockClient.RealmId;
+                model.IsEnabled = mockClient.IsEnabled;
+                model.ClientType = mockClient.ClientType;
+                model.AllowAuthorizationCodeFlow = mockClient.AllowAuthorizationCodeFlow;
+                model.AllowClientCredentialsFlow = mockClient.AllowClientCredentialsFlow;
+                model.AllowRefreshTokenFlow = mockClient.AllowRefreshTokenFlow;
+                model.RequirePkce = mockClient.RequirePkce;
+                model.RedirectUris = mockClient.RedirectUris.ToList();
+                model.PostLogoutUris = mockClient.PostLogoutUris.ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading client {ClientId}", Id);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to load client data");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task OnSave(CreateClientRequest args)
+    {
+        if (string.IsNullOrWhiteSpace(model.ClientId))
+        {
+            NotificationService.Notify(NotificationSeverity.Warning, "Validation Error", "Client ID is required");
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(model.RealmId))
+        {
+            NotificationService.Notify(NotificationSeverity.Warning, "Validation Error", "Realm selection is required");
+            return;
+        }
+
+        isSaving = true;
+        try
+        {
+            // Remove empty redirect URIs
+            model.RedirectUris = model.RedirectUris.Where(uri => !string.IsNullOrWhiteSpace(uri)).ToList();
+            model.PostLogoutUris = model.PostLogoutUris.Where(uri => !string.IsNullOrWhiteSpace(uri)).ToList();
+
+            await Task.Delay(1000);
+
+            var action = IsEdit ? "updated" : "created";
+            NotificationService.Notify(NotificationSeverity.Success, "Success", $"Client '{model.Name}' has been {action} successfully");
+            
+            Navigation.NavigateTo("/clients");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error saving client");
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to save client");
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void GenerateSecret()
+    {
+        var random = new Random();
+        var chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
+        model.ClientSecret = new string(Enumerable.Repeat(chars, 32)
+            .Select(s => s[random.Next(s.Length)]).ToArray());
+        
+        NotificationService.Notify(NotificationSeverity.Info, "Generated", "New client secret generated");
+    }
+
+    private async Task DeleteClient()
+    {
+        var result = await DialogService.Confirm($"Are you sure you want to delete the client '{model.Name}'?", "Delete Client", new ConfirmOptions() { OkButtonText = "Delete", CancelButtonText = "Cancel" });
+        
+        if (result == true)
+        {
+            try
+            {
+                await Task.Delay(500);
+                
+                NotificationService.Notify(NotificationSeverity.Success, "Success", $"Client '{model.Name}' has been deleted");
+                Navigation.NavigateTo("/clients");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error deleting client");
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to delete client");
+            }
+        }
+    }
+
+    private void Cancel()
+    {
+        Navigation.NavigateTo("/clients");
+    }
+
+    // Mock data method
+    private ClientDto? GetMockClient(string id)
+    {
+        var mockClients = new Dictionary<string, ClientDto>
+        {
+            ["1"] = new() { 
+                Id = "1", ClientId = "mrwho_admin_web", Name = "MrWho Admin Web Application", 
+                Description = "Official web administration interface",
+                RealmId = "1", IsEnabled = true, ClientType = ClientType.Confidential,
+                AllowAuthorizationCodeFlow = true, AllowRefreshTokenFlow = true, RequirePkce = true,
+                RedirectUris = new() { "https://localhost:7257/signin-oidc" },
+                PostLogoutUris = new() { "https://localhost:7257/" }
+            }
+        };
+
+        return mockClients.TryGetValue(id, out var client) ? client : null;
+    }
+}

@@ -1,0 +1,382 @@
+@page "/users/add"
+@page "/users/edit/{Id}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject NavigationManager Navigation
+@inject NotificationService NotificationService
+@inject DialogService DialogService
+@inject ILogger<EditUser> Logger
+
+<PageTitle>@(IsEdit ? "Edit User" : "Add User") - MrWho Admin</PageTitle>
+
+<RadzenStack>
+    <RadzenBreadCrumb>
+        <RadzenBreadCrumbItem Path="/users" Text="Users" />
+        <RadzenBreadCrumbItem Text="@(IsEdit ? "Edit" : "Add")" />
+    </RadzenBreadCrumb>
+
+    <RadzenText TextStyle="TextStyle.H3" TagName="TagName.H1" class="rz-pt-4">
+        <RadzenIcon Icon="@(IsEdit ? "edit" : "person_add")" class="rz-me-1" />
+        @(IsEdit ? "Edit User" : "Add New User")
+    </RadzenText>
+</RadzenStack>
+
+<RadzenCard class="rz-my-4">
+    @if (isLoading)
+    {
+        <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+        <RadzenText class="rz-mt-3">Loading user data...</RadzenText>
+    }
+    else
+    {
+        <RadzenTemplateForm Data="@model" TItem="CreateUserRequest" Submit="@OnSave">
+            <RadzenStack Gap="2rem">
+                <!-- Basic Information -->
+                <RadzenFieldset Text="Basic Information">
+                    <RadzenStack Gap="1rem">
+                        <RadzenRow>
+                            <RadzenColumn Size="12" SizeMD="6">
+                                <RadzenFormField Text="Email Address" Variant="Variant.Outlined">
+                                    <RadzenTextBox @bind-Value="@model.Email" 
+                                                  Placeholder="user@example.com" 
+                                                  Style="width: 100%;" 
+                                                  Disabled="@IsEdit" />
+                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                        @(IsEdit ? "Email cannot be changed after creation" : "This will be used for login")
+                                    </RadzenText>
+                                </RadzenFormField>
+                            </RadzenColumn>
+                            <RadzenColumn Size="12" SizeMD="6">
+                                <RadzenFormField Text="Username" Variant="Variant.Outlined">
+                                    <RadzenTextBox @bind-Value="@model.UserName" 
+                                                  Placeholder="Enter username" 
+                                                  Style="width: 100%;" 
+                                                  Disabled="@IsEdit" />
+                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                        @(IsEdit ? "Username cannot be changed after creation" : "Leave blank to use email as username")
+                                    </RadzenText>
+                                </RadzenFormField>
+                            </RadzenColumn>
+                        </RadzenRow>
+
+                        @if (!IsEdit)
+                        {
+                            <RadzenRow>
+                                <RadzenColumn Size="12" SizeMD="6">
+                                    <RadzenFormField Text="Password" Variant="Variant.Outlined">
+                                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Stretch">
+                                            <RadzenTextBox @bind-Value="@model.Password" 
+                                                          Type="@(showPassword ? "text" : "password")"
+                                                          Placeholder="Enter password" 
+                                                          Style="flex: 1;" />
+                                            <RadzenButton Icon="@(showPassword ? "visibility_off" : "visibility")" 
+                                                         ButtonStyle="ButtonStyle.Light" 
+                                                         Click="@(() => showPassword = !showPassword)" />
+                                            <RadzenButton Icon="refresh" 
+                                                         ButtonStyle="ButtonStyle.Secondary" 
+                                                         Text="Generate" 
+                                                         Click="@GeneratePassword" />
+                                        </RadzenStack>
+                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                            Minimum 8 characters with mixed case, numbers, and symbols
+                                        </RadzenText>
+                                    </RadzenFormField>
+                                </RadzenColumn>
+                                <RadzenColumn Size="12" SizeMD="6">
+                                    <RadzenFormField Text="Confirm Password" Variant="Variant.Outlined">
+                                        <RadzenTextBox @bind-Value="@confirmPassword" 
+                                                      Type="password"
+                                                      Placeholder="Confirm password" 
+                                                      Style="width: 100%;" />
+                                    </RadzenFormField>
+                                </RadzenColumn>
+                            </RadzenRow>
+                        }
+
+                        <RadzenFormField Text="Phone Number" Variant="Variant.Outlined">
+                            <RadzenTextBox @bind-Value="@model.PhoneNumber" 
+                                          Placeholder="+1 (555) 123-4567" 
+                                          Style="width: 100%;" />
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                Optional - used for two-factor authentication
+                            </RadzenText>
+                        </RadzenFormField>
+                    </RadzenStack>
+                </RadzenFieldset>
+
+                <!-- Account Settings -->
+                <RadzenFieldset Text="Account Settings">
+                    <RadzenStack Gap="1rem">
+                        <RadzenRow>
+                            <RadzenColumn Size="12" SizeMD="6">
+                                <RadzenFormField Text="Email Status" Variant="Variant.Outlined">
+                                    <RadzenCheckBox @bind-Value="@emailConfirmed" />
+                                    <RadzenLabel Text="Email is confirmed" class="rz-ml-2" />
+                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary rz-mt-1">
+                                        Confirmed users can receive email notifications
+                                    </RadzenText>
+                                </RadzenFormField>
+                            </RadzenColumn>
+                            <RadzenColumn Size="12" SizeMD="6">
+                                <RadzenFormField Text="Phone Status" Variant="Variant.Outlined">
+                                    <RadzenCheckBox @bind-Value="@phoneConfirmed" />
+                                    <RadzenLabel Text="Phone number is confirmed" class="rz-ml-2" />
+                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary rz-mt-1">
+                                        Required for SMS-based two-factor authentication
+                                    </RadzenText>
+                                </RadzenFormField>
+                            </RadzenColumn>
+                        </RadzenRow>
+
+                        <RadzenFormField Text="Two-Factor Authentication" Variant="Variant.Outlined">
+                            <RadzenCheckBox @bind-Value="@twoFactorEnabled" />
+                            <RadzenLabel Text="Enable two-factor authentication" class="rz-ml-2" />
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary rz-mt-1">
+                                Requires additional verification during login
+                            </RadzenText>
+                        </RadzenFormField>
+                    </RadzenStack>
+                </RadzenFieldset>
+
+                @if (IsEdit)
+                {
+                    <!-- Security Actions (Edit Mode Only) -->
+                    <RadzenFieldset Text="Security Actions">
+                        <RadzenStack Gap="1rem">
+                            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
+                                Administrative actions for user account management
+                            </RadzenText>
+                            
+                            <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" Wrap="FlexWrap.Wrap">
+                                <RadzenButton Icon="lock_reset" ButtonStyle="ButtonStyle.Warning" Text="Reset Password" 
+                                             Click="@ResetPassword" />
+                                <RadzenButton Icon="email" ButtonStyle="ButtonStyle.Info" Text="Send Confirmation Email" 
+                                             Click="@SendConfirmationEmail" />
+                                <RadzenButton Icon="block" ButtonStyle="ButtonStyle.Danger" Text="Lock Account" 
+                                             Click="@LockAccount" />
+                                <RadzenButton Icon="logout" ButtonStyle="ButtonStyle.Secondary" Text="Force Logout" 
+                                             Click="@ForceLogout" />
+                            </RadzenStack>
+                        </RadzenStack>
+                    </RadzenFieldset>
+                }
+
+                <!-- Action Buttons -->
+                <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" class="rz-mt-4">
+                    <RadzenButton Click="@Cancel" Icon="cancel" ButtonStyle="ButtonStyle.Light" Text="Cancel" />
+                    <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem">
+                        @if (IsEdit)
+                        {
+                            <RadzenButton Click="@DeleteUser" Icon="delete" ButtonStyle="ButtonStyle.Danger" 
+                                         Text="Delete User" Disabled="@isSaving" />
+                        }
+                        <RadzenButton ButtonType="ButtonType.Submit" Icon="save" ButtonStyle="ButtonStyle.Primary" 
+                                     Text="@(IsEdit ? "Update User" : "Create User")" 
+                                     IsBusy="@isSaving" Disabled="@isSaving" />
+                    </RadzenStack>
+                </RadzenStack>
+            </RadzenStack>
+        </RadzenTemplateForm>
+    }
+</RadzenCard>
+
+@code {
+    [Parameter] public string? Id { get; set; }
+
+    private bool IsEdit => !string.IsNullOrEmpty(Id);
+    private bool isLoading = false;
+    private bool isSaving = false;
+    private bool showPassword = false;
+    
+    private CreateUserRequest model = new();
+    private string confirmPassword = "";
+    private bool emailConfirmed = false;
+    private bool phoneConfirmed = false;
+    private bool twoFactorEnabled = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (IsEdit)
+        {
+            await LoadUser();
+        }
+        else
+        {
+            // Set defaults for new user
+            emailConfirmed = false;
+            phoneConfirmed = false;
+            twoFactorEnabled = false;
+        }
+    }
+
+    private async Task LoadUser()
+    {
+        isLoading = true;
+        try
+        {
+            await Task.Delay(500);
+            
+            // Mock user data
+            var mockUser = GetMockUser(Id!);
+            if (mockUser != null)
+            {
+                model.Email = mockUser.Email;
+                model.UserName = mockUser.UserName;
+                model.PhoneNumber = mockUser.PhoneNumber;
+                emailConfirmed = mockUser.EmailConfirmed;
+                phoneConfirmed = mockUser.PhoneNumberConfirmed;
+                twoFactorEnabled = mockUser.TwoFactorEnabled;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading user {UserId}", Id);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to load user data");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task OnSave(CreateUserRequest args)
+    {
+        if (string.IsNullOrWhiteSpace(model.Email))
+        {
+            NotificationService.Notify(NotificationSeverity.Warning, "Validation Error", "Email address is required");
+            return;
+        }
+
+        if (!IsEdit)
+        {
+            if (string.IsNullOrWhiteSpace(model.Password))
+            {
+                NotificationService.Notify(NotificationSeverity.Warning, "Validation Error", "Password is required for new users");
+                return;
+            }
+
+            if (model.Password != confirmPassword)
+            {
+                NotificationService.Notify(NotificationSeverity.Warning, "Validation Error", "Passwords do not match");
+                return;
+            }
+        }
+
+        isSaving = true;
+        try
+        {
+            // Set username to email if not provided
+            if (string.IsNullOrWhiteSpace(model.UserName))
+            {
+                model.UserName = model.Email;
+            }
+
+            // Set confirmation statuses
+            model.EmailConfirmed = emailConfirmed;
+            model.PhoneNumberConfirmed = phoneConfirmed;
+            model.TwoFactorEnabled = twoFactorEnabled;
+
+            await Task.Delay(1000);
+
+            var action = IsEdit ? "updated" : "created";
+            NotificationService.Notify(NotificationSeverity.Success, "Success", $"User '{model.Email}' has been {action} successfully");
+            
+            Navigation.NavigateTo("/users");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error saving user");
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to save user");
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private void GeneratePassword()
+    {
+        var random = new Random();
+        var chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
+        model.Password = new string(Enumerable.Repeat(chars, 16)
+            .Select(s => s[random.Next(s.Length)]).ToArray());
+        confirmPassword = model.Password;
+        
+        NotificationService.Notify(NotificationSeverity.Info, "Generated", "New password generated");
+    }
+
+    private async Task ResetPassword()
+    {
+        var result = await DialogService.Confirm("Send password reset email to this user?", "Reset Password", new ConfirmOptions() { OkButtonText = "Send", CancelButtonText = "Cancel" });
+        
+        if (result == true)
+        {
+            NotificationService.Notify(NotificationSeverity.Success, "Email Sent", "Password reset email has been sent to the user");
+        }
+    }
+
+    private async Task SendConfirmationEmail()
+    {
+        NotificationService.Notify(NotificationSeverity.Success, "Email Sent", "Confirmation email has been sent to the user");
+    }
+
+    private async Task LockAccount()
+    {
+        var result = await DialogService.Confirm("Lock this user account? The user will not be able to login.", "Lock Account", new ConfirmOptions() { OkButtonText = "Lock", CancelButtonText = "Cancel" });
+        
+        if (result == true)
+        {
+            NotificationService.Notify(NotificationSeverity.Success, "Account Locked", "User account has been locked");
+        }
+    }
+
+    private async Task ForceLogout()
+    {
+        NotificationService.Notify(NotificationSeverity.Success, "Logged Out", "All user sessions have been terminated");
+    }
+
+    private async Task DeleteUser()
+    {
+        var result = await DialogService.Confirm($"Are you sure you want to delete the user '{model.Email}'?", "Delete User", new ConfirmOptions() { OkButtonText = "Delete", CancelButtonText = "Cancel" });
+        
+        if (result == true)
+        {
+            try
+            {
+                await Task.Delay(500);
+                
+                NotificationService.Notify(NotificationSeverity.Success, "Success", $"User '{model.Email}' has been deleted");
+                Navigation.NavigateTo("/users");
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error deleting user");
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to delete user");
+            }
+        }
+    }
+
+    private void Cancel()
+    {
+        Navigation.NavigateTo("/users");
+    }
+
+    // Mock data method
+    private UserDto? GetMockUser(string id)
+    {
+        var mockUsers = new Dictionary<string, UserDto>
+        {
+            ["1"] = new() { 
+                Id = "1", UserName = "admin@mrwho.com", Email = "admin@mrwho.com",
+                EmailConfirmed = true, TwoFactorEnabled = true, PhoneNumber = "+1-555-0123",
+                PhoneNumberConfirmed = true
+            },
+            ["2"] = new() { 
+                Id = "2", UserName = "test@example.com", Email = "test@example.com",
+                EmailConfirmed = true, TwoFactorEnabled = false, PhoneNumber = "+1-555-0456"
+            }
+        };
+
+        return mockUsers.TryGetValue(id, out var user) ? user : null;
+    }
+}
