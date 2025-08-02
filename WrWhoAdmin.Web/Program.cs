@@ -5,6 +5,7 @@ using MrWhoAdmin.Web;
 using MrWhoAdmin.Web.Components;
 using MrWhoAdmin.Web.Services;
 using Radzen;
+using Microsoft.AspNetCore.Components.Server.Circuits;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,6 +20,10 @@ builder.Services.AddOutputCache();
 
 // Add Radzen services
 builder.Services.AddRadzenComponents();
+builder.Services.AddScoped<DialogService>();
+builder.Services.AddScoped<NotificationService>();
+builder.Services.AddScoped<TooltipService>();
+builder.Services.AddScoped<ContextMenuService>();
 
 // Add HTTP context accessor for authentication handler
 builder.Services.AddHttpContextAccessor();
@@ -30,36 +35,6 @@ builder.Services.AddHttpClient<WeatherApiClient>(client =>
         // Learn more about service discovery scheme resolution at https://aka.ms/dotnet/sdschemes.
         client.BaseAddress = new("https+http://apiservice");
     });
-
-// Add MrWho API clients with authentication
-builder.Services.AddHttpClient<IRealmsApiService, RealmsApiService>("MrWhoApi", client =>
-{
-    client.BaseAddress = new Uri("https://localhost:7113/"); // MrWho API base URL
-    client.DefaultRequestHeaders.Add("Accept", "application/json");
-})
-.AddHttpMessageHandler<AuthenticationDelegatingHandler>();
-
-builder.Services.AddHttpClient<IClientsApiService, ClientsApiService>("MrWhoApi", client =>
-{
-    client.BaseAddress = new Uri("https://localhost:7113/");
-    client.DefaultRequestHeaders.Add("Accept", "application/json");
-})
-.AddHttpMessageHandler<AuthenticationDelegatingHandler>();
-
-builder.Services.AddHttpClient<IUsersApiService, UsersApiService>("MrWhoApi", client =>
-{
-    client.BaseAddress = new Uri("https://localhost:7113/");
-    client.DefaultRequestHeaders.Add("Accept", "application/json");
-})
-.AddHttpMessageHandler<AuthenticationDelegatingHandler>();
-
-// Register API services
-builder.Services.AddScoped<IRealmsApiService, RealmsApiService>();
-builder.Services.AddScoped<IClientsApiService, ClientsApiService>();
-builder.Services.AddScoped<IUsersApiService, UsersApiService>();
-
-// Add authentication delegating handler
-builder.Services.AddTransient<AuthenticationDelegatingHandler>();
 
 // Add Authentication services
 builder.Services.AddAuthentication(options =>
@@ -104,7 +79,7 @@ builder.Services.AddAuthentication(options =>
     options.ClaimActions.DeleteClaim("at_hash");
     options.ClaimActions.DeleteClaim("azp");
     options.ClaimActions.DeleteClaim("oi_au_id");
-    options.ClaimActions.DeleteClaim("oi_tnk_id");
+    options.ClaimActions.DeleteClaim("oi_tbn_id");
 
     // Only map claims from UserInfo endpoint
     options.ClaimActions.MapJsonKey("name", "name");
@@ -112,71 +87,19 @@ builder.Services.AddAuthentication(options =>
     options.ClaimActions.MapJsonKey("family_name", "family_name");
     options.ClaimActions.MapJsonKey("email", "email");
 
-    // Comprehensive event logging for debugging
+    // Event logging for debugging (simplified)
     options.Events = new OpenIdConnectEvents
     {
         OnRedirectToIdentityProvider = context =>
         {
             var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-            logger.LogInformation("Redirecting to identity provider: {Authority}", context.ProtocolMessage.IssuerAddress);
-            logger.LogInformation("Client ID: {ClientId}", context.ProtocolMessage.ClientId);
-            logger.LogInformation("Redirect URI: {RedirectUri}", context.ProtocolMessage.RedirectUri);
-            logger.LogInformation("Response Type: {ResponseType}", context.ProtocolMessage.ResponseType);
-            logger.LogInformation("Scope: {Scope}", context.ProtocolMessage.Scope);
-            logger.LogInformation("State: {State}", context.ProtocolMessage.State);
-            return Task.CompletedTask;
-        },
-        OnAuthorizationCodeReceived = context =>
-        {
-            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-            logger.LogInformation("Authorization code received from identity provider");
-            logger.LogInformation("Code: {Code}", context.ProtocolMessage.Code?.Substring(0, Math.Min(10, context.ProtocolMessage.Code.Length)) + "...");
-            return Task.CompletedTask;
-        },
-        OnTokenResponseReceived = context =>
-        {
-            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-            logger.LogInformation("Token response received from identity provider");
-            logger.LogInformation("Access token present: {HasAccessToken}", !string.IsNullOrEmpty(context.TokenEndpointResponse.AccessToken));
-            logger.LogInformation("Refresh token present: {HasRefreshToken}", !string.IsNullOrEmpty(context.TokenEndpointResponse.RefreshToken));
-            logger.LogInformation("ID token present: {HasIdToken}", !string.IsNullOrEmpty(context.TokenEndpointResponse.IdToken));
+            logger.LogInformation("Redirecting to identity provider");
             return Task.CompletedTask;
         },
         OnTokenValidated = context =>
         {
             var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-            logger.LogInformation("Token validated successfully. Will call UserInfo endpoint: {GetClaimsFromUserInfoEndpoint}", context.Options.GetClaimsFromUserInfoEndpoint);
-
-            // Log all claims from ID token for debugging
-            logger.LogInformation("=== Claims from ID Token ===");
-            foreach (var claim in context.Principal?.Claims ?? [])
-            {
-                logger.LogInformation("ID Token Claim: {Type} = {Value}", claim.Type, claim.Value);
-            }
-            logger.LogInformation("=== End ID Token Claims ===");
-
-            return Task.CompletedTask;
-        },
-        OnUserInformationReceived = context =>
-        {
-            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-            logger.LogInformation("!!! UserInfo endpoint was called !!!");
-            logger.LogInformation("User information received from UserInfo endpoint: {UserInfo}", context.User.ToString());
-            return Task.CompletedTask;
-        },
-        OnTicketReceived = context =>
-        {
-            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-            logger.LogInformation("Final authentication ticket received");
-
-            // Log final claims after all processing
-            logger.LogInformation("=== Final Claims in Authentication Ticket ===");
-            foreach (var claim in context.Principal?.Claims ?? [])
-            {
-                logger.LogInformation("Final Claim: {Type} = {Value}", claim.Type, claim.Value);
-            }
-            logger.LogInformation("=== End Final Claims ===");
-
+            logger.LogInformation("Token validated successfully");
             return Task.CompletedTask;
         }
     };
@@ -221,8 +144,10 @@ app.UseOutputCache();
 
 app.MapStaticAssets();
 
+// Configure Blazor components properly
 app.MapRazorComponents<App>()
-    .AddInteractiveServerRenderMode();
+    .AddInteractiveServerRenderMode()
+    .AddAdditionalAssemblies(typeof(Radzen.Blazor.RadzenButton).Assembly);
 
 app.MapDefaultEndpoints();
 
