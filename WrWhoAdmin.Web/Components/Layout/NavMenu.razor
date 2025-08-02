@@ -53,6 +53,7 @@
 
 @code {
     [Inject] private NavigationManager Navigation { get; set; } = default!;
+    [Inject] private NotificationService NotificationService { get; set; } = default!;
 
     private string GetUserDisplayName(System.Security.Claims.ClaimsPrincipal user)
     {
@@ -68,5 +69,11 @@
     private void NavigateToLogin()
     {
         Navigation.NavigateTo("/login");
+    }
+
+    protected override void OnInitialized()
+    {
+        // Add some logging to verify the component is properly initialized
+        NotificationService.Notify(NotificationSeverity.Info, "Menu Ready", "Navigation menu is now interactive", duration: 2000);
     }
 }
