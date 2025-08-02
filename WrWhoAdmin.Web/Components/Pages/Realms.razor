@@ -1,8 +1,9 @@
 @page "/realms"
 @attribute [Authorize]
+@rendermode InteractiveServer
 @inject NavigationManager Navigation
 @inject ILogger<Realms> Logger
-@rendermode InteractiveServer
+@inject NotificationService NotificationService
 
 <PageTitle>Realms - MrWho Admin</PageTitle>
 
@@ -66,6 +67,8 @@
                                          ButtonStyle="ButtonStyle.Light" Text="Edit" />
                             <RadzenButton Click="@(() => ViewClients(realm.Id))" Icon="apps" Size="ButtonSize.Small" 
                                          ButtonStyle="ButtonStyle.Info" Text="Clients" />
+                            <RadzenButton Click="@(() => ToggleRealmStatus(realm))" Icon="@(realm.IsEnabled ? "toggle_on" : "toggle_off")" 
+                                         Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Warning" Text="Toggle" />
                         </RadzenStack>
                     </Template>
                 </RadzenDataGridColumn>
@@ -95,22 +98,31 @@
         isLoading = true;
         try
         {
-            // For now, use mock data until API integration is complete
-            await Task.Delay(500); // Simulate API call
+            // Simulate API call
+            await Task.Delay(500); 
             
             realms = new List<RealmDto>
             {
                 new() { 
                     Id = "1", 
+                    Name = "admin", 
+                    DisplayName = "MrWho Administration", 
+                    Description = "Administrative realm for MrWho OIDC server management", 
+                    IsEnabled = true, 
+                    ClientCount = 1,
+                    CreatedAt = DateTime.Now.AddDays(-30)
+                },
+                new() { 
+                    Id = "2", 
                     Name = "default", 
                     DisplayName = "Default Realm", 
                     Description = "Default realm for OIDC clients", 
                     IsEnabled = true, 
                     ClientCount = 3,
-                    CreatedAt = DateTime.Now.AddDays(-30)
+                    CreatedAt = DateTime.Now.AddDays(-25)
                 },
                 new() { 
-                    Id = "2", 
+                    Id = "3", 
                     Name = "sample-development", 
                     DisplayName = "Development Environment", 
                     Description = "Sample realm for development and testing purposes", 
@@ -119,7 +131,7 @@
                     CreatedAt = DateTime.Now.AddDays(-15)
                 },
                 new() { 
-                    Id = "3", 
+                    Id = "4", 
                     Name = "sample-staging", 
                     DisplayName = "Staging Environment", 
                     Description = "Sample realm for staging and pre-production testing", 
@@ -128,16 +140,17 @@
                     CreatedAt = DateTime.Now.AddDays(-10)
                 },
                 new() { 
-                    Id = "4", 
-                    Name = "sample-production", 
-                    DisplayName = "Production Environment", 
-                    Description = "Sample realm for production-like configuration", 
+                    Id = "5", 
+                    Name = "demo-multi-tenant", 
+                    DisplayName = "Multi-Tenant Demo", 
+                    Description = "Demo realm showcasing multi-tenant capabilities", 
                     IsEnabled = false, 
-                    ClientCount = 1,
+                    ClientCount = 4,
                     CreatedAt = DateTime.Now.AddDays(-5)
                 },
             };
 
+            // Apply search filter
             if (!string.IsNullOrWhiteSpace(searchTerm))
             {
                 realms = realms.Where(r => 
@@ -146,25 +159,39 @@
                     r.Description?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) == true
                 ).ToList();
             }
+
+            Logger.LogInformation("Loaded {RealmCount} realms", realms.Count);
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error loading realms");
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to load realms");
         }
         finally
         {
             isLoading = false;
+            StateHasChanged();
         }
     }
 
     private void EditRealm(string realmId)
     {
+        NotificationService.Notify(NotificationSeverity.Info, "Navigation", $"Navigating to edit realm {realmId}");
         Navigation.NavigateTo($"/realms/edit/{realmId}");
     }
 
     private void ViewClients(string realmId)
     {
+        NotificationService.Notify(NotificationSeverity.Info, "Navigation", "Viewing clients for realm");
         Navigation.NavigateTo($"/clients?realmId={realmId}");
+    }
+
+    private void ToggleRealmStatus(RealmDto realm)
+    {
+        realm.IsEnabled = !realm.IsEnabled;
+        var status = realm.IsEnabled ? "enabled" : "disabled";
+        NotificationService.Notify(NotificationSeverity.Success, "Realm Updated", $"Realm '{realm.Name}' has been {status}");
+        StateHasChanged();
     }
 
     public class RealmDto
