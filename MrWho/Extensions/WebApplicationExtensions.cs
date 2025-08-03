@@ -1,0 +1,423 @@
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using MrWho.Data;
+using MrWho.Handlers;
+using MrWho.Services;
+using OpenIddict.Abstractions;
+
+namespace MrWho.Extensions;
+
+public static class WebApplicationExtensions
+{
+    public static async Task<WebApplication> ConfigureMrWhoPipelineAsync(this WebApplication app)
+    {
+        app.MapDefaultEndpoints();
+
+        // Configure the HTTP request pipeline
+        if (!app.Environment.IsDevelopment())
+        {
+            app.UseExceptionHandler("/Error");
+            app.UseHsts();
+        }
+
+        app.UseHttpsRedirection();
+        app.UseStaticFiles();
+        app.UseRouting();
+
+        // Add antiforgery middleware
+        app.UseAntiforgery();
+
+        app.UseAuthentication();
+        app.UseAuthorization();
+
+        // Initialize database and seed essential data
+        await app.InitializeDatabaseAsync();
+
+        // Configure routing for controllers
+        app.MapControllerRoute(
+            name: "default",
+            pattern: "{controller=Home}/{action=Index}/{id?}");
+
+        return app;
+    }
+
+    public static WebApplication AddMrWhoEndpoints(this WebApplication app)
+    {
+        // OIDC Token endpoint - now uses injected TokenHandler
+        app.MapPost("/connect/token", async (HttpContext context, ITokenHandler tokenHandler) =>
+        {
+            return await tokenHandler.HandleTokenRequestAsync(context);
+        });
+
+        // UserInfo endpoint (optional but recommended) - Updated to use OpenIddict validation
+        app.MapGet("/connect/userinfo", async (HttpContext context, IUserInfoHandler userInfoHandler) =>
+        {
+            return await userInfoHandler.HandleUserInfoRequestAsync(context);
+        }).RequireAuthorization();
+
+        // API Test endpoint (for debugging) - This will now work with OpenIddict validation
+        app.MapGet("/api/test", [Authorize] () =>
+        {
+            return Results.Ok(new { Message = "API is working!", Timestamp = DateTime.UtcNow });
+        });
+
+        return app;
+    }
+
+    public static WebApplication AddMrWhoDebugEndpoints(this WebApplication app)
+    {
+        app.MapGet("/debug/client-info", async (IOidcClientService oidcClientService) =>
+        {
+            var clients = await oidcClientService.GetEnabledClientsAsync();
+            var postmanClient = clients.FirstOrDefault(c => c.ClientId == "postman_client");
+            
+            if (postmanClient == null)
+            {
+                return Results.NotFound("Postman client not found");
+            }
+            
+            return Results.Ok(new
+            {
+                ClientId = postmanClient.ClientId,
+                ClientSecret = postmanClient.ClientSecret,
+                AuthorizeUrl = "https://localhost:7000/connect/authorize",
+                TokenUrl = "https://localhost:7000/connect/token",
+                LogoutUrl = "https://localhost:7000/connect/logout",
+                RedirectUris = postmanClient.RedirectUris.Select(ru => ru.Uri).ToArray(),
+                PostLogoutRedirectUris = postmanClient.PostLogoutUris.Select(plu => plu.Uri).ToArray(),
+                SampleAuthUrl = $"https://localhost:7000/connect/authorize?client_id={postmanClient.ClientId}&response_type=code&redirect_uri=https://localhost:7002/signin-oidc&scope=openid%20email%20profile&state=test_state",
+                SampleLogoutUrl = "https://localhost:7000/connect/logout?post_logout_redirect_uri=https://localhost:7002/signout-callback-oidc"
+            });
+        });
+
+        // Debug endpoint to show actual database client configuration
+        app.MapGet("/debug/db-client-config", async (IOpenIddictApplicationManager applicationManager, IOidcClientService oidcClientService) =>
+        {
+            var clients = await oidcClientService.GetEnabledClientsAsync();
+            var clientConfigs = new List<object>();
+            
+            foreach (var client in clients)
+            {
+                var openIddictClient = await applicationManager.FindByClientIdAsync(client.ClientId);
+                if (openIddictClient != null)
+                {
+                    clientConfigs.Add(new
+                    {
+                        ClientId = await applicationManager.GetClientIdAsync(openIddictClient),
+                        DisplayName = await applicationManager.GetDisplayNameAsync(openIddictClient),
+                        RedirectUris = await applicationManager.GetRedirectUrisAsync(openIddictClient),
+                        PostLogoutRedirectUris = await applicationManager.GetPostLogoutRedirectUrisAsync(openIddictClient),
+                        DatabaseConfiguration = new
+                        {
+                            client.ClientId,
+                            client.Name,
+                            client.IsEnabled,
+                            RealmName = client.Realm.Name,
+                            client.AllowAuthorizationCodeFlow,
+                            client.AllowClientCredentialsFlow,
+                            client.AllowPasswordFlow,
+                            client.AllowRefreshTokenFlow
+                        }
+                    });
+                }
+            }
+            
+            return Results.Ok(clientConfigs);
+        });
+
+        app.MapGet("/debug/admin-client-info", async (IOidcClientService oidcClientService) =>
+        {
+            var clients = await oidcClientService.GetEnabledClientsAsync();
+            var adminClient = clients.FirstOrDefault(c => c.ClientId == "mrwho_admin_web");
+            
+            if (adminClient == null)
+            {
+                return Results.NotFound("Admin client not found");
+            }
+            
+            return Results.Ok(new
+            {
+                ClientId = adminClient.ClientId,
+                ClientSecret = adminClient.ClientSecret,
+                Name = adminClient.Name,
+                RealmName = adminClient.Realm.Name,
+                IsEnabled = adminClient.IsEnabled,
+                AuthorizeUrl = "https://localhost:7113/connect/authorize",
+                TokenUrl = "https://localhost:7113/connect/token",
+                LogoutUrl = "https://localhost:7113/connect/logout",
+                RedirectUris = adminClient.RedirectUris.Select(ru => ru.Uri).ToArray(),
+                PostLogoutRedirectUris = adminClient.PostLogoutUris.Select(plu => plu.Uri).ToArray(),
+                Scopes = adminClient.Scopes.Select(s => s.Scope).ToArray(),
+                SampleAuthUrl = $"https://localhost:7113/connect/authorize?client_id={adminClient.ClientId}&response_type=code&redirect_uri=https://localhost:7257/signin-oidc&scope=openid%20email%20profile%20roles%20api.read%20api.write&state=admin_test",
+                SampleLogoutUrl = "https://localhost:7113/connect/logout?post_logout_redirect_uri=https://localhost:7257/signout-callback-oidc",
+                AdminCredentials = new
+                {
+                    Username = "admin@mrwho.local",
+                    Password = "MrWhoAdmin2024!"
+                }
+            });
+        });
+
+        // Debug endpoint for all essential data
+        app.MapGet("/debug/essential-data", async (IOidcClientService oidcClientService, ApplicationDbContext context) =>
+        {
+            var adminRealm = await context.Realms.FirstOrDefaultAsync(r => r.Name == "admin");
+            var adminClient = await context.Clients
+                .Include(c => c.RedirectUris)
+                .Include(c => c.PostLogoutUris)
+                .Include(c => c.Scopes)
+                .FirstOrDefaultAsync(c => c.ClientId == "mrwho_admin_web");
+            var adminUser = await context.Users.FirstOrDefaultAsync(u => u.UserName == "admin@mrwho.local");
+            
+            return Results.Ok(new
+            {
+                AdminRealm = adminRealm != null ? new
+                {
+                    adminRealm.Id,
+                    adminRealm.Name,
+                    adminRealm.DisplayName,
+                    adminRealm.Description,
+                    adminRealm.IsEnabled
+                } : null,
+                AdminClient = adminClient != null ? new
+                {
+                    adminClient.Id,
+                    adminClient.ClientId,
+                    adminClient.Name,
+                    adminClient.IsEnabled,
+                    adminClient.RealmId,
+                    RedirectUris = adminClient.RedirectUris.Select(ru => ru.Uri).ToArray(),
+                    PostLogoutUris = adminClient.PostLogoutUris.Select(plu => plu.Uri).ToArray(),
+                    Scopes = adminClient.Scopes.Select(s => s.Scope).ToArray()
+                } : null,
+                AdminUser = adminUser != null ? new
+                {
+                    adminUser.Id,
+                    adminUser.UserName,
+                    adminUser.Email,
+                    adminUser.EmailConfirmed
+                } : null,
+                SetupInstructions = new
+                {
+                    LoginUrl = "https://localhost:7257/login",
+                    AdminCredentials = new
+                    {
+                        Username = "admin@mrwho.local",
+                        Password = "MrWhoAdmin2024!"
+                    }
+                }
+            });
+        });
+
+        // Debug endpoint to check the current client permissions and scopes in the database
+        app.MapGet("/debug/client-permissions", async (IOidcClientService oidcClientService, ApplicationDbContext context) =>
+        {
+            var adminClient = await context.Clients
+                .Include(c => c.Scopes)
+                .Include(c => c.Permissions)
+                .FirstOrDefaultAsync(c => c.ClientId == "mrwho_admin_web");
+            
+            if (adminClient == null)
+            {
+                return Results.NotFound("Admin client not found");
+            }
+            
+            return Results.Ok(new
+            {
+                ClientId = adminClient.ClientId,
+                Scopes = adminClient.Scopes.Select(s => s.Scope).ToArray(),
+                Permissions = adminClient.Permissions.Select(p => p.Permission).ToArray(),
+                ScopesWithApiAccess = adminClient.Scopes.Where(s => s.Scope.StartsWith("api.")).ToArray(),
+                PermissionsWithApiAccess = adminClient.Permissions.Where(p => p.Permission.StartsWith("api.") || p.Permission.Contains("api.")).ToArray()
+            });
+        });
+
+        // Debug endpoint to reset admin client (DEVELOPMENT ONLY)
+        app.MapPost("/debug/reset-admin-client", async (ApplicationDbContext context, IOidcClientService oidcClientService, ILogger<Program> logger) =>
+        {
+            if (!app.Environment.IsDevelopment())
+            {
+                return Results.BadRequest("This endpoint is only available in development");
+            }
+            
+            logger.LogWarning("RESETTING ADMIN CLIENT - This will delete and recreate the admin client");
+            logger.LogWarning("Ensure you have a backup of your database before proceeding!");
+            // Find and delete existing admin client
+            var existingClient = await context.Clients
+                .Include(c => c.RedirectUris)
+                .Include(c => c.PostLogoutUris)
+                .Include(c => c.Scopes)
+                .Include(c => c.Permissions)
+                .FirstOrDefaultAsync(c => c.ClientId == "mrwho_admin_web");
+            
+            if (existingClient != null)
+            {
+                context.Clients.Remove(existingClient);
+                await context.SaveChangesAsync();
+                logger.LogInformation("Deleted existing admin client");
+            }
+            
+            // Recreate the client with correct permissions
+            try 
+            {
+                await oidcClientService.InitializeEssentialDataAsync();
+                return Results.Ok(new { message = "Admin client reset successfully", timestamp = DateTime.UtcNow });
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error recreating admin client");
+                return Results.Problem($"Error recreating admin client: {ex.Message}");
+            }
+        });
+
+        // Debug endpoint to fix API permissions format (DEVELOPMENT ONLY)
+        app.MapPost("/debug/fix-api-permissions", async (ApplicationDbContext context, IOidcClientService oidcClientService, ILogger<Program> logger) =>
+        {
+            if (!app.Environment.IsDevelopment())
+            {
+                return Results.BadRequest("This endpoint is only available in development");
+            }
+            
+            logger.LogInformation("FIXING API PERMISSIONS - Updating permission format for all clients with API scopes");
+            
+            // Get all clients that have API scopes
+            var clientsWithApiScopes = await context.Clients
+                .Include(c => c.Scopes)
+                .Include(c => c.Permissions)
+                .Where(c => c.Scopes.Any(s => s.Scope.StartsWith("api.")))
+                .ToListAsync();
+            
+            var updatedClients = new List<string>();
+            
+            foreach (var client in clientsWithApiScopes)
+            {
+                var hasChanges = false;
+                
+                // Remove old format permissions
+                var oldPermissions = client.Permissions
+                    .Where(p => p.Permission.StartsWith("oidc:scope:api.") || 
+                               (p.Permission.StartsWith("api.") && !p.Permission.StartsWith("scp:")))
+                    .ToList();
+                
+                if (oldPermissions.Any())
+                {
+                    logger.LogInformation("Removing old API permissions for client {ClientId}: {Permissions}", 
+                        client.ClientId, string.Join(", ", oldPermissions.Select(p => p.Permission)));
+                    
+                    foreach (var oldPerm in oldPermissions)
+                    {
+                        context.ClientPermissions.Remove(oldPerm);
+                    }
+                    hasChanges = true;
+                }
+                
+                // Add correct format permissions
+                var apiScopes = client.Scopes.Where(s => s.Scope.StartsWith("api.")).Select(s => s.Scope).ToList();
+                foreach (var apiScope in apiScopes)
+                {
+                    var correctPermission = $"scp:{apiScope}";
+                    if (!client.Permissions.Any(p => p.Permission == correctPermission))
+                    {
+                        logger.LogInformation("Adding correct API permission for client {ClientId}: {Permission}", 
+                            client.ClientId, correctPermission);
+                        
+                        context.ClientPermissions.Add(new Models.ClientPermission
+                        {
+                            ClientId = client.Id,
+                            Permission = correctPermission
+                        });
+                        hasChanges = true;
+                    }
+                }
+                
+                if (hasChanges)
+                {
+                    updatedClients.Add(client.ClientId);
+                    
+                    // Re-sync the client with OpenIddict
+                    try
+                    {
+                        await oidcClientService.SyncClientWithOpenIddictAsync(client);
+                        logger.LogInformation("Re-synced client {ClientId} with OpenIddict", client.ClientId);
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogError(ex, "Failed to re-sync client {ClientId} with OpenIddict", client.ClientId);
+                    }
+                }
+            }
+            
+            if (updatedClients.Any())
+            {
+                await context.SaveChangesAsync();
+                logger.LogInformation("Updated API permissions for clients: {Clients}", string.Join(", ", updatedClients));
+                
+                return Results.Ok(new 
+                { 
+                    message = "API permissions fixed successfully", 
+                    updatedClients = updatedClients,
+                    timestamp = DateTime.UtcNow 
+                });
+            }
+            else
+            {
+                return Results.Ok(new 
+                { 
+                    message = "No API permission fixes needed", 
+                    timestamp = DateTime.UtcNow 
+                });
+            }
+        });
+
+        return app;
+    }
+
+    private static async Task InitializeDatabaseAsync(this WebApplication app)
+    {
+        using var scope = app.Services.CreateScope();
+        var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
+        var oidcClientService = scope.ServiceProvider.GetRequiredService<IOidcClientService>();
+        
+        // Ensure database is created (works for both development and production)
+        await context.Database.EnsureCreatedAsync();
+        
+        // Initialize essential data (admin realm, admin client, admin user)
+        try
+        {
+            await oidcClientService.InitializeEssentialDataAsync();
+            Console.WriteLine("Essential OIDC data initialized successfully");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error initializing essential OIDC data: {ex.Message}");
+            throw;
+        }
+        
+        // Seed additional test users for development
+        if (!await context.Users.AnyAsync(u => u.UserName == "test@example.com"))
+        {
+            var testUser = new IdentityUser 
+            { 
+                UserName = "test@example.com", 
+                Email = "test@example.com", 
+                EmailConfirmed = true 
+            };
+            await userManager.CreateAsync(testUser, "Test123!");
+            Console.WriteLine("Created test user");
+        }
+        
+        // Initialize default realm and clients using the dynamic service (keeping for backwards compatibility)
+        try
+        {
+            await oidcClientService.InitializeDefaultRealmAndClientsAsync();
+            Console.WriteLine("Dynamic OIDC client configuration initialized successfully");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error initializing dynamic OIDC client configuration: {ex.Message}");
+            throw;
+        }
+    }
+}
