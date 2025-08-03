@@ -493,7 +493,7 @@ public class OidcClientService : IOidcClientService
                 }
             }
 
-            // IMPORTANT: Also add the endpoint access for UserInfo if we have openid scope 
+            // IMPORTANT: Also add the endpoint access if we have openid scope 
             if (client.Scopes.Any(s => s.Scope == "openid"))
             {
                 descriptor.Permissions.Add(OpenIddictConstants.Permissions.Endpoints.EndSession);

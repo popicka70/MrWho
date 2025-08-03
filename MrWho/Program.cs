@@ -213,11 +213,11 @@ app.MapPost("/connect/token", async (HttpContext context, ITokenHandler tokenHan
     return await tokenHandler.HandleTokenRequestAsync(context);
 });
 
-// UserInfo endpoint (optional but recommended)
-app.MapGet("/connect/userinfo", [Authorize] async (HttpContext context, IUserInfoHandler userInfoHandler) =>
+// UserInfo endpoint (optional but recommended) - Updated to use OpenIddict validation
+app.MapGet("/connect/userinfo", async (HttpContext context, IUserInfoHandler userInfoHandler) =>
 {
     return await userInfoHandler.HandleUserInfoRequestAsync(context);
-});
+}).RequireAuthorization();
 
 // API Test endpoint (for debugging) - This will now work with OpenIddict validation
 app.MapGet("/api/test", [Authorize] () =>
