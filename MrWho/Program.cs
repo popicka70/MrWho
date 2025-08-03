@@ -13,6 +13,7 @@ using OpenIddict.Server.AspNetCore;
 using static OpenIddict.Abstractions.OpenIddictConstants;
 using System.ComponentModel.DataAnnotations;
 using MrWho.Handlers.Users;
+using OpenIddict.Validation.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -121,22 +122,13 @@ builder.Services.AddOpenIddict()
         options.UseAspNetCore();
     });
 
-// Add authentication for API access
-builder.Services.AddAuthentication()
-    .AddJwtBearer("Bearer", options =>
-    {
-        options.Authority = "https://localhost:7113";
-        options.RequireHttpsMetadata = false; // Only for development
-        options.TokenValidationParameters.ValidateAudience = false;
-        options.TokenValidationParameters.ValidateIssuer = false;
-    });
-
-// Configure authorization policies
+// REMOVED: The conflicting JWT Bearer configuration
+// Instead, configure authorization to work with OpenIddict
 builder.Services.AddAuthorization(options =>
 {
     options.DefaultPolicy = new AuthorizationPolicyBuilder()
         .RequireAuthenticatedUser()
-        .AddAuthenticationSchemes("Identity.Application", "Bearer")
+        .AddAuthenticationSchemes("Identity.Application", OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme)
         .Build();
 });
 
@@ -226,7 +218,7 @@ app.MapGet("/connect/userinfo", [Authorize] async (HttpContext context, IUserInf
     return await userInfoHandler.HandleUserInfoRequestAsync(context);
 });
 
-// API Test endpoint (for debugging)
+// API Test endpoint (for debugging) - This will now work with OpenIddict validation
 app.MapGet("/api/test", [Authorize] () =>
 {
     return Results.Ok(new { Message = "API is working!", Timestamp = DateTime.UtcNow });
@@ -373,6 +365,67 @@ app.MapGet("/debug/essential-data", async (IOidcClientService oidcClientService,
             }
         }
     });
+});
+
+// Debug endpoint to check the current client permissions and scopes in the database
+app.MapGet("/debug/client-permissions", async (IOidcClientService oidcClientService, ApplicationDbContext context) =>
+{
+    var adminClient = await context.Clients
+        .Include(c => c.Scopes)
+        .Include(c => c.Permissions)
+        .FirstOrDefaultAsync(c => c.ClientId == "mrwho_admin_web");
+    
+    if (adminClient == null)
+    {
+        return Results.NotFound("Admin client not found");
+    }
+    
+    return Results.Ok(new
+    {
+        ClientId = adminClient.ClientId,
+        Scopes = adminClient.Scopes.Select(s => s.Scope).ToArray(),
+        Permissions = adminClient.Permissions.Select(p => p.Permission).ToArray(),
+        ScopesWithApiAccess = adminClient.Scopes.Where(s => s.Scope.StartsWith("api.")).ToArray(),
+        PermissionsWithApiAccess = adminClient.Permissions.Where(p => p.Permission.StartsWith("api.") || p.Permission.Contains("api.")).ToArray()
+    });
+});
+
+// Debug endpoint to reset admin client (DEVELOPMENT ONLY)
+app.MapPost("/debug/reset-admin-client", async (ApplicationDbContext context, IOidcClientService oidcClientService, ILogger<Program> logger) =>
+{
+    if (!app.Environment.IsDevelopment())
+    {
+        return Results.BadRequest("This endpoint is only available in development");
+    }
+    
+    logger.LogWarning("RESETTING ADMIN CLIENT - This will delete and recreate the admin client");
+    logger.LogWarning("Ensure you have a backup of your database before proceeding!");
+    // Find and delete existing admin client
+    var existingClient = await context.Clients
+        .Include(c => c.RedirectUris)
+        .Include(c => c.PostLogoutUris)
+        .Include(c => c.Scopes)
+        .Include(c => c.Permissions)
+        .FirstOrDefaultAsync(c => c.ClientId == "mrwho_admin_web");
+    
+    if (existingClient != null)
+    {
+        context.Clients.Remove(existingClient);
+        await context.SaveChangesAsync();
+        logger.LogInformation("Deleted existing admin client");
+    }
+    
+    // Recreate the client with correct permissions
+    try 
+    {
+        await oidcClientService.InitializeEssentialDataAsync();
+        return Results.Ok(new { message = "Admin client reset successfully", timestamp = DateTime.UtcNow });
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Error recreating admin client");
+        return Results.Problem($"Error recreating admin client: {ex.Message}");
+    }
 });
 
 app.Run();

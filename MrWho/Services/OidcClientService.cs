@@ -159,8 +159,8 @@ public class OidcClientService : IOidcClientService
                 OpenIddictConstants.Permissions.Scopes.Profile,
                 OpenIddictConstants.Permissions.Scopes.Roles,
                 OpenIddictConstants.Permissions.ResponseTypes.Code,
-                "api.read",   // Add API read permission
-                "api.write"   // Add API write permission
+                "oidc:scope:api.read",   // Use oidc:scope: prefix for API read permission
+                "oidc:scope:api.write"   // Use oidc:scope: prefix for API write permission
             };
 
             foreach (var permission in permissions)
@@ -179,7 +179,18 @@ public class OidcClientService : IOidcClientService
         {
             // Check if existing admin client has API scopes and add them if missing
             var existingApiScopes = adminClient.Scopes.Where(s => s.Scope.StartsWith("api.")).ToList();
-            var existingApiPermissions = adminClient.Permissions.Where(p => p.Permission.StartsWith("api.")).ToList();
+            var existingCorrectApiPermissions = adminClient.Permissions.Where(p => p.Permission.StartsWith("oidc:scope:api.")).ToList();
+
+            // Fix existing incorrect permissions - remove old format and add correct format
+            var oldApiPermissions = adminClient.Permissions.Where(p => p.Permission.StartsWith("api.") && !p.Permission.StartsWith("oidc:scope:")).ToList();
+            if (oldApiPermissions.Any())
+            {
+                _logger.LogInformation("Removing old API permissions with incorrect format");
+                foreach (var oldPermission in oldApiPermissions)
+                {
+                    _context.ClientPermissions.Remove(oldPermission);
+                }
+            }
 
             if (existingApiScopes.Count == 0)
             {
@@ -195,9 +206,14 @@ public class OidcClientService : IOidcClientService
                         Scope = scope
                     });
                 }
+            }
 
-                // Add API permissions
-                var apiPermissions = new[] { "api.read", "api.write" };
+            if (existingCorrectApiPermissions.Count == 0)
+            {
+                _logger.LogInformation("Adding API permissions with correct format to existing admin client");
+                
+                // Add API permissions with correct oidc:scope: prefix
+                var apiPermissions = new[] { "oidc:scope:api.read", "oidc:scope:api.write" };
                 foreach (var permission in apiPermissions)
                 {
                     _context.ClientPermissions.Add(new ClientPermission
@@ -206,9 +222,12 @@ public class OidcClientService : IOidcClientService
                         Permission = permission
                     });
                 }
+            }
 
+            if (existingApiScopes.Count == 0 || existingCorrectApiPermissions.Count == 0 || oldApiPermissions.Any())
+            {
                 await _context.SaveChangesAsync();
-                _logger.LogInformation("Added API scopes and permissions to existing admin client");
+                _logger.LogInformation("Updated API scopes and permissions on existing admin client");
                 
                 // Reload the client with new scopes and permissions
                 adminClient = await _context.Clients
@@ -244,6 +263,9 @@ public class OidcClientService : IOidcClientService
 
         // Sync the admin client with OpenIddict
         await SyncClientWithOpenIddictAsync(adminClient!);
+        
+        // CRITICAL FIX: Clean up any existing incorrect API permissions and ensure correct ones are present
+        await FixExistingApiPermissionsAsync(adminClient!);
     }
 
     public async Task InitializeDefaultRealmAndClientsAsync()
@@ -442,10 +464,52 @@ public class OidcClientService : IOidcClientService
             // Always add token endpoint
             descriptor.Permissions.Add(OpenIddictConstants.Permissions.Endpoints.Token);
 
-            // Add configured permissions
+            // Add scope permissions based on client scopes
+            foreach (var scope in client.Scopes)
+            {
+                switch (scope.Scope.ToLower())
+                {
+                    case "openid":
+                        descriptor.Permissions.Add("oidc:scope:openid");
+                        break;
+                    case "email":
+                        descriptor.Permissions.Add(OpenIddictConstants.Permissions.Scopes.Email);
+                        break;
+                    case "profile":
+                        descriptor.Permissions.Add(OpenIddictConstants.Permissions.Scopes.Profile);
+                        break;
+                    case "roles":
+                        descriptor.Permissions.Add(OpenIddictConstants.Permissions.Scopes.Roles);
+                        break;
+                    case "api.read":
+                        descriptor.Permissions.Add("oidc:scope:api.read");
+                        break;
+                    case "api.write":
+                        descriptor.Permissions.Add("oidc:scope:api.write");
+                        break;
+                    default:
+                        // For custom scopes, add them with the oidc:scope: prefix
+                        descriptor.Permissions.Add($"oidc:scope:{scope.Scope}");
+                        break;
+                }
+            }
+
+            // IMPORTANT: Also add the endpoint access for UserInfo if we have openid scope 
+            if (client.Scopes.Any(s => s.Scope == "openid"))
+            {
+                descriptor.Permissions.Add(OpenIddictConstants.Permissions.Endpoints.EndSession);
+            }
+
+            // Add additional permissions from client permissions (but skip the ones we're handling above)
             foreach (var permission in client.Permissions)
             {
-                descriptor.Permissions.Add(permission.Permission);
+                // Skip scope permissions as they are handled above, and skip old incorrect API permissions
+                if (!permission.Permission.StartsWith("oidc:scope:") && 
+                    !permission.Permission.StartsWith("api.") &&
+                    !descriptor.Permissions.Contains(permission.Permission))
+                {
+                    descriptor.Permissions.Add(permission.Permission);
+                }
             }
 
             // Add redirect URIs
@@ -463,13 +527,57 @@ public class OidcClientService : IOidcClientService
             // Create the OpenIddict application
             await _applicationManager.CreateAsync(descriptor);
 
-            _logger.LogInformation("Successfully synced client '{ClientId}' with OpenIddict", client.ClientId);
+            _logger.LogInformation("Successfully synced client '{ClientId}' with OpenIddict. Permissions: {Permissions}", 
+                client.ClientId, string.Join(", ", descriptor.Permissions));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to sync client '{ClientId}' with OpenIddict", client.ClientId);
             throw;
         }
+    }
+
+    private async Task FixExistingApiPermissionsAsync(Client client)
+    {
+        // Ensure any existing API permissions are corrected to the new format
+        var apiScopes = new[] { "api.read", "api.write" };
+        var correctApiPermissions = apiScopes.Select(scope => $"oidc:scope:{scope}").ToList();
+
+        // Remove old API permissions without oidc:scope: prefix
+        var oldApiPermissions = client.Permissions
+            .Where(p => p.Permission.StartsWith("api.") && !p.Permission.StartsWith("oidc:scope:"))
+            .ToList();
+
+        // Remove old API permissions
+        if (oldApiPermissions.Any())
+        {
+            _logger.LogInformation("Removing old API permissions with incorrect format for client '{ClientId}'", client.ClientId);
+            foreach (var oldPermission in oldApiPermissions)
+            {
+                _context.ClientPermissions.Remove(oldPermission);
+            }
+        }
+
+        // Add missing correct API permissions
+        var missingApiPermissions = correctApiPermissions
+            .Where(p => !client.Permissions.Any(cp => cp.Permission == p))
+            .ToList();
+
+        if (missingApiPermissions.Any())
+        {
+            _logger.LogInformation("Adding missing correct API permissions for client '{ClientId}': {Permissions}", client.ClientId, string.Join(", ", missingApiPermissions));
+            foreach (var permission in missingApiPermissions)
+            {
+                _context.ClientPermissions.Add(new ClientPermission
+                {
+                    ClientId = client.Id,
+                    Permission = permission
+                });
+            }
+        }
+
+        await _context.SaveChangesAsync();
+        _logger.LogInformation("Successfully fixed API permissions for client '{ClientId}'", client.ClientId);
     }
 }
 
