@@ -69,9 +69,9 @@ builder.Services.AddScoped<IUserInfoHandler, MrWho.Handlers.UserInfoHandler>();
 // Register User management handlers
 builder.Services.AddScoped<IGetUsersHandler, GetUsersHandler>();
 builder.Services.AddScoped<IGetUserHandler, GetUserHandler>();
-//builder.Services.AddScoped<ICreateUserHandler, CreateUserHandler>();
-//builder.Services.AddScoped<IUpdateUserHandler, UpdateUserHandler>();
-//builder.Services.AddScoped<IDeleteUserHandler, DeleteUserHandler>();
+builder.Services.AddScoped<ICreateUserHandler, CreateUserHandler>();
+builder.Services.AddScoped<IUpdateUserHandler, UpdateUserHandler>();
+builder.Services.AddScoped<IDeleteUserHandler, DeleteUserHandler>();
 //builder.Services.AddScoped<IChangePasswordHandler, ChangePasswordHandler>();
 //builder.Services.AddScoped<IResetPasswordHandler, ResetPasswordHandler>();
 //builder.Services.AddScoped<ISetLockoutHandler, SetLockoutHandler>();

@@ -12,15 +12,24 @@ public class UsersController : ControllerBase
 {
     private readonly IGetUsersHandler _getUsersHandler;
     private readonly IGetUserHandler _getUserHandler;
+    private readonly ICreateUserHandler _createUserHandler;
+    private readonly IUpdateUserHandler _updateUserHandler;
+    private readonly IDeleteUserHandler _deleteUserHandler;
     private readonly ILogger<UsersController> _logger;
 
     public UsersController(
         IGetUsersHandler getUsersHandler,
         IGetUserHandler getUserHandler,
+        ICreateUserHandler createUserHandler,
+        IUpdateUserHandler updateUserHandler,
+        IDeleteUserHandler deleteUserHandler,
         ILogger<UsersController> logger)
     {
         _getUsersHandler = getUsersHandler;
         _getUserHandler = getUserHandler;
+        _createUserHandler = createUserHandler;
+        _updateUserHandler = updateUserHandler;
+        _deleteUserHandler = deleteUserHandler;
         _logger = logger;
     }
 
@@ -51,11 +60,92 @@ public class UsersController : ControllerBase
         return Ok(user);
     }
 
-    // TODO: Implement remaining user management endpoints when handlers are created
-    // - CreateUser
-    // - UpdateUser  
-    // - DeleteUser
-    // - ChangePassword
-    // - ResetPassword
-    // - SetLockout
+    /// <summary>
+    /// Create a new user
+    /// </summary>
+    [HttpPost]
+    public async Task<ActionResult<UserDto>> CreateUser([FromBody] CreateUserRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var (success, user, errors) = await _createUserHandler.HandleAsync(request);
+
+        if (!success)
+        {
+            foreach (var error in errors)
+            {
+                ModelState.AddModelError("", error);
+            }
+            return BadRequest(ModelState);
+        }
+
+        _logger.LogInformation("User {UserName} created successfully with ID {UserId}", user!.UserName, user.Id);
+        return CreatedAtAction(nameof(GetUser), new { id = user.Id }, user);
+    }
+
+    /// <summary>
+    /// Update an existing user
+    /// </summary>
+    [HttpPut("{id}")]
+    public async Task<ActionResult<UserDto>> UpdateUser(string id, [FromBody] UpdateUserRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var (success, user, errors) = await _updateUserHandler.HandleAsync(id, request);
+
+        if (!success)
+        {
+            if (user == null)
+            {
+                return NotFound($"User with ID '{id}' not found.");
+            }
+
+            foreach (var error in errors)
+            {
+                ModelState.AddModelError("", error);
+            }
+            return BadRequest(ModelState);
+        }
+
+        _logger.LogInformation("User {UserName} updated successfully", user!.UserName);
+        return Ok(user);
+    }
+
+    /// <summary>
+    /// Delete a user
+    /// </summary>
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> DeleteUser(string id)
+    {
+        var (success, errors) = await _deleteUserHandler.HandleAsync(id);
+
+        if (!success)
+        {
+            var errorsList = errors.ToList();
+            if (errorsList.Any(e => e.Contains("not found")))
+            {
+                return NotFound($"User with ID '{id}' not found.");
+            }
+
+            foreach (var error in errorsList)
+            {
+                ModelState.AddModelError("", error);
+            }
+            return BadRequest(ModelState);
+        }
+
+        _logger.LogInformation("User with ID {UserId} deleted successfully", id);
+        return NoContent();
+    }
+
+    // TODO: Implement remaining endpoints when handlers are created:
+    // - ChangePassword (POST /api/users/{id}/change-password)
+    // - ResetPassword (POST /api/users/{id}/reset-password)  
+    // - SetLockout (POST /api/users/{id}/lockout)
 }
