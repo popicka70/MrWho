@@ -25,28 +25,19 @@
                         <RadzenButton Icon="notifications" ButtonStyle="ButtonStyle.Light" Variant="Variant.Text" 
                                       Click="@ShowNotifications" class="rz-border-radius-50 rz-p-2" />
                         
-                        <!-- User Profile Menu -->
-                        <RadzenProfileMenu>
-                            <Template>
-                                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="8px">
-                                    <RadzenGravatar Email="@GetUserEmail(context.User)" />
-                                    <div class="rz-display-none rz-display-md-block">
-                                        <div class="rz-font-weight-bold">@GetUserDisplayName(context.User)</div>
-                                        <div class="rz-font-size-sm rz-color-secondary">Administrator</div>
-                                    </div>
-                                </RadzenStack>
-                            </Template>
-                            <ChildContent>
-                                <RadzenProfileMenuItem Text="My Profile" Icon="person" Path="/profile" />
-                                <RadzenProfileMenuItem Text="Account Settings" Icon="settings" Path="/account/settings" />
-                                <RadzenProfileMenuItem Text="Change Password" Icon="lock" Path="/account/change-password" />
-                                <RadzenProfileMenuSeparator />
-                                <RadzenProfileMenuItem Text="Help & Support" Icon="help" Path="/help" />
-                                <RadzenProfileMenuItem Text="About" Icon="info" Path="/about" />
-                                <RadzenProfileMenuSeparator />
-                                <RadzenProfileMenuItem Text="Logout" Icon="logout" Path="/logout" />
-                            </ChildContent>
-                        </RadzenProfileMenu>
+                        <!-- User Profile Menu - Replaced with standard Radzen components -->
+                        <RadzenDropDown TValue="string" Style="width: auto; min-width: 150px;" 
+                                        Placeholder="@GetUserDisplayName(context.User)"
+                                        Change="@OnProfileMenuChange">
+                            <Items>
+                                <RadzenDropDownItem TValue="string" Text="My Profile" Value="profile" />
+                                <RadzenDropDownItem TValue="string" Text="Account Settings" Value="settings" />
+                                <RadzenDropDownItem TValue="string" Text="Change Password" Value="change-password" />
+                                <RadzenDropDownItem TValue="string" Text="Help & Support" Value="help" />
+                                <RadzenDropDownItem TValue="string" Text="About" Value="about" />
+                                <RadzenDropDownItem TValue="string" Text="Logout" Value="logout" />
+                            </Items>
+                        </RadzenDropDown>
                     </Authorized>
                     <NotAuthorized>
                         <RadzenButton Text="Login" Icon="login" ButtonStyle="ButtonStyle.Primary" 
@@ -129,6 +120,34 @@
                     break;
                 case "api-docs":
                     Navigation.NavigateTo("/dev/api-docs");
+                    break;
+            }
+        }
+    }
+
+    private void OnProfileMenuChange(object value)
+    {
+        if (value?.ToString() is string action)
+        {
+            switch (action)
+            {
+                case "profile":
+                    Navigation.NavigateTo("/profile");
+                    break;
+                case "settings":
+                    Navigation.NavigateTo("/account/settings");
+                    break;
+                case "change-password":
+                    Navigation.NavigateTo("/account/change-password");
+                    break;
+                case "help":
+                    Navigation.NavigateTo("/help");
+                    break;
+                case "about":
+                    Navigation.NavigateTo("/about");
+                    break;
+                case "logout":
+                    Navigation.NavigateTo("/logout");
                     break;
             }
         }
