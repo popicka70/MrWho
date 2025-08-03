@@ -33,14 +33,6 @@ builder.Services.AddTransient<AuthenticationDelegatingHandler>();
 // Get the MrWho API base URL from configuration
 var mrWhoApiBaseUrl = builder.Configuration.GetValue<string>("MrWhoApi:BaseUrl") ?? "https://localhost:7113/";
 
-// Add HTTP clients for APIs with proper registration
-builder.Services.AddHttpClient<WeatherApiClient>(client =>
-{
-    // This URL uses "https+http://" to indicate HTTPS is preferred over HTTP.
-    // Learn more about service discovery scheme resolution at https://aka.ms/dotnet/sdsschemes.
-    client.BaseAddress = new("https+http://apiservice");
-});
-
 // Register MrWho API clients with authentication
 builder.Services.AddHttpClient<IRealmsApiService, RealmsApiService>(client =>
 {
