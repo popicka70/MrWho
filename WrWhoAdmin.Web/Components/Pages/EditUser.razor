@@ -2,9 +2,12 @@
 @page "/users/edit/{Id}"
 @attribute [Authorize]
 @rendermode InteractiveServer
+@using MrWhoAdmin.Web.Models
+@using MrWhoAdmin.Web.Services
 @inject NavigationManager Navigation
-@inject NotificationService NotificationService
+@inject NotificationService NotificationService  
 @inject DialogService DialogService
+@inject IUsersApiService UsersApiService
 @inject ILogger<EditUser> Logger
 
 <PageTitle>@(IsEdit ? "Edit User" : "Add User") - MrWho Admin</PageTitle>
@@ -214,24 +217,31 @@
         isLoading = true;
         try
         {
-            await Task.Delay(500);
+            // Call the real API instead of using mock data
+            var user = await UsersApiService.GetUserAsync(Id!);
             
-            // Mock user data
-            var mockUser = GetMockUser(Id!);
-            if (mockUser != null)
+            if (user != null)
             {
-                model.Email = mockUser.Email;
-                model.UserName = mockUser.UserName;
-                model.PhoneNumber = mockUser.PhoneNumber;
-                emailConfirmed = mockUser.EmailConfirmed;
-                phoneConfirmed = mockUser.PhoneNumberConfirmed;
-                twoFactorEnabled = mockUser.TwoFactorEnabled;
+                model.Email = user.Email;
+                model.UserName = user.UserName;
+                model.PhoneNumber = user.PhoneNumber;
+                emailConfirmed = user.EmailConfirmed;
+                phoneConfirmed = user.PhoneNumberConfirmed;
+                twoFactorEnabled = user.TwoFactorEnabled;
+                
+                Logger.LogInformation("Loaded user {UserId} from API", Id);
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", $"User with ID '{Id}' not found");
+                Navigation.NavigateTo("/users");
             }
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error loading user {UserId}", Id);
             NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to load user data");
+            Navigation.NavigateTo("/users");
         }
         finally
         {
@@ -276,7 +286,36 @@
             model.PhoneNumberConfirmed = phoneConfirmed;
             model.TwoFactorEnabled = twoFactorEnabled;
 
-            await Task.Delay(1000);
+            if (IsEdit)
+            {
+                // UPDATE USER - Create UpdateUserRequest from current model
+                var updateRequest = new UpdateUserRequest
+                {
+                    Email = model.Email,
+                    UserName = model.UserName,
+                    PhoneNumber = model.PhoneNumber,
+                    EmailConfirmed = emailConfirmed,
+                    PhoneNumberConfirmed = phoneConfirmed,
+                    TwoFactorEnabled = twoFactorEnabled
+                };
+
+                var updatedUser = await UsersApiService.UpdateUserAsync(Id!, updateRequest);
+                if (updatedUser == null)
+                {
+                    NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to update user");
+                    return;
+                }
+            }
+            else
+            {
+                // CREATE USER
+                var createdUser = await UsersApiService.CreateUserAsync(model);
+                if (createdUser == null)
+                {
+                    NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to create user");
+                    return;
+                }
+            }
 
             var action = IsEdit ? "updated" : "created";
             NotificationService.Notify(NotificationSeverity.Success, "Success", $"User '{model.Email}' has been {action} successfully");

@@ -12,7 +12,7 @@ public interface IUsersApiService
     Task<PagedResult<UserDto>?> GetUsersAsync(int page = 1, int pageSize = 10, string? search = null);
     Task<UserDto?> GetUserAsync(string id);
     Task<UserDto?> CreateUserAsync(CreateUserRequest request);
-    Task<UserDto?> UpdateUserAsync(string id, UserDto request);
+    Task<UserDto?> UpdateUserAsync(string id, UpdateUserRequest request);
     Task<bool> DeleteUserAsync(string id);
     Task<bool> ResetPasswordAsync(string id, string newPassword);
     Task<bool> SetLockoutAsync(string id, DateTimeOffset? lockoutEnd);
@@ -95,7 +95,7 @@ public class UsersApiService : IUsersApiService
         }
     }
 
-    public async Task<UserDto?> UpdateUserAsync(string id, UserDto request)
+    public async Task<UserDto?> UpdateUserAsync(string id, UpdateUserRequest request)
     {
         try
         {
