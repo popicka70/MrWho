@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Authentication;
 using OpenIddict.Abstractions;
 using OpenIddict.Server.AspNetCore;
 using System.Security.Claims;
@@ -40,7 +41,7 @@ public class TokenHandler : ITokenHandler
 
         if (request.IsAuthorizationCodeGrantType())
         {
-            return await HandleAuthorizationCodeGrantAsync(request);
+            return await HandleAuthorizationCodeGrantAsync(context, request);
         }
 
         if (request.IsRefreshTokenGrantType())
@@ -83,31 +84,39 @@ public class TokenHandler : ITokenHandler
         return Results.SignIn(principal, authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
     }
 
-    private async Task<IResult> HandleAuthorizationCodeGrantAsync(OpenIddictRequest request)
+    private async Task<IResult> HandleAuthorizationCodeGrantAsync(HttpContext context, OpenIddictRequest request)
     {
-        // For authorization code flow, OpenIddict handles most of the work automatically
-        // We just need to create the identity with the user's claims
+        // Retrieve the claims principal stored in the authorization code when it was created
+        var authenticateResult = await context.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+        var principal = authenticateResult.Principal;
         
-        // In a typical authorization code flow, the user has already been authenticated
-        // during the authorization step, so we don't need to re-authenticate them here
-        
-        // Create a basic identity - in a real application, you would retrieve the user
-        // information from the authorization code or from a stored context
+        if (principal == null)
+        {
+            return Results.Forbid(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
+        }
+
+        // Create a new identity for the access token with the claims from the authorization code
         var identity = new ClaimsIdentity(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
         
-        // For now, use a placeholder subject - this should be replaced with actual user identification
-        // In a production app, you would extract the user ID from the authorization code context
-        identity.AddClaim(OpenIddictConstants.Claims.Subject, "authorized_user");
-        identity.AddClaim(OpenIddictConstants.Claims.Name, "Authorized User");
-        identity.AddClaim(OpenIddictConstants.Claims.Email, "user@example.com");
-        identity.AddClaim(OpenIddictConstants.Claims.PreferredUsername, "user@example.com");
+        // Copy the claims from the principal stored in the authorization code
+        var subjectClaim = principal.FindFirst(OpenIddictConstants.Claims.Subject);
+        var nameClaim = principal.FindFirst(OpenIddictConstants.Claims.Name);
+        var emailClaim = principal.FindFirst(OpenIddictConstants.Claims.Email);
+        var preferredUsernameClaim = principal.FindFirst(OpenIddictConstants.Claims.PreferredUsername);
         
-        var principal = new ClaimsPrincipal(identity);
-        principal.SetScopes(request.GetScopes());
+        if (subjectClaim != null)
+            identity.AddClaim(OpenIddictConstants.Claims.Subject, subjectClaim.Value);
+        if (nameClaim != null)
+            identity.AddClaim(OpenIddictConstants.Claims.Name, nameClaim.Value);
+        if (emailClaim != null)
+            identity.AddClaim(OpenIddictConstants.Claims.Email, emailClaim.Value);
+        if (preferredUsernameClaim != null)
+            identity.AddClaim(OpenIddictConstants.Claims.PreferredUsername, preferredUsernameClaim.Value);
+        
+        var newPrincipal = new ClaimsPrincipal(identity);
+        newPrincipal.SetScopes(request.GetScopes());
 
-        await Task.CompletedTask; // Simulate async operation if needed
-
-        return Results.SignIn(principal, authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+        return Results.SignIn(newPrincipal, authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
     }
 
     private static IResult HandleRefreshTokenGrant(OpenIddictRequest request)
