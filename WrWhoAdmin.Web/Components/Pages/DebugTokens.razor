@@ -140,14 +140,14 @@
                 var refreshToken = await httpContext.GetTokenAsync("refresh_token");
                 hasRefreshToken = !string.IsNullOrEmpty(refreshToken);
 
-                // Get authentication properties
+                // Get authentication properties  
                 var authenticateResult = await httpContext.AuthenticateAsync();
                 if (authenticateResult.Properties != null)
                 {
                     authProperties = authenticateResult.Properties.Items.Select(kvp => new PropertyInfo
                     {
                         Key = kvp.Key,
-                        Value = kvp.Value
+                        Value = kvp.Value ?? ""  // Handle potential null value
                     }).ToList();
                 }
             }

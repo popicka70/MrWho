@@ -5,7 +5,7 @@
         <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0" class="rz-px-4">
             <RadzenSidebarToggle Click="@(() => sidebarExpanded = !sidebarExpanded)" />
             <RadzenLabel Text="MrWho Administration" class="rz-font-weight-bold rz-font-size-h5 rz-color-primary rz-m-0" />
-            <RadzenSpacer />
+            <div style="flex-grow: 1;"></div> @* Replace RadzenSpacer with simple div *@
             <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="12px">
                 <AuthorizeView>
                     <Authorized>
@@ -13,12 +13,10 @@
                         <RadzenDropDown TValue="string" class="rz-display-none rz-display-md-inline-flex"
                                         Style="width: 200px;" Placeholder="Quick Actions" AllowClear="true"
                                         Change="@OnQuickActionChange">
-                            <Items>
-                                <RadzenDropDownItem TValue="string" Text="Add New User" Value="add-user" />
-                                <RadzenDropDownItem TValue="string" Text="View Reports" Value="reports" />
-                                <RadzenDropDownItem TValue="string" Text="System Health" Value="health" />
-                                <RadzenDropDownItem TValue="string" Text="API Documentation" Value="api-docs" />
-                            </Items>
+                            <RadzenDropDownItem TValue="string" Text="Add New User" Value="add-user" />
+                            <RadzenDropDownItem TValue="string" Text="View Reports" Value="reports" />
+                            <RadzenDropDownItem TValue="string" Text="System Health" Value="health" />
+                            <RadzenDropDownItem TValue="string" Text="API Documentation" Value="api-docs" />
                         </RadzenDropDown>
                         
                         <!-- Notifications Button -->
@@ -29,14 +27,12 @@
                         <RadzenDropDown TValue="string" Style="width: auto; min-width: 150px;" 
                                         Placeholder="@GetUserDisplayName(context.User)"
                                         Change="@OnProfileMenuChange">
-                            <Items>
-                                <RadzenDropDownItem TValue="string" Text="My Profile" Value="profile" />
-                                <RadzenDropDownItem TValue="string" Text="Account Settings" Value="settings" />
-                                <RadzenDropDownItem TValue="string" Text="Change Password" Value="change-password" />
-                                <RadzenDropDownItem TValue="string" Text="Help & Support" Value="help" />
-                                <RadzenDropDownItem TValue="string" Text="About" Value="about" />
-                                <RadzenDropDownItem TValue="string" Text="Logout" Value="logout" />
-                            </Items>
+                            <RadzenDropDownItem TValue="string" Text="My Profile" Value="profile" />
+                            <RadzenDropDownItem TValue="string" Text="Account Settings" Value="settings" />
+                            <RadzenDropDownItem TValue="string" Text="Change Password" Value="change-password" />
+                            <RadzenDropDownItem TValue="string" Text="Help & Support" Value="help" />
+                            <RadzenDropDownItem TValue="string" Text="About" Value="about" />
+                            <RadzenDropDownItem TValue="string" Text="Logout" Value="logout" />
                         </RadzenDropDown>
                     </Authorized>
                     <NotAuthorized>
