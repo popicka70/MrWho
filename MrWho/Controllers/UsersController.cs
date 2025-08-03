@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MrWho.Models;
 using MrWho.Handlers.Users;
+using Microsoft.AspNetCore.Identity;
 
 namespace MrWho.Controllers;
 
@@ -15,6 +16,7 @@ public class UsersController : ControllerBase
     private readonly ICreateUserHandler _createUserHandler;
     private readonly IUpdateUserHandler _updateUserHandler;
     private readonly IDeleteUserHandler _deleteUserHandler;
+    private readonly UserManager<IdentityUser> _userManager;
     private readonly ILogger<UsersController> _logger;
 
     public UsersController(
@@ -23,6 +25,7 @@ public class UsersController : ControllerBase
         ICreateUserHandler createUserHandler,
         IUpdateUserHandler updateUserHandler,
         IDeleteUserHandler deleteUserHandler,
+        UserManager<IdentityUser> userManager,
         ILogger<UsersController> logger)
     {
         _getUsersHandler = getUsersHandler;
@@ -30,6 +33,7 @@ public class UsersController : ControllerBase
         _createUserHandler = createUserHandler;
         _updateUserHandler = updateUserHandler;
         _deleteUserHandler = deleteUserHandler;
+        _userManager = userManager;
         _logger = logger;
     }
 
@@ -143,9 +147,4 @@ public class UsersController : ControllerBase
         _logger.LogInformation("User with ID {UserId} deleted successfully", id);
         return NoContent();
     }
-
-    // TODO: Implement remaining endpoints when handlers are created:
-    // - ChangePassword (POST /api/users/{id}/change-password)
-    // - ResetPassword (POST /api/users/{id}/reset-password)  
-    // - SetLockout (POST /api/users/{id}/lockout)
 }

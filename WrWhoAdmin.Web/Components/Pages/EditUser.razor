@@ -152,13 +152,15 @@
                             
                             <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" Wrap="FlexWrap.Wrap">
                                 <RadzenButton Icon="lock_reset" ButtonStyle="ButtonStyle.Warning" Text="Reset Password" 
-                                             Click="@ResetPassword" />
+                                             Click="@ResetPassword" IsBusy="@isResettingPassword" />
                                 <RadzenButton Icon="email" ButtonStyle="ButtonStyle.Info" Text="Send Confirmation Email" 
-                                             Click="@SendConfirmationEmail" />
-                                <RadzenButton Icon="block" ButtonStyle="ButtonStyle.Danger" Text="Lock Account" 
-                                             Click="@LockAccount" />
+                                             Click="@SendConfirmationEmail" IsBusy="@isSendingEmail" />
+                                <RadzenButton Icon="@(isLocked ? "lock_open" : "lock")" 
+                                             ButtonStyle="@(isLocked ? ButtonStyle.Success : ButtonStyle.Danger)" 
+                                             Text="@(isLocked ? "Unlock Account" : "Lock Account")" 
+                                             Click="@ToggleLockAccount" IsBusy="@isTogglingLock" />
                                 <RadzenButton Icon="logout" ButtonStyle="ButtonStyle.Secondary" Text="Force Logout" 
-                                             Click="@ForceLogout" />
+                                             Click="@ForceLogout" IsBusy="@isForcingLogout" />
                             </RadzenStack>
                         </RadzenStack>
                     </RadzenFieldset>
@@ -171,7 +173,7 @@
                         @if (IsEdit)
                         {
                             <RadzenButton Click="@DeleteUser" Icon="delete" ButtonStyle="ButtonStyle.Danger" 
-                                         Text="Delete User" Disabled="@isSaving" />
+                                         Text="Delete User" Disabled="@isSaving" IsBusy="@isDeleting" />
                         }
                         <RadzenButton ButtonType="ButtonType.Submit" Icon="save" ButtonStyle="ButtonStyle.Primary" 
                                      Text="@(IsEdit ? "Update User" : "Create User")" 
@@ -189,7 +191,13 @@
     private bool IsEdit => !string.IsNullOrEmpty(Id);
     private bool isLoading = false;
     private bool isSaving = false;
+    private bool isDeleting = false;
+    private bool isResettingPassword = false;
+    private bool isSendingEmail = false;
+    private bool isTogglingLock = false;
+    private bool isForcingLogout = false;
     private bool showPassword = false;
+    private bool isLocked = false;
     
     private CreateUserRequest model = new();
     private string confirmPassword = "";
@@ -217,7 +225,6 @@
         isLoading = true;
         try
         {
-            // Call the real API instead of using mock data
             var user = await UsersApiService.GetUserAsync(Id!);
             
             if (user != null)
@@ -228,6 +235,7 @@
                 emailConfirmed = user.EmailConfirmed;
                 phoneConfirmed = user.PhoneNumberConfirmed;
                 twoFactorEnabled = user.TwoFactorEnabled;
+                isLocked = user.LockoutEnd.HasValue && user.LockoutEnd > DateTimeOffset.UtcNow;
                 
                 Logger.LogInformation("Loaded user {UserId} from API", Id);
             }
@@ -288,7 +296,6 @@
 
             if (IsEdit)
             {
-                // UPDATE USER - Create UpdateUserRequest from current model
                 var updateRequest = new UpdateUserRequest
                 {
                     Email = model.Email,
@@ -308,7 +315,6 @@
             }
             else
             {
-                // CREATE USER
                 var createdUser = await UsersApiService.CreateUserAsync(model);
                 if (createdUser == null)
                 {
@@ -346,52 +352,178 @@
 
     private async Task ResetPassword()
     {
-        var result = await DialogService.Confirm("Send password reset email to this user?", "Reset Password", new ConfirmOptions() { OkButtonText = "Send", CancelButtonText = "Cancel" });
+        if (!IsEdit) return;
+
+        var result = await DialogService.Confirm("Are you sure you want to reset this user's password?", "Reset Password", 
+            new ConfirmOptions() { OkButtonText = "Reset", CancelButtonText = "Cancel" });
         
-        if (result == true)
+        if (result != true) return;
+
+        isResettingPassword = true;
+        try
         {
-            NotificationService.Notify(NotificationSeverity.Success, "Email Sent", "Password reset email has been sent to the user");
+            // Generate a temporary password
+            var tempPassword = GenerateTemporaryPassword();
+            var success = await UsersApiService.ResetPasswordAsync(Id!, tempPassword);
+            
+            if (success)
+            {
+                NotificationService.Notify(NotificationSeverity.Success, "Password Reset", 
+                    $"Password has been reset. Temporary password: {tempPassword}");
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to reset password");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error resetting password for user {UserId}", Id);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to reset password");
+        }
+        finally
+        {
+            isResettingPassword = false;
         }
     }
 
     private async Task SendConfirmationEmail()
     {
-        NotificationService.Notify(NotificationSeverity.Success, "Email Sent", "Confirmation email has been sent to the user");
+        if (!IsEdit) return;
+        
+        isSendingEmail = true;
+        try
+        {
+            var success = await UsersApiService.SendConfirmationEmailAsync(Id!);
+            
+            if (success)
+            {
+                NotificationService.Notify(NotificationSeverity.Success, "Email Sent", 
+                    "Confirmation email has been sent to the user");
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to send confirmation email");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error sending confirmation email for user {UserId}", Id);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to send confirmation email");
+        }
+        finally
+        {
+            isSendingEmail = false;
+        }
     }
 
-    private async Task LockAccount()
+    private async Task ToggleLockAccount()
     {
-        var result = await DialogService.Confirm("Lock this user account? The user will not be able to login.", "Lock Account", new ConfirmOptions() { OkButtonText = "Lock", CancelButtonText = "Cancel" });
+        if (!IsEdit) return;
+
+        var action = isLocked ? "unlock" : "lock";
+        var result = await DialogService.Confirm($"Are you sure you want to {action} this user's account?", 
+            $"{char.ToUpper(action[0])}{action[1..]} Account", 
+            new ConfirmOptions() { OkButtonText = char.ToUpper(action[0]) + action[1..], CancelButtonText = "Cancel" });
         
-        if (result == true)
+        if (result != true) return;
+
+        isTogglingLock = true;
+        try
         {
-            NotificationService.Notify(NotificationSeverity.Success, "Account Locked", "User account has been locked");
+            var lockoutEnd = isLocked ? (DateTimeOffset?)null : DateTimeOffset.UtcNow.AddYears(1);
+            var success = await UsersApiService.SetLockoutAsync(Id!, lockoutEnd);
+            
+            if (success)
+            {
+                isLocked = !isLocked;
+                NotificationService.Notify(NotificationSeverity.Success, "Success", 
+                    $"User account has been {(isLocked ? "locked" : "unlocked")}");
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to {action} account");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error toggling lockout for user {UserId}", Id);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to {action} account");
+        }
+        finally
+        {
+            isTogglingLock = false;
         }
     }
 
     private async Task ForceLogout()
     {
-        NotificationService.Notify(NotificationSeverity.Success, "Logged Out", "All user sessions have been terminated");
+        if (!IsEdit) return;
+
+        var result = await DialogService.Confirm("Are you sure you want to force logout all sessions for this user?", 
+            "Force Logout", new ConfirmOptions() { OkButtonText = "Force Logout", CancelButtonText = "Cancel" });
+        
+        if (result != true) return;
+
+        isForcingLogout = true;
+        try
+        {
+            var success = await UsersApiService.ForceLogoutAsync(Id!);
+            
+            if (success)
+            {
+                NotificationService.Notify(NotificationSeverity.Success, "Success", 
+                    "All user sessions have been terminated");
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to force logout");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error forcing logout for user {UserId}", Id);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to force logout");
+        }
+        finally
+        {
+            isForcingLogout = false;
+        }
     }
 
     private async Task DeleteUser()
     {
-        var result = await DialogService.Confirm($"Are you sure you want to delete the user '{model.Email}'?", "Delete User", new ConfirmOptions() { OkButtonText = "Delete", CancelButtonText = "Cancel" });
+        if (!IsEdit) return;
+
+        var result = await DialogService.Confirm($"Are you sure you want to delete the user '{model.Email}'?", 
+            "Delete User", new ConfirmOptions() { OkButtonText = "Delete", CancelButtonText = "Cancel" });
         
-        if (result == true)
+        if (result != true) return;
+
+        isDeleting = true;
+        try
         {
-            try
+            var success = await UsersApiService.DeleteUserAsync(Id!);
+            
+            if (success)
             {
-                await Task.Delay(500);
-                
-                NotificationService.Notify(NotificationSeverity.Success, "Success", $"User '{model.Email}' has been deleted");
+                NotificationService.Notify(NotificationSeverity.Success, "Success", 
+                    $"User '{model.Email}' has been deleted");
                 Navigation.NavigateTo("/users");
             }
-            catch (Exception ex)
+            else
             {
-                Logger.LogError(ex, "Error deleting user");
                 NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to delete user");
             }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error deleting user {UserId}", Id);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to delete user");
+        }
+        finally
+        {
+            isDeleting = false;
         }
     }
 
@@ -400,22 +532,11 @@
         Navigation.NavigateTo("/users");
     }
 
-    // Mock data method
-    private UserDto? GetMockUser(string id)
+    private string GenerateTemporaryPassword()
     {
-        var mockUsers = new Dictionary<string, UserDto>
-        {
-            ["1"] = new() { 
-                Id = "1", UserName = "admin@mrwho.com", Email = "admin@mrwho.com",
-                EmailConfirmed = true, TwoFactorEnabled = true, PhoneNumber = "+1-555-0123",
-                PhoneNumberConfirmed = true
-            },
-            ["2"] = new() { 
-                Id = "2", UserName = "test@example.com", Email = "test@example.com",
-                EmailConfirmed = true, TwoFactorEnabled = false, PhoneNumber = "+1-555-0456"
-            }
-        };
-
-        return mockUsers.TryGetValue(id, out var user) ? user : null;
+        var random = new Random();
+        var chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        return new string(Enumerable.Repeat(chars, 12)
+            .Select(s => s[random.Next(s.Length)]).ToArray());
     }
 }

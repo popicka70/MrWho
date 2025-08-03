@@ -5,6 +5,8 @@
 @inject NavigationManager Navigation
 @inject NotificationService NotificationService
 @inject DialogService DialogService
+@inject IClientsApiService ClientsApiService
+@inject IRealmsApiService RealmsApiService
 @inject ILogger<EditClient> Logger
 
 <PageTitle>@(IsEdit ? "Edit Client" : "Add Client") - MrWho Admin</PageTitle>
@@ -183,7 +185,7 @@
                         @if (IsEdit)
                         {
                             <RadzenButton Click="@DeleteClient" Icon="delete" ButtonStyle="ButtonStyle.Danger" 
-                                         Text="Delete" Disabled="@isSaving" />
+                                         Text="Delete" Disabled="@isSaving" IsBusy="@isDeleting" />
                         }
                         <RadzenButton ButtonType="ButtonType.Submit" Icon="save" ButtonStyle="ButtonStyle.Primary" 
                                      Text="@(IsEdit ? "Update Client" : "Create Client")" 
@@ -201,6 +203,7 @@
     private bool IsEdit => !string.IsNullOrEmpty(Id);
     private bool isLoading = false;
     private bool isSaving = false;
+    private bool isDeleting = false;
     private bool showSecret = false;
     
     private CreateClientRequest model = new();
@@ -237,13 +240,27 @@
 
     private async Task LoadRealms()
     {
-        // Mock realms data
-        availableRealms = new List<RealmDto>
+        try
         {
-            new() { Id = "1", Name = "admin", DisplayName = "MrWho Administration" },
-            new() { Id = "2", Name = "default", DisplayName = "Default Realm" },
-            new() { Id = "3", Name = "sample-development", DisplayName = "Development Environment" }
-        };
+            var result = await RealmsApiService.GetRealmsAsync(page: 1, pageSize: 100);
+            if (result != null)
+            {
+                availableRealms = result.Items;
+                Logger.LogInformation("Loaded {RealmCount} realms from API", availableRealms.Count);
+            }
+            else
+            {
+                Logger.LogWarning("Failed to load realms from API");
+                NotificationService.Notify(NotificationSeverity.Warning, "Warning", "Failed to load realms from API");
+                availableRealms = new List<RealmDto>();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading realms");
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to load realms");
+            availableRealms = new List<RealmDto>();
+        }
     }
 
     private async Task LoadClient()
@@ -251,30 +268,35 @@
         isLoading = true;
         try
         {
-            await Task.Delay(500);
-            
-            // Mock client data
-            var mockClient = GetMockClient(Id!);
-            if (mockClient != null)
+            var client = await ClientsApiService.GetClientAsync(Id!);
+            if (client != null)
             {
-                model.ClientId = mockClient.ClientId;
-                model.Name = mockClient.Name;
-                model.Description = mockClient.Description;
-                model.RealmId = mockClient.RealmId;
-                model.IsEnabled = mockClient.IsEnabled;
-                model.ClientType = mockClient.ClientType;
-                model.AllowAuthorizationCodeFlow = mockClient.AllowAuthorizationCodeFlow;
-                model.AllowClientCredentialsFlow = mockClient.AllowClientCredentialsFlow;
-                model.AllowRefreshTokenFlow = mockClient.AllowRefreshTokenFlow;
-                model.RequirePkce = mockClient.RequirePkce;
-                model.RedirectUris = mockClient.RedirectUris.ToList();
-                model.PostLogoutUris = mockClient.PostLogoutUris.ToList();
+                model.ClientId = client.ClientId;
+                model.Name = client.Name;
+                model.Description = client.Description;
+                model.RealmId = client.RealmId;
+                model.IsEnabled = client.IsEnabled;
+                model.ClientType = client.ClientType;
+                model.AllowAuthorizationCodeFlow = client.AllowAuthorizationCodeFlow;
+                model.AllowClientCredentialsFlow = client.AllowClientCredentialsFlow;
+                model.AllowRefreshTokenFlow = client.AllowRefreshTokenFlow;
+                model.RequirePkce = client.RequirePkce;
+                model.RedirectUris = client.RedirectUris.ToList();
+                model.PostLogoutUris = client.PostLogoutUris.ToList();
+                
+                Logger.LogInformation("Loaded client {ClientId} from API", Id);
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", $"Client with ID '{Id}' not found");
+                Navigation.NavigateTo("/clients");
             }
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error loading client {ClientId}", Id);
             NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to load client data");
+            Navigation.NavigateTo("/clients");
         }
         finally
         {
@@ -303,12 +325,26 @@
             model.RedirectUris = model.RedirectUris.Where(uri => !string.IsNullOrWhiteSpace(uri)).ToList();
             model.PostLogoutUris = model.PostLogoutUris.Where(uri => !string.IsNullOrWhiteSpace(uri)).ToList();
 
-            await Task.Delay(1000);
+            ClientDto? result;
+            if (IsEdit)
+            {
+                result = await ClientsApiService.UpdateClientAsync(Id!, model);
+            }
+            else
+            {
+                result = await ClientsApiService.CreateClientAsync(model);
+            }
 
-            var action = IsEdit ? "updated" : "created";
-            NotificationService.Notify(NotificationSeverity.Success, "Success", $"Client '{model.Name}' has been {action} successfully");
-            
-            Navigation.NavigateTo("/clients");
+            if (result != null)
+            {
+                var action = IsEdit ? "updated" : "created";
+                NotificationService.Notify(NotificationSeverity.Success, "Success", $"Client '{result.Name}' has been {action} successfully");
+                Navigation.NavigateTo("/clients");
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to save client");
+            }
         }
         catch (Exception ex)
         {
@@ -335,43 +371,36 @@
     {
         var result = await DialogService.Confirm($"Are you sure you want to delete the client '{model.Name}'?", "Delete Client", new ConfirmOptions() { OkButtonText = "Delete", CancelButtonText = "Cancel" });
         
-        if (result == true)
+        if (result != true) return;
+
+        isDeleting = true;
+        try
         {
-            try
+            var success = await ClientsApiService.DeleteClientAsync(Id!);
+            
+            if (success)
             {
-                await Task.Delay(500);
-                
                 NotificationService.Notify(NotificationSeverity.Success, "Success", $"Client '{model.Name}' has been deleted");
                 Navigation.NavigateTo("/clients");
             }
-            catch (Exception ex)
+            else
             {
-                Logger.LogError(ex, "Error deleting client");
                 NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to delete client");
             }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error deleting client {ClientId}", Id);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to delete client");
+        }
+        finally
+        {
+            isDeleting = false;
         }
     }
 
     private void Cancel()
     {
         Navigation.NavigateTo("/clients");
-    }
-
-    // Mock data method
-    private ClientDto? GetMockClient(string id)
-    {
-        var mockClients = new Dictionary<string, ClientDto>
-        {
-            ["1"] = new() { 
-                Id = "1", ClientId = "mrwho_admin_web", Name = "MrWho Admin Web Application", 
-                Description = "Official web administration interface",
-                RealmId = "1", IsEnabled = true, ClientType = ClientType.Confidential,
-                AllowAuthorizationCodeFlow = true, AllowRefreshTokenFlow = true, RequirePkce = true,
-                RedirectUris = new() { "https://localhost:7257/signin-oidc" },
-                PostLogoutUris = new() { "https://localhost:7257/" }
-            }
-        };
-
-        return mockClients.TryGetValue(id, out var client) ? client : null;
     }
 }
