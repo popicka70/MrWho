@@ -9,8 +9,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MrWhoAdmin.AppHost", "WrWho
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MrWhoAdmin.ServiceDefaults", "WrWhoAdmin.ServiceDefaults\MrWhoAdmin.ServiceDefaults.csproj", "{B58C1D3E-BAF0-2028-F629-1E699BE12DD1}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MrWhoAdmin.ApiService", "WrWhoAdmin.ApiService\MrWhoAdmin.ApiService.csproj", "{7CF4F411-23FF-6585-79B5-2CC6656107AF}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MrWhoAdmin.Web", "WrWhoAdmin.Web\MrWhoAdmin.Web.csproj", "{BFA34AF9-E963-A6FF-C22C-8B41FBCFA2E9}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MrWhoAdmin.Tests", "WrWhoAdmin.Tests\MrWhoAdmin.Tests.csproj", "{71BF738B-9DE2-A251-932F-1886D6C6AF44}"
@@ -38,10 +36,6 @@ Global
 		{B58C1D3E-BAF0-2028-F629-1E699BE12DD1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B58C1D3E-BAF0-2028-F629-1E699BE12DD1}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B58C1D3E-BAF0-2028-F629-1E699BE12DD1}.Release|Any CPU.Build.0 = Release|Any CPU
-		{7CF4F411-23FF-6585-79B5-2CC6656107AF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{7CF4F411-23FF-6585-79B5-2CC6656107AF}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{7CF4F411-23FF-6585-79B5-2CC6656107AF}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{7CF4F411-23FF-6585-79B5-2CC6656107AF}.Release|Any CPU.Build.0 = Release|Any CPU
 		{BFA34AF9-E963-A6FF-C22C-8B41FBCFA2E9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{BFA34AF9-E963-A6FF-C22C-8B41FBCFA2E9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BFA34AF9-E963-A6FF-C22C-8B41FBCFA2E9}.Release|Any CPU.ActiveCfg = Release|Any CPU

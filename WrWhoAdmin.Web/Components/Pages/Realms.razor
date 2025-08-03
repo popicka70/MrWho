@@ -61,15 +61,15 @@
                     </Template>
                 </RadzenDataGridColumn>
                 
-                <RadzenDataGridColumn TItem="RealmDto" Title="Actions" Width="200px" Sortable="false">
+                <RadzenDataGridColumn TItem="RealmDto" Title="Actions" Width="350px" Sortable="false">
                     <Template Context="realm">
                         <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
-                            <RadzenButton Click="@(() => EditRealm(realm.Id))" Icon="edit" Size="ButtonSize.Small" 
+                            <RadzenButton Click="@(() => EditRealm(realm.Id))" Icon="edit" Size="ButtonSize.Medium" 
                                          ButtonStyle="ButtonStyle.Light" Text="Edit" />
-                            <RadzenButton Click="@(() => ViewClients(realm.Id))" Icon="apps" Size="ButtonSize.Small" 
+                            <RadzenButton Click="@(() => ViewClients(realm.Id))" Icon="apps" Size="ButtonSize.Medium" 
                                          ButtonStyle="ButtonStyle.Info" Text="Clients" />
                             <RadzenButton Click="@(() => ToggleRealmStatus(realm))" Icon="@(realm.IsEnabled ? "toggle_on" : "toggle_off")" 
-                                         Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Warning" Text="Toggle" />
+                                         Size="ButtonSize.Medium" ButtonStyle="ButtonStyle.Warning" Text="Toggle" />
                         </RadzenStack>
                     </Template>
                 </RadzenDataGridColumn>
