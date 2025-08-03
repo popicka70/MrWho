@@ -1,0 +1,147 @@
+@page "/debug-api"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject IHttpClientFactory HttpClientFactory
+@inject IRealmsApiService RealmsApi
+@inject NotificationService NotificationService
+@inject ILogger<DebugApi> Logger
+@inject IConfiguration Configuration
+
+<PageTitle>API Debug - MrWho Admin</PageTitle>
+
+<RadzenText TextStyle="TextStyle.H3">API Debug Information</RadzenText>
+
+<RadzenCard class="rz-my-4">
+    <RadzenStack Gap="2rem">
+        <RadzenFieldset Text="Configuration">
+            <RadzenStack Gap="1rem">
+                <RadzenText><strong>MrWho API Base URL:</strong> @apiBaseUrl</RadzenText>
+                <RadzenText><strong>Authentication Authority:</strong> @authAuthority</RadzenText>
+                <RadzenText><strong>Client ID:</strong> @clientId</RadzenText>
+            </RadzenStack>
+        </RadzenFieldset>
+
+        <RadzenFieldset Text="HttpClient Test">
+            <RadzenStack Gap="1rem">
+                <RadzenButton Click="@TestHttpClient" Text="Test Direct HttpClient" Icon="http" ButtonStyle="ButtonStyle.Primary" IsBusy="@testingHttpClient" />
+                <RadzenButton Click="@TestRealmsService" Text="Test Realms API Service" Icon="domain" ButtonStyle="ButtonStyle.Success" IsBusy="@testingRealmsService" />
+                
+                @if (!string.IsNullOrEmpty(testResult))
+                {
+                    <RadzenAlert AlertStyle="@(testSuccess ? AlertStyle.Success : AlertStyle.Danger)">
+                        <RadzenText>@testResult</RadzenText>
+                    </RadzenAlert>
+                }
+            </RadzenStack>
+        </RadzenFieldset>
+    </RadzenStack>
+</RadzenCard>
+
+@code {
+    private bool testingHttpClient = false;
+    private bool testingRealmsService = false;
+    private string testResult = "";
+    private bool testSuccess = false;
+    
+    private string apiBaseUrl = "";
+    private string authAuthority = "";
+    private string clientId = "";
+
+    protected override void OnInitialized()
+    {
+        apiBaseUrl = Configuration.GetValue<string>("MrWhoApi:BaseUrl") ?? "Not configured";
+        authAuthority = Configuration.GetValue<string>("Authentication:Authority") ?? "Not configured";
+        clientId = Configuration.GetValue<string>("Authentication:ClientId") ?? "Not configured";
+    }
+
+    private async Task TestHttpClient()
+    {
+        testingHttpClient = true;
+        testResult = "";
+        
+        try
+        {
+            // Create a new HttpClient directly to test the connection
+            using var httpClient = HttpClientFactory.CreateClient();
+            httpClient.BaseAddress = new Uri("https://localhost:7113/");
+            httpClient.Timeout = TimeSpan.FromSeconds(10);
+            
+            Logger.LogInformation("Testing direct HttpClient call to: {BaseUrl}", httpClient.BaseAddress);
+            
+            var response = await httpClient.GetAsync("api/realms?page=1&pageSize=5");
+            
+            testResult = $"Response Status: {response.StatusCode}\n";
+            testResult += $"Response Headers: {string.Join(", ", response.Headers.Select(h => $"{h.Key}={string.Join(",", h.Value)}"))}\n";
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                testResult += $"Content Length: {content.Length} characters\n";
+                testResult += $"Content Preview: {content.Substring(0, Math.Min(200, content.Length))}...";
+                testSuccess = true;
+            }
+            else
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                testResult += $"Error Content: {content}";
+                testSuccess = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            testResult = $"Exception: {ex.GetType().Name}\nMessage: {ex.Message}";
+            if (ex.InnerException != null)
+            {
+                testResult += $"\nInner Exception: {ex.InnerException.Message}";
+            }
+            testSuccess = false;
+            Logger.LogError(ex, "Error testing direct HttpClient");
+        }
+        finally
+        {
+            testingHttpClient = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task TestRealmsService()
+    {
+        testingRealmsService = true;
+        testResult = "";
+        
+        try
+        {
+            Logger.LogInformation("Testing RealmsApiService call");
+            
+            var result = await RealmsApi.GetRealmsAsync(page: 1, pageSize: 5);
+            
+            if (result != null)
+            {
+                testResult = $"Success! Loaded {result.Items.Count} realms out of {result.TotalCount} total\n";
+                testResult += $"Page: {result.Page}, PageSize: {result.PageSize}, TotalPages: {result.TotalPages}\n";
+                testResult += $"Realms: {string.Join(", ", result.Items.Select(r => r.Name))}";
+                testSuccess = true;
+            }
+            else
+            {
+                testResult = "API returned null result";
+                testSuccess = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            testResult = $"Exception: {ex.GetType().Name}\nMessage: {ex.Message}";
+            if (ex.InnerException != null)
+            {
+                testResult += $"\nInner Exception: {ex.InnerException.Message}";
+            }
+            testSuccess = false;
+            Logger.LogError(ex, "Error testing RealmsApiService");
+        }
+        finally
+        {
+            testingRealmsService = false;
+            StateHasChanged();
+        }
+    }
+}

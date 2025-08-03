@@ -6,6 +6,7 @@
 @inject NotificationService NotificationService
 @inject DialogService DialogService
 @inject ILogger<EditRealm> Logger
+@inject IRealmsApiService RealmsApi
 
 <PageTitle>@(IsEdit ? "Edit Realm" : "Add Realm") - MrWho Admin</PageTitle>
 
@@ -165,31 +166,35 @@
         isLoading = true;
         try
         {
-            // Mock data - in real implementation, call API service
-            await Task.Delay(500);
-            
-            // Simulate loading realm data based on Id
-            var mockRealm = GetMockRealm(Id!);
-            if (mockRealm != null)
+            var realm = await RealmsApi.GetRealmAsync(Id!);
+            if (realm != null)
             {
-                model.Name = mockRealm.Name;
-                model.DisplayName = mockRealm.DisplayName;
-                model.Description = mockRealm.Description;
-                model.IsEnabled = mockRealm.IsEnabled;
-                model.AccessTokenLifetime = mockRealm.AccessTokenLifetime;
-                model.RefreshTokenLifetime = mockRealm.RefreshTokenLifetime;
-                model.AuthorizationCodeLifetime = mockRealm.AuthorizationCodeLifetime;
+                model.Name = realm.Name;
+                model.DisplayName = realm.DisplayName;
+                model.Description = realm.Description;
+                model.IsEnabled = realm.IsEnabled;
+                model.AccessTokenLifetime = realm.AccessTokenLifetime;
+                model.RefreshTokenLifetime = realm.RefreshTokenLifetime;
+                model.AuthorizationCodeLifetime = realm.AuthorizationCodeLifetime;
 
                 // Convert to form values
-                accessTokenMinutes = (int)mockRealm.AccessTokenLifetime.TotalMinutes;
-                refreshTokenDays = (int)mockRealm.RefreshTokenLifetime.TotalDays;
-                authCodeMinutes = (int)mockRealm.AuthorizationCodeLifetime.TotalMinutes;
+                accessTokenMinutes = (int)realm.AccessTokenLifetime.TotalMinutes;
+                refreshTokenDays = (int)realm.RefreshTokenLifetime.TotalDays;
+                authCodeMinutes = (int)realm.AuthorizationCodeLifetime.TotalMinutes;
+
+                Logger.LogInformation("Loaded realm {RealmName} for editing", realm.Name);
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Realm not found");
+                Navigation.NavigateTo("/realms");
             }
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error loading realm {RealmId}", Id);
             NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to load realm data");
+            Navigation.NavigateTo("/realms");
         }
         finally
         {
@@ -213,13 +218,27 @@
             model.RefreshTokenLifetime = TimeSpan.FromDays(refreshTokenDays);
             model.AuthorizationCodeLifetime = TimeSpan.FromMinutes(authCodeMinutes);
 
-            // Simulate API call
-            await Task.Delay(1000);
-
-            var action = IsEdit ? "updated" : "created";
-            NotificationService.Notify(NotificationSeverity.Success, "Success", $"Realm '{model.Name}' has been {action} successfully");
+            RealmDto? result;
             
-            Navigation.NavigateTo("/realms");
+            if (IsEdit)
+            {
+                result = await RealmsApi.UpdateRealmAsync(Id!, model);
+            }
+            else
+            {
+                result = await RealmsApi.CreateRealmAsync(model);
+            }
+
+            if (result != null)
+            {
+                var action = IsEdit ? "updated" : "created";
+                NotificationService.Notify(NotificationSeverity.Success, "Success", $"Realm '{result.Name}' has been {action} successfully");
+                Navigation.NavigateTo("/realms");
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to save realm");
+            }
         }
         catch (Exception ex)
         {
@@ -240,11 +259,17 @@
         {
             try
             {
-                // Simulate API call
-                await Task.Delay(500);
+                var deleteResult = await RealmsApi.DeleteRealmAsync(Id!);
                 
-                NotificationService.Notify(NotificationSeverity.Success, "Success", $"Realm '{model.Name}' has been deleted");
-                Navigation.NavigateTo("/realms");
+                if (deleteResult)
+                {
+                    NotificationService.Notify(NotificationSeverity.Success, "Success", $"Realm '{model.Name}' has been deleted");
+                    Navigation.NavigateTo("/realms");
+                }
+                else
+                {
+                    NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to delete realm");
+                }
             }
             catch (Exception ex)
             {
@@ -258,30 +283,4 @@
     {
         Navigation.NavigateTo("/realms");
     }
-
-    // Mock data method - replace with actual API call
-    private RealmDto? GetMockRealm(string id)
-    {
-        var mockRealms = new Dictionary<string, RealmDto>
-        {
-            ["1"] = new() { 
-                Id = "1", Name = "admin", DisplayName = "MrWho Administration", 
-                Description = "Administrative realm for MrWho OIDC server management", 
-                IsEnabled = true, ClientCount = 1,
-                AccessTokenLifetime = TimeSpan.FromMinutes(60),
-                RefreshTokenLifetime = TimeSpan.FromDays(30),
-                AuthorizationCodeLifetime = TimeSpan.FromMinutes(10)
-            },
-            ["2"] = new() { 
-                Id = "2", Name = "default", DisplayName = "Default Realm", 
-                Description = "Default realm for OIDC clients", 
-                IsEnabled = true, ClientCount = 3,
-                AccessTokenLifetime = TimeSpan.FromMinutes(30),
-                RefreshTokenLifetime = TimeSpan.FromDays(14),
-                AuthorizationCodeLifetime = TimeSpan.FromMinutes(5)
-            }
-        };
-
-        return mockRealms.TryGetValue(id, out var realm) ? realm : null;
-    }
-}
+}}

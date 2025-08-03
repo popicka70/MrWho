@@ -12,6 +12,7 @@ using OpenIddict.Abstractions;
 using OpenIddict.Server.AspNetCore;
 using static OpenIddict.Abstractions.OpenIddictConstants;
 using System.ComponentModel.DataAnnotations;
+using MrWho.Handlers.Users;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -63,6 +64,16 @@ builder.Services.AddScoped<ITokenHandler, MrWho.Handlers.TokenHandler>();
 // Register userinfo handler
 builder.Services.AddScoped<IUserInfoHandler, MrWho.Handlers.UserInfoHandler>();
 
+// Register User management handlers
+builder.Services.AddScoped<IGetUsersHandler, GetUsersHandler>();
+builder.Services.AddScoped<IGetUserHandler, GetUserHandler>();
+//builder.Services.AddScoped<ICreateUserHandler, CreateUserHandler>();
+//builder.Services.AddScoped<IUpdateUserHandler, UpdateUserHandler>();
+//builder.Services.AddScoped<IDeleteUserHandler, DeleteUserHandler>();
+//builder.Services.AddScoped<IChangePasswordHandler, ChangePasswordHandler>();
+//builder.Services.AddScoped<IResetPasswordHandler, ResetPasswordHandler>();
+//builder.Services.AddScoped<ISetLockoutHandler, SetLockoutHandler>();
+
 // Configure OpenIddict
 builder.Services.AddOpenIddict()
     .AddCore(options =>
@@ -77,6 +88,7 @@ builder.Services.AddOpenIddict()
                .SetTokenEndpointUris("/connect/token")
                .SetEndSessionEndpointUris("/connect/logout")
                .SetConfigurationEndpointUris("/.well-known/openid_configuration")
+               .SetUserInfoEndpointUris("/connect/userinfo")
 
                // Enable grant types
                .AllowAuthorizationCodeFlow()
@@ -84,11 +96,13 @@ builder.Services.AddOpenIddict()
                .AllowPasswordFlow()
                .AllowRefreshTokenFlow();
 
-        // Register scopes
+        // Register scopes (including API scopes)
         options.RegisterScopes("openid",
                               OpenIddictConstants.Scopes.Email,
                               OpenIddictConstants.Scopes.Profile,
-                              OpenIddictConstants.Scopes.Roles);
+                              OpenIddictConstants.Scopes.Roles,
+                              "api.read",   // Add this
+                              "api.write"); // Add this
 
         // Register the signing and encryption credentials
         options.AddDevelopmentEncryptionCertificate()
@@ -98,13 +112,33 @@ builder.Services.AddOpenIddict()
         options.UseAspNetCore()
                .EnableAuthorizationEndpointPassthrough()
                .EnableTokenEndpointPassthrough()
-               .EnableEndSessionEndpointPassthrough();
+               .EnableEndSessionEndpointPassthrough()
+               .EnableUserInfoEndpointPassthrough();
     })
     .AddValidation(options =>
     {
         options.UseLocalServer();
         options.UseAspNetCore();
     });
+
+// Add authentication for API access
+builder.Services.AddAuthentication()
+    .AddJwtBearer("Bearer", options =>
+    {
+        options.Authority = "https://localhost:7113";
+        options.RequireHttpsMetadata = false; // Only for development
+        options.TokenValidationParameters.ValidateAudience = false;
+        options.TokenValidationParameters.ValidateIssuer = false;
+    });
+
+// Configure authorization policies
+builder.Services.AddAuthorization(options =>
+{
+    options.DefaultPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .AddAuthenticationSchemes("Identity.Application", "Bearer")
+        .Build();
+});
 
 var app = builder.Build();
 
@@ -192,6 +226,12 @@ app.MapGet("/connect/userinfo", [Authorize] async (HttpContext context, IUserInf
     return await userInfoHandler.HandleUserInfoRequestAsync(context);
 });
 
+// API Test endpoint (for debugging)
+app.MapGet("/api/test", [Authorize] () =>
+{
+    return Results.Ok(new { Message = "API is working!", Timestamp = DateTime.UtcNow });
+});
+
 app.MapGet("/debug/client-info", async (IOidcClientService oidcClientService) =>
 {
     var clients = await oidcClientService.GetEnabledClientsAsync();
@@ -274,7 +314,7 @@ app.MapGet("/debug/admin-client-info", async (IOidcClientService oidcClientServi
         RedirectUris = adminClient.RedirectUris.Select(ru => ru.Uri).ToArray(),
         PostLogoutRedirectUris = adminClient.PostLogoutUris.Select(plu => plu.Uri).ToArray(),
         Scopes = adminClient.Scopes.Select(s => s.Scope).ToArray(),
-        SampleAuthUrl = $"https://localhost:7113/connect/authorize?client_id={adminClient.ClientId}&response_type=code&redirect_uri=https://localhost:7257/signin-oidc&scope=openid%20email%20profile%20roles&state=admin_test",
+        SampleAuthUrl = $"https://localhost:7113/connect/authorize?client_id={adminClient.ClientId}&response_type=code&redirect_uri=https://localhost:7257/signin-oidc&scope=openid%20email%20profile%20roles%20api.read%20api.write&state=admin_test",
         SampleLogoutUrl = "https://localhost:7113/connect/logout?post_logout_redirect_uri=https://localhost:7257/signout-callback-oidc",
         AdminCredentials = new
         {

@@ -1,0 +1,227 @@
+@page "/debug-tokens"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authentication
+@inject IHttpContextAccessor HttpContextAccessor
+@inject ILogger<DebugTokens> Logger
+
+<PageTitle>Token Debug - MrWho Admin</PageTitle>
+
+<RadzenText TextStyle="TextStyle.H3">Authentication Token Debug</RadzenText>
+
+<RadzenCard class="rz-my-4">
+    <RadzenStack Gap="2rem">
+        <RadzenFieldset Text="User Information">
+            <RadzenStack Gap="1rem">
+                <RadzenText><strong>Is Authenticated:</strong> @isAuthenticated</RadzenText>
+                <RadzenText><strong>User Name:</strong> @userName</RadzenText>
+                <RadzenText><strong>Authentication Type:</strong> @authenticationType</RadzenText>
+                <RadzenText><strong>Claims Count:</strong> @claimsCount</RadzenText>
+            </RadzenStack>
+        </RadzenFieldset>
+
+        <RadzenFieldset Text="Available Tokens">
+            <RadzenStack Gap="1rem">
+                <RadzenText><strong>Access Token:</strong> @(hasAccessToken ? "Available" : "Missing")</RadzenText>
+                @if (hasAccessToken)
+                {
+                    <RadzenText><strong>Access Token Preview:</strong> @accessTokenPreview</RadzenText>
+                }
+                
+                <RadzenText><strong>ID Token:</strong> @(hasIdToken ? "Available" : "Missing")</RadzenText>
+                @if (hasIdToken)
+                {
+                    <RadzenText><strong>ID Token Preview:</strong> @idTokenPreview</RadzenText>
+                }
+                
+                <RadzenText><strong>Refresh Token:</strong> @(hasRefreshToken ? "Available" : "Missing")</RadzenText>
+            </RadzenStack>
+        </RadzenFieldset>
+
+        @if (claims.Any())
+        {
+            <RadzenFieldset Text="User Claims">
+                <RadzenDataGrid Data="@claims" TItem="ClaimInfo" AllowPaging="true" PageSize="10">
+                    <Columns>
+                        <RadzenDataGridColumn TItem="ClaimInfo" Property="Type" Title="Claim Type" />
+                        <RadzenDataGridColumn TItem="ClaimInfo" Property="Value" Title="Value" />
+                    </Columns>
+                </RadzenDataGrid>
+            </RadzenFieldset>
+        }
+
+        <RadzenFieldset Text="Authentication Properties">
+            @if (authProperties.Any())
+            {
+                <RadzenDataGrid Data="@authProperties" TItem="PropertyInfo" AllowPaging="true" PageSize="10">
+                    <Columns>
+                        <RadzenDataGridColumn TItem="PropertyInfo" Property="Key" Title="Property" />
+                        <RadzenDataGridColumn TItem="PropertyInfo" Property="Value" Title="Value" />
+                    </Columns>
+                </RadzenDataGrid>
+            }
+            else
+            {
+                <RadzenText>No authentication properties available</RadzenText>
+            }
+        </RadzenFieldset>
+
+        <RadzenFieldset Text="Actions">
+            <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem">
+                <RadzenButton Click="@RefreshTokenInfo" Text="Refresh Token Info" Icon="refresh" ButtonStyle="ButtonStyle.Primary" />
+                <RadzenButton Click="@TestApiCall" Text="Test API Call" Icon="api" ButtonStyle="ButtonStyle.Success" IsBusy="@testingApi" />
+            </RadzenStack>
+            
+            @if (!string.IsNullOrEmpty(apiTestResult))
+            {
+                <RadzenAlert AlertStyle="@(apiTestSuccess ? AlertStyle.Success : AlertStyle.Danger)" class="rz-mt-3">
+                    <RadzenText>@apiTestResult</RadzenText>
+                </RadzenAlert>
+            }
+        </RadzenFieldset>
+    </RadzenStack>
+</RadzenCard>
+
+@code {
+    private bool isAuthenticated = false;
+    private string userName = "";
+    private string authenticationType = "";
+    private int claimsCount = 0;
+    private bool hasAccessToken = false;
+    private bool hasIdToken = false;
+    private bool hasRefreshToken = false;
+    private string accessTokenPreview = "";
+    private string idTokenPreview = "";
+    private List<ClaimInfo> claims = new();
+    private List<PropertyInfo> authProperties = new();
+    private bool testingApi = false;
+    private string apiTestResult = "";
+    private bool apiTestSuccess = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await RefreshTokenInfo();
+    }
+
+    private async Task RefreshTokenInfo()
+    {
+        var httpContext = HttpContextAccessor.HttpContext;
+        if (httpContext != null)
+        {
+            isAuthenticated = httpContext.User.Identity?.IsAuthenticated ?? false;
+            userName = httpContext.User.Identity?.Name ?? "Unknown";
+            authenticationType = httpContext.User.Identity?.AuthenticationType ?? "None";
+            claimsCount = httpContext.User.Claims.Count();
+
+            // Get claims
+            claims = httpContext.User.Claims.Select(c => new ClaimInfo
+            {
+                Type = c.Type,
+                Value = c.Value
+            }).ToList();
+
+            // Check for tokens
+            try
+            {
+                var accessToken = await httpContext.GetTokenAsync("access_token");
+                hasAccessToken = !string.IsNullOrEmpty(accessToken);
+                if (hasAccessToken)
+                {
+                    accessTokenPreview = accessToken!.Substring(0, Math.Min(50, accessToken.Length)) + "...";
+                }
+
+                var idToken = await httpContext.GetTokenAsync("id_token");
+                hasIdToken = !string.IsNullOrEmpty(idToken);
+                if (hasIdToken)
+                {
+                    idTokenPreview = idToken!.Substring(0, Math.Min(50, idToken.Length)) + "...";
+                }
+
+                var refreshToken = await httpContext.GetTokenAsync("refresh_token");
+                hasRefreshToken = !string.IsNullOrEmpty(refreshToken);
+
+                // Get authentication properties
+                var authenticateResult = await httpContext.AuthenticateAsync();
+                if (authenticateResult.Properties != null)
+                {
+                    authProperties = authenticateResult.Properties.Items.Select(kvp => new PropertyInfo
+                    {
+                        Key = kvp.Key,
+                        Value = kvp.Value
+                    }).ToList();
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error getting token information");
+            }
+        }
+
+        StateHasChanged();
+    }
+
+    private async Task TestApiCall()
+    {
+        testingApi = true;
+        apiTestResult = "";
+        
+        try
+        {
+            var httpContext = HttpContextAccessor.HttpContext;
+            if (httpContext != null)
+            {
+                var accessToken = await httpContext.GetTokenAsync("access_token");
+                
+                if (string.IsNullOrEmpty(accessToken))
+                {
+                    apiTestResult = "No access token available for API call";
+                    apiTestSuccess = false;
+                }
+                else
+                {
+                    using var httpClient = new HttpClient();
+                    httpClient.BaseAddress = new Uri("https://localhost:7113/");
+                    httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+                    
+                    var response = await httpClient.GetAsync("api/realms?page=1&pageSize=1");
+                    
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var content = await response.Content.ReadAsStringAsync();
+                        apiTestResult = $"API call successful! Response length: {content.Length} characters";
+                        apiTestSuccess = true;
+                    }
+                    else
+                    {
+                        var errorContent = await response.Content.ReadAsStringAsync();
+                        apiTestResult = $"API call failed: {response.StatusCode} - {errorContent}";
+                        apiTestSuccess = false;
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            apiTestResult = $"Exception during API test: {ex.Message}";
+            apiTestSuccess = false;
+            Logger.LogError(ex, "Error testing API call");
+        }
+        finally
+        {
+            testingApi = false;
+            StateHasChanged();
+        }
+    }
+
+    private class ClaimInfo
+    {
+        public string Type { get; set; } = "";
+        public string Value { get; set; } = "";
+    }
+
+    private class PropertyInfo
+    {
+        public string Key { get; set; } = "";
+        public string Value { get; set; } = "";
+    }
+}

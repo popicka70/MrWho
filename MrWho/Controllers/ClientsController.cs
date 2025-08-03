@@ -473,6 +473,63 @@ public class ClientsController : ControllerBase
         }
     }
 
+    [HttpPost("{id}/toggle")]
+    public async Task<ActionResult<ClientDto>> ToggleClient(string id)
+    {
+        var client = await _context.Clients
+            .Include(c => c.Realm)
+            .Include(c => c.RedirectUris)
+            .Include(c => c.PostLogoutUris)
+            .Include(c => c.Scopes)
+            .Include(c => c.Permissions)
+            .FirstOrDefaultAsync(c => c.Id == id);
+
+        if (client == null)
+        {
+            return NotFound($"Client with ID '{id}' not found.");
+        }
+
+        client.IsEnabled = !client.IsEnabled;
+        client.UpdatedAt = DateTime.UtcNow;
+        client.UpdatedBy = User.Identity?.Name;
+
+        await _context.SaveChangesAsync();
+
+        var action = client.IsEnabled ? "enabled" : "disabled";
+        _logger.LogInformation("Client '{ClientId}' {Action} successfully", client.ClientId, action);
+
+        var clientDto = new ClientDto
+        {
+            Id = client.Id,
+            ClientId = client.ClientId,
+            Name = client.Name,
+            Description = client.Description,
+            IsEnabled = client.IsEnabled,
+            ClientType = client.ClientType,
+            AllowAuthorizationCodeFlow = client.AllowAuthorizationCodeFlow,
+            AllowClientCredentialsFlow = client.AllowClientCredentialsFlow,
+            AllowPasswordFlow = client.AllowPasswordFlow,
+            AllowRefreshTokenFlow = client.AllowRefreshTokenFlow,
+            RequirePkce = client.RequirePkce,
+            RequireClientSecret = client.RequireClientSecret,
+            AccessTokenLifetime = client.AccessTokenLifetime,
+            RefreshTokenLifetime = client.RefreshTokenLifetime,
+            AuthorizationCodeLifetime = client.AuthorizationCodeLifetime,
+            RealmId = client.RealmId,
+            RealmName = client.Realm.Name,
+            CreatedAt = client.CreatedAt,
+            UpdatedAt = client.UpdatedAt,
+            CreatedBy = client.CreatedBy,
+            UpdatedBy = client.UpdatedBy,
+            RedirectUris = client.RedirectUris.Select(ru => ru.Uri).ToList(),
+            PostLogoutUris = client.PostLogoutUris.Select(plu => plu.Uri).ToList(),
+            Scopes = client.Scopes.Select(s => s.Scope).ToList(),
+            Permissions = client.Permissions.Select(p => p.Permission).ToList()
+        };
+
+        return Ok(clientDto);
+    }
+
     private async Task CreateOpenIddictApplication(Client client, CreateClientRequest request)
     {
         var descriptor = new OpenIddictApplicationDescriptor

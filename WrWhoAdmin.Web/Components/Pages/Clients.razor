@@ -4,6 +4,8 @@
 @inject NavigationManager Navigation
 @inject NotificationService NotificationService
 @inject ILogger<Clients> Logger
+@inject IClientsApiService ClientsApi
+@inject IRealmsApiService RealmsApi
 
 <PageTitle>Clients - MrWho Admin</PageTitle>
 
@@ -120,14 +122,19 @@
 
     private async Task LoadRealms()
     {
-        realms = new List<RealmDto>
+        try
         {
-            new() { Id = "1", Name = "admin", DisplayName = "MrWho Administration" },
-            new() { Id = "2", Name = "default", DisplayName = "Default Realm" },
-            new() { Id = "3", Name = "sample-development", DisplayName = "Development Environment" },
-            new() { Id = "4", Name = "sample-staging", DisplayName = "Staging Environment" },
-            new() { Id = "5", Name = "demo-multi-tenant", DisplayName = "Multi-Tenant Demo" }
-        };
+            var result = await RealmsApi.GetRealmsAsync(page: 1, pageSize: 100);
+            if (result != null)
+            {
+                realms = result.Items;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading realms for filter");
+            // Don't show error notification for this, just continue without realm filter
+        }
     }
 
     private async Task LoadClients()
@@ -135,76 +142,24 @@
         isLoading = true;
         try
         {
-            await Task.Delay(500);
+            var result = await ClientsApi.GetClientsAsync(page: 1, pageSize: 50, search: searchTerm, realmId: selectedRealmId);
             
-            clients = new List<ClientDto>
+            if (result != null)
             {
-                new() { 
-                    Id = "1", ClientId = "mrwho_admin_web", Name = "MrWho Admin Web Application", 
-                    Description = "Official web administration interface",
-                    RealmId = "1", RealmName = "MrWho Administration", IsEnabled = true, 
-                    ClientType = ClientType.Confidential,
-                    AllowAuthorizationCodeFlow = true, AllowRefreshTokenFlow = true, RequirePkce = true,
-                    CreatedAt = DateTime.Now.AddDays(-30)
-                },
-                new() { 
-                    Id = "2", ClientId = "postman_client", Name = "Postman Test Client", 
-                    Description = "Default test client for development",
-                    RealmId = "2", RealmName = "Default Realm", IsEnabled = true, 
-                    ClientType = ClientType.Confidential,
-                    AllowAuthorizationCodeFlow = true, AllowClientCredentialsFlow = true, AllowRefreshTokenFlow = true,
-                    CreatedAt = DateTime.Now.AddDays(-25)
-                },
-                new() { 
-                    Id = "3", ClientId = "spa-dev-app", Name = "SPA Development App", 
-                    Description = "Single Page Application for development",
-                    RealmId = "3", RealmName = "Development Environment", IsEnabled = true, 
-                    ClientType = ClientType.Public,
-                    AllowAuthorizationCodeFlow = true, AllowRefreshTokenFlow = true, RequirePkce = true,
-                    CreatedAt = DateTime.Now.AddDays(-20)
-                },
-                new() { 
-                    Id = "4", ClientId = "api-service-client", Name = "API Service Client", 
-                    Description = "Machine-to-machine client for API services",
-                    RealmId = "3", RealmName = "Development Environment", IsEnabled = true, 
-                    ClientType = ClientType.Machine,
-                    AllowClientCredentialsFlow = true,
-                    CreatedAt = DateTime.Now.AddDays(-15)
-                },
-                new() { 
-                    Id = "5", ClientId = "mobile-demo-app", Name = "Mobile Demo Application", 
-                    Description = "Mobile application for demonstration purposes",
-                    RealmId = "5", RealmName = "Multi-Tenant Demo", IsEnabled = false, 
-                    ClientType = ClientType.Public,
-                    AllowAuthorizationCodeFlow = true, AllowRefreshTokenFlow = true, RequirePkce = true,
-                    CreatedAt = DateTime.Now.AddDays(-10)
-                }
-            };
-
-            // Apply filters
-            var filteredClients = clients.AsEnumerable();
-
-            if (!string.IsNullOrWhiteSpace(searchTerm))
-            {
-                filteredClients = filteredClients.Where(c => 
-                    c.ClientId.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                    c.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                    (c.Description?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ?? false));
+                clients = result.Items;
+                Logger.LogInformation("Loaded {ClientCount} clients from API", clients.Count);
             }
-
-            if (!string.IsNullOrWhiteSpace(selectedRealmId))
+            else
             {
-                filteredClients = filteredClients.Where(c => c.RealmId == selectedRealmId);
+                clients = new List<ClientDto>();
+                NotificationService.Notify(NotificationSeverity.Warning, "Warning", "Failed to load clients from API");
             }
-
-            clients = filteredClients.ToList();
-
-            Logger.LogInformation("Loaded {ClientCount} clients", clients.Count);
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Error loading clients");
+            Logger.LogError(ex, "Error loading clients from API");
             NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to load clients");
+            clients = new List<ClientDto>();
         }
         finally
         {
@@ -225,12 +180,32 @@
         Navigation.NavigateTo($"/clients/details/{clientId}");
     }
 
-    private void ToggleClientStatus(ClientDto client)
+    private async Task ToggleClientStatus(ClientDto client)
     {
-        client.IsEnabled = !client.IsEnabled;
-        var status = client.IsEnabled ? "enabled" : "disabled";
-        NotificationService.Notify(NotificationSeverity.Success, "Client Updated", $"Client '{client.Name}' has been {status}");
-        StateHasChanged();
+        try
+        {
+            var result = await ClientsApi.ToggleClientAsync(client.Id);
+            
+            if (result != null)
+            {
+                // Update the local data with the API response
+                client.IsEnabled = result.IsEnabled;
+                client.UpdatedAt = result.UpdatedAt;
+                
+                var status = client.IsEnabled ? "enabled" : "disabled";
+                NotificationService.Notify(NotificationSeverity.Success, "Client Updated", $"Client '{client.Name}' has been {status}");
+                StateHasChanged();
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to toggle client status");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error toggling client status for {ClientId}", client.Id);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to toggle client status");
+        }
     }
 
     private string GetClientTypeIcon(ClientType clientType)

@@ -1,6 +1,11 @@
 ﻿@page "/"
 @attribute [Authorize]
 @rendermode InteractiveServer
+@inject NavigationManager Navigation
+@inject IRealmsApiService RealmsApi
+@inject IClientsApiService ClientsApi
+@inject IUsersApiService UsersApi
+@inject ILogger<Home> Logger
 
 <PageTitle>Dashboard - MrWho Administration</PageTitle>
 
@@ -45,112 +50,75 @@
     
     <RadzenColumn Size="12" SizeMD="6" SizeLG="3">
         <RadzenCard class="rz-text-align-center rz-p-4" Style="min-height: 150px;">
-            <RadzenIcon Icon="security" class="rz-color-warning" Style="font-size: 3rem;" />
-            <RadzenText TextStyle="TextStyle.H4" class="rz-mt-2">99.9%</RadzenText>
-            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">System Uptime</RadzenText>
-            <RadzenButton Click="@(() => Navigation.NavigateTo("/system/health"))" 
+            <RadzenIcon Icon="verified_user" class="rz-color-warning" Style="font-size: 3rem;" />
+            <RadzenText TextStyle="TextStyle.H4" class="rz-mt-2">Online</RadzenText>
+            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">System Status</RadzenText>
+            <RadzenButton Click="@(() => Navigation.NavigateTo("/debug-api"))" 
                          ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" 
-                         Text="Details" class="rz-mt-2" />
-        </RadzenCard>
-    </RadzenColumn>
-</RadzenRow>
-
-<!-- Test Section for Interactivity -->
-<RadzenRow Gap="2rem" class="rz-mt-4">
-    <RadzenColumn Size="12">
-        <RadzenCard class="rz-p-4">
-            <RadzenText TextStyle="TextStyle.H6" class="rz-mb-3">🧪 Interactive Test</RadzenText>
-            <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" AlignItems="AlignItems.Center">
-                <RadzenButton Text="@($"Test Button (Clicked {testClickCount} times)")" 
-                             Click="@IncrementTestCounter" 
-                             ButtonStyle="ButtonStyle.Primary" />
-                <RadzenButton Text="Reset" 
-                             Click="@ResetTestCounter" 
-                             ButtonStyle="ButtonStyle.Secondary" />
-                <RadzenText>@testMessage</RadzenText>
-            </RadzenStack>
+                         Text="Debug API" class="rz-mt-2" />
         </RadzenCard>
     </RadzenColumn>
 </RadzenRow>
 
 <RadzenRow Gap="2rem" class="rz-mt-4">
-    <RadzenColumn Size="12" SizeLG="8">
+    <RadzenColumn Size="12" SizeMD="8">
         <RadzenCard>
-            <RadzenText TextStyle="TextStyle.H5" class="rz-mb-3">
-                <RadzenIcon Icon="history" class="rz-me-2" />
+            <RadzenText TextStyle="TextStyle.H6" class="rz-mb-3">
+                <RadzenIcon Icon="timeline" class="rz-me-1" />
                 Recent Activity
             </RadzenText>
-            @if (isLoading)
+            
+            @if (isLoadingActivity)
             {
                 <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.Small" />
+                <RadzenText class="rz-ml-2">Loading recent activity...</RadzenText>
+            }
+            else if (hasApiError)
+            {
+                <RadzenAlert AlertStyle="AlertStyle.Warning">
+                    <RadzenText>Unable to load recent activity. API connection may be unavailable.</RadzenText>
+                    <RadzenButton Click="@LoadDashboardData" Text="Retry" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" class="rz-mt-2" />
+                </RadzenAlert>
             }
             else
             {
-                <RadzenDataGrid AllowFiltering="false" AllowColumnResize="false" AllowSorting="false" 
-                               Data="@recentActivities" TItem="ActivityLog" Density="Density.Compact" PageSize="5">
-                    <Columns>
-                        <RadzenDataGridColumn TItem="ActivityLog" Property="Time" Title="Time" Width="120px" />
-                        <RadzenDataGridColumn TItem="ActivityLog" Property="User" Title="User" Width="180px" />
-                        <RadzenDataGridColumn TItem="ActivityLog" Property="Action" Title="Action" />
-                        <RadzenDataGridColumn TItem="ActivityLog" Property="Status" Title="Status" Width="100px">
-                            <Template Context="data">
-                                <RadzenBadge BadgeStyle="@(data.Status == "Success" ? BadgeStyle.Success : BadgeStyle.Danger)" 
-                                            Text="@data.Status" />
-                            </Template>
-                        </RadzenDataGridColumn>
-                    </Columns>
-                </RadzenDataGrid>
+                <RadzenDataList Data="@recentActivity" TItem="ActivityItem">
+                    <Template>
+                        <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" AlignItems="AlignItems.Center" class="rz-py-2">
+                            <RadzenIcon Icon="@context.Icon" Style="@($"color: {context.Color}")" />
+                            <RadzenStack Gap="0.2rem">
+                                <RadzenText>@context.Description</RadzenText>
+                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">@context.Timestamp.ToString("MMM dd, yyyy HH:mm")</RadzenText>
+                            </RadzenStack>
+                        </RadzenStack>
+                    </Template>
+                </RadzenDataList>
             }
         </RadzenCard>
     </RadzenColumn>
     
-    <RadzenColumn Size="12" SizeLG="4">
+    <RadzenColumn Size="12" SizeMD="4">
         <RadzenCard>
-            <RadzenText TextStyle="TextStyle.H5" class="rz-mb-3">
-                <RadzenIcon Icon="health_and_safety" class="rz-me-2" />
-                System Status
+            <RadzenText TextStyle="TextStyle.H6" class="rz-mb-3">
+                <RadzenIcon Icon="info" class="rz-me-1" />
+                System Information
             </RadzenText>
+            
             <RadzenStack Gap="1rem">
-                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
-                    <RadzenText>Identity Server</RadzenText>
-                    <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="Online" />
+                <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween">
+                    <RadzenText>API Status:</RadzenText>
+                    <RadzenBadge BadgeStyle="@(hasApiError ? BadgeStyle.Danger : BadgeStyle.Success)" 
+                                Text="@(hasApiError ? "Offline" : "Online")" />
                 </RadzenStack>
-                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
-                    <RadzenText>Database</RadzenText>
-                    <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="Connected" />
+                
+                <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween">
+                    <RadzenText>Version:</RadzenText>
+                    <RadzenText>1.0.0</RadzenText>
                 </RadzenStack>
-                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
-                    <RadzenText>API Services</RadzenText>
-                    <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="Running" />
-                </RadzenStack>
-                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
-                    <RadzenText>OpenIddict</RadzenText>
-                    <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="Active" />
-                </RadzenStack>
-            </RadzenStack>
-        </RadzenCard>
-
-        <RadzenCard class="rz-mt-4">
-            <RadzenText TextStyle="TextStyle.H5" class="rz-mb-3">
-                <RadzenIcon Icon="trending_up" class="rz-me-2" />
-                Quick Stats
-            </RadzenText>
-            <RadzenStack Gap="1rem">
-                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
-                    <RadzenText>Active Sessions</RadzenText>
-                    <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="42" />
-                </RadzenStack>
-                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
-                    <RadzenText>Tokens Issued Today</RadzenText>
-                    <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="1,247" />
-                </RadzenStack>
-                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
-                    <RadzenText>Failed Logins</RadzenText>
-                    <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text="3" />
-                </RadzenStack>
-                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
-                    <RadzenText>API Calls/Hour</RadzenText>
-                    <RadzenBadge BadgeStyle="BadgeStyle.Light" Text="~890" />
+                
+                <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween">
+                    <RadzenText>Environment:</RadzenText>
+                    <RadzenText>Development</RadzenText>
                 </RadzenStack>
             </RadzenStack>
         </RadzenCard>
@@ -158,27 +126,12 @@
 </RadzenRow>
 
 @code {
-    [Inject] private NavigationManager Navigation { get; set; } = default!;
-    [Inject] private ILogger<Home> Logger { get; set; } = default!;
-    [Inject] private NotificationService NotificationService { get; set; } = default!;
-
-    private int totalRealms = 4;
-    private int totalClients = 12;
-    private int totalUsers = 1247;
-    private bool isLoading = true;
-    
-    // Test interactivity
-    private int testClickCount = 0;
-    private string testMessage = "Click the test button to verify interactivity!";
-
-    private List<ActivityLog> recentActivities = new()
-    {
-        new ActivityLog { Time = "10:30 AM", User = "john.doe@company.com", Action = "User login", Status = "Success" },
-        new ActivityLog { Time = "10:25 AM", User = "admin@mrwho.com", Action = "Created new client 'webapp-prod'", Status = "Success" },
-        new ActivityLog { Time = "10:20 AM", User = "jane.smith@company.com", Action = "Updated realm settings", Status = "Success" },
-        new ActivityLog { Time = "10:15 AM", User = "bob.wilson@company.com", Action = "Failed login attempt", Status = "Failed" },
-        new ActivityLog { Time = "10:10 AM", User = "admin@mrwho.com", Action = "Disabled client 'test-app'", Status = "Success" }
-    };
+    private int totalRealms = 0;
+    private int totalClients = 0;
+    private int totalUsers = 0;
+    private bool isLoadingActivity = true;
+    private bool hasApiError = false;
+    private List<ActivityItem> recentActivity = new();
 
     protected override async Task OnInitializedAsync()
     {
@@ -187,47 +140,76 @@
 
     private async Task LoadDashboardData()
     {
-        isLoading = true;
+        isLoadingActivity = true;
+        hasApiError = false;
+        
         try
         {
-            // Simulate API loading
-            await Task.Delay(500); 
-            
-            // Data is already set above - just simulate loading
-            Logger.LogInformation("Dashboard data loaded successfully");
+            // Load dashboard statistics from APIs
+            var realmsTask = RealmsApi.GetRealmsAsync(page: 1, pageSize: 1);
+            var clientsTask = ClientsApi.GetClientsAsync(page: 1, pageSize: 1);
+            var usersTask = UsersApi.GetUsersAsync(page: 1, pageSize: 1);
+
+            await Task.WhenAll(realmsTask, clientsTask, usersTask);
+
+            var realmsResult = await realmsTask;
+            var clientsResult = await clientsTask;
+            var usersResult = await usersTask;
+
+            if (realmsResult != null)
+                totalRealms = realmsResult.TotalCount;
+            else
+                hasApiError = true;
+
+            if (clientsResult != null)
+                totalClients = clientsResult.TotalCount;
+            else
+                hasApiError = true;
+
+            if (usersResult != null)
+                totalUsers = usersResult.TotalCount;
+            else
+                hasApiError = true;
+
+            // Generate some mock recent activity for now
+            recentActivity = new List<ActivityItem>
+            {
+                new() { Icon = "domain", Color = "var(--rz-primary)", Description = $"Loaded {totalRealms} realms from API", Timestamp = DateTime.Now.AddMinutes(-5) },
+                new() { Icon = "apps", Color = "var(--rz-success)", Description = $"Found {totalClients} OIDC clients", Timestamp = DateTime.Now.AddMinutes(-10) },
+                new() { Icon = "people", Color = "var(--rz-info)", Description = $"{totalUsers} users in system", Timestamp = DateTime.Now.AddMinutes(-15) },
+                new() { Icon = "login", Color = "var(--rz-warning)", Description = "Admin user logged in", Timestamp = DateTime.Now.AddMinutes(-20) }
+            };
+
+            Logger.LogInformation("Dashboard loaded - Realms: {Realms}, Clients: {Clients}, Users: {Users}, HasError: {HasError}", 
+                totalRealms, totalClients, totalUsers, hasApiError);
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error loading dashboard data");
+            hasApiError = true;
+            
+            // Set fallback values
+            totalRealms = 0;
+            totalClients = 0;
+            totalUsers = 0;
+            
+            recentActivity = new List<ActivityItem>
+            {
+                new() { Icon = "error", Color = "var(--rz-danger)", Description = "Failed to load data from API", Timestamp = DateTime.Now }
+            };
         }
         finally
         {
-            isLoading = false;
+            isLoadingActivity = false;
             StateHasChanged();
         }
     }
 
-    private void IncrementTestCounter()
+    private class ActivityItem
     {
-        testClickCount++;
-        testMessage = $"✅ Interactivity is working! Button clicked {testClickCount} times.";
-        NotificationService.Notify(NotificationSeverity.Success, "Interactive Test", $"Button clicked {testClickCount} times!");
-        StateHasChanged();
-    }
-
-    private void ResetTestCounter()
-    {
-        testClickCount = 0;
-        testMessage = "Counter reset. Click the test button again!";
-        NotificationService.Notify(NotificationSeverity.Info, "Reset", "Test counter has been reset.");
-        StateHasChanged();
-    }
-
-    public class ActivityLog
-    {
-        public string Time { get; set; } = "";
-        public string User { get; set; } = "";
-        public string Action { get; set; } = "";
-        public string Status { get; set; } = "";
+        public string Icon { get; set; } = "";
+        public string Color { get; set; } = "";
+        public string Description { get; set; } = "";
+        public DateTime Timestamp { get; set; }
     }
 }

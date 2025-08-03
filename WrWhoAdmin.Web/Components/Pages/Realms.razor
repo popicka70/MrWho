@@ -4,6 +4,7 @@
 @inject NavigationManager Navigation
 @inject ILogger<Realms> Logger
 @inject NotificationService NotificationService
+@inject IRealmsApiService RealmsApi
 
 <PageTitle>Realms - MrWho Admin</PageTitle>
 
@@ -98,74 +99,25 @@
         isLoading = true;
         try
         {
-            // Simulate API call
-            await Task.Delay(500); 
+            var result = await RealmsApi.GetRealmsAsync(page: 1, pageSize: 50, search: searchTerm);
             
-            realms = new List<RealmDto>
+            if (result != null)
             {
-                new() { 
-                    Id = "1", 
-                    Name = "admin", 
-                    DisplayName = "MrWho Administration", 
-                    Description = "Administrative realm for MrWho OIDC server management", 
-                    IsEnabled = true, 
-                    ClientCount = 1,
-                    CreatedAt = DateTime.Now.AddDays(-30)
-                },
-                new() { 
-                    Id = "2", 
-                    Name = "default", 
-                    DisplayName = "Default Realm", 
-                    Description = "Default realm for OIDC clients", 
-                    IsEnabled = true, 
-                    ClientCount = 3,
-                    CreatedAt = DateTime.Now.AddDays(-25)
-                },
-                new() { 
-                    Id = "3", 
-                    Name = "sample-development", 
-                    DisplayName = "Development Environment", 
-                    Description = "Sample realm for development and testing purposes", 
-                    IsEnabled = true, 
-                    ClientCount = 5,
-                    CreatedAt = DateTime.Now.AddDays(-15)
-                },
-                new() { 
-                    Id = "4", 
-                    Name = "sample-staging", 
-                    DisplayName = "Staging Environment", 
-                    Description = "Sample realm for staging and pre-production testing", 
-                    IsEnabled = true, 
-                    ClientCount = 2,
-                    CreatedAt = DateTime.Now.AddDays(-10)
-                },
-                new() { 
-                    Id = "5", 
-                    Name = "demo-multi-tenant", 
-                    DisplayName = "Multi-Tenant Demo", 
-                    Description = "Demo realm showcasing multi-tenant capabilities", 
-                    IsEnabled = false, 
-                    ClientCount = 4,
-                    CreatedAt = DateTime.Now.AddDays(-5)
-                },
-            };
-
-            // Apply search filter
-            if (!string.IsNullOrWhiteSpace(searchTerm))
-            {
-                realms = realms.Where(r => 
-                    r.Name.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                    r.DisplayName?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) == true ||
-                    r.Description?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) == true
-                ).ToList();
+                realms = result.Items;
+                Logger.LogInformation("Loaded {RealmCount} realms from API", realms.Count);
             }
-
-            Logger.LogInformation("Loaded {RealmCount} realms", realms.Count);
+            else
+            {
+                // Fallback to empty list if API call fails
+                realms = new List<RealmDto>();
+                NotificationService.Notify(NotificationSeverity.Warning, "Warning", "Failed to load realms from API");
+            }
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Error loading realms");
+            Logger.LogError(ex, "Error loading realms from API");
             NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to load realms");
+            realms = new List<RealmDto>();
         }
         finally
         {
@@ -186,28 +138,31 @@
         Navigation.NavigateTo($"/clients?realmId={realmId}");
     }
 
-    private void ToggleRealmStatus(RealmDto realm)
+    private async Task ToggleRealmStatus(RealmDto realm)
     {
-        realm.IsEnabled = !realm.IsEnabled;
-        var status = realm.IsEnabled ? "enabled" : "disabled";
-        NotificationService.Notify(NotificationSeverity.Success, "Realm Updated", $"Realm '{realm.Name}' has been {status}");
-        StateHasChanged();
-    }
-
-    public class RealmDto
-    {
-        public string Id { get; set; } = string.Empty;
-        public string Name { get; set; } = string.Empty;
-        public string? Description { get; set; }
-        public bool IsEnabled { get; set; } = true;
-        public string? DisplayName { get; set; }
-        public TimeSpan AccessTokenLifetime { get; set; } = TimeSpan.FromMinutes(60);
-        public TimeSpan RefreshTokenLifetime { get; set; } = TimeSpan.FromDays(30);
-        public TimeSpan AuthorizationCodeLifetime { get; set; } = TimeSpan.FromMinutes(10);
-        public DateTime CreatedAt { get; set; }
-        public DateTime UpdatedAt { get; set; }
-        public string? CreatedBy { get; set; }
-        public string? UpdatedBy { get; set; }
-        public int ClientCount { get; set; }
+        try
+        {
+            var result = await RealmsApi.ToggleRealmAsync(realm.Id);
+            
+            if (result != null)
+            {
+                // Update the local data with the API response
+                realm.IsEnabled = result.IsEnabled;
+                realm.UpdatedAt = result.UpdatedAt;
+                
+                var status = realm.IsEnabled ? "enabled" : "disabled";
+                NotificationService.Notify(NotificationSeverity.Success, "Realm Updated", $"Realm '{realm.Name}' has been {status}");
+                StateHasChanged();
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to toggle realm status");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error toggling realm status for {RealmId}", realm.Id);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to toggle realm status");
+        }
     }
 }

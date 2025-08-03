@@ -135,8 +135,8 @@ public class OidcClientService : IOidcClientService
                 });
             }
 
-            // Add scopes
-            var scopes = new[] { "openid", "email", "profile", "roles" };
+            // Add scopes (INCLUDING API SCOPES)
+            var scopes = new[] { "openid", "email", "profile", "roles", "api.read", "api.write" };
             foreach (var scope in scopes)
             {
                 _context.ClientScopes.Add(new ClientScope
@@ -146,7 +146,7 @@ public class OidcClientService : IOidcClientService
                 });
             }
 
-            // Add permissions
+            // Add permissions (INCLUDING API PERMISSIONS)
             var permissions = new[]
             {
                 OpenIddictConstants.Permissions.Endpoints.Authorization,
@@ -158,7 +158,9 @@ public class OidcClientService : IOidcClientService
                 OpenIddictConstants.Permissions.Scopes.Email,
                 OpenIddictConstants.Permissions.Scopes.Profile,
                 OpenIddictConstants.Permissions.Scopes.Roles,
-                OpenIddictConstants.Permissions.ResponseTypes.Code
+                OpenIddictConstants.Permissions.ResponseTypes.Code,
+                "api.read",   // Add API read permission
+                "api.write"   // Add API write permission
             };
 
             foreach (var permission in permissions)
@@ -171,7 +173,51 @@ public class OidcClientService : IOidcClientService
             }
 
             await _context.SaveChangesAsync();
-            _logger.LogInformation("Created admin client 'mrwho_admin_web'");
+            _logger.LogInformation("Created admin client 'mrwho_admin_web' with API access");
+        }
+        else
+        {
+            // Check if existing admin client has API scopes and add them if missing
+            var existingApiScopes = adminClient.Scopes.Where(s => s.Scope.StartsWith("api.")).ToList();
+            var existingApiPermissions = adminClient.Permissions.Where(p => p.Permission.StartsWith("api.")).ToList();
+
+            if (existingApiScopes.Count == 0)
+            {
+                _logger.LogInformation("Adding API scopes to existing admin client");
+                
+                // Add API scopes
+                var apiScopes = new[] { "api.read", "api.write" };
+                foreach (var scope in apiScopes)
+                {
+                    _context.ClientScopes.Add(new ClientScope
+                    {
+                        ClientId = adminClient.Id,
+                        Scope = scope
+                    });
+                }
+
+                // Add API permissions
+                var apiPermissions = new[] { "api.read", "api.write" };
+                foreach (var permission in apiPermissions)
+                {
+                    _context.ClientPermissions.Add(new ClientPermission
+                    {
+                        ClientId = adminClient.Id,
+                        Permission = permission
+                    });
+                }
+
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Added API scopes and permissions to existing admin client");
+                
+                // Reload the client with new scopes and permissions
+                adminClient = await _context.Clients
+                    .Include(c => c.RedirectUris)
+                    .Include(c => c.PostLogoutUris)
+                    .Include(c => c.Scopes)
+                    .Include(c => c.Permissions)
+                    .FirstOrDefaultAsync(c => c.ClientId == "mrwho_admin_web");
+            }
         }
 
         // 3. Create admin user if it doesn't exist
@@ -197,7 +243,7 @@ public class OidcClientService : IOidcClientService
         }
 
         // Sync the admin client with OpenIddict
-        await SyncClientWithOpenIddictAsync(adminClient);
+        await SyncClientWithOpenIddictAsync(adminClient!);
     }
 
     public async Task InitializeDefaultRealmAndClientsAsync()

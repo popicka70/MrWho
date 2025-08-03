@@ -5,7 +5,6 @@ using MrWhoAdmin.Web;
 using MrWhoAdmin.Web.Components;
 using MrWhoAdmin.Web.Services;
 using Radzen;
-using Microsoft.AspNetCore.Components.Server.Circuits;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -28,13 +27,44 @@ builder.Services.AddScoped<ContextMenuService>();
 // Add HTTP context accessor for authentication handler
 builder.Services.AddHttpContextAccessor();
 
-// Add HTTP clients for APIs
+// Add authentication delegating handler
+builder.Services.AddTransient<AuthenticationDelegatingHandler>();
+
+// Get the MrWho API base URL from configuration
+var mrWhoApiBaseUrl = builder.Configuration.GetValue<string>("MrWhoApi:BaseUrl") ?? "https://localhost:7113/";
+
+// Add HTTP clients for APIs with proper registration
 builder.Services.AddHttpClient<WeatherApiClient>(client =>
-    {
-        // This URL uses "https+http://" to indicate HTTPS is preferred over HTTP.
-        // Learn more about service discovery scheme resolution at https://aka.ms/dotnet/sdschemes.
-        client.BaseAddress = new("https+http://apiservice");
-    });
+{
+    // This URL uses "https+http://" to indicate HTTPS is preferred over HTTP.
+    // Learn more about service discovery scheme resolution at https://aka.ms/dotnet/sdsschemes.
+    client.BaseAddress = new("https+http://apiservice");
+});
+
+// Register MrWho API clients with authentication
+builder.Services.AddHttpClient<IRealmsApiService, RealmsApiService>(client =>
+{
+    client.BaseAddress = new Uri(mrWhoApiBaseUrl);
+    client.DefaultRequestHeaders.Add("Accept", "application/json");
+    client.Timeout = TimeSpan.FromSeconds(30);
+})
+.AddHttpMessageHandler<AuthenticationDelegatingHandler>();
+
+builder.Services.AddHttpClient<IClientsApiService, ClientsApiService>(client =>
+{
+    client.BaseAddress = new Uri(mrWhoApiBaseUrl);
+    client.DefaultRequestHeaders.Add("Accept", "application/json");
+    client.Timeout = TimeSpan.FromSeconds(30);
+})
+.AddHttpMessageHandler<AuthenticationDelegatingHandler>();
+
+builder.Services.AddHttpClient<IUsersApiService, UsersApiService>(client =>
+{
+    client.BaseAddress = new Uri(mrWhoApiBaseUrl);
+    client.DefaultRequestHeaders.Add("Accept", "application/json");
+    client.Timeout = TimeSpan.FromSeconds(30);
+})
+.AddHttpMessageHandler<AuthenticationDelegatingHandler>();
 
 // Add Authentication services
 builder.Services.AddAuthentication(options =>
@@ -45,12 +75,15 @@ builder.Services.AddAuthentication(options =>
 .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme)
 .AddOpenIdConnect(OpenIdConnectDefaults.AuthenticationScheme, options =>
 {
-    // Use the dedicated admin client created by the seeding process
-    options.Authority = "https://localhost:7113/";
-    options.ClientId = "mrwho_admin_web";
-    options.ClientSecret = "MrWhoAdmin2024!SecretKey";
+    // Get values from configuration
+    var authConfig = builder.Configuration.GetSection("Authentication");
+    
+    options.Authority = authConfig.GetValue<string>("Authority") ?? "https://localhost:7113/";
+    options.ClientId = authConfig.GetValue<string>("ClientId") ?? "mrwho_admin_web";
+    options.ClientSecret = authConfig.GetValue<string>("ClientSecret") ?? "MrWhoAdmin2024!SecretKey";
+    
     options.ResponseType = "code";
-    options.SaveTokens = true;
+    options.SaveTokens = true; // CRITICAL: This saves tokens for API calls
     options.GetClaimsFromUserInfoEndpoint = true;
     options.RequireHttpsMetadata = false; // Only for development
 
@@ -59,15 +92,17 @@ builder.Services.AddAuthentication(options =>
     options.SignedOutCallbackPath = "/signout-callback-oidc";
 
     // Additional configuration for OpenIddict compatibility
-    options.MetadataAddress = "https://localhost:7113/.well-known/openid_configuration";
+    options.MetadataAddress = $"{options.Authority}.well-known/openid_configuration";
     options.UsePkce = true; // Enable PKCE for better security
 
-    // Map standard OIDC scopes
+    // Map standard OIDC scopes + API scopes
     options.Scope.Clear();
     options.Scope.Add("openid");
     options.Scope.Add("profile");
     options.Scope.Add("email");
     options.Scope.Add("roles");
+    options.Scope.Add("api.read");  // Add API read scope
+    options.Scope.Add("api.write"); // Add API write scope
 
     // Force UserInfo endpoint call by removing ALL claims from ID token processing
     options.ClaimActions.Clear();
@@ -87,19 +122,33 @@ builder.Services.AddAuthentication(options =>
     options.ClaimActions.MapJsonKey("family_name", "family_name");
     options.ClaimActions.MapJsonKey("email", "email");
 
-    // Event logging for debugging (simplified)
+    // Event logging for debugging
     options.Events = new OpenIdConnectEvents
     {
         OnRedirectToIdentityProvider = context =>
         {
             var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-            logger.LogInformation("Redirecting to identity provider");
+            logger.LogInformation("Redirecting to identity provider: {Authority}", options.Authority);
             return Task.CompletedTask;
         },
         OnTokenValidated = context =>
         {
             var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
             logger.LogInformation("Token validated successfully");
+            return Task.CompletedTask;
+        },
+        OnTokenResponseReceived = context =>
+        {
+            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+            logger.LogInformation("Token response received - Access Token: {HasAccessToken}, Refresh Token: {HasRefreshToken}", 
+                !string.IsNullOrEmpty(context.TokenEndpointResponse.AccessToken),
+                !string.IsNullOrEmpty(context.TokenEndpointResponse.RefreshToken));
+            return Task.CompletedTask;
+        },
+        OnRemoteFailure = context =>
+        {
+            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+            logger.LogError("Remote authentication failure: {Error}", context.Failure?.Message);
             return Task.CompletedTask;
         }
     };
@@ -159,10 +208,12 @@ app.Run();
 public class AuthenticationDelegatingHandler : DelegatingHandler
 {
     private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly ILogger<AuthenticationDelegatingHandler> _logger;
 
-    public AuthenticationDelegatingHandler(IHttpContextAccessor httpContextAccessor)
+    public AuthenticationDelegatingHandler(IHttpContextAccessor httpContextAccessor, ILogger<AuthenticationDelegatingHandler> logger)
     {
         _httpContextAccessor = httpContextAccessor;
+        _logger = logger;
     }
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
@@ -170,11 +221,35 @@ public class AuthenticationDelegatingHandler : DelegatingHandler
         var httpContext = _httpContextAccessor.HttpContext;
         if (httpContext?.User.Identity?.IsAuthenticated == true)
         {
-            var accessToken = await httpContext.GetTokenAsync("access_token");
-            if (!string.IsNullOrEmpty(accessToken))
+            try
             {
-                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+                var accessToken = await httpContext.GetTokenAsync("access_token");
+                if (!string.IsNullOrEmpty(accessToken))
+                {
+                    request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+                    _logger.LogDebug("Added Bearer token to request: {RequestUri} (Token preview: {TokenPreview})", 
+                        request.RequestUri, accessToken.Substring(0, Math.Min(20, accessToken.Length)) + "...");
+                }
+                else
+                {
+                    _logger.LogWarning("No access token found for authenticated user - checking available tokens");
+                    
+                    // Log available token names for debugging
+                    var tokens = await httpContext.GetTokenAsync("id_token");
+                    _logger.LogDebug("Available tokens - ID Token: {HasIdToken}", !string.IsNullOrEmpty(tokens));
+                    
+                    var refreshToken = await httpContext.GetTokenAsync("refresh_token");
+                    _logger.LogDebug("Available tokens - Refresh Token: {HasRefreshToken}", !string.IsNullOrEmpty(refreshToken));
+                }
             }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting access token for request to {RequestUri}", request.RequestUri);
+            }
+        }
+        else
+        {
+            _logger.LogDebug("User not authenticated, skipping token attachment for: {RequestUri}", request.RequestUri);
         }
 
         return await base.SendAsync(request, cancellationToken);

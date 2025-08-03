@@ -32,6 +32,9 @@ public class ClientsApiService : IClientsApiService
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             PropertyNameCaseInsensitive = true
         };
+        
+        // Log HttpClient configuration for debugging
+        _logger.LogInformation("ClientsApiService initialized with BaseAddress: {BaseAddress}", _httpClient.BaseAddress);
     }
 
     public async Task<PagedResult<ClientDto>?> GetClientsAsync(int page = 1, int pageSize = 10, string? search = null, string? realmId = null)
@@ -48,15 +51,50 @@ public class ClientsApiService : IClientsApiService
                 queryString += $"&realmId={Uri.EscapeDataString(realmId)}";
             }
 
-            var response = await _httpClient.GetAsync($"api/clients{queryString}");
-            response.EnsureSuccessStatusCode();
+            var requestUri = $"api/clients{queryString}";
+            var fullUri = new Uri(_httpClient.BaseAddress!, requestUri);
+            
+            _logger.LogInformation("Making request to: {FullUri}", fullUri);
+            _logger.LogDebug("Request headers: {Headers}", 
+                string.Join(", ", _httpClient.DefaultRequestHeaders.Select(h => $"{h.Key}={string.Join(",", h.Value)}")));
+
+            var response = await _httpClient.GetAsync(requestUri);
+            
+            _logger.LogInformation("Response Status: {StatusCode} for {RequestUri}", response.StatusCode, fullUri);
+            
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                _logger.LogError("API Error - Status: {StatusCode}, Content: {ErrorContent}", response.StatusCode, errorContent);
+                
+                // Log response headers for debugging
+                _logger.LogDebug("Response headers: {Headers}", 
+                    string.Join(", ", response.Headers.Select(h => $"{h.Key}={string.Join(",", h.Value)}")));
+                
+                return null;
+            }
 
             var json = await response.Content.ReadAsStringAsync();
-            return JsonSerializer.Deserialize<PagedResult<ClientDto>>(json, _jsonOptions);
+            _logger.LogDebug("Response content length: {Length}", json.Length);
+            
+            var result = JsonSerializer.Deserialize<PagedResult<ClientDto>>(json, _jsonOptions);
+            _logger.LogInformation("Successfully deserialized {ItemCount} clients", result?.Items.Count ?? 0);
+            
+            return result;
+        }
+        catch (HttpRequestException httpEx)
+        {
+            _logger.LogError(httpEx, "HTTP request exception getting clients. BaseAddress: {BaseAddress}", _httpClient.BaseAddress);
+            return null;
+        }
+        catch (TaskCanceledException tcEx)
+        {
+            _logger.LogError(tcEx, "Request timeout getting clients. BaseAddress: {BaseAddress}", _httpClient.BaseAddress);
+            return null;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting clients");
+            _logger.LogError(ex, "Error getting clients. BaseAddress: {BaseAddress}", _httpClient.BaseAddress);
             return null;
         }
     }
@@ -65,8 +103,20 @@ public class ClientsApiService : IClientsApiService
     {
         try
         {
-            var response = await _httpClient.GetAsync($"api/clients/{id}");
-            response.EnsureSuccessStatusCode();
+            var requestUri = $"api/clients/{id}";
+            var fullUri = new Uri(_httpClient.BaseAddress!, requestUri);
+            
+            _logger.LogInformation("Getting client {ClientId} from: {FullUri}", id, fullUri);
+            
+            var response = await _httpClient.GetAsync(requestUri);
+            
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                _logger.LogError("API Error getting client {ClientId} - Status: {StatusCode}, Content: {ErrorContent}", 
+                    id, response.StatusCode, errorContent);
+                return null;
+            }
 
             var json = await response.Content.ReadAsStringAsync();
             return JsonSerializer.Deserialize<ClientDto>(json, _jsonOptions);
@@ -85,8 +135,18 @@ public class ClientsApiService : IClientsApiService
             var json = JsonSerializer.Serialize(request, _jsonOptions);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
+            _logger.LogInformation("Creating client {ClientId}", request.ClientId);
+            _logger.LogDebug("Request payload: {Payload}", json);
+
             var response = await _httpClient.PostAsync("api/clients", content);
-            response.EnsureSuccessStatusCode();
+            
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                _logger.LogError("API Error creating client - Status: {StatusCode}, Content: {ErrorContent}", 
+                    response.StatusCode, errorContent);
+                return null;
+            }
 
             var responseJson = await response.Content.ReadAsStringAsync();
             return JsonSerializer.Deserialize<ClientDto>(responseJson, _jsonOptions);
@@ -105,8 +165,17 @@ public class ClientsApiService : IClientsApiService
             var json = JsonSerializer.Serialize(request, _jsonOptions);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
+            _logger.LogInformation("Updating client {ClientId}", id);
+
             var response = await _httpClient.PutAsync($"api/clients/{id}", content);
-            response.EnsureSuccessStatusCode();
+            
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                _logger.LogError("API Error updating client {ClientId} - Status: {StatusCode}, Content: {ErrorContent}", 
+                    id, response.StatusCode, errorContent);
+                return null;
+            }
 
             var responseJson = await response.Content.ReadAsStringAsync();
             return JsonSerializer.Deserialize<ClientDto>(responseJson, _jsonOptions);
@@ -122,7 +191,17 @@ public class ClientsApiService : IClientsApiService
     {
         try
         {
+            _logger.LogInformation("Deleting client {ClientId}", id);
+            
             var response = await _httpClient.DeleteAsync($"api/clients/{id}");
+            
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                _logger.LogError("API Error deleting client {ClientId} - Status: {StatusCode}, Content: {ErrorContent}", 
+                    id, response.StatusCode, errorContent);
+            }
+            
             return response.IsSuccessStatusCode;
         }
         catch (Exception ex)
@@ -136,8 +215,17 @@ public class ClientsApiService : IClientsApiService
     {
         try
         {
+            _logger.LogInformation("Toggling client {ClientId}", id);
+            
             var response = await _httpClient.PostAsync($"api/clients/{id}/toggle", null);
-            response.EnsureSuccessStatusCode();
+            
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                _logger.LogError("API Error toggling client {ClientId} - Status: {StatusCode}, Content: {ErrorContent}", 
+                    id, response.StatusCode, errorContent);
+                return null;
+            }
 
             var responseJson = await response.Content.ReadAsStringAsync();
             return JsonSerializer.Deserialize<ClientDto>(responseJson, _jsonOptions);

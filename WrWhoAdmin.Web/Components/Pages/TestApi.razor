@@ -1,0 +1,212 @@
+@page "/test-api"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject IRealmsApiService RealmsApi
+@inject IClientsApiService ClientsApi
+@inject IUsersApiService UsersApi
+@inject NotificationService NotificationService
+@inject ILogger<TestApi> Logger
+
+<PageTitle>API Integration Test - MrWho Admin</PageTitle>
+
+<RadzenText TextStyle="TextStyle.H3">API Integration Test</RadzenText>
+
+<RadzenCard class="rz-my-4">
+    <RadzenStack Gap="2rem">
+        <RadzenText TextStyle="TextStyle.H6">Test API Connections</RadzenText>
+        
+        <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem">
+            <RadzenButton Click="@TestRealmsApi" Icon="domain" ButtonStyle="ButtonStyle.Primary" 
+                         Text="Test Realms API" IsBusy="@testingRealms" />
+            <RadzenButton Click="@TestClientsApi" Icon="apps" ButtonStyle="ButtonStyle.Success" 
+                         Text="Test Clients API" IsBusy="@testingClients" />
+            <RadzenButton Click="@TestUsersApi" Icon="people" ButtonStyle="ButtonStyle.Info" 
+                         Text="Test Users API" IsBusy="@testingUsers" />
+        </RadzenStack>
+
+        @if (testResults.Any())
+        {
+            <RadzenFieldset Text="Test Results">
+                @foreach (var result in testResults)
+                {
+                    <RadzenAlert AlertStyle="@(result.Success ? AlertStyle.Success : AlertStyle.Danger)" 
+                                class="rz-mb-2">
+                        <RadzenText><strong>@result.Service:</strong> @result.Message</RadzenText>
+                        @if (!string.IsNullOrEmpty(result.Details))
+                        {
+                            <RadzenText TextStyle="TextStyle.Caption">@result.Details</RadzenText>
+                        }
+                    </RadzenAlert>
+                }
+            </RadzenFieldset>
+        }
+    </RadzenStack>
+</RadzenCard>
+
+@code {
+    private bool testingRealms = false;
+    private bool testingClients = false;
+    private bool testingUsers = false;
+    private List<TestResult> testResults = new();
+
+    private async Task TestRealmsApi()
+    {
+        testingRealms = true;
+        try
+        {
+            var result = await RealmsApi.GetRealmsAsync(page: 1, pageSize: 5);
+            
+            if (result != null)
+            {
+                testResults.Add(new TestResult
+                {
+                    Service = "Realms API",
+                    Success = true,
+                    Message = $"Successfully loaded {result.Items.Count} realms",
+                    Details = $"Total count: {result.TotalCount}, Pages: {result.TotalPages}"
+                });
+                
+                NotificationService.Notify(NotificationSeverity.Success, "Success", "Realms API test passed");
+            }
+            else
+            {
+                testResults.Add(new TestResult
+                {
+                    Service = "Realms API",
+                    Success = false,
+                    Message = "Failed to load realms - API returned null"
+                });
+                
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Realms API test failed");
+            }
+        }
+        catch (Exception ex)
+        {
+            testResults.Add(new TestResult
+            {
+                Service = "Realms API",
+                Success = false,
+                Message = "Exception occurred during API call",
+                Details = ex.Message
+            });
+            
+            Logger.LogError(ex, "Error testing Realms API");
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Realms API test failed with exception");
+        }
+        finally
+        {
+            testingRealms = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task TestClientsApi()
+    {
+        testingClients = true;
+        try
+        {
+            var result = await ClientsApi.GetClientsAsync(page: 1, pageSize: 5);
+            
+            if (result != null)
+            {
+                testResults.Add(new TestResult
+                {
+                    Service = "Clients API",
+                    Success = true,
+                    Message = $"Successfully loaded {result.Items.Count} clients",
+                    Details = $"Total count: {result.TotalCount}, Pages: {result.TotalPages}"
+                });
+                
+                NotificationService.Notify(NotificationSeverity.Success, "Success", "Clients API test passed");
+            }
+            else
+            {
+                testResults.Add(new TestResult
+                {
+                    Service = "Clients API",
+                    Success = false,
+                    Message = "Failed to load clients - API returned null"
+                });
+                
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Clients API test failed");
+            }
+        }
+        catch (Exception ex)
+        {
+            testResults.Add(new TestResult
+            {
+                Service = "Clients API",
+                Success = false,
+                Message = "Exception occurred during API call",
+                Details = ex.Message
+            });
+            
+            Logger.LogError(ex, "Error testing Clients API");
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Clients API test failed with exception");
+        }
+        finally
+        {
+            testingClients = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task TestUsersApi()
+    {
+        testingUsers = true;
+        try
+        {
+            var result = await UsersApi.GetUsersAsync(page: 1, pageSize: 5);
+            
+            if (result != null)
+            {
+                testResults.Add(new TestResult
+                {
+                    Service = "Users API",
+                    Success = true,
+                    Message = $"Successfully loaded {result.Items.Count} users",
+                    Details = $"Total count: {result.TotalCount}, Pages: {result.TotalPages}"
+                });
+                
+                NotificationService.Notify(NotificationSeverity.Success, "Success", "Users API test passed");
+            }
+            else
+            {
+                testResults.Add(new TestResult
+                {
+                    Service = "Users API",
+                    Success = false,
+                    Message = "Failed to load users - API returned null"
+                });
+                
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Users API test failed");
+            }
+        }
+        catch (Exception ex)
+        {
+            testResults.Add(new TestResult
+            {
+                Service = "Users API",
+                Success = false,
+                Message = "Exception occurred during API call",
+                Details = ex.Message
+            });
+            
+            Logger.LogError(ex, "Error testing Users API");
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Users API test failed with exception");
+        }
+        finally
+        {
+            testingUsers = false;
+            StateHasChanged();
+        }
+    }
+
+    private class TestResult
+    {
+        public string Service { get; set; } = "";
+        public bool Success { get; set; }
+        public string Message { get; set; } = "";
+        public string? Details { get; set; }
+    }
+}
