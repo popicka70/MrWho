@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using MrWho.Models;
 using MrWho.Handlers.Users;
+using Microsoft.AspNetCore.Identity;
 
 namespace MrWho.Controllers;
 
@@ -16,9 +16,7 @@ public class UsersController : ControllerBase
     private readonly ICreateUserHandler _createUserHandler;
     private readonly IUpdateUserHandler _updateUserHandler;
     private readonly IDeleteUserHandler _deleteUserHandler;
-    private readonly IChangePasswordHandler _changePasswordHandler;
-    private readonly IResetPasswordHandler _resetPasswordHandler;
-    private readonly ISetLockoutHandler _setLockoutHandler;
+    private readonly UserManager<IdentityUser> _userManager;
     private readonly ILogger<UsersController> _logger;
 
     public UsersController(
@@ -27,9 +25,7 @@ public class UsersController : ControllerBase
         ICreateUserHandler createUserHandler,
         IUpdateUserHandler updateUserHandler,
         IDeleteUserHandler deleteUserHandler,
-        IChangePasswordHandler changePasswordHandler,
-        IResetPasswordHandler resetPasswordHandler,
-        ISetLockoutHandler setLockoutHandler,
+        UserManager<IdentityUser> userManager,
         ILogger<UsersController> logger)
     {
         _getUsersHandler = getUsersHandler;
@@ -37,9 +33,7 @@ public class UsersController : ControllerBase
         _createUserHandler = createUserHandler;
         _updateUserHandler = updateUserHandler;
         _deleteUserHandler = deleteUserHandler;
-        _changePasswordHandler = changePasswordHandler;
-        _resetPasswordHandler = resetPasswordHandler;
-        _setLockoutHandler = setLockoutHandler;
+        _userManager = userManager;
         _logger = logger;
     }
 
@@ -152,101 +146,5 @@ public class UsersController : ControllerBase
 
         _logger.LogInformation("User with ID {UserId} deleted successfully", id);
         return NoContent();
-    }
-
-    /// <summary>
-    /// Change user password
-    /// </summary>
-    [HttpPost("{id}/change-password")]
-    public async Task<IActionResult> ChangePassword(string id, [FromBody] ChangePasswordRequest request)
-    {
-        if (!ModelState.IsValid)
-        {
-            return BadRequest(ModelState);
-        }
-
-        var (success, errors) = await _changePasswordHandler.HandleAsync(id, request);
-
-        if (!success)
-        {
-            var errorsList = errors.ToList();
-            if (errorsList.Any(e => e.Contains("not found")))
-            {
-                return NotFound($"User with ID '{id}' not found.");
-            }
-
-            foreach (var error in errorsList)
-            {
-                ModelState.AddModelError("", error);
-            }
-            return BadRequest(ModelState);
-        }
-
-        _logger.LogInformation("Password changed successfully for user with ID {UserId}", id);
-        return Ok(new { message = "Password changed successfully" });
-    }
-
-    /// <summary>
-    /// Reset user password (admin function)
-    /// </summary>
-    [HttpPost("{id}/reset-password")]
-    public async Task<IActionResult> ResetPassword(string id, [FromBody] ResetPasswordRequest request)
-    {
-        if (!ModelState.IsValid)
-        {
-            return BadRequest(ModelState);
-        }
-
-        var (success, errors) = await _resetPasswordHandler.HandleAsync(id, request);
-
-        if (!success)
-        {
-            var errorsList = errors.ToList();
-            if (errorsList.Any(e => e.Contains("not found")))
-            {
-                return NotFound($"User with ID '{id}' not found.");
-            }
-
-            foreach (var error in errorsList)
-            {
-                ModelState.AddModelError("", error);
-            }
-            return BadRequest(ModelState);
-        }
-
-        _logger.LogInformation("Password reset successfully for user with ID {UserId}", id);
-        return Ok(new { message = "Password reset successfully" });
-    }
-
-    /// <summary>
-    /// Lock/unlock user account
-    /// </summary>
-    [HttpPost("{id}/lockout")]
-    public async Task<IActionResult> SetLockout(string id, [FromBody] SetLockoutRequest request)
-    {
-        if (!ModelState.IsValid)
-        {
-            return BadRequest(ModelState);
-        }
-
-        var (success, action, errors) = await _setLockoutHandler.HandleAsync(id, request);
-
-        if (!success)
-        {
-            var errorsList = errors.ToList();
-            if (errorsList.Any(e => e.Contains("not found")))
-            {
-                return NotFound($"User with ID '{id}' not found.");
-            }
-
-            foreach (var error in errorsList)
-            {
-                ModelState.AddModelError("", error);
-            }
-            return BadRequest(ModelState);
-        }
-
-        _logger.LogInformation("User with ID {UserId} {Action} successfully", id, action);
-        return Ok(new { message = $"User {action} successfully" });
     }
 }

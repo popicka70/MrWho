@@ -1,10 +1,13 @@
 @page "/users"
 @attribute [Authorize]
 @rendermode InteractiveServer
+@using MrWhoAdmin.Web.Models
+@using MrWhoAdmin.Web.Services
 @inject NavigationManager Navigation
 @inject ILogger<Users> Logger
 @inject NotificationService NotificationService
 @inject DialogService DialogService
+@inject IUsersApiService UsersApi
 
 <PageTitle>Users - MrWho Admin</PageTitle>
 
@@ -120,73 +123,25 @@
         isLoading = true;
         try
         {
-            // For now, use mock data until API integration is complete
-            await Task.Delay(500); // Simulate API call
+            // Call the real API instead of using mock data
+            var result = await UsersApi.GetUsersAsync(page: 1, pageSize: 100, search: searchTerm);
             
-            users = new List<UserDto>
+            if (result != null)
             {
-                new() { 
-                    Id = "1", 
-                    UserName = "admin@mrwho.local", 
-                    Email = "admin@mrwho.local",
-                    EmailConfirmed = true,
-                    TwoFactorEnabled = true,
-                    LockoutEnabled = true,
-                    AccessFailedCount = 0
-                },
-                new() { 
-                    Id = "2", 
-                    UserName = "test@example.com", 
-                    Email = "test@example.com",
-                    EmailConfirmed = true,
-                    TwoFactorEnabled = false,
-                    LockoutEnabled = true,
-                    AccessFailedCount = 0
-                },
-                new() { 
-                    Id = "3", 
-                    UserName = "john.doe@company.com", 
-                    Email = "john.doe@company.com",
-                    EmailConfirmed = true,
-                    TwoFactorEnabled = true,
-                    LockoutEnabled = true,
-                    AccessFailedCount = 0
-                },
-                new() { 
-                    Id = "4", 
-                    UserName = "jane.smith@company.com", 
-                    Email = "jane.smith@company.com",
-                    EmailConfirmed = false,
-                    TwoFactorEnabled = false,
-                    LockoutEnabled = true,
-                    AccessFailedCount = 0
-                },
-                new() { 
-                    Id = "5", 
-                    UserName = "bob.wilson@company.com", 
-                    Email = "bob.wilson@company.com",
-                    EmailConfirmed = true,
-                    TwoFactorEnabled = false,
-                    LockoutEnabled = true,
-                    LockoutEnd = DateTimeOffset.UtcNow.AddHours(2), // Currently locked
-                    AccessFailedCount = 3
-                },
-            };
-
-            if (!string.IsNullOrWhiteSpace(searchTerm))
-            {
-                users = users.Where(u => 
-                    u.UserName.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) ||
-                    u.Email.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)
-                ).ToList();
+                users = result.Items;
+                Logger.LogInformation("Loaded {UserCount} users from API", users.Count);
             }
-
-            Logger.LogInformation("Loaded {UserCount} users", users.Count);
+            else
+            {
+                users = new List<UserDto>();
+                NotificationService.Notify(NotificationSeverity.Warning, "Warning", "Failed to load users from API");
+            }
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error loading users");
             NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to load users");
+            users = new List<UserDto>();
         }
         finally
         {
@@ -237,19 +192,5 @@
             }
             StateHasChanged();
         }
-    }
-
-    public class UserDto
-    {
-        public string Id { get; set; } = string.Empty;
-        public string UserName { get; set; } = string.Empty;
-        public string Email { get; set; } = string.Empty;
-        public bool EmailConfirmed { get; set; }
-        public string? PhoneNumber { get; set; }
-        public bool PhoneNumberConfirmed { get; set; }
-        public bool TwoFactorEnabled { get; set; }
-        public bool LockoutEnabled { get; set; }
-        public DateTimeOffset? LockoutEnd { get; set; }
-        public int AccessFailedCount { get; set; }
     }
 }

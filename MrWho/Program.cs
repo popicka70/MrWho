@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 using MrWho.Data;
 using MrWho.Handlers;
 using MrWho.Services;
+using MrWho.Models;
 using OpenIddict.Abstractions;
 using OpenIddict.Server.AspNetCore;
 using static OpenIddict.Abstractions.OpenIddictConstants;
@@ -68,9 +69,9 @@ builder.Services.AddScoped<IUserInfoHandler, MrWho.Handlers.UserInfoHandler>();
 // Register User management handlers
 builder.Services.AddScoped<IGetUsersHandler, GetUsersHandler>();
 builder.Services.AddScoped<IGetUserHandler, GetUserHandler>();
-//builder.Services.AddScoped<ICreateUserHandler, CreateUserHandler>();
-//builder.Services.AddScoped<IUpdateUserHandler, UpdateUserHandler>();
-//builder.Services.AddScoped<IDeleteUserHandler, DeleteUserHandler>();
+builder.Services.AddScoped<ICreateUserHandler, CreateUserHandler>();
+builder.Services.AddScoped<IUpdateUserHandler, UpdateUserHandler>();
+builder.Services.AddScoped<IDeleteUserHandler, DeleteUserHandler>();
 //builder.Services.AddScoped<IChangePasswordHandler, ChangePasswordHandler>();
 //builder.Services.AddScoped<IResetPasswordHandler, ResetPasswordHandler>();
 //builder.Services.AddScoped<ISetLockoutHandler, SetLockoutHandler>();
@@ -212,11 +213,11 @@ app.MapPost("/connect/token", async (HttpContext context, ITokenHandler tokenHan
     return await tokenHandler.HandleTokenRequestAsync(context);
 });
 
-// UserInfo endpoint (optional but recommended)
-app.MapGet("/connect/userinfo", [Authorize] async (HttpContext context, IUserInfoHandler userInfoHandler) =>
+// UserInfo endpoint (optional but recommended) - Updated to use OpenIddict validation
+app.MapGet("/connect/userinfo", async (HttpContext context, IUserInfoHandler userInfoHandler) =>
 {
     return await userInfoHandler.HandleUserInfoRequestAsync(context);
-});
+}).RequireAuthorization();
 
 // API Test endpoint (for debugging) - This will now work with OpenIddict validation
 app.MapGet("/api/test", [Authorize] () =>
@@ -425,6 +426,105 @@ app.MapPost("/debug/reset-admin-client", async (ApplicationDbContext context, IO
     {
         logger.LogError(ex, "Error recreating admin client");
         return Results.Problem($"Error recreating admin client: {ex.Message}");
+    }
+});
+
+// Debug endpoint to fix API permissions format (DEVELOPMENT ONLY)
+app.MapPost("/debug/fix-api-permissions", async (ApplicationDbContext context, IOidcClientService oidcClientService, ILogger<Program> logger) =>
+{
+    if (!app.Environment.IsDevelopment())
+    {
+        return Results.BadRequest("This endpoint is only available in development");
+    }
+    
+    logger.LogInformation("FIXING API PERMISSIONS - Updating permission format for all clients with API scopes");
+    
+    // Get all clients that have API scopes
+    var clientsWithApiScopes = await context.Clients
+        .Include(c => c.Scopes)
+        .Include(c => c.Permissions)
+        .Where(c => c.Scopes.Any(s => s.Scope.StartsWith("api.")))
+        .ToListAsync();
+    
+    var updatedClients = new List<string>();
+    
+    foreach (var client in clientsWithApiScopes)
+    {
+        var hasChanges = false;
+        
+        // Remove old format permissions
+        var oldPermissions = client.Permissions
+            .Where(p => p.Permission.StartsWith("oidc:scope:api.") || 
+                       (p.Permission.StartsWith("api.") && !p.Permission.StartsWith("scp:")))
+            .ToList();
+        
+        if (oldPermissions.Any())
+        {
+            logger.LogInformation("Removing old API permissions for client {ClientId}: {Permissions}", 
+                client.ClientId, string.Join(", ", oldPermissions.Select(p => p.Permission)));
+            
+            foreach (var oldPerm in oldPermissions)
+            {
+                context.ClientPermissions.Remove(oldPerm);
+            }
+            hasChanges = true;
+        }
+        
+        // Add correct format permissions
+        var apiScopes = client.Scopes.Where(s => s.Scope.StartsWith("api.")).Select(s => s.Scope).ToList();
+        foreach (var apiScope in apiScopes)
+        {
+            var correctPermission = $"scp:{apiScope}";
+            if (!client.Permissions.Any(p => p.Permission == correctPermission))
+            {
+                logger.LogInformation("Adding correct API permission for client {ClientId}: {Permission}", 
+                    client.ClientId, correctPermission);
+                
+                context.ClientPermissions.Add(new ClientPermission
+                {
+                    ClientId = client.Id,
+                    Permission = correctPermission
+                });
+                hasChanges = true;
+            }
+        }
+        
+        if (hasChanges)
+        {
+            updatedClients.Add(client.ClientId);
+            
+            // Re-sync the client with OpenIddict
+            try
+            {
+                await oidcClientService.SyncClientWithOpenIddictAsync(client);
+                logger.LogInformation("Re-synced client {ClientId} with OpenIddict", client.ClientId);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to re-sync client {ClientId} with OpenIddict", client.ClientId);
+            }
+        }
+    }
+    
+    if (updatedClients.Any())
+    {
+        await context.SaveChangesAsync();
+        logger.LogInformation("Updated API permissions for clients: {Clients}", string.Join(", ", updatedClients));
+        
+        return Results.Ok(new 
+        { 
+            message = "API permissions fixed successfully", 
+            updatedClients = updatedClients,
+            timestamp = DateTime.UtcNow 
+        });
+    }
+    else
+    {
+        return Results.Ok(new 
+        { 
+            message = "No API permission fixes needed", 
+            timestamp = DateTime.UtcNow 
+        });
     }
 });
 

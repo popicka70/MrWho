@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Identity;
+using OpenIddict.Abstractions;
 using OpenIddict.Server.AspNetCore;
 
 namespace MrWho.Handlers;
@@ -31,7 +32,17 @@ public class UserInfoHandler : IUserInfoHandler
     /// <inheritdoc />
     public async Task<IResult> HandleUserInfoRequestAsync(HttpContext context)
     {
-        var user = await _userManager.GetUserAsync(context.User);
+        // When called with a Bearer token, the user claims are in OpenIddict format
+        // We need to extract the Subject claim to find the user
+        var subjectClaim = context.User.FindFirst(OpenIddictConstants.Claims.Subject);
+        
+        if (subjectClaim == null)
+        {
+            return Results.Challenge(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
+        }
+
+        // Find the user by their ID (which is stored in the Subject claim)
+        var user = await _userManager.FindByIdAsync(subjectClaim.Value);
 
         if (user == null)
         {

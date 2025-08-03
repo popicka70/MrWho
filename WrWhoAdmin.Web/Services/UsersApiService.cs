@@ -12,10 +12,13 @@ public interface IUsersApiService
     Task<PagedResult<UserDto>?> GetUsersAsync(int page = 1, int pageSize = 10, string? search = null);
     Task<UserDto?> GetUserAsync(string id);
     Task<UserDto?> CreateUserAsync(CreateUserRequest request);
-    Task<UserDto?> UpdateUserAsync(string id, UserDto request);
+    Task<UserDto?> UpdateUserAsync(string id, UpdateUserRequest request);
     Task<bool> DeleteUserAsync(string id);
     Task<bool> ResetPasswordAsync(string id, string newPassword);
+    Task<bool> ChangePasswordAsync(string id, string currentPassword, string newPassword);
     Task<bool> SetLockoutAsync(string id, DateTimeOffset? lockoutEnd);
+    Task<bool> SendConfirmationEmailAsync(string id);
+    Task<bool> ForceLogoutAsync(string id);
 }
 
 public class UsersApiService : IUsersApiService
@@ -95,7 +98,7 @@ public class UsersApiService : IUsersApiService
         }
     }
 
-    public async Task<UserDto?> UpdateUserAsync(string id, UserDto request)
+    public async Task<UserDto?> UpdateUserAsync(string id, UpdateUserRequest request)
     {
         try
         {
@@ -147,6 +150,24 @@ public class UsersApiService : IUsersApiService
         }
     }
 
+    public async Task<bool> ChangePasswordAsync(string id, string currentPassword, string newPassword)
+    {
+        try
+        {
+            var request = new { CurrentPassword = currentPassword, NewPassword = newPassword };
+            var json = JsonSerializer.Serialize(request, _jsonOptions);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            var response = await _httpClient.PostAsync($"api/users/{id}/change-password", content);
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error changing password for user {UserId}", id);
+            return false;
+        }
+    }
+
     public async Task<bool> SetLockoutAsync(string id, DateTimeOffset? lockoutEnd)
     {
         try
@@ -161,6 +182,40 @@ public class UsersApiService : IUsersApiService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error setting lockout for user {UserId}", id);
+            return false;
+        }
+    }
+
+    public async Task<bool> SendConfirmationEmailAsync(string id)
+    {
+        try
+        {
+            // This would typically send a confirmation email
+            // For now we'll just return true as a placeholder
+            _logger.LogInformation("Sending confirmation email for user {UserId}", id);
+            await Task.Delay(100); // Simulate API call
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error sending confirmation email for user {UserId}", id);
+            return false;
+        }
+    }
+
+    public async Task<bool> ForceLogoutAsync(string id)
+    {
+        try
+        {
+            // This would typically invalidate all user sessions
+            // For now we'll just return true as a placeholder
+            _logger.LogInformation("Forcing logout for user {UserId}", id);
+            await Task.Delay(100); // Simulate API call
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error forcing logout for user {UserId}", id);
             return false;
         }
     }
