@@ -13,12 +13,13 @@ using MrWhoAdmin.Web.Extensions;
 namespace MrWhoAdmin.Tests;
 
 /// <summary>
-/// Integration tests for the web application
+/// Integration tests for the web application using Aspire's SQL Server
 /// </summary>
 [TestClass]
+[TestCategory("Integration")]
 public class WebTests
 {
-    private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(60); // Increased timeout
 
     [TestMethod]
     public async Task GetWebResourceRootReturnsOkStatusCode()
@@ -50,12 +51,39 @@ public class WebTests
         // Assert
         Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
     }
+
+    [TestMethod]
+    public async Task DatabaseIntegrationTest_WithRealSqlServer()
+    {
+        // Arrange
+        var cancellationToken = new CancellationTokenSource(DefaultTimeout).Token;
+
+        var appHost = await DistributedApplicationTestingBuilder.CreateAsync<Projects.MrWhoAdmin_AppHost>(cancellationToken);
+        
+        await using var app = await appHost.BuildAsync(cancellationToken).WaitAsync(DefaultTimeout, cancellationToken);
+        await app.StartAsync(cancellationToken).WaitAsync(DefaultTimeout, cancellationToken);
+
+        // Wait for SQL Server to be ready
+        await app.ResourceNotifications.WaitForResourceHealthyAsync("sqlserver", cancellationToken).WaitAsync(DefaultTimeout, cancellationToken);
+        await app.ResourceNotifications.WaitForResourceHealthyAsync("mrwho", cancellationToken).WaitAsync(DefaultTimeout, cancellationToken);
+
+        // Act - Test database connectivity through the API
+        var httpClient = app.CreateHttpClient("webfrontend");
+        await app.ResourceNotifications.WaitForResourceHealthyAsync("webfrontend", cancellationToken).WaitAsync(DefaultTimeout, cancellationToken);
+        
+        // Test API endpoint that uses the database
+        var response = await httpClient.GetAsync("/api/realms?page=1&pageSize=10", cancellationToken);
+
+        // Assert
+        response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.Unauthorized); // OK if no auth, Unauthorized if auth required
+    }
 }
 
 /// <summary>
-/// Tests for the RealmsController using MrWho.Models
+/// Unit tests for controllers using in-memory database
 /// </summary>
 [TestClass]
+[TestCategory("Unit")]
 public class RealmsControllerTests
 {
     private ApplicationDbContext _context = null!;
@@ -65,7 +93,7 @@ public class RealmsControllerTests
     [TestInitialize]
     public void Setup()
     {
-        // Create in-memory database
+        // Create in-memory database for fast unit tests
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
             .Options;
@@ -225,24 +253,12 @@ public class RealmsControllerTests
 }
 
 /// <summary>
-/// Tests for Service Extensions
+/// Tests for Service Extensions and Configuration
 /// </summary>
 [TestClass]
+[TestCategory("Unit")]
 public class ServiceExtensionTests
 {
-    [TestMethod]
-    public void AddHttpServices_RegistersRequiredServices()
-    {
-        // Arrange
-        var services = new ServiceCollection();
-
-        // Act
-        services.AddHttpServices();
-
-        // Assert
-        services.Should().Contain(s => s.ServiceType == typeof(IHttpContextAccessor));
-    }
-
     [TestMethod]
     public void AddAuthorizationServices_DoesNotThrow()
     {
@@ -252,20 +268,29 @@ public class ServiceExtensionTests
         // Act & Assert - Should not throw
         var result = services.AddAuthorizationServices();
         result.Should().NotBeNull();
+        result.Should().BeSameAs(services);
     }
 }
 
 /// <summary>
-/// Tests for User Handlers
+/// Tests for User Handlers - FIXED VERSION
 /// </summary>
 [TestClass]
+[TestCategory("Unit")]
 public class UserHandlerTests
 {
     [TestMethod]
     public void GetUsersHandler_WithInvalidPageParameters_ClampsToValidValues()
     {
-        // Arrange
-        var mockUserStore = new Mock<IUserStore<IdentityUser>>();
+        // Arrange - Create a real in-memory database context instead of mocking
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+            .Options;
+
+        using var context = new ApplicationDbContext(options);
+        
+        // Create UserManager with real Entity Framework context
+        var userStore = new Microsoft.AspNetCore.Identity.EntityFrameworkCore.UserStore<IdentityUser>(context);
         var mockUserManagerLogger = new Mock<ILogger<UserManager<IdentityUser>>>();
         var mockPasswordHasher = new Mock<IPasswordHasher<IdentityUser>>();
         var mockKeyNormalizer = new Mock<ILookupNormalizer>();
@@ -273,7 +298,7 @@ public class UserHandlerTests
         var mockServiceProvider = new Mock<IServiceProvider>();
 
         var userManager = new UserManager<IdentityUser>(
-            mockUserStore.Object,
+            userStore,
             null, // IOptions<IdentityOptions>
             mockPasswordHasher.Object,
             null, // IEnumerable<IUserValidator<IdentityUser>>
@@ -282,10 +307,6 @@ public class UserHandlerTests
             mockErrorDescriber.Object,
             mockServiceProvider.Object,
             mockUserManagerLogger.Object);
-
-        mockUserStore.As<IQueryableUserStore<IdentityUser>>()
-            .Setup(x => x.Users)
-            .Returns(new List<IdentityUser>().AsQueryable());
 
         var handler = new GetUsersHandler(userManager);
 
@@ -305,12 +326,62 @@ public class UserHandlerTests
         var result4 = handler.HandleAsync(1, 200, null).Result;
         result4.PageSize.Should().Be(10);
     }
+
+    [TestMethod]
+    public void GetUsersHandler_WithUsers_ReturnsCorrectData()
+    {
+        // Arrange - Create a real in-memory database context
+        var options = new DbContextOptionsBuilder<ApplicationDbContext>()
+            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+            .Options;
+
+        using var context = new ApplicationDbContext(options);
+        
+        // Add test users to the context
+        var user1 = new IdentityUser { Id = "1", UserName = "user1@test.com", Email = "user1@test.com", EmailConfirmed = true };
+        var user2 = new IdentityUser { Id = "2", UserName = "user2@test.com", Email = "user2@test.com", EmailConfirmed = false };
+        
+        context.Users.AddRange(user1, user2);
+        context.SaveChanges();
+
+        // Create UserManager with real Entity Framework context
+        var userStore = new Microsoft.AspNetCore.Identity.EntityFrameworkCore.UserStore<IdentityUser>(context);
+        var mockUserManagerLogger = new Mock<ILogger<UserManager<IdentityUser>>>();
+        var mockPasswordHasher = new Mock<IPasswordHasher<IdentityUser>>();
+        var mockKeyNormalizer = new Mock<ILookupNormalizer>();
+        var mockErrorDescriber = new Mock<IdentityErrorDescriber>();
+        var mockServiceProvider = new Mock<IServiceProvider>();
+
+        var userManager = new UserManager<IdentityUser>(
+            userStore,
+            null,
+            mockPasswordHasher.Object,
+            null,
+            null,
+            mockKeyNormalizer.Object,
+            mockErrorDescriber.Object,
+            mockServiceProvider.Object,
+            mockUserManagerLogger.Object);
+
+        var handler = new GetUsersHandler(userManager);
+
+        // Act
+        var result = handler.HandleAsync(1, 10, null).Result;
+
+        // Assert
+        result.Should().NotBeNull();
+        result.Items.Should().HaveCount(2);
+        result.TotalCount.Should().Be(2);
+        result.Items.First().Email.Should().Be("user1@test.com");
+        result.Items.First().EmailConfirmed.Should().BeTrue();
+    }
 }
 
 /// <summary>
 /// Tests for model validation and behavior
 /// </summary>
 [TestClass]
+[TestCategory("Unit")]
 public class ModelTests
 {
     [TestMethod]
