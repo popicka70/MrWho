@@ -66,7 +66,7 @@
                         <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
                             <RadzenButton Click="@(() => EditRole(role))" Icon="edit" Size="ButtonSize.Medium" 
                                          ButtonStyle="ButtonStyle.Light" Text="Edit" Style="min-width: 80px;" />
-                            <RadzenButton Click="@(() => ViewRoleUsers(role.Id))" Icon="people" Size="ButtonSize.Medium" 
+                            <RadzenButton Click="@(async () => await ViewRoleUsers(role.Id))" Icon="people" Size="ButtonSize.Medium" 
                                          ButtonStyle="ButtonStyle.Info" Text="Users" Style="min-width: 80px;" />
                             <RadzenButton Click="@(async () => await DeleteRole(role))" Icon="delete" Size="ButtonSize.Medium" 
                                          ButtonStyle="ButtonStyle.Danger" Text="Delete" Style="min-width: 80px;" />
@@ -127,76 +127,6 @@
     </RadzenCard>
 }
 
-@if (showUsersModal)
-{
-    <RadzenDialog>
-        <RadzenStack Gap="1rem">
-            <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
-                <RadzenText TextStyle="TextStyle.H6">
-                    Users with Role: @selectedRoleForUsers?.Name
-                </RadzenText>
-                <RadzenButton Click="@CloseUsersModal" Icon="close" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" />
-            </RadzenStack>
-
-            <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" class="rz-mb-3">
-                <RadzenTextBox @bind-Value="@userSearchTerm" Placeholder="Search users..." Style="width: 300px;" />
-                <RadzenButton Click="@(async () => await LoadRoleUsers())" Icon="search" ButtonStyle="ButtonStyle.Secondary" />
-            </RadzenStack>
-
-            @if (isLoadingUsers)
-            {
-                <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
-                <RadzenText>Loading users...</RadzenText>
-            }
-            else if (roleUsers.Any())
-            {
-                <RadzenDataGrid Data="@roleUsers" TItem="UserDto" AllowPaging="true" PageSize="5" AllowSorting="true" Style="height: 400px;">
-                    <Columns>
-                        <RadzenDataGridColumn TItem="UserDto" Property="UserName" Title="Username" Width="200px">
-                            <Template Context="user">
-                                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
-                                    <RadzenIcon Icon="person" Style="color: var(--rz-primary);" />
-                                    <RadzenText Text="@user.UserName" />
-                                </RadzenStack>
-                            </Template>
-                        </RadzenDataGridColumn>
-                        
-                        <RadzenDataGridColumn TItem="UserDto" Property="Email" Title="Email" />
-                        
-                        <RadzenDataGridColumn TItem="UserDto" Property="EmailConfirmed" Title="Status" Width="120px">
-                            <Template Context="user">
-                                <RadzenBadge BadgeStyle="@(user.EmailConfirmed ? BadgeStyle.Success : BadgeStyle.Warning)" 
-                                            Text="@(user.EmailConfirmed ? "Confirmed" : "Pending")" />
-                            </Template>
-                        </RadzenDataGridColumn>
-                        
-                        <RadzenDataGridColumn TItem="UserDto" Title="Actions" Width="150px" Sortable="false">
-                            <Template Context="user">
-                                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
-                                    <RadzenButton Click="@(() => ViewUserDetails(user.Id))" Icon="visibility" Size="ButtonSize.Small" 
-                                                 ButtonStyle="ButtonStyle.Light" Text="View" />
-                                    <RadzenButton Click="@(async () => await RemoveUserFromRole(user, selectedRoleForUsers!))" Icon="remove" Size="ButtonSize.Small" 
-                                                 ButtonStyle="ButtonStyle.Danger" Text="Remove" />
-                                </RadzenStack>
-                            </Template>
-                        </RadzenDataGridColumn>
-                    </Columns>
-                </RadzenDataGrid>
-            }
-            else
-            {
-                <RadzenAlert AlertStyle="AlertStyle.Info">
-                    <RadzenText>No users found with this role.</RadzenText>
-                </RadzenAlert>
-            }
-
-            <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="1rem">
-                <RadzenButton Click="@CloseUsersModal" Icon="close" ButtonStyle="ButtonStyle.Secondary" Text="Close" />
-            </RadzenStack>
-        </RadzenStack>
-    </RadzenDialog>
-}
-
 @code {
     private List<RoleDto> roles = new();
     private bool isLoading = false;
@@ -212,10 +142,10 @@
     private string editRoleDescription = "";
     private bool editRoleEnabled = true;
 
+    // For role users functionality
     private List<UserDto> roleUsers = new();
     private bool isLoadingUsers = false;
     private string userSearchTerm = "";
-    private bool showUsersModal = false;
     private RoleDto? selectedRoleForUsers = null;
 
     protected override async Task OnInitializedAsync()
@@ -384,19 +314,22 @@
 
         selectedRoleForUsers = role;
         userSearchTerm = "";
-        showUsersModal = true;
-        await LoadRoleUsers();
-        StateHasChanged();
+        
+        // Load users for this role
+        await LoadRoleUsersForDialog();
+        
+        // Show users in a simple dialog
+        await ShowUsersDialog();
     }
 
-    private async Task LoadRoleUsers()
+    private async Task LoadRoleUsersForDialog()
     {
         if (selectedRoleForUsers == null) return;
 
         isLoadingUsers = true;
         try
         {
-            var result = await RolesApi.GetRoleUsersAsync(selectedRoleForUsers.Id, page: 1, pageSize: 50, search: userSearchTerm);
+            var result = await RolesApi.GetRoleUsersAsync(selectedRoleForUsers.Id, page: 1, pageSize: 100, search: userSearchTerm);
             
             if (result != null)
             {
@@ -406,72 +339,36 @@
             else
             {
                 roleUsers = new List<UserDto>();
-                NotificationService.Notify(NotificationSeverity.Warning, "Warning", "Failed to load users for this role");
             }
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error loading users for role {RoleId}", selectedRoleForUsers.Id);
-            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to load role users");
             roleUsers = new List<UserDto>();
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to load role users");
         }
         finally
         {
             isLoadingUsers = false;
-            StateHasChanged();
         }
     }
 
-    private void CloseUsersModal()
+    private async Task ShowUsersDialog()
     {
-        showUsersModal = false;
-        selectedRoleForUsers = null;
-        roleUsers.Clear();
-        userSearchTerm = "";
-        StateHasChanged();
-    }
+        if (selectedRoleForUsers == null) return;
 
-    private void ViewUserDetails(string userId)
-    {
-        CloseUsersModal();
-        Navigation.NavigateTo($"/users/edit/{userId}");
-    }
-
-    private async Task RemoveUserFromRole(UserDto user, RoleDto role)
-    {
-        var result = await DialogService.Confirm(
-            $"Are you sure you want to remove user '{user.UserName}' from role '{role.Name}'?", 
-            "Remove User from Role", 
-            new ConfirmOptions() { 
-                OkButtonText = "Remove", 
-                CancelButtonText = "Cancel" 
-            });
-        
-        if (result == true)
+        if (!roleUsers.Any())
         {
-            try
-            {
-                var success = await RolesApi.RemoveRoleAsync(user.Id, role.Id);
-                
-                if (success)
-                {
-                    NotificationService.Notify(NotificationSeverity.Success, "User Removed", 
-                        $"User '{user.UserName}' has been removed from role '{role.Name}'");
-                    await LoadRoleUsers(); // Refresh the list
-                }
-                else
-                {
-                    NotificationService.Notify(NotificationSeverity.Error, "Error", 
-                        $"Failed to remove user '{user.UserName}' from role '{role.Name}'");
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Error removing user {UserId} from role {RoleId}", user.Id, role.Id);
-                NotificationService.Notify(NotificationSeverity.Error, "Error", 
-                    $"An error occurred while removing user from role: {ex.Message}");
-            }
+            await DialogService.Alert($"No users are currently assigned to the role '{selectedRoleForUsers.Name}'.", 
+                                     $"Users in Role: {selectedRoleForUsers.Name}");
+            return;
         }
+
+        var usersList = roleUsers.Select(u => $"• {u.UserName} ({u.Email})").ToList();
+        var dialogContent = $"The following {roleUsers.Count} user(s) have the role '{selectedRoleForUsers.Name}':\n\n" +
+                           string.Join("\n", usersList);
+
+        await DialogService.Alert(dialogContent, $"Users in Role: {selectedRoleForUsers.Name}");
     }
 
     private async Task DeleteRole(RoleDto role)
