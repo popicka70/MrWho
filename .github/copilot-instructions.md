@@ -43,3 +43,68 @@ This is a Razor Pages project with:
 - Commands should be executed in Visual Studio 2022 Developer PowerShell
 - Build and run using `dotnet` CLI commands
 - Database operations use Entity Framework migrations
+
+## Blazor with Radzen - Critical Requirements
+
+### CRITICAL: Radzen Components Setup
+**ALWAYS** ensure `<RadzenComponents @rendermode="InteractiveServer" />` is present in MainLayout.razor for Radzen components to work properly:
+
+```razor
+@inherits LayoutComponentBase
+<RadzenComponents @rendermode="InteractiveServer" />
+<RadzenLayout>
+  <!-- layout content -->
+</RadzenLayout>
+```
+
+Without this component, Radzen UI components (dialogs, notifications, etc.) will not function correctly.
+
+### CRITICAL: Async Methods in Event Handlers
+When using async methods in Blazor event handlers, especially in lambda expressions, **ALWAYS** use `async` and `await`:
+
+**❌ WRONG - Will not execute:**
+```razor
+<RadzenButton Click="@(() => DeleteRole(role))" />
+```
+
+**✅ CORRECT - Will execute properly:**
+```razor
+<RadzenButton Click="@(async () => await DeleteRole(role))" />
+```
+
+**Key Rules:**
+1. **Any async method call in a lambda must be awaited**
+2. **The lambda must be marked as async**
+3. **This applies to all event handlers: Click, Change, Submit, etc.**
+4. **Failure to follow this pattern results in methods not being called at all**
+
+### Common Async Patterns in Blazor
+```razor
+<!-- Button clicks with async methods -->
+<RadzenButton Click="@(async () => await SaveData())" />
+<RadzenButton Click="@(async () => await DeleteItem(item.Id))" />
+
+<!-- Form submissions -->
+<RadzenTemplateForm Submit="@(async (args) => await OnSubmit(args))" />
+
+<!-- Dropdown changes -->
+<RadzenDropDown Change="@(async (value) => await OnSelectionChanged(value))" />
+
+<!-- DataGrid actions -->
+<Template Context="item">
+    <RadzenButton Click="@(async () => await EditItem(item))" />
+    <RadzenButton Click="@(async () => await DeleteItem(item))" />
+</Template>
+```
+
+### Blazor Rendermode Requirements
+- Use `@rendermode InteractiveServer` on pages with interactive components
+- Ensure all Radzen components have proper rendermode inheritance
+- Server-side rendering requires proper async handling
+
+## Debugging Async Issues
+If a method is not being called:
+1. Check if the method is async and the lambda uses `async/await`
+2. Verify `<RadzenComponents @rendermode="InteractiveServer" />` is in MainLayout
+3. Check browser console for JavaScript errors
+4. Verify proper rendermode is set on the page
