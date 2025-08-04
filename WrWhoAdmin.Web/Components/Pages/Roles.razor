@@ -61,15 +61,15 @@
                     </Template>
                 </RadzenDataGridColumn>
                 
-                <RadzenDataGridColumn TItem="RoleDto" Title="Actions" Width="250px" Sortable="false">
+                <RadzenDataGridColumn TItem="RoleDto" Title="Actions" Width="350px" Sortable="false">
                     <Template Context="role">
                         <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
                             <RadzenButton Click="@(() => EditRole(role))" Icon="edit" Size="ButtonSize.Medium" 
-                                         ButtonStyle="ButtonStyle.Light" Text="Edit" />
+                                         ButtonStyle="ButtonStyle.Light" Text="Edit" Style="min-width: 80px;" />
                             <RadzenButton Click="@(() => ViewRoleUsers(role.Id))" Icon="people" Size="ButtonSize.Medium" 
-                                         ButtonStyle="ButtonStyle.Info" Text="Users" />
+                                         ButtonStyle="ButtonStyle.Info" Text="Users" Style="min-width: 80px;" />
                             <RadzenButton Click="@(() => DeleteRole(role))" Icon="delete" Size="ButtonSize.Medium" 
-                                         ButtonStyle="ButtonStyle.Danger" Text="Delete" />
+                                         ButtonStyle="ButtonStyle.Danger" Text="Delete" Style="min-width: 80px;" />
                         </RadzenStack>
                     </Template>
                 </RadzenDataGridColumn>
@@ -103,14 +103,43 @@
     </RadzenCard>
 }
 
+@if (showEditForm)
+{
+    <RadzenCard class="rz-my-4">
+        <RadzenText TextStyle="TextStyle.H6">Edit Role: @editingRole?.Name</RadzenText>
+        <RadzenStack Gap="1rem" class="rz-mt-3">
+            <RadzenFormField Text="Role Name">
+                <RadzenTextBox @bind-Value="@editRoleName" Style="width: 100%;" />
+            </RadzenFormField>
+            <RadzenFormField Text="Description">
+                <RadzenTextArea @bind-Value="@editRoleDescription" Style="width: 100%;" />
+            </RadzenFormField>
+            <RadzenFormField Text="Status">
+                <RadzenCheckBox @bind-Value="@editRoleEnabled" />
+                <RadzenLabel Text="Role is enabled" class="rz-ml-2" />
+            </RadzenFormField>
+            <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem">
+                <RadzenButton Click="@UpdateRole" Icon="save" ButtonStyle="ButtonStyle.Primary" Text="Update Role" IsBusy="@isUpdating" />
+                <RadzenButton Click="@CancelEdit" Icon="cancel" ButtonStyle="ButtonStyle.Secondary" Text="Cancel" />
+            </RadzenStack>
+        </RadzenStack>
+    </RadzenCard>
+}
+
 @code {
     private List<RoleDto> roles = new();
     private bool isLoading = false;
     private string searchTerm = "";
     private bool showCreateForm = false;
+    private bool showEditForm = false;
     private bool isCreating = false;
+    private bool isUpdating = false;
     private string newRoleName = "";
     private string newRoleDescription = "";
+    private RoleDto? editingRole;
+    private string editRoleName = "";
+    private string editRoleDescription = "";
+    private bool editRoleEnabled = true;
 
     protected override async Task OnInitializedAsync()
     {
@@ -151,6 +180,7 @@
     private void ShowCreateRoleForm()
     {
         showCreateForm = true;
+        showEditForm = false;
         newRoleName = "";
         newRoleDescription = "";
     }
@@ -206,13 +236,71 @@
 
     private void EditRole(RoleDto role)
     {
-        // For now, just navigate to a simple edit - you could extend this
-        NotificationService.Notify(NotificationSeverity.Info, "Info", $"Edit functionality for role '{role.Name}' - Coming soon!");
+        editingRole = role;
+        editRoleName = role.Name;
+        editRoleDescription = role.Description ?? "";
+        editRoleEnabled = role.IsEnabled;
+        showEditForm = true;
+        showCreateForm = false;
+        StateHasChanged();
+    }
+
+    private void CancelEdit()
+    {
+        showEditForm = false;
+        editingRole = null;
+        editRoleName = "";
+        editRoleDescription = "";
+        editRoleEnabled = true;
+    }
+
+    private async Task UpdateRole()
+    {
+        if (editingRole == null || string.IsNullOrWhiteSpace(editRoleName))
+        {
+            NotificationService.Notify(NotificationSeverity.Warning, "Warning", "Role name is required");
+            return;
+        }
+
+        isUpdating = true;
+        try
+        {
+            var request = new UpdateRoleRequest
+            {
+                Name = editRoleName,
+                Description = editRoleDescription,
+                IsEnabled = editRoleEnabled
+            };
+
+            var result = await RolesApi.UpdateRoleAsync(editingRole.Id, request);
+            
+            if (result != null)
+            {
+                NotificationService.Notify(NotificationSeverity.Success, "Success", $"Role '{result.Name}' updated successfully");
+                await LoadRoles();
+                CancelEdit();
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to update role");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error updating role");
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to update role");
+        }
+        finally
+        {
+            isUpdating = false;
+        }
     }
 
     private void ViewRoleUsers(string roleId)
     {
-        Navigation.NavigateTo($"/users/roles/{roleId}/users");
+        NotificationService.Notify(NotificationSeverity.Info, "Navigation", $"Viewing users for role ID: {roleId}");
+        // For now, just show a notification. You could implement a detailed role users view later
+        NotificationService.Notify(NotificationSeverity.Info, "Feature", "Role users view - Coming soon!");
     }
 
     private async Task DeleteRole(RoleDto role)
@@ -222,16 +310,24 @@
         
         if (result == true)
         {
-            var success = await RolesApi.DeleteRoleAsync(role.Id);
-            
-            if (success)
+            try
             {
-                NotificationService.Notify(NotificationSeverity.Success, "Role Deleted", $"Role '{role.Name}' has been deleted");
-                await LoadRoles();
+                var success = await RolesApi.DeleteRoleAsync(role.Id);
+                
+                if (success)
+                {
+                    NotificationService.Notify(NotificationSeverity.Success, "Role Deleted", $"Role '{role.Name}' has been deleted");
+                    await LoadRoles();
+                }
+                else
+                {
+                    NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to delete role '{role.Name}'");
+                }
             }
-            else
+            catch (Exception ex)
             {
-                NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to delete role '{role.Name}'");
+                Logger.LogError(ex, "Error deleting role {RoleId}", role.Id);
+                NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to delete role '{role.Name}': {ex.Message}");
             }
         }
     }

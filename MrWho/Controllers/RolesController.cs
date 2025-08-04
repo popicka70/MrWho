@@ -141,6 +141,60 @@ public class RolesController : ControllerBase
     }
 
     /// <summary>
+    /// Update an existing role
+    /// </summary>
+    [HttpPut("{id}")]
+    public async Task<ActionResult<RoleDto>> UpdateRole(string id, [FromBody] UpdateRoleRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var role = await _roleManager.FindByIdAsync(id);
+        if (role == null)
+        {
+            return NotFound($"Role with ID '{id}' not found.");
+        }
+
+        // Update role name if provided
+        if (!string.IsNullOrEmpty(request.Name) && request.Name != role.Name)
+        {
+            role.Name = request.Name;
+        }
+
+        // Note: ASP.NET Core Identity doesn't support custom properties like Description and IsEnabled on IdentityRole
+        // For a full implementation, you would need to extend IdentityRole or use a custom role entity
+
+        var result = await _roleManager.UpdateAsync(role);
+
+        if (!result.Succeeded)
+        {
+            foreach (var error in result.Errors)
+            {
+                ModelState.AddModelError("", error.Description);
+            }
+            return BadRequest(ModelState);
+        }
+
+        _logger.LogInformation("Successfully updated role {RoleName} with ID {RoleId}", role.Name, role.Id);
+
+        var roleDto = new RoleDto
+        {
+            Id = role.Id,
+            Name = role.Name!,
+            Description = request.Description,
+            IsEnabled = request.IsEnabled ?? true,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+            CreatedBy = null,
+            UpdatedBy = User.Identity?.Name
+        };
+
+        return Ok(roleDto);
+    }
+
+    /// <summary>
     /// Delete a role
     /// </summary>
     [HttpDelete("{id}")]
