@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MrWho.Shared.Models;
+using System.Security.Claims;
 
 namespace MrWho.Controllers;
 
@@ -48,22 +49,32 @@ public class RolesController : ControllerBase
         var roles = await query
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Select(r => new RoleDto
+            .ToListAsync();
+
+        var roleDtos = new List<RoleDto>();
+        foreach (var role in roles)
+        {
+            var claims = await _roleManager.GetClaimsAsync(role);
+            var description = claims.FirstOrDefault(c => c.Type == "description")?.Value;
+            var isEnabledClaim = claims.FirstOrDefault(c => c.Type == "enabled")?.Value;
+            var isEnabled = string.IsNullOrEmpty(isEnabledClaim) || bool.Parse(isEnabledClaim);
+
+            roleDtos.Add(new RoleDto
             {
-                Id = r.Id,
-                Name = r.Name!,
-                Description = null,
-                IsEnabled = true,
-                CreatedAt = DateTime.UtcNow,
+                Id = role.Id,
+                Name = role.Name!,
+                Description = description,
+                IsEnabled = isEnabled,
+                CreatedAt = DateTime.UtcNow, // IdentityRole doesn't have timestamps
                 UpdatedAt = DateTime.UtcNow,
                 CreatedBy = null,
                 UpdatedBy = null
-            })
-            .ToListAsync();
+            });
+        }
 
         var result = new PagedResult<RoleDto>
         {
-            Items = roles,
+            Items = roleDtos,
             TotalCount = totalCount,
             Page = page,
             PageSize = pageSize,
@@ -85,12 +96,17 @@ public class RolesController : ControllerBase
             return NotFound($"Role with ID '{id}' not found.");
         }
 
+        var claims = await _roleManager.GetClaimsAsync(role);
+        var description = claims.FirstOrDefault(c => c.Type == "description")?.Value;
+        var isEnabledClaim = claims.FirstOrDefault(c => c.Type == "enabled")?.Value;
+        var isEnabled = string.IsNullOrEmpty(isEnabledClaim) || bool.Parse(isEnabledClaim);
+
         var roleDto = new RoleDto
         {
             Id = role.Id,
             Name = role.Name!,
-            Description = null,
-            IsEnabled = true,
+            Description = description,
+            IsEnabled = isEnabled,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
             CreatedBy = null,
@@ -122,6 +138,15 @@ public class RolesController : ControllerBase
             }
             return BadRequest(ModelState);
         }
+
+        // Add description as a role claim if provided
+        if (!string.IsNullOrEmpty(request.Description))
+        {
+            await _roleManager.AddClaimAsync(role, new Claim("description", request.Description));
+        }
+
+        // Add enabled status as a role claim
+        await _roleManager.AddClaimAsync(role, new Claim("enabled", request.IsEnabled.ToString()));
 
         _logger.LogInformation("Successfully created role {RoleName} with ID {RoleId}", role.Name, role.Id);
 
@@ -161,30 +186,62 @@ public class RolesController : ControllerBase
         if (!string.IsNullOrEmpty(request.Name) && request.Name != role.Name)
         {
             role.Name = request.Name;
+            var updateResult = await _roleManager.UpdateAsync(role);
+            if (!updateResult.Succeeded)
+            {
+                foreach (var error in updateResult.Errors)
+                {
+                    ModelState.AddModelError("", error.Description);
+                }
+                return BadRequest(ModelState);
+            }
         }
 
-        // Note: ASP.NET Core Identity doesn't support custom properties like Description and IsEnabled on IdentityRole
-        // For a full implementation, you would need to extend IdentityRole or use a custom role entity
-
-        var result = await _roleManager.UpdateAsync(role);
-
-        if (!result.Succeeded)
+        // Update description claim
+        if (request.Description != null)
         {
-            foreach (var error in result.Errors)
+            var claims = await _roleManager.GetClaimsAsync(role);
+            var existingDescriptionClaim = claims.FirstOrDefault(c => c.Type == "description");
+            
+            if (existingDescriptionClaim != null)
             {
-                ModelState.AddModelError("", error.Description);
+                await _roleManager.RemoveClaimAsync(role, existingDescriptionClaim);
             }
-            return BadRequest(ModelState);
+            
+            if (!string.IsNullOrEmpty(request.Description))
+            {
+                await _roleManager.AddClaimAsync(role, new Claim("description", request.Description));
+            }
+        }
+
+        // Update enabled status claim
+        if (request.IsEnabled.HasValue)
+        {
+            var claims = await _roleManager.GetClaimsAsync(role);
+            var existingEnabledClaim = claims.FirstOrDefault(c => c.Type == "enabled");
+            
+            if (existingEnabledClaim != null)
+            {
+                await _roleManager.RemoveClaimAsync(role, existingEnabledClaim);
+            }
+            
+            await _roleManager.AddClaimAsync(role, new Claim("enabled", request.IsEnabled.Value.ToString()));
         }
 
         _logger.LogInformation("Successfully updated role {RoleName} with ID {RoleId}", role.Name, role.Id);
+
+        // Get updated claims for response
+        var updatedClaims = await _roleManager.GetClaimsAsync(role);
+        var description = updatedClaims.FirstOrDefault(c => c.Type == "description")?.Value;
+        var isEnabledClaim = updatedClaims.FirstOrDefault(c => c.Type == "enabled")?.Value;
+        var isEnabled = string.IsNullOrEmpty(isEnabledClaim) || bool.Parse(isEnabledClaim);
 
         var roleDto = new RoleDto
         {
             Id = role.Id,
             Name = role.Name!,
-            Description = request.Description,
-            IsEnabled = request.IsEnabled ?? true,
+            Description = description,
+            IsEnabled = isEnabled,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
             CreatedBy = null,

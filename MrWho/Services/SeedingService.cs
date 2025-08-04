@@ -118,15 +118,15 @@ public class SeedingService : ISeedingService
 
     private async Task SeedDefaultRoles()
     {
-        var defaultRoles = new[]
+        var defaultRoles = new Dictionary<string, string>
         {
-            "Administrator",
-            "User", 
-            "Manager",
-            "Viewer"
+            { "Administrator", "Full system administrator with all permissions" },
+            { "User", "Standard user with basic permissions" },
+            { "Manager", "Manager with elevated permissions for team management" },
+            { "Viewer", "Read-only access to view system information" }
         };
 
-        foreach (var roleName in defaultRoles)
+        foreach (var (roleName, description) in defaultRoles)
         {
             if (!await _roleManager.RoleExistsAsync(roleName))
             {
@@ -135,7 +135,11 @@ public class SeedingService : ISeedingService
                 
                 if (result.Succeeded)
                 {
-                    _logger.LogInformation("Created default role: {RoleName}", roleName);
+                    // Add description and enabled status as role claims
+                    await _roleManager.AddClaimAsync(role, new System.Security.Claims.Claim("description", description));
+                    await _roleManager.AddClaimAsync(role, new System.Security.Claims.Claim("enabled", "true"));
+                    
+                    _logger.LogInformation("Created default role: {RoleName} with description: {Description}", roleName, description);
                 }
                 else
                 {
