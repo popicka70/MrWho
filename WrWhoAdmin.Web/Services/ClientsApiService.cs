@@ -132,11 +132,36 @@ public class ClientsApiService : IClientsApiService
     {
         try
         {
-            var json = JsonSerializer.Serialize(request, _jsonOptions);
+            // Convert the request to match the API's expectations (enum as integer)
+            var apiCompatibleRequest = new
+            {
+                clientId = request.ClientId,
+                clientSecret = request.ClientSecret,
+                name = request.Name,
+                description = request.Description,
+                realmId = request.RealmId,
+                isEnabled = request.IsEnabled,
+                clientType = (int)request.ClientType, // Convert enum to integer
+                allowAuthorizationCodeFlow = request.AllowAuthorizationCodeFlow,
+                allowClientCredentialsFlow = request.AllowClientCredentialsFlow,
+                allowPasswordFlow = request.AllowPasswordFlow,
+                allowRefreshTokenFlow = request.AllowRefreshTokenFlow,
+                requirePkce = request.RequirePkce,
+                requireClientSecret = request.RequireClientSecret,
+                accessTokenLifetime = request.AccessTokenLifetime,
+                refreshTokenLifetime = request.RefreshTokenLifetime,
+                authorizationCodeLifetime = request.AuthorizationCodeLifetime,
+                redirectUris = request.RedirectUris,
+                postLogoutUris = request.PostLogoutUris,
+                scopes = request.Scopes,
+                permissions = request.Permissions
+            };
+
+            var json = JsonSerializer.Serialize(apiCompatibleRequest, _jsonOptions);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
             _logger.LogInformation("Creating client {ClientId}", request.ClientId);
-            _logger.LogDebug("Request payload: {Payload}", json);
+            _logger.LogInformation("Request payload for debugging: {Payload}", json);
 
             var response = await _httpClient.PostAsync("api/clients", content);
             
@@ -149,6 +174,7 @@ public class ClientsApiService : IClientsApiService
             }
 
             var responseJson = await response.Content.ReadAsStringAsync();
+            _logger.LogInformation("Successful client creation response: {Response}", responseJson);
             return JsonSerializer.Deserialize<ClientDto>(responseJson, _jsonOptions);
         }
         catch (Exception ex)
@@ -162,10 +188,34 @@ public class ClientsApiService : IClientsApiService
     {
         try
         {
-            var json = JsonSerializer.Serialize(request, _jsonOptions);
+            // Convert CreateClientRequest to UpdateClientRequest for the API with integer enum
+            var updateRequest = new
+            {
+                clientSecret = request.ClientSecret,
+                name = request.Name,
+                description = request.Description,
+                isEnabled = request.IsEnabled,
+                clientType = (int?)request.ClientType, // Convert enum to integer
+                allowAuthorizationCodeFlow = request.AllowAuthorizationCodeFlow,
+                allowClientCredentialsFlow = request.AllowClientCredentialsFlow,
+                allowPasswordFlow = request.AllowPasswordFlow,
+                allowRefreshTokenFlow = request.AllowRefreshTokenFlow,
+                requirePkce = request.RequirePkce,
+                requireClientSecret = request.RequireClientSecret,
+                accessTokenLifetime = request.AccessTokenLifetime,
+                refreshTokenLifetime = request.RefreshTokenLifetime,
+                authorizationCodeLifetime = request.AuthorizationCodeLifetime,
+                redirectUris = request.RedirectUris,
+                postLogoutUris = request.PostLogoutUris,
+                scopes = request.Scopes,
+                permissions = request.Permissions
+            };
+
+            var json = JsonSerializer.Serialize(updateRequest, _jsonOptions);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
             _logger.LogInformation("Updating client {ClientId}", id);
+            _logger.LogDebug("Request payload: {Payload}", json);
 
             var response = await _httpClient.PutAsync($"api/clients/{id}", content);
             

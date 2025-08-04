@@ -235,6 +235,21 @@
             model.RequireClientSecret = true;
             model.RedirectUris.Add("");
             model.PostLogoutUris.Add("");
+            
+            // Add default scopes for new clients
+            model.Scopes.Add("openid");
+            model.Scopes.Add("profile");
+            model.Scopes.Add("email");
+            
+            // Add default permissions for new clients (using string literals instead of constants)
+            model.Permissions.Add("Endpoints.Authorization");
+            model.Permissions.Add("Endpoints.Token");
+            model.Permissions.Add("GrantTypes.AuthorizationCode");
+            model.Permissions.Add("GrantTypes.RefreshToken");
+            model.Permissions.Add("oidc:scope:openid");
+            model.Permissions.Add("Scopes.Profile");
+            model.Permissions.Add("Scopes.Email");
+            model.Permissions.Add("ResponseTypes.Code");
         }
     }
 
@@ -283,6 +298,10 @@
                 model.RequirePkce = client.RequirePkce;
                 model.RedirectUris = client.RedirectUris.ToList();
                 model.PostLogoutUris = client.PostLogoutUris.ToList();
+                
+                // IMPORTANT: Load scopes and permissions from the existing client
+                model.Scopes = client.Scopes.ToList();
+                model.Permissions = client.Permissions.ToList();
                 
                 Logger.LogInformation("Loaded client {ClientId} from API", Id);
             }

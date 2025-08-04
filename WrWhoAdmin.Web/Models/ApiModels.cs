@@ -120,6 +120,31 @@ public class CreateClientRequest
 }
 
 /// <summary>
+/// Request for updating clients
+/// </summary>
+public class UpdateClientRequest
+{
+    public string? ClientSecret { get; set; }
+    public string? Name { get; set; }
+    public string? Description { get; set; }
+    public bool? IsEnabled { get; set; }
+    public ClientType? ClientType { get; set; }
+    public bool? AllowAuthorizationCodeFlow { get; set; }
+    public bool? AllowClientCredentialsFlow { get; set; }
+    public bool? AllowPasswordFlow { get; set; }
+    public bool? AllowRefreshTokenFlow { get; set; }
+    public bool? RequirePkce { get; set; }
+    public bool? RequireClientSecret { get; set; }
+    public TimeSpan? AccessTokenLifetime { get; set; }
+    public TimeSpan? RefreshTokenLifetime { get; set; }
+    public TimeSpan? AuthorizationCodeLifetime { get; set; }
+    public List<string>? RedirectUris { get; set; }
+    public List<string>? PostLogoutUris { get; set; }
+    public List<string>? Scopes { get; set; }
+    public List<string>? Permissions { get; set; }
+}
+
+/// <summary>
 /// User DTO
 /// </summary>
 public class UserDto

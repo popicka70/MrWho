@@ -166,119 +166,125 @@ public class ClientsController : ControllerBase
             return BadRequest($"Client with ID '{request.ClientId}' already exists.");
         }
 
-        using var transaction = await _context.Database.BeginTransactionAsync();
-        try
+        var strategy = _context.Database.CreateExecutionStrategy();
+        var result = await strategy.ExecuteAsync(async () =>
         {
-            var client = new Client
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
             {
-                ClientId = request.ClientId,
-                ClientSecret = request.ClientSecret,
-                Name = request.Name,
-                Description = request.Description,
-                RealmId = request.RealmId,
-                IsEnabled = request.IsEnabled,
-                ClientType = request.ClientType,
-                AllowAuthorizationCodeFlow = request.AllowAuthorizationCodeFlow,
-                AllowClientCredentialsFlow = request.AllowClientCredentialsFlow,
-                AllowPasswordFlow = request.AllowPasswordFlow,
-                AllowRefreshTokenFlow = request.AllowRefreshTokenFlow,
-                RequirePkce = request.RequirePkce,
-                RequireClientSecret = request.RequireClientSecret,
-                AccessTokenLifetime = request.AccessTokenLifetime,
-                RefreshTokenLifetime = request.RefreshTokenLifetime,
-                AuthorizationCodeLifetime = request.AuthorizationCodeLifetime,
-                CreatedBy = User.Identity?.Name
-            };
-
-            _context.Clients.Add(client);
-            await _context.SaveChangesAsync();
-
-            // Add redirect URIs
-            foreach (var uri in request.RedirectUris)
-            {
-                _context.ClientRedirectUris.Add(new ClientRedirectUri
+                var client = new Client
                 {
-                    ClientId = client.Id,
-                    Uri = uri
-                });
-            }
+                    ClientId = request.ClientId,
+                    ClientSecret = request.ClientSecret,
+                    Name = request.Name,
+                    Description = request.Description,
+                    RealmId = request.RealmId,
+                    IsEnabled = request.IsEnabled,
+                    ClientType = request.ClientType,
+                    AllowAuthorizationCodeFlow = request.AllowAuthorizationCodeFlow,
+                    AllowClientCredentialsFlow = request.AllowClientCredentialsFlow,
+                    AllowPasswordFlow = request.AllowPasswordFlow,
+                    AllowRefreshTokenFlow = request.AllowRefreshTokenFlow,
+                    RequirePkce = request.RequirePkce,
+                    RequireClientSecret = request.RequireClientSecret,
+                    AccessTokenLifetime = request.AccessTokenLifetime,
+                    RefreshTokenLifetime = request.RefreshTokenLifetime,
+                    AuthorizationCodeLifetime = request.AuthorizationCodeLifetime,
+                    CreatedBy = User.Identity?.Name
+                };
 
-            // Add post-logout URIs
-            foreach (var uri in request.PostLogoutUris)
-            {
-                _context.ClientPostLogoutUris.Add(new ClientPostLogoutUri
+                _context.Clients.Add(client);
+                await _context.SaveChangesAsync();
+
+                // Add redirect URIs
+                foreach (var uri in request.RedirectUris)
                 {
-                    ClientId = client.Id,
-                    Uri = uri
-                });
-            }
+                    _context.ClientRedirectUris.Add(new ClientRedirectUri
+                    {
+                        ClientId = client.Id,
+                        Uri = uri
+                    });
+                }
 
-            // Add scopes
-            foreach (var scope in request.Scopes)
-            {
-                _context.ClientScopes.Add(new ClientScope
+                // Add post-logout URIs
+                foreach (var uri in request.PostLogoutUris)
                 {
-                    ClientId = client.Id,
-                    Scope = scope
-                });
-            }
+                    _context.ClientPostLogoutUris.Add(new ClientPostLogoutUri
+                    {
+                        ClientId = client.Id,
+                        Uri = uri
+                    });
+                }
 
-            // Add permissions
-            foreach (var permission in request.Permissions)
-            {
-                _context.ClientPermissions.Add(new ClientPermission
+                // Add scopes
+                foreach (var scope in request.Scopes)
                 {
-                    ClientId = client.Id,
-                    Permission = permission
-                });
+                    _context.ClientScopes.Add(new ClientScope
+                    {
+                        ClientId = client.Id,
+                        Scope = scope
+                    });
+                }
+
+                // Add permissions
+                foreach (var permission in request.Permissions)
+                {
+                    _context.ClientPermissions.Add(new ClientPermission
+                    {
+                        ClientId = client.Id,
+                        Permission = permission
+                    });
+                }
+
+                await _context.SaveChangesAsync();
+
+                // Create OpenIddict application
+                await CreateOpenIddictApplication(client, request);
+
+                await transaction.CommitAsync();
+
+                _logger.LogInformation("Client '{ClientId}' created successfully with ID {Id}", client.ClientId, client.Id);
+
+                var clientDto = new ClientDto
+                {
+                    Id = client.Id,
+                    ClientId = client.ClientId,
+                    Name = client.Name,
+                    Description = client.Description,
+                    IsEnabled = client.IsEnabled,
+                    ClientType = client.ClientType,
+                    AllowAuthorizationCodeFlow = client.AllowAuthorizationCodeFlow,
+                    AllowClientCredentialsFlow = client.AllowClientCredentialsFlow,
+                    AllowPasswordFlow = client.AllowPasswordFlow,
+                    AllowRefreshTokenFlow = client.AllowRefreshTokenFlow,
+                    RequirePkce = client.RequirePkce,
+                    RequireClientSecret = client.RequireClientSecret,
+                    AccessTokenLifetime = client.AccessTokenLifetime,
+                    RefreshTokenLifetime = client.RefreshTokenLifetime,
+                    AuthorizationCodeLifetime = client.AuthorizationCodeLifetime,
+                    RealmId = client.RealmId,
+                    RealmName = realm.Name,
+                    CreatedAt = client.CreatedAt,
+                    UpdatedAt = client.UpdatedAt,
+                    CreatedBy = client.CreatedBy,
+                    UpdatedBy = client.UpdatedBy,
+                    RedirectUris = request.RedirectUris,
+                    PostLogoutUris = request.PostLogoutUris,
+                    Scopes = request.Scopes,
+                    Permissions = request.Permissions
+                };
+
+                return CreatedAtAction(nameof(GetClient), new { id = client.Id }, clientDto);
             }
-
-            await _context.SaveChangesAsync();
-
-            // Create OpenIddict application
-            await CreateOpenIddictApplication(client, request);
-
-            await transaction.CommitAsync();
-
-            _logger.LogInformation("Client '{ClientId}' created successfully with ID {Id}", client.ClientId, client.Id);
-
-            var clientDto = new ClientDto
+            catch (Exception ex)
             {
-                Id = client.Id,
-                ClientId = client.ClientId,
-                Name = client.Name,
-                Description = client.Description,
-                IsEnabled = client.IsEnabled,
-                ClientType = client.ClientType,
-                AllowAuthorizationCodeFlow = client.AllowAuthorizationCodeFlow,
-                AllowClientCredentialsFlow = client.AllowClientCredentialsFlow,
-                AllowPasswordFlow = client.AllowPasswordFlow,
-                AllowRefreshTokenFlow = client.AllowRefreshTokenFlow,
-                RequirePkce = client.RequirePkce,
-                RequireClientSecret = client.RequireClientSecret,
-                AccessTokenLifetime = client.AccessTokenLifetime,
-                RefreshTokenLifetime = client.RefreshTokenLifetime,
-                AuthorizationCodeLifetime = client.AuthorizationCodeLifetime,
-                RealmId = client.RealmId,
-                RealmName = realm.Name,
-                CreatedAt = client.CreatedAt,
-                UpdatedAt = client.UpdatedAt,
-                CreatedBy = client.CreatedBy,
-                UpdatedBy = client.UpdatedBy,
-                RedirectUris = request.RedirectUris,
-                PostLogoutUris = request.PostLogoutUris,
-                Scopes = request.Scopes,
-                Permissions = request.Permissions
-            };
+                await transaction.RollbackAsync();
+                _logger.LogError(ex, "Error creating client '{ClientId}'", request.ClientId);
+                throw;
+            }
+        });
 
-            return CreatedAtAction(nameof(GetClient), new { id = client.Id }, clientDto);
-        }
-        catch (Exception ex)
-        {
-            await transaction.RollbackAsync();
-            _logger.LogError(ex, "Error creating client '{ClientId}'", request.ClientId);
-            throw;
-        }
+        return result;
     }
 
     [HttpPut("{id}")]
@@ -297,143 +303,151 @@ public class ClientsController : ControllerBase
             return NotFound($"Client with ID '{id}' not found.");
         }
 
-        using var transaction = await _context.Database.BeginTransactionAsync();
-        try
+        // Use execution strategy for transaction handling with retry support
+        var strategy = _context.Database.CreateExecutionStrategy();
+        var result = await strategy.ExecuteAsync(async () =>
         {
-            // Update basic properties
-            if (!string.IsNullOrEmpty(request.ClientSecret))
-                client.ClientSecret = request.ClientSecret;
-            if (!string.IsNullOrEmpty(request.Name))
-                client.Name = request.Name;
-            client.Description = request.Description;
-            if (request.IsEnabled.HasValue)
-                client.IsEnabled = request.IsEnabled.Value;
-            if (request.ClientType.HasValue)
-                client.ClientType = request.ClientType.Value;
-            if (request.AllowAuthorizationCodeFlow.HasValue)
-                client.AllowAuthorizationCodeFlow = request.AllowAuthorizationCodeFlow.Value;
-            if (request.AllowClientCredentialsFlow.HasValue)
-                client.AllowClientCredentialsFlow = request.AllowClientCredentialsFlow.Value;
-            if (request.AllowPasswordFlow.HasValue)
-                client.AllowPasswordFlow = request.AllowPasswordFlow.Value;
-            if (request.AllowRefreshTokenFlow.HasValue)
-                client.AllowRefreshTokenFlow = request.AllowRefreshTokenFlow.Value;
-            if (request.RequirePkce.HasValue)
-                client.RequirePkce = request.RequirePkce.Value;
-            if (request.RequireClientSecret.HasValue)
-                client.RequireClientSecret = request.RequireClientSecret.Value;
-
-            client.AccessTokenLifetime = request.AccessTokenLifetime;
-            client.RefreshTokenLifetime = request.RefreshTokenLifetime;
-            client.AuthorizationCodeLifetime = request.AuthorizationCodeLifetime;
-            client.UpdatedAt = DateTime.UtcNow;
-            client.UpdatedBy = User.Identity?.Name;
-
-            // Update redirect URIs if provided
-            if (request.RedirectUris != null)
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
             {
-                _context.ClientRedirectUris.RemoveRange(client.RedirectUris);
-                foreach (var uri in request.RedirectUris)
+                // Update basic properties
+                if (!string.IsNullOrEmpty(request.ClientSecret))
+                    client.ClientSecret = request.ClientSecret;
+                if (!string.IsNullOrEmpty(request.Name))
+                    client.Name = request.Name;
+                client.Description = request.Description;
+                if (request.IsEnabled.HasValue)
+                    client.IsEnabled = request.IsEnabled.Value;
+                if (request.ClientType.HasValue)
+                    client.ClientType = request.ClientType.Value;
+                if (request.AllowAuthorizationCodeFlow.HasValue)
+                    client.AllowAuthorizationCodeFlow = request.AllowAuthorizationCodeFlow.Value;
+                if (request.AllowClientCredentialsFlow.HasValue)
+                    client.AllowClientCredentialsFlow = request.AllowClientCredentialsFlow.Value;
+                if (request.AllowPasswordFlow.HasValue)
+                    client.AllowPasswordFlow = request.AllowPasswordFlow.Value;
+                if (request.AllowRefreshTokenFlow.HasValue)
+                    client.AllowRefreshTokenFlow = request.AllowRefreshTokenFlow.Value;
+                if (request.RequirePkce.HasValue)
+                    client.RequirePkce = request.RequirePkce.Value;
+                if (request.RequireClientSecret.HasValue)
+                    client.RequireClientSecret = request.RequireClientSecret.Value;
+
+                client.AccessTokenLifetime = request.AccessTokenLifetime;
+                client.RefreshTokenLifetime = request.RefreshTokenLifetime;
+                client.AuthorizationCodeLifetime = request.AuthorizationCodeLifetime;
+                client.UpdatedAt = DateTime.UtcNow;
+                client.UpdatedBy = User.Identity?.Name;
+
+                // Update redirect URIs if provided
+                if (request.RedirectUris != null)
                 {
-                    _context.ClientRedirectUris.Add(new ClientRedirectUri
+                    _context.ClientRedirectUris.RemoveRange(client.RedirectUris);
+                    foreach (var uri in request.RedirectUris)
                     {
-                        ClientId = client.Id,
-                        Uri = uri
-                    });
+                        _context.ClientRedirectUris.Add(new ClientRedirectUri
+                        {
+                            ClientId = client.Id,
+                            Uri = uri
+                        });
+                    }
                 }
-            }
 
-            // Update post-logout URIs if provided
-            if (request.PostLogoutUris != null)
-            {
-                _context.ClientPostLogoutUris.RemoveRange(client.PostLogoutUris);
-                foreach (var uri in request.PostLogoutUris)
+                // Update post-logout URIs if provided
+                if (request.PostLogoutUris != null)
                 {
-                    _context.ClientPostLogoutUris.Add(new ClientPostLogoutUri
+                    _context.ClientPostLogoutUris.RemoveRange(client.PostLogoutUris);
+                    foreach (var uri in request.PostLogoutUris)
                     {
-                        ClientId = client.Id,
-                        Uri = uri
-                    });
+                        _context.ClientPostLogoutUris.Add(new ClientPostLogoutUri
+                        {
+                            ClientId = client.Id,
+                            Uri = uri
+                        });
+                    }
                 }
-            }
 
-            // Update scopes if provided
-            if (request.Scopes != null)
-            {
-                _context.ClientScopes.RemoveRange(client.Scopes);
-                foreach (var scope in request.Scopes)
+                // Update scopes if provided
+                if (request.Scopes != null)
                 {
-                    _context.ClientScopes.Add(new ClientScope
+                    _context.ClientScopes.RemoveRange(client.Scopes);
+                    foreach (var scope in request.Scopes)
                     {
-                        ClientId = client.Id,
-                        Scope = scope
-                    });
+                        _context.ClientScopes.Add(new ClientScope
+                        {
+                            ClientId = client.Id,
+                            Scope = scope
+                        });
+                    }
                 }
-            }
 
-            // Update permissions if provided
-            if (request.Permissions != null)
-            {
-                _context.ClientPermissions.RemoveRange(client.Permissions);
-                foreach (var permission in request.Permissions)
+                // Update permissions if provided
+                if (request.Permissions != null)
                 {
-                    _context.ClientPermissions.Add(new ClientPermission
+                    _context.ClientPermissions.RemoveRange(client.Permissions);
+                    foreach (var permission in request.Permissions)
                     {
-                        ClientId = client.Id,
-                        Permission = permission
-                    });
+                        _context.ClientPermissions.Add(new ClientPermission
+                        {
+                            ClientId = client.Id,
+                            Permission = permission
+                        });
+                    }
                 }
+
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Client '{ClientId}' updated in database", client.ClientId);
+                
+                // Update OpenIddict application
+                await UpdateOpenIddictApplication(client);
+
+                await transaction.CommitAsync();
+
+                _logger.LogInformation("Client '{ClientId}' updated successfully", client.ClientId);
+
+                // Reload client with updated data
+                await _context.Entry(client).ReloadAsync();
+                
+                var clientDto = new ClientDto
+                {
+                    Id = client.Id,
+                    ClientId = client.ClientId,
+                    Name = client.Name,
+                    Description = client.Description,
+                    IsEnabled = client.IsEnabled,
+                    ClientType = client.ClientType,
+                    AllowAuthorizationCodeFlow = client.AllowAuthorizationCodeFlow,
+                    AllowClientCredentialsFlow = client.AllowClientCredentialsFlow,
+                    AllowPasswordFlow = client.AllowPasswordFlow,
+                    AllowRefreshTokenFlow = client.AllowRefreshTokenFlow,
+                    RequirePkce = client.RequirePkce,
+                    RequireClientSecret = client.RequireClientSecret,
+                    AccessTokenLifetime = client.AccessTokenLifetime,
+                    RefreshTokenLifetime = client.RefreshTokenLifetime,
+                    AuthorizationCodeLifetime = client.AuthorizationCodeLifetime,
+                    RealmId = client.RealmId,
+                    RealmName = client.Realm.Name,
+                    CreatedAt = client.CreatedAt,
+                    UpdatedAt = client.UpdatedAt,
+                    CreatedBy = client.CreatedBy,
+                    UpdatedBy = client.UpdatedBy,
+                    RedirectUris = client.RedirectUris.Select(ru => ru.Uri).ToList(),
+                    PostLogoutUris = client.PostLogoutUris.Select(plu => plu.Uri).ToList(),
+                    Scopes = client.Scopes.Select(s => s.Scope).ToList(),
+                    Permissions = client.Permissions.Select(p => p.Permission).ToList()
+                };
+
+                return clientDto;
             }
-
-            await _context.SaveChangesAsync();
-
-            // Update OpenIddict application
-            await UpdateOpenIddictApplication(client);
-
-            await transaction.CommitAsync();
-
-            _logger.LogInformation("Client '{ClientId}' updated successfully", client.ClientId);
-
-            // Reload client with updated data
-            await _context.Entry(client).ReloadAsync();
-            
-            var clientDto = new ClientDto
+            catch (Exception ex)
             {
-                Id = client.Id,
-                ClientId = client.ClientId,
-                Name = client.Name,
-                Description = client.Description,
-                IsEnabled = client.IsEnabled,
-                ClientType = client.ClientType,
-                AllowAuthorizationCodeFlow = client.AllowAuthorizationCodeFlow,
-                AllowClientCredentialsFlow = client.AllowClientCredentialsFlow,
-                AllowPasswordFlow = client.AllowPasswordFlow,
-                AllowRefreshTokenFlow = client.AllowRefreshTokenFlow,
-                RequirePkce = client.RequirePkce,
-                RequireClientSecret = client.RequireClientSecret,
-                AccessTokenLifetime = client.AccessTokenLifetime,
-                RefreshTokenLifetime = client.RefreshTokenLifetime,
-                AuthorizationCodeLifetime = client.AuthorizationCodeLifetime,
-                RealmId = client.RealmId,
-                RealmName = client.Realm.Name,
-                CreatedAt = client.CreatedAt,
-                UpdatedAt = client.UpdatedAt,
-                CreatedBy = client.CreatedBy,
-                UpdatedBy = client.UpdatedBy,
-                RedirectUris = client.RedirectUris.Select(ru => ru.Uri).ToList(),
-                PostLogoutUris = client.PostLogoutUris.Select(plu => plu.Uri).ToList(),
-                Scopes = client.Scopes.Select(s => s.Scope).ToList(),
-                Permissions = client.Permissions.Select(p => p.Permission).ToList()
-            };
+                await transaction.RollbackAsync();
+                _logger.LogError(ex, "Error updating client '{ClientId}'", client.ClientId);
+                throw;
+            }
+        });
 
-            return Ok(clientDto);
-        }
-        catch (Exception ex)
-        {
-            await transaction.RollbackAsync();
-            _logger.LogError(ex, "Error updating client '{ClientId}'", client.ClientId);
-            throw;
-        }
+        return Ok(result);
     }
 
     [HttpDelete("{id}")]
@@ -445,32 +459,37 @@ public class ClientsController : ControllerBase
             return NotFound($"Client with ID '{id}' not found.");
         }
 
-        using var transaction = await _context.Database.BeginTransactionAsync();
-        try
+        // Use execution strategy for transaction handling with retry support
+        var strategy = _context.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
         {
-            // Delete from OpenIddict
-            var openIddictClient = await _applicationManager.FindByClientIdAsync(client.ClientId);
-            if (openIddictClient != null)
+            using var transaction = await _context.Database.BeginTransactionAsync();
+            try
             {
-                await _applicationManager.DeleteAsync(openIddictClient);
+                // Delete from OpenIddict
+                var openIddictClient = await _applicationManager.FindByClientIdAsync(client.ClientId);
+                if (openIddictClient != null)
+                {
+                    await _applicationManager.DeleteAsync(openIddictClient);
+                }
+
+                // Delete from our database (cascade will handle related entities)
+                _context.Clients.Remove(client);
+                await _context.SaveChangesAsync();
+
+                await transaction.CommitAsync();
+
+                _logger.LogInformation("Client '{ClientId}' deleted successfully", client.ClientId);
             }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                _logger.LogError(ex, "Error deleting client '{ClientId}'", client.ClientId);
+                throw;
+            }
+        });
 
-            // Delete from our database (cascade will handle related entities)
-            _context.Clients.Remove(client);
-            await _context.SaveChangesAsync();
-
-            await transaction.CommitAsync();
-
-            _logger.LogInformation("Client '{ClientId}' deleted successfully", client.ClientId);
-
-            return NoContent();
-        }
-        catch (Exception ex)
-        {
-            await transaction.RollbackAsync();
-            _logger.LogError(ex, "Error deleting client '{ClientId}'", client.ClientId);
-            throw;
-        }
+        return NoContent();
     }
 
     [HttpPost("{id}/toggle")]
