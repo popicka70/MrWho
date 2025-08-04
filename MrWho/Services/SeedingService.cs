@@ -1,24 +1,183 @@
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using OpenIddict.Abstractions;
 using MrWho.Data;
 using MrWho.Models;
+using MrWho.Shared;
+using MrWho.Services;
+using OpenIddict.Abstractions;
 
 namespace MrWho.Services;
 
 public class SeedingService : ISeedingService
 {
     private readonly ApplicationDbContext _context;
+    private readonly IOpenIddictApplicationManager _applicationManager;
+    private readonly UserManager<IdentityUser> _userManager;
+    private readonly RoleManager<IdentityRole> _roleManager;
     private readonly IOidcClientService _oidcClientService;
     private readonly ILogger<SeedingService> _logger;
 
     public SeedingService(
         ApplicationDbContext context,
+        IOpenIddictApplicationManager applicationManager,
+        UserManager<IdentityUser> userManager,
+        RoleManager<IdentityRole> roleManager,
         IOidcClientService oidcClientService,
         ILogger<SeedingService> logger)
     {
         _context = context;
+        _applicationManager = applicationManager;
+        _userManager = userManager;
+        _roleManager = roleManager;
         _oidcClientService = oidcClientService;
         _logger = logger;
+    }
+
+    public async Task SeedAsync()
+    {
+        await _context.Database.EnsureCreatedAsync();
+        
+        // Seed default realm
+        await SeedDefaultRealm();
+        
+        // Seed default roles
+        await SeedDefaultRoles();
+        
+        // Seed default user
+        await SeedDefaultUser();
+        
+        // Seed default OIDC applications
+        await SeedDefaultApplications();
+    }
+
+    private async Task SeedDefaultRealm()
+    {
+        // Create default realm if it doesn't exist
+        var defaultRealm = await _context.Realms.FirstOrDefaultAsync(r => r.Name == "default");
+        if (defaultRealm == null)
+        {
+            defaultRealm = new Realm
+            {
+                Name = "default",
+                DisplayName = "Default Realm",
+                Description = "Default realm for OIDC clients",
+                IsEnabled = true,
+                CreatedBy = "System"
+            };
+            _context.Realms.Add(defaultRealm);
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Created default realm");
+        }
+    }
+
+    private async Task SeedDefaultApplications()
+    {
+        // Get or create default realm
+        var defaultRealm = await _context.Realms.FirstOrDefaultAsync(r => r.Name == "default");
+        if (defaultRealm == null)
+        {
+            await SeedDefaultRealm();
+            defaultRealm = await _context.Realms.FirstOrDefaultAsync(r => r.Name == "default");
+        }
+
+        // Create default client if it doesn't exist
+        var defaultClient = await _context.Clients
+            .Include(c => c.RedirectUris)
+            .Include(c => c.PostLogoutUris)
+            .Include(c => c.Scopes)  
+            .Include(c => c.Permissions)
+            .FirstOrDefaultAsync(c => c.ClientId == "postman_client");
+
+        if (defaultClient == null)
+        {
+            defaultClient = new Client
+            {
+                ClientId = "postman_client",
+                ClientSecret = "postman_secret",
+                Name = "Postman Test Client",
+                Description = "Default test client for development",
+                RealmId = defaultRealm!.Id,
+                IsEnabled = true,
+                ClientType = ClientType.Confidential,
+                AllowAuthorizationCodeFlow = true,
+                AllowClientCredentialsFlow = true,
+                AllowPasswordFlow = true,
+                AllowRefreshTokenFlow = true,
+                RequirePkce = false,
+                RequireClientSecret = true,
+                CreatedBy = "System"
+            };
+
+            _context.Clients.Add(defaultClient);
+            await _context.SaveChangesAsync();
+
+            // Add redirect URIs, scopes, permissions etc.
+            await _oidcClientService.SyncClientWithOpenIddictAsync(defaultClient);
+            _logger.LogInformation("Created default client application");
+        }
+    }
+
+    private async Task SeedDefaultRoles()
+    {
+        var defaultRoles = new Dictionary<string, string>
+        {
+            { "Administrator", "Full system administrator with all permissions" },
+            { "User", "Standard user with basic permissions" },
+            { "Manager", "Manager with elevated permissions for team management" },
+            { "Viewer", "Read-only access to view system information" }
+        };
+
+        foreach (var (roleName, description) in defaultRoles)
+        {
+            if (!await _roleManager.RoleExistsAsync(roleName))
+            {
+                var role = new IdentityRole(roleName);
+                var result = await _roleManager.CreateAsync(role);
+                
+                if (result.Succeeded)
+                {
+                    // Add description and enabled status as role claims
+                    await _roleManager.AddClaimAsync(role, new System.Security.Claims.Claim("description", description));
+                    await _roleManager.AddClaimAsync(role, new System.Security.Claims.Claim("enabled", "true"));
+                    
+                    _logger.LogInformation("Created default role: {RoleName} with description: {Description}", roleName, description);
+                }
+                else
+                {
+                    _logger.LogError("Failed to create role {RoleName}: {Errors}", 
+                        roleName, string.Join(", ", result.Errors.Select(e => e.Description)));
+                }
+            }
+        }
+    }
+
+    private async Task SeedDefaultUser()
+    {
+        const string defaultEmail = "admin@mrwho.local";
+        const string defaultPassword = "Admin123!";
+
+        if (await _userManager.FindByEmailAsync(defaultEmail) == null)
+        {
+            var user = new IdentityUser
+            {
+                UserName = defaultEmail,
+                Email = defaultEmail,
+                EmailConfirmed = true
+            };
+
+            var result = await _userManager.CreateAsync(user, defaultPassword);
+            if (result.Succeeded)
+            {
+                // Assign Administrator role to default user
+                await _userManager.AddToRoleAsync(user, "Administrator");
+                _logger.LogInformation("Created default admin user: {Email}", defaultEmail);
+            }
+            else
+            {
+                _logger.LogError("Failed to create default user: {Errors}", 
+                    string.Join(", ", result.Errors.Select(e => e.Description)));
+            }
+        }
     }
 
     public async Task SeedSampleDataAsync(bool recreateData = false)

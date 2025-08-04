@@ -1,5 +1,5 @@
 using Microsoft.AspNetCore.Identity;
-using MrWho.Models;
+using MrWho.Shared.Models;
 
 namespace MrWho.Handlers.Users;
 

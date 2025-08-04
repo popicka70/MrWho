@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 using MrWho.Models;
+using MrWho.Shared.Models;
 
 namespace MrWho.Handlers.Users;
 
@@ -23,9 +24,9 @@ public class CreateUserHandler : ICreateUserHandler
                 UserName = request.UserName,
                 Email = request.Email,
                 PhoneNumber = request.PhoneNumber,
-                EmailConfirmed = request.EmailConfirmed ?? false,
-                PhoneNumberConfirmed = request.PhoneNumberConfirmed ?? false,
-                TwoFactorEnabled = request.TwoFactorEnabled ?? false
+                EmailConfirmed = request.EmailConfirmed,
+                PhoneNumberConfirmed = request.PhoneNumberConfirmed,
+                TwoFactorEnabled = request.TwoFactorEnabled
             };
 
             var result = await _userManager.CreateAsync(user, request.Password);
