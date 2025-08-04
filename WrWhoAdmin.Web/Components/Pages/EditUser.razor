@@ -2,8 +2,6 @@
 @page "/users/edit/{Id}"
 @attribute [Authorize]
 @rendermode InteractiveServer
-@using MrWhoAdmin.Web.Models
-@using MrWhoAdmin.Web.Services
 @inject NavigationManager Navigation
 @inject NotificationService NotificationService  
 @inject DialogService DialogService
@@ -499,7 +497,7 @@
             
             if (success)
             {
-                NotificationService.Notify(NotificationSeverity.Success, "Password Reset", 
+                NotificationService.Notify(NotificationSeverity.Success, 
                     $"Password has been reset. Temporary password: {tempPassword}");
             }
             else
@@ -529,7 +527,7 @@
             
             if (success)
             {
-                NotificationService.Notify(NotificationSeverity.Success, "Email Sent", 
+                NotificationService.Notify(NotificationSeverity.Success, 
                     "Confirmation email has been sent to the user");
             }
             else
@@ -568,18 +566,18 @@
             if (success)
             {
                 isLocked = !isLocked;
-                NotificationService.Notify(NotificationSeverity.Success, "Success", 
+                NotificationService.Notify(NotificationSeverity.Success, 
                     $"User account has been {(isLocked ? "locked" : "unlocked")}");
             }
             else
             {
-                NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to {action} account");
+                NotificationService.Notify(NotificationSeverity.Error, $"Failed to {action} account");
             }
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error toggling lockout for user {UserId}", Id);
-            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to {action} account");
+            NotificationService.Notify(NotificationSeverity.Error, $"Failed to {action} account");
         }
         finally
         {
@@ -603,7 +601,7 @@
             
             if (success)
             {
-                NotificationService.Notify(NotificationSeverity.Success, "Success", 
+                NotificationService.Notify(NotificationSeverity.Success, 
                     "All user sessions have been terminated");
             }
             else
@@ -638,7 +636,7 @@
             
             if (success)
             {
-                NotificationService.Notify(NotificationSeverity.Success, "Success", 
+                NotificationService.Notify(NotificationSeverity.Success, 
                     $"User '{model.Email}' has been deleted");
                 Navigation.NavigateTo("/users");
             }
