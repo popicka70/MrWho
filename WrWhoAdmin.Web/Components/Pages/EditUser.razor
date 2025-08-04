@@ -112,32 +112,41 @@
                     <RadzenStack Gap="1rem">
                         <RadzenRow>
                             <RadzenColumn Size="12" SizeMD="6">
-                                <RadzenFormField Text="Email Status" Variant="Variant.Outlined">
-                                    <RadzenCheckBox @bind-Value="@emailConfirmed" />
-                                    <RadzenLabel Text="Email is confirmed" class="rz-ml-2" />
-                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary rz-mt-1">
+                                <RadzenStack Gap="0.5rem">
+                                    <RadzenLabel Text="Email Status" class="rz-text-align-left" />
+                                    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
+                                        <RadzenCheckBox @bind-Value="@emailConfirmed" />
+                                        <RadzenLabel Text="Email is confirmed" class="rz-ml-1" />
+                                    </RadzenStack>
+                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
                                         Confirmed users can receive email notifications
                                     </RadzenText>
-                                </RadzenFormField>
+                                </RadzenStack>
                             </RadzenColumn>
                             <RadzenColumn Size="12" SizeMD="6">
-                                <RadzenFormField Text="Phone Status" Variant="Variant.Outlined">
-                                    <RadzenCheckBox @bind-Value="@phoneConfirmed" />
-                                    <RadzenLabel Text="Phone number is confirmed" class="rz-ml-2" />
-                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary rz-mt-1">
+                                <RadzenStack Gap="0.5rem">
+                                    <RadzenLabel Text="Phone Status" class="rz-text-align-left" />
+                                    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
+                                        <RadzenCheckBox @bind-Value="@phoneConfirmed" />
+                                        <RadzenLabel Text="Phone number is confirmed" class="rz-ml-1" />
+                                    </RadzenStack>
+                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
                                         Required for SMS-based two-factor authentication
                                     </RadzenText>
-                                </RadzenFormField>
+                                </RadzenStack>
                             </RadzenColumn>
                         </RadzenRow>
 
-                        <RadzenFormField Text="Two-Factor Authentication" Variant="Variant.Outlined">
-                            <RadzenCheckBox @bind-Value="@twoFactorEnabled" />
-                            <RadzenLabel Text="Enable two-factor authentication" class="rz-ml-2" />
-                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary rz-mt-1">
+                        <RadzenStack Gap="0.5rem">
+                            <RadzenLabel Text="Two-Factor Authentication" class="rz-text-align-left" />
+                            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
+                                <RadzenCheckBox @bind-Value="@twoFactorEnabled" />
+                                <RadzenLabel Text="Enable two-factor authentication" class="rz-ml-1" />
+                            </RadzenStack>
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
                                 Requires additional verification during login
                             </RadzenText>
-                        </RadzenFormField>
+                        </RadzenStack>
                     </RadzenStack>
                 </RadzenFieldset>
 
