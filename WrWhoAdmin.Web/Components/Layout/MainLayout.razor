@@ -5,7 +5,7 @@
         <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0" class="rz-px-4">
             <RadzenSidebarToggle Click="@(() => sidebarExpanded = !sidebarExpanded)" />
             <RadzenLabel Text="MrWho Administration" class="rz-font-weight-bold rz-font-size-h5 rz-color-primary rz-m-0" />
-            <div style="flex-grow: 1;"></div> @* Replace RadzenSpacer with simple div *@
+            <div style="flex-grow: 1;"></div>
             <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="12px">
                 <AuthorizeView>
                     <Authorized>
@@ -23,17 +23,16 @@
                         <RadzenButton Icon="notifications" ButtonStyle="ButtonStyle.Light" Variant="Variant.Text" 
                                       Click="@ShowNotifications" class="rz-border-radius-50 rz-p-2" />
                         
-                        <!-- User Profile Menu - Replaced with standard Radzen components -->
-                        <RadzenDropDown TValue="string" Style="width: auto; min-width: 150px;" 
-                                        Placeholder="@GetUserDisplayName(context.User)"
-                                        Change="@OnProfileMenuChange">
-                            <RadzenDropDownItem TValue="string" Text="My Profile" Value="profile" />
-                            <RadzenDropDownItem TValue="string" Text="Account Settings" Value="settings" />
-                            <RadzenDropDownItem TValue="string" Text="Change Password" Value="change-password" />
-                            <RadzenDropDownItem TValue="string" Text="Help & Support" Value="help" />
-                            <RadzenDropDownItem TValue="string" Text="About" Value="about" />
-                            <RadzenDropDownItem TValue="string" Text="Logout" Value="logout" />
-                        </RadzenDropDown>
+                        <!-- User Profile Menu using SplitButton -->
+                        <RadzenSplitButton Text="@GetUserDisplayName(context.User)" Icon="account_circle" 
+                                          ButtonStyle="ButtonStyle.Light" Click="@(() => Navigation.NavigateTo("/profile"))">
+                            <RadzenSplitButtonItem Text="My Profile" Value="profile" Click="@(() => OnProfileMenuItemClick("profile"))" />
+                            <RadzenSplitButtonItem Text="Account Settings" Value="settings" Click="@(() => OnProfileMenuItemClick("settings"))" />
+                            <RadzenSplitButtonItem Text="Change Password" Value="change-password" Click="@(() => OnProfileMenuItemClick("change-password"))" />
+                            <RadzenSplitButtonItem Text="Help & Support" Value="help" Click="@(() => OnProfileMenuItemClick("help"))" />
+                            <RadzenSplitButtonItem Text="About" Value="about" Click="@(() => OnProfileMenuItemClick("about"))" />
+                            <RadzenSplitButtonItem Text="Logout" Value="logout" Icon="logout" Click="@(() => OnProfileMenuItemClick("logout"))" />
+                        </RadzenSplitButton>
                     </Authorized>
                     <NotAuthorized>
                         <RadzenButton Text="Login" Icon="login" ButtonStyle="ButtonStyle.Primary" 
@@ -121,31 +120,28 @@
         }
     }
 
-    private void OnProfileMenuChange(object value)
+    private void OnProfileMenuItemClick(string action)
     {
-        if (value?.ToString() is string action)
+        switch (action)
         {
-            switch (action)
-            {
-                case "profile":
-                    Navigation.NavigateTo("/profile");
-                    break;
-                case "settings":
-                    Navigation.NavigateTo("/account/settings");
-                    break;
-                case "change-password":
-                    Navigation.NavigateTo("/account/change-password");
-                    break;
-                case "help":
-                    Navigation.NavigateTo("/help");
-                    break;
-                case "about":
-                    Navigation.NavigateTo("/about");
-                    break;
-                case "logout":
-                    Navigation.NavigateTo("/logout");
-                    break;
-            }
+            case "profile":
+                Navigation.NavigateTo("/profile");
+                break;
+            case "settings":
+                Navigation.NavigateTo("/account/settings");
+                break;
+            case "change-password":
+                Navigation.NavigateTo("/account/change-password");
+                break;
+            case "help":
+                Navigation.NavigateTo("/help");
+                break;
+            case "about":
+                Navigation.NavigateTo("/about");
+                break;
+            case "logout":
+                Navigation.NavigateTo("/logout");
+                break;
         }
     }
 }
