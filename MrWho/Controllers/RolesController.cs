@@ -263,6 +263,20 @@ public class RolesController : ControllerBase
             return NotFound($"Role with ID '{id}' not found.");
         }
 
+        // Prevent deletion of critical system roles
+        var protectedRoles = new[] { "Administrator", "User" };
+        if (protectedRoles.Contains(role.Name))
+        {
+            return BadRequest($"The '{role.Name}' role is protected and cannot be deleted as it's required for system operation.");
+        }
+
+        // Check if role is assigned to any users
+        var usersInRole = await _userManager.GetUsersInRoleAsync(role.Name!);
+        if (usersInRole.Any())
+        {
+            return BadRequest($"Cannot delete role '{role.Name}' because it is assigned to {usersInRole.Count} user(s). Remove the role from all users first.");
+        }
+
         var result = await _roleManager.DeleteAsync(role);
 
         if (!result.Succeeded)

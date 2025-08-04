@@ -68,7 +68,7 @@
                                          ButtonStyle="ButtonStyle.Light" Text="Edit" Style="min-width: 80px;" />
                             <RadzenButton Click="@(() => ViewRoleUsers(role.Id))" Icon="people" Size="ButtonSize.Medium" 
                                          ButtonStyle="ButtonStyle.Info" Text="Users" Style="min-width: 80px;" />
-                            <RadzenButton Click="@(() => DeleteRole(role))" Icon="delete" Size="ButtonSize.Medium" 
+                            <RadzenButton Click="@(async () => await DeleteRole(role))" Icon="delete" Size="ButtonSize.Medium" 
                                          ButtonStyle="ButtonStyle.Danger" Text="Delete" Style="min-width: 80px;" />
                         </RadzenStack>
                     </Template>
@@ -306,30 +306,64 @@
 
     private async Task DeleteRole(RoleDto role)
     {
-        var result = await DialogService.Confirm($"Are you sure you want to delete the role '{role.Name}'?", 
-            "Delete Role", new ConfirmOptions() { OkButtonText = "Delete", CancelButtonText = "Cancel" });
+        // Prevent deletion of critical system roles
+        var protectedRoles = new[] { "Administrator", "User" };
+        if (protectedRoles.Contains(role.Name))
+        {
+            NotificationService.Notify(NotificationSeverity.Warning, "Cannot Delete", 
+                $"The '{role.Name}' role is protected and cannot be deleted as it's required for system operation.");
+            return;
+        }
+
+        var result = await DialogService.Confirm(
+            $"Are you sure you want to delete the role '{role.Name}'?\n\nThis action cannot be undone and will remove the role from all users who have it assigned.", 
+            "Delete Role", 
+            new ConfirmOptions() { 
+                OkButtonText = "Delete", 
+                CancelButtonText = "Cancel" 
+            });
         
         if (result == true)
         {
+            bool isDeleting = false;
             try
             {
+                isDeleting = true;
+                StateHasChanged(); // Show loading state
+                
+                Logger.LogInformation("Attempting to delete role '{RoleName}' with ID '{RoleId}'", role.Name, role.Id);
+                
                 var success = await RolesApi.DeleteRoleAsync(role.Id);
                 
                 if (success)
                 {
-                    NotificationService.Notify(NotificationSeverity.Success, "Role Deleted", $"Role '{role.Name}' has been deleted");
+                    NotificationService.Notify(NotificationSeverity.Success, "Role Deleted", 
+                        $"Role '{role.Name}' has been deleted successfully");
+                    Logger.LogInformation("Successfully deleted role '{RoleName}'", role.Name);
                     await LoadRoles();
                 }
                 else
                 {
-                    NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to delete role '{role.Name}'");
+                    Logger.LogWarning("API returned false when attempting to delete role '{RoleName}'", role.Name);
+                    NotificationService.Notify(NotificationSeverity.Error, "Delete Failed", 
+                        $"Failed to delete role '{role.Name}'. The role might be in use by existing users or there was a server error.");
                 }
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "Error deleting role {RoleId}", role.Id);
-                NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to delete role '{role.Name}': {ex.Message}");
+                Logger.LogError(ex, "Exception occurred while deleting role '{RoleName}' with ID '{RoleId}'", role.Name, role.Id);
+                NotificationService.Notify(NotificationSeverity.Error, "Delete Error", 
+                    $"An error occurred while deleting role '{role.Name}': {ex.Message}");
             }
+            finally
+            {
+                isDeleting = false;
+                StateHasChanged();
+            }
+        }
+        else
+        {
+            Logger.LogInformation("User cancelled deletion of role '{RoleName}'", role.Name);
         }
     }
 }
