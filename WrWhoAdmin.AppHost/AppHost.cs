@@ -3,6 +3,7 @@ var builder = DistributedApplication.CreateBuilder(args);
 // Add SQL Server database
 var sqlServer = builder.AddSqlServer("sqlserver")
     .WithDataVolume()
+    .WithLifetime(ContainerLifetime.Persistent)
     .AddDatabase("mrwhodb");
 
 var mrWho = builder.AddProject<Projects.MrWho>("mrwho")

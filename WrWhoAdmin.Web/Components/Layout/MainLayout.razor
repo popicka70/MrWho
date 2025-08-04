@@ -24,13 +24,17 @@
                         <RadzenButton Icon="notifications" ButtonStyle="ButtonStyle.Light" Variant="Variant.Text" 
                                       Click="@ShowNotifications" class="rz-border-radius-50 rz-p-2" />
                         
-                        <!-- User Profile Menu - Simple HTML Logout Button -->
+                        <!-- User Profile Menu - Clean and improved visibility -->
                         <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
-                            <RadzenText Text="@GetUserDisplayName(context.User)" class="rz-text-nowrap" />
+                            <div style="background-color: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.25); padding: 8px 12px; border-radius: 6px; display: flex; align-items: center; gap: 8px;">
+                                <RadzenIcon Icon="person" style="color: white; font-size: 16px;" />
+                                <RadzenText Text="@GetUserDisplayName(context.User)" 
+                                          style="color: white; font-weight: 600; font-size: 14px; text-shadow: 0 1px 2px rgba(0,0,0,0.5); margin: 0;" 
+                                          class="rz-text-nowrap" />
+                            </div>
                             <a href="/logout" class="rz-button rz-button-sm rz-variant-filled rz-danger rz-shade-default" 
-                               style="display: inline-flex; align-items: center; gap: 4px; text-decoration: none; color: white; padding: 4px 8px; border-radius: 4px; font-size: 14px;">
-                                <i class="rz-icon material-icons" style="font-size: 16px;"></i>
-                                Logout
+                               style="display: inline-flex; align-items: center; gap: 4px; text-decoration: none; color: white; padding: 8px 12px; border-radius: 4px; font-size: 14px; font-weight: 500;">
+                                <i class="rz-icon material-icons" style="font-size: 16px;">logout</i>
                             </a>
                         </RadzenStack>
                     </Authorized>
@@ -145,9 +149,6 @@
                 break;
             case "settings":
                 Navigation.NavigateTo("/account/settings");
-                break;
-            case "change-password":
-                Navigation.NavigateTo("/account/change-password");
                 break;
             case "help":
                 Navigation.NavigateTo("/help");
