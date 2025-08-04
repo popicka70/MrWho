@@ -84,15 +84,15 @@
                     </Template>
                 </RadzenDataGridColumn>
                 
-                <RadzenDataGridColumn TItem="UserDto" Title="Actions" Width="200px" Sortable="false">
+                <RadzenDataGridColumn TItem="UserDto" Title="Actions" Width="350px" Sortable="false">
                     <Template Context="user">
                         <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
-                            <RadzenButton Click="@(() => EditUser(user.Id))" Icon="edit" Size="ButtonSize.Small" 
+                            <RadzenButton Click="@(() => EditUser(user.Id))" Icon="edit" Size="ButtonSize.Medium" 
                                          ButtonStyle="ButtonStyle.Light" Text="Edit" />
-                            <RadzenButton Click="@(() => ResetPassword(user.Id))" Icon="lock_reset" Size="ButtonSize.Small" 
+                            <RadzenButton Click="@(() => ResetPassword(user.Id))" Icon="lock_reset" Size="ButtonSize.Medium" 
                                          ButtonStyle="ButtonStyle.Warning" Text="Reset" />
                             <RadzenButton Click="@(() => ToggleLockout(user))" Icon="@(IsUserLocked(user) ? "lock_open" : "lock")" 
-                                         Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Secondary" 
+                                         Size="ButtonSize.Medium" ButtonStyle="ButtonStyle.Secondary" 
                                          Text="@(IsUserLocked(user) ? "Unlock" : "Lock")" />
                         </RadzenStack>
                     </Template>
