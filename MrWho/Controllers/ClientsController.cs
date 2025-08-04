@@ -68,7 +68,7 @@ public class ClientsController : ControllerBase
                 Name = c.Name,
                 Description = c.Description,
                 IsEnabled = c.IsEnabled,
-                ClientType = (MrWho.Shared.ClientType)c.ClientType,
+                ClientType = c.ClientType, // Remove cast since now using shared enum
                 AllowAuthorizationCodeFlow = c.AllowAuthorizationCodeFlow,
                 AllowClientCredentialsFlow = c.AllowClientCredentialsFlow,
                 AllowPasswordFlow = c.AllowPasswordFlow,
@@ -126,7 +126,7 @@ public class ClientsController : ControllerBase
             Name = client.Name,
             Description = client.Description,
             IsEnabled = client.IsEnabled,
-            ClientType = (MrWho.Shared.ClientType)client.ClientType,
+            ClientType = client.ClientType, // Remove cast since now using shared enum
             AllowAuthorizationCodeFlow = client.AllowAuthorizationCodeFlow,
             AllowClientCredentialsFlow = client.AllowClientCredentialsFlow,
             AllowPasswordFlow = client.AllowPasswordFlow,
@@ -181,7 +181,7 @@ public class ClientsController : ControllerBase
                     Description = request.Description,
                     RealmId = request.RealmId,
                     IsEnabled = request.IsEnabled,
-                    ClientType = (MrWho.Models.ClientType)request.ClientType,
+                    ClientType = request.ClientType, // Remove cast since now using shared enum
                     AllowAuthorizationCodeFlow = request.AllowAuthorizationCodeFlow,
                     AllowClientCredentialsFlow = request.AllowClientCredentialsFlow,
                     AllowPasswordFlow = request.AllowPasswordFlow,
@@ -253,7 +253,7 @@ public class ClientsController : ControllerBase
                     Name = client.Name,
                     Description = client.Description,
                     IsEnabled = client.IsEnabled,
-                    ClientType = (MrWho.Shared.ClientType)client.ClientType,
+                    ClientType = client.ClientType, // Remove cast since now using shared enum
                     AllowAuthorizationCodeFlow = client.AllowAuthorizationCodeFlow,
                     AllowClientCredentialsFlow = client.AllowClientCredentialsFlow,
                     AllowPasswordFlow = client.AllowPasswordFlow,
@@ -320,7 +320,7 @@ public class ClientsController : ControllerBase
                 if (request.IsEnabled.HasValue)
                     client.IsEnabled = request.IsEnabled.Value;
                 if (request.ClientType.HasValue)
-                    client.ClientType = (MrWho.Models.ClientType)request.ClientType.Value;
+                    client.ClientType = request.ClientType.Value; // Remove cast since now using shared enum
                 if (request.AllowAuthorizationCodeFlow.HasValue)
                     client.AllowAuthorizationCodeFlow = request.AllowAuthorizationCodeFlow.Value;
                 if (request.AllowClientCredentialsFlow.HasValue)
@@ -416,7 +416,7 @@ public class ClientsController : ControllerBase
                     Name = client.Name,
                     Description = client.Description,
                     IsEnabled = client.IsEnabled,
-                    ClientType = (MrWho.Shared.ClientType)client.ClientType,
+                    ClientType = client.ClientType, // Remove cast since now using shared enum
                     AllowAuthorizationCodeFlow = client.AllowAuthorizationCodeFlow,
                     AllowClientCredentialsFlow = client.AllowClientCredentialsFlow,
                     AllowPasswordFlow = client.AllowPasswordFlow,
@@ -525,7 +525,7 @@ public class ClientsController : ControllerBase
             Name = client.Name,
             Description = client.Description,
             IsEnabled = client.IsEnabled,
-            ClientType = (MrWho.Shared.ClientType)client.ClientType,
+            ClientType = client.ClientType, // Remove cast since now using shared enum
             AllowAuthorizationCodeFlow = client.AllowAuthorizationCodeFlow,
             AllowClientCredentialsFlow = client.AllowClientCredentialsFlow,
             AllowPasswordFlow = client.AllowPasswordFlow,
@@ -633,7 +633,7 @@ public class ClientsController : ControllerBase
                 Name = client.Name,
                 Description = client.Description,
                 RealmId = client.RealmId,
-                ClientType = (MrWho.Shared.ClientType)client.ClientType,
+                ClientType = client.ClientType, // Remove cast since now using shared enum
                 RedirectUris = client.RedirectUris.Select(ru => ru.Uri).ToList(),
                 PostLogoutUris = client.PostLogoutUris.Select(plu => plu.Uri).ToList(),
                 Scopes = client.Scopes.Select(s => s.Scope).ToList(),

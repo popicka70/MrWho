@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using OpenIddict.Abstractions;
 using MrWho.Data;
 using MrWho.Models;
+using MrWho.Shared;
 using Microsoft.AspNetCore.Identity;
 
 namespace MrWho.Services;
