@@ -1,0 +1,139 @@
+@using MrWho.Shared.Models
+@inject DialogService DialogService
+
+<RadzenStack Gap="1rem">
+    <RadzenCard>
+        <RadzenStack Gap="1rem">
+            <RadzenText TextStyle="TextStyle.H6" Text="Basic Information" />
+            
+            <RadzenStack Orientation="Orientation.Horizontal" Gap="2rem">
+                <RadzenStack Style="flex: 1;">
+                    <RadzenText TextStyle="TextStyle.Subtitle2" Text="Scope Name" />
+                    <RadzenText Text="@Scope.Name" />
+                </RadzenStack>
+                <RadzenStack Style="flex: 1;">
+                    <RadzenText TextStyle="TextStyle.Subtitle2" Text="Display Name" />
+                    <RadzenText Text="@(Scope.DisplayName ?? "-")" />
+                </RadzenStack>
+            </RadzenStack>
+
+            <RadzenStack>
+                <RadzenText TextStyle="TextStyle.Subtitle2" Text="Description" />
+                <RadzenText Text="@(Scope.Description ?? "-")" />
+            </RadzenStack>
+
+            <RadzenStack Orientation="Orientation.Horizontal" Gap="2rem">
+                <RadzenStack Style="flex: 1;">
+                    <RadzenText TextStyle="TextStyle.Subtitle2" Text="Type" />
+                    <RadzenBadge BadgeStyle="@GetScopeTypeBadgeStyle(Scope.Type)" 
+                                Text="@GetScopeTypeText(Scope.Type)" />
+                </RadzenStack>
+                <RadzenStack Style="flex: 1;">
+                    <RadzenText TextStyle="TextStyle.Subtitle2" Text="Status" />
+                    <RadzenBadge BadgeStyle="@(Scope.IsEnabled ? BadgeStyle.Success : BadgeStyle.Danger)" 
+                                Text="@(Scope.IsEnabled ? "Enabled" : "Disabled")" />
+                </RadzenStack>
+            </RadzenStack>
+        </RadzenStack>
+    </RadzenCard>
+
+    <RadzenCard>
+        <RadzenStack Gap="1rem">
+            <RadzenText TextStyle="TextStyle.H6" Text="Configuration" />
+            
+            <RadzenStack Orientation="Orientation.Horizontal" Gap="2rem">
+                <RadzenStack Style="flex: 1;">
+                    <RadzenText TextStyle="TextStyle.Subtitle2" Text="Required Scope" />
+                    <RadzenBadge BadgeStyle="@(Scope.IsRequired ? BadgeStyle.Warning : BadgeStyle.Secondary)" 
+                                Text="@(Scope.IsRequired ? "Yes" : "No")" />
+                </RadzenStack>
+                <RadzenStack Style="flex: 1;">
+                    <RadzenText TextStyle="TextStyle.Subtitle2" Text="Show in Discovery" />
+                    <RadzenBadge BadgeStyle="@(Scope.ShowInDiscoveryDocument ? BadgeStyle.Primary : BadgeStyle.Secondary)" 
+                                Text="@(Scope.ShowInDiscoveryDocument ? "Yes" : "No")" />
+                </RadzenStack>
+                <RadzenStack Style="flex: 1;">
+                    <RadzenText TextStyle="TextStyle.Subtitle2" Text="Standard Scope" />
+                    <RadzenBadge BadgeStyle="@(Scope.IsStandard ? BadgeStyle.Info : BadgeStyle.Secondary)" 
+                                Text="@(Scope.IsStandard ? "Yes" : "No")" />
+                </RadzenStack>
+            </RadzenStack>
+        </RadzenStack>
+    </RadzenCard>
+
+    <RadzenCard>
+        <RadzenStack Gap="1rem">
+            <RadzenText TextStyle="TextStyle.H6" Text="Claims" />
+            
+            @if (Scope.Claims.Any())
+            {
+                <RadzenDataList Data="@Scope.Claims" TItem="string">
+                    <Template Context="claim">
+                        <RadzenCard Style="margin-bottom: 0.5rem;">
+                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                <RadzenIcon Icon="verified_user" Style="color: var(--rz-info);" />
+                                <RadzenText Text="@claim" />
+                            </RadzenStack>
+                        </RadzenCard>
+                    </Template>
+                </RadzenDataList>
+            }
+            else
+            {
+                <RadzenAlert AlertStyle="AlertStyle.Info">
+                    <RadzenText>No claims are associated with this scope.</RadzenText>
+                </RadzenAlert>
+            }
+        </RadzenStack>
+    </RadzenCard>
+
+    <RadzenCard>
+        <RadzenStack Gap="1rem">
+            <RadzenText TextStyle="TextStyle.H6" Text="Metadata" />
+            
+            <RadzenStack Orientation="Orientation.Horizontal" Gap="2rem">
+                <RadzenStack Style="flex: 1;">
+                    <RadzenText TextStyle="TextStyle.Subtitle2" Text="Created" />
+                    <RadzenText Text="@Scope.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")" />
+                    <RadzenText TextStyle="TextStyle.Caption" Text="@($"by {Scope.CreatedBy ?? "System"}")" />
+                </RadzenStack>
+                @if (Scope.UpdatedAt.HasValue)
+                {
+                    <RadzenStack Style="flex: 1;">
+                        <RadzenText TextStyle="TextStyle.Subtitle2" Text="Last Updated" />
+                        <RadzenText Text="@Scope.UpdatedAt.Value.ToString("yyyy-MM-dd HH:mm:ss")" />
+                        <RadzenText TextStyle="TextStyle.Caption" Text="@($"by {Scope.UpdatedBy ?? "System"}")" />
+                    </RadzenStack>
+                }
+            </RadzenStack>
+        </RadzenStack>
+    </RadzenCard>
+</RadzenStack>
+
+<RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" class="rz-mt-4" JustifyContent="JustifyContent.End">
+    <RadzenButton Click="@(() => DialogService.Close())" Text="Close" ButtonStyle="ButtonStyle.Primary" />
+</RadzenStack>
+
+@code {
+    [Parameter] public ScopeDto Scope { get; set; } = null!;
+
+    private BadgeStyle GetScopeTypeBadgeStyle(ScopeType scopeType)
+    {
+        return scopeType switch
+        {
+            ScopeType.Identity => BadgeStyle.Info,
+            ScopeType.Resource => BadgeStyle.Success,
+            _ => BadgeStyle.Secondary
+        };
+    }
+
+    private string GetScopeTypeText(ScopeType scopeType)
+    {
+        return scopeType switch
+        {
+            ScopeType.Identity => "Identity",
+            ScopeType.Resource => "Resource",
+            _ => "Unknown"
+        };
+    }
+}}

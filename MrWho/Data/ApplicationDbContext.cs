@@ -19,6 +19,10 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>
     public DbSet<ClientPostLogoutUri> ClientPostLogoutUris { get; set; }
     public DbSet<ClientScope> ClientScopes { get; set; }
     public DbSet<ClientPermission> ClientPermissions { get; set; }
+    
+    // Scope management entities
+    public DbSet<Scope> Scopes { get; set; }
+    public DbSet<ScopeClaim> ScopeClaims { get; set; }
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -103,6 +107,24 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>
                   .HasForeignKey(cp => cp.ClientId)
                   .OnDelete(DeleteBehavior.Cascade);
             entity.HasIndex(cp => new { cp.ClientId, cp.Permission }).IsUnique();
+        });
+        
+        // Configure Scope entity
+        builder.Entity<Scope>(entity =>
+        {
+            entity.HasKey(s => s.Id);
+            entity.HasIndex(s => s.Name).IsUnique();
+        });
+
+        // Configure ScopeClaim entity
+        builder.Entity<ScopeClaim>(entity =>
+        {
+            entity.HasKey(sc => sc.Id);
+            entity.HasOne(sc => sc.Scope)
+                  .WithMany(s => s.Claims)
+                  .HasForeignKey(sc => sc.ScopeId)
+                  .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(sc => new { sc.ScopeId, sc.ClaimType }).IsUnique();
         });
     }
 }

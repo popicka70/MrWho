@@ -5,6 +5,7 @@ using MrWho.Data;
 using MrWho.Handlers;
 using MrWho.Services;
 using OpenIddict.Abstractions;
+using System.Linq;
 
 namespace MrWho.Extensions;
 
@@ -379,9 +380,33 @@ public static class WebApplicationExtensions
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
         var oidcClientService = scope.ServiceProvider.GetRequiredService<IOidcClientService>();
+        var scopeSeederService = scope.ServiceProvider.GetRequiredService<IScopeSeederService>();
         
-        // Ensure database is created (works for both development and production)
-        await context.Database.EnsureCreatedAsync();
+        // For development: Delete and recreate database to include new Scope tables
+        if (app.Environment.IsDevelopment())
+        {
+            await context.Database.EnsureDeletedAsync();
+            await context.Database.EnsureCreatedAsync();
+            //Console.WriteLine("Database recreated with latest schema");
+            //await context.Database.MigrateAsync();
+        }
+        else
+        {
+            // For production: Use migrations
+            await context.Database.MigrateAsync();
+        }
+        
+        // Initialize standard scopes first
+        try
+        {
+            await scopeSeederService.InitializeStandardScopesAsync();
+            Console.WriteLine("Standard scopes initialized successfully");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error initializing standard scopes: {ex.Message}");
+            throw;
+        }
         
         // Initialize essential data (admin realm, admin client, admin user)
         try

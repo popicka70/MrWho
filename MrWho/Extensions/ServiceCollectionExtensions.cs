@@ -19,6 +19,7 @@ public static class ServiceCollectionExtensions
         // Register custom services
         services.AddScoped<IOidcClientService, OidcClientService>();
         services.AddScoped<ISeedingService, SeedingService>();
+        services.AddScoped<IScopeSeederService, ScopeSeederService>();
 
         // Register token handler
         services.AddScoped<ITokenHandler, TokenHandler>();

@@ -1,0 +1,325 @@
+@page "/identity/scopes"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using MrWho.Shared.Models
+@inject NavigationManager Navigation
+@inject NotificationService NotificationService
+@inject DialogService DialogService
+@inject ILogger<Scopes> Logger
+@inject IScopesApiService ScopesApi
+
+<PageTitle>Scopes - MrWho Admin</PageTitle>
+
+<RadzenText TextStyle="TextStyle.H3" TagName="TagName.H1" class="rz-pt-8">
+    <RadzenIcon Icon="tune" class="rz-me-1" />
+    Scopes Management
+</RadzenText>
+
+<RadzenCard class="rz-my-4">
+    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" class="rz-mb-4">
+        <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem">
+            <RadzenTextBox @bind-Value="@searchTerm" Placeholder="Search scopes..." Style="width: 300px;" />
+            <RadzenDropDown @bind-Value="@selectedType" Data="@scopeTypes" TextProperty="Text" ValueProperty="Value" 
+                           Placeholder="Filter by type..." Style="width: 200px;" AllowClear="true" />
+            <RadzenButton Click="@LoadScopes" Icon="search" ButtonStyle="ButtonStyle.Secondary" />
+        </RadzenStack>
+        <RadzenButton Click="@(async () => await ShowCreateScopeDialog())" Icon="add" ButtonStyle="ButtonStyle.Primary" Text="Add Scope" />
+    </RadzenStack>
+
+    @if (isLoading)
+    {
+        <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+    }
+    else if (scopes.Any())
+    {
+        <RadzenDataGrid Data="@scopes" TItem="ScopeDto" AllowPaging="true" PageSize="10" AllowSorting="true">
+            <Columns>
+                <RadzenDataGridColumn TItem="ScopeDto" Property="Name" Title="Scope Name" Width="200px">
+                    <Template Context="scope">
+                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
+                            <RadzenIcon Icon="@GetScopeTypeIcon(scope.Type)" 
+                                       Style="@($"color: {GetScopeTypeColor(scope.Type)}")" />
+                            <RadzenText Text="@scope.Name" />
+                            @if (scope.IsStandard)
+                            {
+                                <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="Standard" Size="BadgeSize.ExtraSmall" />
+                            }
+                        </RadzenStack>
+                    </Template>
+                </RadzenDataGridColumn>
+                
+                <RadzenDataGridColumn TItem="ScopeDto" Property="DisplayName" Title="Display Name" />
+                
+                <RadzenDataGridColumn TItem="ScopeDto" Property="Description" Title="Description">
+                    <Template Context="scope">
+                        <RadzenText Text="@(scope.Description ?? "-")" Style="max-width: 300px; overflow: hidden; text-overflow: ellipsis;" />
+                    </Template>
+                </RadzenDataGridColumn>
+                
+                <RadzenDataGridColumn TItem="ScopeDto" Property="Type" Title="Type" Width="120px">
+                    <Template Context="scope">
+                        <RadzenBadge BadgeStyle="@GetScopeTypeBadgeStyle(scope.Type)" 
+                                    Text="@GetScopeTypeText(scope.Type)" />
+                    </Template>
+                </RadzenDataGridColumn>
+                
+                <RadzenDataGridColumn TItem="ScopeDto" Property="IsEnabled" Title="Status" Width="100px">
+                    <Template Context="scope">
+                        <RadzenBadge BadgeStyle="@(scope.IsEnabled ? BadgeStyle.Success : BadgeStyle.Danger)" 
+                                    Text="@(scope.IsEnabled ? "Enabled" : "Disabled")" />
+                    </Template>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="ScopeDto" Title="Properties" Width="150px">
+                    <Template Context="scope">
+                        <RadzenStack Gap="0.2rem">
+                            @if (scope.IsRequired)
+                            {
+                                <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text="Required" Size="BadgeSize.ExtraSmall" />
+                            }
+                            @if (scope.ShowInDiscoveryDocument)
+                            {
+                                <RadzenBadge BadgeStyle="BadgeStyle.Primary" Text="Public" Size="BadgeSize.ExtraSmall" />
+                            }
+                        </RadzenStack>
+                    </Template>
+                </RadzenDataGridColumn>
+                
+                <RadzenDataGridColumn TItem="ScopeDto" Title="Claims" Width="200px">
+                    <Template Context="scope">
+                        @if (scope.Claims.Any())
+                        {
+                            <RadzenText Text="@string.Join(", ", scope.Claims.Take(3))" />
+                            @if (scope.Claims.Count > 3)
+                            {
+                                <RadzenText Text="@($" and {scope.Claims.Count - 3} more...")" Style="font-style: italic; color: var(--rz-text-disabled-color);" />
+                            }
+                        }
+                        else
+                        {
+                            <RadzenText Text="-" Style="color: var(--rz-text-disabled-color);" />
+                        }
+                    </Template>
+                </RadzenDataGridColumn>
+                
+                <RadzenDataGridColumn TItem="ScopeDto" Title="Actions" Width="300px" Sortable="false">
+                    <Template Context="scope">
+                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                            <RadzenButton Click="@(async () => await ShowEditScopeDialog(scope))" Icon="edit" Size="ButtonSize.Medium" 
+                                         ButtonStyle="ButtonStyle.Light" Text="Edit" Disabled="@scope.IsStandard" />
+                            <RadzenButton Click="@(async () => await ViewScopeDetails(scope))" Icon="visibility" Size="ButtonSize.Medium" 
+                                         ButtonStyle="ButtonStyle.Info" Text="View" />
+                            <RadzenButton Click="@(async () => await ToggleScopeStatus(scope))" Icon="@(scope.IsEnabled ? "toggle_on" : "toggle_off")" 
+                                         Size="ButtonSize.Medium" ButtonStyle="ButtonStyle.Warning" Text="Toggle" />
+                            <RadzenButton Click="@(async () => await DeleteScope(scope))" Icon="delete" Size="ButtonSize.Medium" 
+                                         ButtonStyle="ButtonStyle.Danger" Text="Delete" Disabled="@scope.IsStandard" />
+                        </RadzenStack>
+                    </Template>
+                </RadzenDataGridColumn>
+            </Columns>
+        </RadzenDataGrid>
+    }
+    else
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Info">
+            <RadzenText>No scopes found. Click "Add Scope" to create your first custom scope.</RadzenText>
+        </RadzenAlert>
+    }
+</RadzenCard>
+
+@code {
+    private List<ScopeDto> scopes = new();
+    private bool isLoading = false;
+    private string searchTerm = "";
+    private ScopeType? selectedType = null;
+
+    private readonly List<DropDownItem> scopeTypes = new()
+    {
+        new() { Text = "Identity", Value = ScopeType.Identity },
+        new() { Text = "Resource", Value = ScopeType.Resource }
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadScopes();
+    }
+
+    private async Task LoadScopes()
+    {
+        isLoading = true;
+        try
+        {
+            var result = await ScopesApi.GetScopesAsync(page: 1, pageSize: 50, search: searchTerm, type: selectedType);
+            
+            if (result != null)
+            {
+                scopes = result.Items;
+                Logger.LogInformation("Loaded {ScopeCount} scopes from API", scopes.Count);
+            }
+            else
+            {
+                scopes = new List<ScopeDto>();
+                NotificationService.Notify(NotificationSeverity.Warning, "Warning", "Failed to load scopes from API");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading scopes from API");
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to load scopes");
+            scopes = new List<ScopeDto>();
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ShowCreateScopeDialog()
+    {
+        var result = await DialogService.OpenAsync<CreateScopeDialog>("Create New Scope", 
+            new Dictionary<string, object>(), 
+            new DialogOptions() { Width = "600px", Height = "600px" });
+
+        if (result != null && result is ScopeDto)
+        {
+            await LoadScopes();
+            NotificationService.Notify(NotificationSeverity.Success, "Scope Created", "New scope has been created successfully");
+        }
+    }
+
+    private async Task ShowEditScopeDialog(ScopeDto scope)
+    {
+        if (scope.IsStandard)
+        {
+            NotificationService.Notify(NotificationSeverity.Warning, "Cannot Edit", "Standard scopes cannot be modified");
+            return;
+        }
+
+        var result = await DialogService.OpenAsync<EditScopeDialog>("Edit Scope", 
+            new Dictionary<string, object> { { "Scope", scope } }, 
+            new DialogOptions() { Width = "600px", Height = "600px" });
+
+        if (result != null && result is ScopeDto)
+        {
+            await LoadScopes();
+            NotificationService.Notify(NotificationSeverity.Success, "Scope Updated", "Scope has been updated successfully");
+        }
+    }
+
+    private async Task ViewScopeDetails(ScopeDto scope)
+    {
+        await DialogService.OpenAsync<ScopeDetailsDialog>("Scope Details", 
+            new Dictionary<string, object> { { "Scope", scope } }, 
+            new DialogOptions() { Width = "500px", Height = "500px" });
+    }
+
+    private async Task ToggleScopeStatus(ScopeDto scope)
+    {
+        try
+        {
+            var result = await ScopesApi.ToggleScopeAsync(scope.Id);
+            
+            if (result != null)
+            {
+                scope.IsEnabled = result.IsEnabled;
+                scope.UpdatedAt = result.UpdatedAt;
+                
+                var status = scope.IsEnabled ? "enabled" : "disabled";
+                NotificationService.Notify(NotificationSeverity.Success, "Scope Updated", $"Scope '{scope.Name}' has been {status}");
+                StateHasChanged();
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to toggle scope status");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error toggling scope status for {ScopeId}", scope.Id);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to toggle scope status");
+        }
+    }
+
+    private async Task DeleteScope(ScopeDto scope)
+    {
+        if (scope.IsStandard)
+        {
+            NotificationService.Notify(NotificationSeverity.Warning, "Cannot Delete", "Standard scopes cannot be deleted");
+            return;
+        }
+
+        var confirm = await DialogService.Confirm($"Are you sure you want to delete the scope '{scope.Name}'?", 
+            "Delete Scope", new ConfirmOptions() { OkButtonText = "Yes", CancelButtonText = "No" });
+
+        if (confirm == true)
+        {
+            try
+            {
+                var success = await ScopesApi.DeleteScopeAsync(scope.Id);
+                
+                if (success)
+                {
+                    scopes.Remove(scope);
+                    NotificationService.Notify(NotificationSeverity.Success, "Scope Deleted", $"Scope '{scope.Name}' has been deleted");
+                    StateHasChanged();
+                }
+                else
+                {
+                    NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to delete scope");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error deleting scope {ScopeId}", scope.Id);
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to delete scope");
+            }
+        }
+    }
+
+    private string GetScopeTypeIcon(ScopeType scopeType)
+    {
+        return scopeType switch
+        {
+            ScopeType.Identity => "fingerprint",
+            ScopeType.Resource => "api",
+            _ => "tune"
+        };
+    }
+
+    private string GetScopeTypeColor(ScopeType scopeType)
+    {
+        return scopeType switch
+        {
+            ScopeType.Identity => "var(--rz-info)",
+            ScopeType.Resource => "var(--rz-success)",
+            _ => "var(--rz-text-color)"
+        };
+    }
+
+    private BadgeStyle GetScopeTypeBadgeStyle(ScopeType scopeType)
+    {
+        return scopeType switch
+        {
+            ScopeType.Identity => BadgeStyle.Info,
+            ScopeType.Resource => BadgeStyle.Success,
+            _ => BadgeStyle.Secondary
+        };
+    }
+
+    private string GetScopeTypeText(ScopeType scopeType)
+    {
+        return scopeType switch
+        {
+            ScopeType.Identity => "Identity",
+            ScopeType.Resource => "Resource",
+            _ => "Unknown"
+        };
+    }
+
+    private class DropDownItem
+    {
+        public string Text { get; set; } = string.Empty;
+        public ScopeType Value { get; set; }
+    }
+}}

@@ -1,0 +1,169 @@
+@using MrWho.Shared.Models
+@inject NotificationService NotificationService
+@inject DialogService DialogService
+@inject ILogger<EditScopeDialog> Logger
+@inject IScopesApiService ScopesApi
+
+<RadzenTemplateForm Data="@model" Submit="@(async (UpdateScopeRequest formModel) => await OnSubmit(formModel))">
+    <RadzenStack Gap="1rem">
+        <RadzenFormField Text="Scope Name" Variant="Variant.Outlined">
+            <ChildContent>
+                <RadzenTextBox Value="@originalScope.Name" Style="width: 100%;" Disabled="true" />
+            </ChildContent>
+            <Helper>
+                <RadzenText TextStyle="TextStyle.Caption" Text="Scope name cannot be changed" />
+            </Helper>
+        </RadzenFormField>
+
+        <RadzenFormField Text="Display Name" Variant="Variant.Outlined">
+            <ChildContent>
+                <RadzenTextBox @bind-Value="@model.DisplayName" Style="width: 100%;" Placeholder="Human-readable name" />
+            </ChildContent>
+        </RadzenFormField>
+
+        <RadzenFormField Text="Description" Variant="Variant.Outlined">
+            <ChildContent>
+                <RadzenTextArea @bind-Value="@model.Description" Style="width: 100%; height: 80px;" 
+                               Placeholder="Description of what this scope provides access to" />
+            </ChildContent>
+        </RadzenFormField>
+
+        <RadzenFormField Text="Scope Type" Variant="Variant.Outlined">
+            <ChildContent>
+                <RadzenDropDown @bind-Value="@model.Type" Data="@scopeTypes" TextProperty="Text" ValueProperty="Value" 
+                               Style="width: 100%;" />
+            </ChildContent>
+        </RadzenFormField>
+
+        <RadzenRow>
+            <RadzenColumn Size="6">
+                <RadzenFormField Text="Enabled" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenCheckBox @bind-Value="@model.IsEnabled" />
+                    </ChildContent>
+                </RadzenFormField>
+            </RadzenColumn>
+            <RadzenColumn Size="6">
+                <RadzenFormField Text="Required" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenCheckBox @bind-Value="@model.IsRequired" />
+                    </ChildContent>
+                </RadzenFormField>
+            </RadzenColumn>
+        </RadzenRow>
+
+        <RadzenFormField Text="Show in Discovery Document" Variant="Variant.Outlined">
+            <ChildContent>
+                <RadzenCheckBox @bind-Value="@model.ShowInDiscoveryDocument" />
+            </ChildContent>
+        </RadzenFormField>
+
+        <RadzenFormField Text="Claims" Variant="Variant.Outlined">
+            <ChildContent>
+                <RadzenStack Gap="0.5rem">
+                    @if (model.Claims != null)
+                    {
+                        @for (int i = 0; i < model.Claims.Count; i++)
+                        {
+                            var index = i;
+                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                <RadzenTextBox @bind-Value="@model.Claims[index]" Style="flex: 1;" />
+                                <RadzenButton Click="@(() => RemoveClaim(model.Claims[index]))" Icon="close" Size="ButtonSize.Small" 
+                                             ButtonStyle="ButtonStyle.Danger" />
+                            </RadzenStack>
+                        }
+                    }
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                        <RadzenTextBox @bind-Value="@newClaim" Style="flex: 1;" Placeholder="Enter claim type" />
+                        <RadzenButton Click="@AddClaim" Icon="add" Size="ButtonSize.Small" 
+                                     ButtonStyle="ButtonStyle.Success" Text="Add" Disabled="@string.IsNullOrWhiteSpace(newClaim)" />
+                    </RadzenStack>
+                </RadzenStack>
+            </ChildContent>
+        </RadzenFormField>
+    </RadzenStack>
+
+    <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" class="rz-mt-4" JustifyContent="JustifyContent.End">
+        <RadzenButton Click="@(() => DialogService.Close())" Text="Cancel" ButtonStyle="ButtonStyle.Light" />
+        <RadzenButton ButtonType="ButtonType.Submit" Text="Update Scope" ButtonStyle="ButtonStyle.Primary" IsBusy="@isSubmitting" />
+    </RadzenStack>
+</RadzenTemplateForm>
+
+@code {
+    [Parameter] public ScopeDto Scope { get; set; } = null!;
+
+    private UpdateScopeRequest model = new();
+    private ScopeDto originalScope = null!;
+    private bool isSubmitting = false;
+    private string newClaim = "";
+
+    private readonly List<DropDownItem> scopeTypes = new()
+    {
+        new() { Text = "Identity Scope", Value = ScopeType.Identity },
+        new() { Text = "Resource Scope", Value = ScopeType.Resource }
+    };
+
+    protected override void OnInitialized()
+    {
+        originalScope = Scope;
+        model = new UpdateScopeRequest
+        {
+            DisplayName = Scope.DisplayName,
+            Description = Scope.Description,
+            IsEnabled = Scope.IsEnabled,
+            IsRequired = Scope.IsRequired,
+            ShowInDiscoveryDocument = Scope.ShowInDiscoveryDocument,
+            Type = Scope.Type,
+            Claims = new List<string>(Scope.Claims)
+        };
+    }
+
+    private async Task OnSubmit(UpdateScopeRequest formModel)
+    {
+        if (isSubmitting) return;
+
+        isSubmitting = true;
+        try
+        {
+            var result = await ScopesApi.UpdateScopeAsync(originalScope.Id, formModel);
+            
+            if (result != null)
+            {
+                DialogService.Close(result);
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to update scope");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error updating scope");
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to update scope");
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private void AddClaim()
+    {
+        if (!string.IsNullOrWhiteSpace(newClaim) && model.Claims != null && !model.Claims.Contains(newClaim))
+        {
+            model.Claims.Add(newClaim.Trim());
+            newClaim = "";
+        }
+    }
+
+    private void RemoveClaim(string claim)
+    {
+        model.Claims?.Remove(claim);
+    }
+
+    private class DropDownItem
+    {
+        public string Text { get; set; } = string.Empty;
+        public ScopeType Value { get; set; }
+    }
+}
