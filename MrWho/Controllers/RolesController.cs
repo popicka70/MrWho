@@ -377,4 +377,69 @@ public class RolesController : ControllerBase
         _logger.LogInformation("Successfully removed role {RoleName} from user {UserName}", role.Name, user.UserName);
         return Ok($"Role '{role.Name}' removed from user '{user.UserName}' successfully.");
     }
+
+    /// <summary>
+    /// Get users assigned to a specific role
+    /// </summary>
+    [HttpGet("{id}/users")]
+    public async Task<ActionResult<PagedResult<UserDto>>> GetRoleUsers(
+        string id,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10,
+        [FromQuery] string? search = null)
+    {
+        if (page < 1) page = 1;
+        if (pageSize < 1 || pageSize > 100) pageSize = 10;
+
+        var role = await _roleManager.FindByIdAsync(id);
+        if (role == null)
+        {
+            return NotFound($"Role with ID '{id}' not found.");
+        }
+
+        // Get all users in the role
+        var usersInRole = await _userManager.GetUsersInRoleAsync(role.Name!);
+        
+        // Apply search filter if provided
+        IEnumerable<IdentityUser> filteredUsers = usersInRole;
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            filteredUsers = usersInRole.Where(u => 
+                (u.UserName != null && u.UserName.Contains(search, StringComparison.OrdinalIgnoreCase)) ||
+                (u.Email != null && u.Email.Contains(search, StringComparison.OrdinalIgnoreCase)));
+        }
+
+        var totalCount = filteredUsers.Count();
+        var pagedUsers = filteredUsers
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(u => new UserDto
+            {
+                Id = u.Id,
+                UserName = u.UserName!,
+                Email = u.Email!,
+                EmailConfirmed = u.EmailConfirmed,
+                PhoneNumber = u.PhoneNumber,
+                PhoneNumberConfirmed = u.PhoneNumberConfirmed,
+                TwoFactorEnabled = u.TwoFactorEnabled,
+                LockoutEnabled = u.LockoutEnabled,
+                LockoutEnd = u.LockoutEnd,
+                AccessFailedCount = u.AccessFailedCount
+            })
+            .ToList();
+
+        var result = new PagedResult<UserDto>
+        {
+            Items = pagedUsers,
+            TotalCount = totalCount,
+            Page = page,
+            PageSize = pageSize,
+            TotalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
+        };
+
+        _logger.LogInformation("Retrieved {UserCount} users for role '{RoleName}' (page {Page})", 
+            pagedUsers.Count, role.Name, page);
+
+        return Ok(result);
+    }
 }
