@@ -16,6 +16,8 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Položky řešení", "Položky řešení", "{73E6DEBC-5D85-E032-7380-14D1E53616C6}"
 	ProjectSection(SolutionItems) = preProject
 		.github\copilot-instructions.md = .github\copilot-instructions.md
+		ESSENTIAL_DATA_SETUP.md = ESSENTIAL_DATA_SETUP.md
+		README.md = README.md
 	EndProjectSection
 EndProject
 Global
