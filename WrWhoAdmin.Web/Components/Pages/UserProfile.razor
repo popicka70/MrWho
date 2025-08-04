@@ -1,0 +1,25 @@
+@page "/profile"
+@attribute [Authorize]
+@rendermode InteractiveServer
+
+<PageTitle>User Profile - MrWho Admin</PageTitle>
+
+<RadzenText TextStyle="TextStyle.H3" TagName="TagName.H1" class="rz-pt-8">
+    <RadzenIcon Icon="person" class="rz-me-1" />
+    User Profile
+</RadzenText>
+
+<RadzenCard class="rz-my-4">
+    <RadzenText>This is the user profile page. Navigation from the dropdown menu works!</RadzenText>
+    
+    <AuthorizeView>
+        <Authorized>
+            <RadzenText>Welcome, @context.User.Identity?.Name!</RadzenText>
+            <RadzenButton Icon="logout" ButtonStyle="ButtonStyle.Danger" Text="Test Logout" Click="@(() => Navigation.NavigateTo("/logout"))" />
+        </Authorized>
+    </AuthorizeView>
+</RadzenCard>
+
+@code {
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+}

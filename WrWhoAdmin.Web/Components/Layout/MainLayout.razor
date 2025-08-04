@@ -1,4 +1,5 @@
 ﻿@inherits LayoutComponentBase
+@inject IJSRuntime JSRuntime
 
 <RadzenLayout>
     <RadzenHeader>
@@ -23,16 +24,15 @@
                         <RadzenButton Icon="notifications" ButtonStyle="ButtonStyle.Light" Variant="Variant.Text" 
                                       Click="@ShowNotifications" class="rz-border-radius-50 rz-p-2" />
                         
-                        <!-- User Profile Menu using SplitButton -->
-                        <RadzenSplitButton Text="@GetUserDisplayName(context.User)" Icon="account_circle" 
-                                          ButtonStyle="ButtonStyle.Light" Click="@(() => Navigation.NavigateTo("/profile"))">
-                            <RadzenSplitButtonItem Text="My Profile" Value="profile" Click="@(() => OnProfileMenuItemClick("profile"))" />
-                            <RadzenSplitButtonItem Text="Account Settings" Value="settings" Click="@(() => OnProfileMenuItemClick("settings"))" />
-                            <RadzenSplitButtonItem Text="Change Password" Value="change-password" Click="@(() => OnProfileMenuItemClick("change-password"))" />
-                            <RadzenSplitButtonItem Text="Help & Support" Value="help" Click="@(() => OnProfileMenuItemClick("help"))" />
-                            <RadzenSplitButtonItem Text="About" Value="about" Click="@(() => OnProfileMenuItemClick("about"))" />
-                            <RadzenSplitButtonItem Text="Logout" Value="logout" Icon="logout" Click="@(() => OnProfileMenuItemClick("logout"))" />
-                        </RadzenSplitButton>
+                        <!-- User Profile Menu - Simple HTML Logout Button -->
+                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
+                            <RadzenText Text="@GetUserDisplayName(context.User)" class="rz-text-nowrap" />
+                            <a href="/logout" class="rz-button rz-button-sm rz-variant-filled rz-danger rz-shade-default" 
+                               style="display: inline-flex; align-items: center; gap: 4px; text-decoration: none; color: white; padding: 4px 8px; border-radius: 4px; font-size: 14px;">
+                                <i class="rz-icon material-icons" style="font-size: 16px;"></i>
+                                Logout
+                            </a>
+                        </RadzenStack>
                     </Authorized>
                     <NotAuthorized>
                         <RadzenButton Text="Login" Icon="login" ButtonStyle="ButtonStyle.Primary" 
@@ -73,6 +73,7 @@
 
     [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private NotificationService NotificationService { get; set; } = default!;
+    [Inject] private ContextMenuService ContextMenuService { get; set; } = default!;
 
     private string GetUserDisplayName(System.Security.Claims.ClaimsPrincipal user)
     {
@@ -120,9 +121,24 @@
         }
     }
 
-    private void OnProfileMenuItemClick(string action)
+    private void ShowUserContextMenu(MouseEventArgs args)
     {
-        switch (action)
+        ContextMenuService.Open(args, new List<ContextMenuItem>
+        {
+            new ContextMenuItem() { Text = "My Profile", Icon = "person", Value = "profile" },
+            new ContextMenuItem() { Text = "Account Settings", Icon = "settings", Value = "settings" },
+            new ContextMenuItem() { Text = "Change Password", Icon = "lock", Value = "change-password" },
+            new ContextMenuItem() { Text = "Help & Support", Icon = "help", Value = "help" },
+            new ContextMenuItem() { Text = "About", Icon = "info", Value = "about" },
+            new ContextMenuItem() { Text = "Logout", Icon = "logout", Value = "logout" }
+        }, OnContextMenuClick);
+    }
+
+    private void OnContextMenuClick(MenuItemEventArgs args)
+    {
+        ContextMenuService.Close();
+        
+        switch (args.Value?.ToString())
         {
             case "profile":
                 Navigation.NavigateTo("/profile");
@@ -140,7 +156,7 @@
                 Navigation.NavigateTo("/about");
                 break;
             case "logout":
-                Navigation.NavigateTo("/logout");
+                // This will now be handled by the HTML anchor tag in the layout
                 break;
         }
     }

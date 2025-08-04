@@ -1,0 +1,110 @@
+@page "/profile"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject IJSRuntime JSRuntime
+
+<PageTitle>User Profile - MrWho Admin</PageTitle>
+
+<RadzenText TextStyle="TextStyle.H3" TagName="TagName.H1" class="rz-pt-8">
+    <RadzenIcon Icon="person" class="rz-me-1" />
+    User Profile
+</RadzenText>
+
+<RadzenCard class="rz-my-4">
+    <RadzenStack Gap="2rem">
+        <RadzenFieldset Text="User Information">
+            <RadzenStack Gap="1rem">
+                <AuthorizeView>
+                    <Authorized>
+                        <RadzenFormField Text="Display Name" Variant="Variant.Outlined">
+                            <RadzenTextBox Value="@GetUserDisplayName(context.User)" ReadOnly="true" Style="width: 100%;" />
+                        </RadzenFormField>
+                        
+                        <RadzenFormField Text="Email" Variant="Variant.Outlined">
+                            <RadzenTextBox Value="@GetUserEmail(context.User)" ReadOnly="true" Style="width: 100%;" />
+                        </RadzenFormField>
+                        
+                        <RadzenFormField Text="User ID" Variant="Variant.Outlined">
+                            <RadzenTextBox Value="@GetUserId(context.User)" ReadOnly="true" Style="width: 100%;" />
+                        </RadzenFormField>
+                        
+                        <RadzenFormField Text="Authentication Type" Variant="Variant.Outlined">
+                            <RadzenTextBox Value="@(context.User.Identity?.AuthenticationType ?? "Unknown")" ReadOnly="true" Style="width: 100%;" />
+                        </RadzenFormField>
+                    </Authorized>
+                    <NotAuthorized>
+                        <RadzenAlert AlertStyle="AlertStyle.Warning">
+                            You are not authenticated. Please log in.
+                        </RadzenAlert>
+                    </NotAuthorized>
+                </AuthorizeView>
+            </RadzenStack>
+        </RadzenFieldset>
+        
+        <RadzenFieldset Text="User Claims">
+            <AuthorizeView>
+                <Authorized>
+                    @if (context.User.Claims.Any())
+                    {
+                        <RadzenDataGrid Data="@context.User.Claims" TItem="System.Security.Claims.Claim" PageSize="10" AllowPaging="true">
+                            <Columns>
+                                <RadzenDataGridColumn TItem="System.Security.Claims.Claim" Property="Type" Title="Claim Type" />
+                                <RadzenDataGridColumn TItem="System.Security.Claims.Claim" Property="Value" Title="Value" />
+                                <RadzenDataGridColumn TItem="System.Security.Claims.Claim" Property="Issuer" Title="Issuer" />
+                            </Columns>
+                        </RadzenDataGrid>
+                    }
+                    else
+                    {
+                        <RadzenAlert AlertStyle="AlertStyle.Info">
+                            No claims found for the current user.
+                        </RadzenAlert>
+                    }
+                </Authorized>
+            </AuthorizeView>
+        </RadzenFieldset>
+        
+        <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem">
+            <RadzenButton Icon="refresh" ButtonStyle="ButtonStyle.Secondary" Text="Refresh" Click="@RefreshPage" />
+            <RadzenButton Icon="logout" ButtonStyle="ButtonStyle.Danger" Text="Logout" Click="@Logout" />
+        </RadzenStack>
+    </RadzenStack>
+</RadzenCard>
+
+@code {
+    [Inject] private NavigationManager Navigation { get; set; } = default!;
+
+    private string GetUserDisplayName(System.Security.Claims.ClaimsPrincipal user)
+    {
+        return user.FindFirst("name")?.Value ??
+               user.FindFirst("preferred_username")?.Value ??
+               user.FindFirst("given_name")?.Value ??
+               user.FindFirst("email")?.Value ??
+               user.Identity?.Name ??
+               "Unknown User";
+    }
+
+    private string GetUserEmail(System.Security.Claims.ClaimsPrincipal user)
+    {
+        return user.FindFirst("email")?.Value ??
+               user.FindFirst("preferred_username")?.Value ??
+               "Not provided";
+    }
+
+    private string GetUserId(System.Security.Claims.ClaimsPrincipal user)
+    {
+        return user.FindFirst("sub")?.Value ??
+               user.FindFirst("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier")?.Value ??
+               "Not provided";
+    }
+
+    private async Task RefreshPage()
+    {
+        await JSRuntime.InvokeVoidAsync("location.reload");
+    }
+
+    private void Logout()
+    {
+        Navigation.NavigateTo("/logout");
+    }
+}
