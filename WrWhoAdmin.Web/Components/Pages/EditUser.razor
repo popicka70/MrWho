@@ -8,6 +8,7 @@
 @inject NotificationService NotificationService  
 @inject DialogService DialogService
 @inject IUsersApiService UsersApiService
+@inject IRolesApiService RolesApiService
 @inject ILogger<EditUser> Logger
 
 <PageTitle>@(IsEdit ? "Edit User" : "Add User") - MrWho Admin</PageTitle>
@@ -152,6 +153,72 @@
 
                 @if (IsEdit)
                 {
+                    <!-- User Roles Management -->
+                    <RadzenFieldset Text="User Roles">
+                        <RadzenStack Gap="1rem">
+                            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
+                                Manage roles assigned to this user
+                            </RadzenText>
+                            
+                            @if (isLoadingRoles)
+                            {
+                                <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.Small" />
+                                <RadzenText TextStyle="TextStyle.Caption">Loading user roles...</RadzenText>
+                            }
+                            else
+                            {
+                                <!-- Current User Roles -->
+                                <RadzenStack Gap="1rem">
+                                    <RadzenText TextStyle="TextStyle.H6">Current Roles</RadzenText>
+                                    @if (userRoles.Any())
+                                    {
+                                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" Wrap="FlexWrap.Wrap">
+                                            @foreach (var role in userRoles)
+                                            {
+                                                <RadzenBadge BadgeStyle="BadgeStyle.Success" class="rz-p-2">
+                                                    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
+                                                        <RadzenIcon Icon="security" />
+                                                        <RadzenText Text="@role.Name" />
+                                                        <RadzenButton Icon="close" Size="ButtonSize.ExtraSmall" ButtonStyle="ButtonStyle.Danger" 
+                                                                     Click="@(async () => await RemoveRoleFromUser(role.Id))" 
+                                                                     Disabled="@isManagingRoles" />
+                                                    </RadzenStack>
+                                                </RadzenBadge>
+                                            }
+                                        </RadzenStack>
+                                    }
+                                    else
+                                    {
+                                        <RadzenAlert AlertStyle="AlertStyle.Info">
+                                            <RadzenText>This user has no roles assigned.</RadzenText>
+                                        </RadzenAlert>
+                                    }
+                                </RadzenStack>
+
+                                <!-- Assign New Role -->
+                                <RadzenStack Gap="1rem">
+                                    <RadzenText TextStyle="TextStyle.H6">Assign New Role</RadzenText>
+                                    <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" AlignItems="AlignItems.End">
+                                        <RadzenStack Gap="0.5rem" Style="flex: 1;">
+                                            <RadzenLabel Text="Select Role" />
+                                            <RadzenDropDown @bind-Value="@selectedRoleId" 
+                                                           Data="@availableRoles" 
+                                                           TextProperty="Name" 
+                                                           ValueProperty="Id" 
+                                                           Placeholder="Select a role to assign..."
+                                                           Style="width: 100%;"
+                                                           Disabled="@isManagingRoles" />
+                                        </RadzenStack>
+                                        <RadzenButton Icon="add" ButtonStyle="ButtonStyle.Primary" Text="Assign Role" 
+                                                     Click="@(async () => await AssignRoleToUser())" 
+                                                     Disabled="@(string.IsNullOrEmpty(selectedRoleId) || isManagingRoles)"
+                                                     IsBusy="@isManagingRoles" />
+                                    </RadzenStack>
+                                </RadzenStack>
+                            }
+                        </RadzenStack>
+                    </RadzenFieldset>
+
                     <!-- Security Actions (Edit Mode Only) -->
                     <RadzenFieldset Text="Security Actions">
                         <RadzenStack Gap="1rem">
@@ -208,6 +275,13 @@
     private bool showPassword = false;
     private bool isLocked = false;
     
+    // Role management fields
+    private bool isLoadingRoles = false;
+    private bool isManagingRoles = false;
+    private List<RoleDto> userRoles = new();
+    private List<RoleDto> availableRoles = new();
+    private string selectedRoleId = "";
+    
     private CreateUserRequest model = new();
     private string confirmPassword = "";
     private bool emailConfirmed = false;
@@ -219,6 +293,8 @@
         if (IsEdit)
         {
             await LoadUser();
+            await LoadUserRoles();
+            await LoadAvailableRoles();
         }
         else
         {
@@ -263,6 +339,52 @@
         finally
         {
             isLoading = false;
+        }
+    }
+
+    private async Task LoadUserRoles()
+    {
+        if (!IsEdit) return;
+
+        isLoadingRoles = true;
+        try
+        {
+            var roles = await RolesApiService.GetUserRolesAsync(Id!);
+            userRoles = roles ?? new List<RoleDto>();
+            
+            Logger.LogInformation("Loaded {RoleCount} roles for user {UserId}", userRoles.Count, Id);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading roles for user {UserId}", Id);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to load user roles");
+            userRoles = new List<RoleDto>();
+        }
+        finally
+        {
+            isLoadingRoles = false;
+        }
+    }
+
+    private async Task LoadAvailableRoles()
+    {
+        if (!IsEdit) return;
+
+        try
+        {
+            var result = await RolesApiService.GetRolesAsync(page: 1, pageSize: 100);
+            var allRoles = result?.Items ?? new List<RoleDto>();
+            
+            // Filter out roles already assigned to the user
+            availableRoles = allRoles.Where(r => !userRoles.Any(ur => ur.Id == r.Id)).ToList();
+            
+            Logger.LogInformation("Loaded {AvailableRoleCount} available roles for assignment", availableRoles.Count);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading available roles");
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to load available roles");
+            availableRoles = new List<RoleDto>();
         }
     }
 
@@ -547,5 +669,93 @@
         var chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
         return new string(Enumerable.Repeat(chars, 12)
             .Select(s => s[random.Next(s.Length)]).ToArray());
+    }
+
+    private async Task AssignRoleToUser()
+    {
+        if (string.IsNullOrEmpty(selectedRoleId) || !IsEdit) return;
+
+        var selectedRole = availableRoles.FirstOrDefault(r => r.Id == selectedRoleId);
+        if (selectedRole == null)
+        {
+            NotificationService.Notify(NotificationSeverity.Warning, "Warning", "Please select a valid role");
+            return;
+        }
+
+        isManagingRoles = true;
+        try
+        {
+            var success = await RolesApiService.AssignRoleAsync(Id!, selectedRoleId);
+            
+            if (success)
+            {
+                NotificationService.Notify(NotificationSeverity.Success, 
+                    $"Role '{selectedRole.Name}' assigned to user successfully");
+                
+                // Refresh the role lists
+                await LoadUserRoles();
+                await LoadAvailableRoles();
+                selectedRoleId = "";
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to assign role to user");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error assigning role {RoleId} to user {UserId}", selectedRoleId, Id);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to assign role to user");
+        }
+        finally
+        {
+            isManagingRoles = false;
+        }
+    }
+
+    private async Task RemoveRoleFromUser(string roleId)
+    {
+        if (!IsEdit) return;
+
+        var role = userRoles.FirstOrDefault(r => r.Id == roleId);
+        if (role == null)
+        {
+            NotificationService.Notify(NotificationSeverity.Warning, "Warning", "Role not found");
+            return;
+        }
+
+        var result = await DialogService.Confirm($"Are you sure you want to remove the role '{role.Name}' from this user?", 
+            "Remove Role", new ConfirmOptions() { OkButtonText = "Remove", CancelButtonText = "Cancel" });
+        
+        if (result != true) return;
+
+        isManagingRoles = true;
+        try
+        {
+            var success = await RolesApiService.RemoveRoleAsync(Id!, roleId);
+            
+            if (success)
+            {
+                NotificationService.Notify(NotificationSeverity.Success, 
+                    $"Role '{role.Name}' removed from user successfully");
+                
+                // Refresh the role lists
+                await LoadUserRoles();
+                await LoadAvailableRoles();
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to remove role from user");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error removing role {RoleId} from user {UserId}", roleId, Id);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to remove role from user");
+        }
+        finally
+        {
+            isManagingRoles = false;
+        }
     }
 }
