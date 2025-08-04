@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MrWho.Data;
 using MrWho.Models;
+using MrWho.Shared.Models;
 using OpenIddict.Abstractions;
 
 namespace MrWho.Controllers;
@@ -67,7 +68,7 @@ public class ClientsController : ControllerBase
                 Name = c.Name,
                 Description = c.Description,
                 IsEnabled = c.IsEnabled,
-                ClientType = c.ClientType,
+                ClientType = (MrWho.Shared.ClientType)c.ClientType,
                 AllowAuthorizationCodeFlow = c.AllowAuthorizationCodeFlow,
                 AllowClientCredentialsFlow = c.AllowClientCredentialsFlow,
                 AllowPasswordFlow = c.AllowPasswordFlow,
@@ -125,7 +126,7 @@ public class ClientsController : ControllerBase
             Name = client.Name,
             Description = client.Description,
             IsEnabled = client.IsEnabled,
-            ClientType = client.ClientType,
+            ClientType = (MrWho.Shared.ClientType)client.ClientType,
             AllowAuthorizationCodeFlow = client.AllowAuthorizationCodeFlow,
             AllowClientCredentialsFlow = client.AllowClientCredentialsFlow,
             AllowPasswordFlow = client.AllowPasswordFlow,
@@ -180,7 +181,7 @@ public class ClientsController : ControllerBase
                     Description = request.Description,
                     RealmId = request.RealmId,
                     IsEnabled = request.IsEnabled,
-                    ClientType = request.ClientType,
+                    ClientType = (MrWho.Models.ClientType)request.ClientType,
                     AllowAuthorizationCodeFlow = request.AllowAuthorizationCodeFlow,
                     AllowClientCredentialsFlow = request.AllowClientCredentialsFlow,
                     AllowPasswordFlow = request.AllowPasswordFlow,
@@ -252,7 +253,7 @@ public class ClientsController : ControllerBase
                     Name = client.Name,
                     Description = client.Description,
                     IsEnabled = client.IsEnabled,
-                    ClientType = client.ClientType,
+                    ClientType = (MrWho.Shared.ClientType)client.ClientType,
                     AllowAuthorizationCodeFlow = client.AllowAuthorizationCodeFlow,
                     AllowClientCredentialsFlow = client.AllowClientCredentialsFlow,
                     AllowPasswordFlow = client.AllowPasswordFlow,
@@ -319,7 +320,7 @@ public class ClientsController : ControllerBase
                 if (request.IsEnabled.HasValue)
                     client.IsEnabled = request.IsEnabled.Value;
                 if (request.ClientType.HasValue)
-                    client.ClientType = request.ClientType.Value;
+                    client.ClientType = (MrWho.Models.ClientType)request.ClientType.Value;
                 if (request.AllowAuthorizationCodeFlow.HasValue)
                     client.AllowAuthorizationCodeFlow = request.AllowAuthorizationCodeFlow.Value;
                 if (request.AllowClientCredentialsFlow.HasValue)
@@ -415,7 +416,7 @@ public class ClientsController : ControllerBase
                     Name = client.Name,
                     Description = client.Description,
                     IsEnabled = client.IsEnabled,
-                    ClientType = client.ClientType,
+                    ClientType = (MrWho.Shared.ClientType)client.ClientType,
                     AllowAuthorizationCodeFlow = client.AllowAuthorizationCodeFlow,
                     AllowClientCredentialsFlow = client.AllowClientCredentialsFlow,
                     AllowPasswordFlow = client.AllowPasswordFlow,
@@ -524,7 +525,7 @@ public class ClientsController : ControllerBase
             Name = client.Name,
             Description = client.Description,
             IsEnabled = client.IsEnabled,
-            ClientType = client.ClientType,
+            ClientType = (MrWho.Shared.ClientType)client.ClientType,
             AllowAuthorizationCodeFlow = client.AllowAuthorizationCodeFlow,
             AllowClientCredentialsFlow = client.AllowClientCredentialsFlow,
             AllowPasswordFlow = client.AllowPasswordFlow,
@@ -632,6 +633,7 @@ public class ClientsController : ControllerBase
                 Name = client.Name,
                 Description = client.Description,
                 RealmId = client.RealmId,
+                ClientType = (MrWho.Shared.ClientType)client.ClientType,
                 RedirectUris = client.RedirectUris.Select(ru => ru.Uri).ToList(),
                 PostLogoutUris = client.PostLogoutUris.Select(plu => plu.Uri).ToList(),
                 Scopes = client.Scopes.Select(s => s.Scope).ToList(),

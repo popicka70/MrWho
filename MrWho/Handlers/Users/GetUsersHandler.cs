@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using MrWho.Models;
+using MrWho.Shared.Models;
 
 namespace MrWho.Handlers.Users;
 

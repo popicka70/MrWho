@@ -187,3 +187,56 @@ public class UpdateUserRequest
     public bool? PhoneNumberConfirmed { get; set; }
     public bool? TwoFactorEnabled { get; set; }
 }
+
+/// <summary>
+/// Role DTO
+/// </summary>
+public class RoleDto
+{
+    public string Id { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public bool IsEnabled { get; set; } = true;
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
+    public string? CreatedBy { get; set; }
+    public string? UpdatedBy { get; set; }
+}
+
+/// <summary>
+/// Create role request
+/// </summary>
+public class CreateRoleRequest
+{
+    public string Name { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public bool IsEnabled { get; set; } = true;
+}
+
+/// <summary>
+/// Update role request
+/// </summary>
+public class UpdateRoleRequest
+{
+    public string? Name { get; set; }
+    public string? Description { get; set; }
+    public bool? IsEnabled { get; set; }
+}
+
+/// <summary>
+/// Assign role request
+/// </summary>
+public class AssignRoleRequest
+{
+    public string UserId { get; set; } = string.Empty;
+    public string RoleId { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Remove role request
+/// </summary>
+public class RemoveRoleRequest
+{
+    public string UserId { get; set; } = string.Empty;
+    public string RoleId { get; set; } = string.Empty;
+}
