@@ -1,0 +1,325 @@
+@inject IApiResourcesApiService ApiResourcesApi
+@inject DialogService DialogService
+@inject NotificationService NotificationService
+@inject ILogger<EditApiResourceDialog> Logger
+
+<RadzenTemplateForm TItem="UpdateApiResourceRequest" Data="@model" Submit="@OnSubmit">
+    <RadzenStack Gap="1rem">
+        <!-- API Resource Info -->
+        <RadzenCard class="rz-p-3" Style="background-color: var(--rz-base-50);">
+            <RadzenStack Gap="0.5rem">
+                <RadzenText TextStyle="TextStyle.H6" class="rz-color-primary">@ApiResource.Name</RadzenText>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                    Created: @ApiResource.CreatedAt.ToString("MMM dd, yyyy HH:mm") 
+                    @if (!string.IsNullOrEmpty(ApiResource.CreatedBy))
+                    {
+                        <text>by @ApiResource.CreatedBy</text>
+                    }
+                </RadzenText>
+            </RadzenStack>
+        </RadzenCard>
+
+        <!-- Basic Information -->
+        <RadzenFieldset Text="Basic Information">
+            <RadzenStack Gap="1rem">
+                <RadzenRow>
+                    <RadzenColumn Size="12" SizeMD="6">
+                        <RadzenFormField Text="Display Name" Variant="Variant.Outlined">
+                            <RadzenTextBox @bind-Value="@model.DisplayName" Name="DisplayName" class="w-100" />
+                        </RadzenFormField>
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="6">
+                        <RadzenCheckBox @bind-Value="@enabledValue" Name="IsEnabled" />
+                        <RadzenLabel Text="Enabled" Component="IsEnabled" class="rz-ms-2" />
+                    </RadzenColumn>
+                </RadzenRow>
+                
+                <RadzenFormField Text="Description" Variant="Variant.Outlined">
+                    <RadzenTextArea @bind-Value="@model.Description" Name="Description" class="w-100" Rows="3" />
+                </RadzenFormField>
+            </RadzenStack>
+        </RadzenFieldset>
+
+        <!-- Scopes -->
+        <RadzenFieldset Text="Scopes">
+            <RadzenStack Gap="1rem">
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                    Define the scopes that this API resource supports. These scopes can be requested by clients to access this API.
+                </RadzenText>
+                
+                <RadzenRow>
+                    <RadzenColumn Size="10">
+                        <RadzenTextBox @bind-Value="@newScope" Placeholder="Enter scope name (e.g., api.read, api.write)" class="w-100" />
+                    </RadzenColumn>
+                    <RadzenColumn Size="2">
+                        <RadzenButton Click="@AddScope" Icon="add" ButtonStyle="ButtonStyle.Primary" class="w-100" />
+                    </RadzenColumn>
+                </RadzenRow>
+                
+                @if (model.Scopes != null && model.Scopes.Any())
+                {
+                    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" Wrap="FlexWrap.Wrap">
+                        @foreach (var scope in model.Scopes)
+                        {
+                            <RadzenBadge BadgeStyle="BadgeStyle.Info" class="rz-p-2">
+                                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
+                                    <RadzenText>@scope</RadzenText>
+                                    <RadzenButton Click="@(() => RemoveScope(scope))" Icon="close" Size="ButtonSize.ExtraSmall" 
+                                                 ButtonStyle="ButtonStyle.Danger" Variant="Variant.Text" />
+                                </RadzenStack>
+                            </RadzenBadge>
+                        }
+                    </RadzenStack>
+                }
+                else
+                {
+                    <RadzenAlert AlertStyle="AlertStyle.Info" Size="AlertSize.Small">
+                        No scopes defined. Add scopes that this API resource supports.
+                    </RadzenAlert>
+                }
+            </RadzenStack>
+        </RadzenFieldset>
+
+        <!-- User Claims -->
+        <RadzenFieldset Text="User Claims">
+            <RadzenStack Gap="1rem">
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                    Define which user claims should be included in access tokens for this API resource.
+                </RadzenText>
+                
+                <RadzenRow>
+                    <RadzenColumn Size="10">
+                        <RadzenTextBox @bind-Value="@newClaim" Placeholder="Enter claim type (e.g., sub, email, name)" class="w-100" />
+                    </RadzenColumn>
+                    <RadzenColumn Size="2">
+                        <RadzenButton Click="@AddClaim" Icon="add" ButtonStyle="ButtonStyle.Primary" class="w-100" />
+                    </RadzenColumn>
+                </RadzenRow>
+                
+                @if (model.UserClaims != null && model.UserClaims.Any())
+                {
+                    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" Wrap="FlexWrap.Wrap">
+                        @foreach (var claim in model.UserClaims)
+                        {
+                            <RadzenBadge BadgeStyle="BadgeStyle.Success" class="rz-p-2">
+                                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
+                                    <RadzenText>@claim</RadzenText>
+                                    <RadzenButton Click="@(() => RemoveClaim(claim))" Icon="close" Size="ButtonSize.ExtraSmall" 
+                                                 ButtonStyle="ButtonStyle.Danger" Variant="Variant.Text" />
+                                </RadzenStack>
+                            </RadzenBadge>
+                        }
+                    </RadzenStack>
+                }
+                else
+                {
+                    <RadzenAlert AlertStyle="AlertStyle.Info" Size="AlertSize.Small">
+                        No user claims defined. Add claims that should be included in access tokens.
+                    </RadzenAlert>
+                }
+            </RadzenStack>
+        </RadzenFieldset>
+
+        <!-- Secrets -->
+        <RadzenFieldset Text="API Secrets">
+            <RadzenStack Gap="1rem">
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                    API secrets are used for token introspection and other server-to-server scenarios. Update or add new secrets as needed.
+                </RadzenText>
+                
+                @if (newSecret != null)
+                {
+                    <RadzenCard class="rz-p-3" Style="background-color: var(--rz-base-50);">
+                        <RadzenStack Gap="1rem">
+                            <RadzenRow>
+                                <RadzenColumn Size="12" SizeMD="6">
+                                    <RadzenFormField Text="Description" Variant="Variant.Outlined">
+                                        <RadzenTextBox @bind-Value="@newSecret.Description" class="w-100" />
+                                    </RadzenFormField>
+                                </RadzenColumn>
+                                <RadzenColumn Size="12" SizeMD="6">
+                                    <RadzenFormField Text="Secret Value" Variant="Variant.Outlined">
+                                        <RadzenTextBox @bind-Value="@newSecret.Value" class="w-100" />
+                                        <RadzenRequiredValidator Component="SecretValue" Text="Secret value is required" />
+                                    </RadzenFormField>
+                                </RadzenColumn>
+                            </RadzenRow>
+                            <RadzenRow>
+                                <RadzenColumn Size="12" SizeMD="6">
+                                    <RadzenFormField Text="Expiration (Optional)" Variant="Variant.Outlined">
+                                        <RadzenDatePicker @bind-Value="@newSecret.Expiration" class="w-100" ShowTime="true" />
+                                    </RadzenFormField>
+                                </RadzenColumn>
+                                <RadzenColumn Size="12" SizeMD="6">
+                                    <RadzenFormField Text="Type" Variant="Variant.Outlined">
+                                        <RadzenTextBox @bind-Value="@newSecret.Type" class="w-100" />
+                                    </RadzenFormField>
+                                </RadzenColumn>
+                            </RadzenRow>
+                            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                                <RadzenButton Click="@AddSecret" Icon="add" ButtonStyle="ButtonStyle.Success" Text="Add Secret" />
+                                <RadzenButton Click="@CancelAddSecret" Icon="cancel" ButtonStyle="ButtonStyle.Light" Text="Cancel" />
+                            </RadzenStack>
+                        </RadzenStack>
+                    </RadzenCard>
+                }
+                else
+                {
+                    <RadzenButton Click="@StartAddSecret" Icon="add" ButtonStyle="ButtonStyle.Secondary" Text="Add New Secret" />
+                }
+                
+                @if (model.Secrets != null && model.Secrets.Any())
+                {
+                    <RadzenStack Gap="0.5rem">
+                        @foreach (var secret in model.Secrets.Select((s, i) => new { Secret = s, Index = i }))
+                        {
+                            <RadzenCard class="rz-p-2">
+                                <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                                    <RadzenStack Gap="0.25rem">
+                                        <RadzenText TextStyle="TextStyle.Subtitle2">@(string.IsNullOrEmpty(secret.Secret.Description) ? $"Secret {secret.Index + 1}" : secret.Secret.Description)</RadzenText>
+                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Type: @secret.Secret.Type</RadzenText>
+                                        @if (secret.Secret.Expiration.HasValue)
+                                        {
+                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Expires: @secret.Secret.Expiration.Value.ToString("MMM dd, yyyy HH:mm")</RadzenText>
+                                        }
+                                    </RadzenStack>
+                                    <RadzenButton Click="@(() => RemoveSecret(secret.Index))" Icon="delete" Size="ButtonSize.Small" 
+                                                 ButtonStyle="ButtonStyle.Danger" />
+                                </RadzenStack>
+                            </RadzenCard>
+                        }
+                    </RadzenStack>
+                }
+                else
+                {
+                    <RadzenAlert AlertStyle="AlertStyle.Info" Size="AlertSize.Small">
+                        No secrets defined. Secrets are optional but useful for API introspection.
+                    </RadzenAlert>
+                }
+            </RadzenStack>
+        </RadzenFieldset>
+    </RadzenStack>
+
+    <!-- Form Actions -->
+    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem" class="rz-mt-6">
+        <RadzenButton Click="@(() => DialogService.Close())" Text="Cancel" ButtonStyle="ButtonStyle.Light" />
+        <RadzenButton ButtonType="ButtonType.Submit" Text="Update API Resource" ButtonStyle="ButtonStyle.Primary" IsBusy="@isSubmitting" />
+    </RadzenStack>
+</RadzenTemplateForm>
+
+@code {
+    [Parameter] public ApiResourceDto ApiResource { get; set; } = default!;
+
+    private UpdateApiResourceRequest model = new();
+    private bool isSubmitting = false;
+    private string newScope = "";
+    private string newClaim = "";
+    private CreateApiSecretRequest? newSecret = null;
+    
+    private bool enabledValue
+    {
+        get => model.IsEnabled ?? false;
+        set => model.IsEnabled = value;
+    }
+
+    protected override void OnInitialized()
+    {
+        // Initialize the model with existing API resource data
+        model = new UpdateApiResourceRequest
+        {
+            DisplayName = ApiResource.DisplayName,
+            Description = ApiResource.Description,
+            IsEnabled = ApiResource.IsEnabled,
+            Scopes = new List<string>(ApiResource.Scopes),
+            UserClaims = new List<string>(ApiResource.UserClaims),
+            Secrets = new List<CreateApiSecretRequest>()
+        };
+    }
+
+    private async Task OnSubmit(UpdateApiResourceRequest formModel)
+    {
+        if (isSubmitting) return;
+
+        isSubmitting = true;
+        try
+        {
+            var result = await ApiResourcesApi.UpdateApiResourceAsync(ApiResource.Id, formModel);
+            
+            if (result != null)
+            {
+                DialogService.Close(result);
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to update API resource");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error updating API resource");
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to update API resource");
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private void AddScope()
+    {
+        if (!string.IsNullOrWhiteSpace(newScope) && model.Scopes != null && !model.Scopes.Contains(newScope))
+        {
+            model.Scopes.Add(newScope.Trim());
+            newScope = "";
+        }
+    }
+
+    private void RemoveScope(string scope)
+    {
+        model.Scopes?.Remove(scope);
+    }
+
+    private void AddClaim()
+    {
+        if (!string.IsNullOrWhiteSpace(newClaim) && model.UserClaims != null && !model.UserClaims.Contains(newClaim))
+        {
+            model.UserClaims.Add(newClaim.Trim());
+            newClaim = "";
+        }
+    }
+
+    private void RemoveClaim(string claim)
+    {
+        model.UserClaims?.Remove(claim);
+    }
+
+    private void StartAddSecret()
+    {
+        newSecret = new CreateApiSecretRequest
+        {
+            Type = "SharedSecret"
+        };
+    }
+
+    private void AddSecret()
+    {
+        if (newSecret != null && !string.IsNullOrWhiteSpace(newSecret.Value) && model.Secrets != null)
+        {
+            model.Secrets.Add(newSecret);
+            newSecret = null;
+        }
+    }
+
+    private void CancelAddSecret()
+    {
+        newSecret = null;
+    }
+
+    private void RemoveSecret(int index)
+    {
+        if (model.Secrets != null && index >= 0 && index < model.Secrets.Count)
+        {
+            model.Secrets.RemoveAt(index);
+        }
+    }
+}

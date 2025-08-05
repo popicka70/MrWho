@@ -1,0 +1,239 @@
+@using MrWho.Shared.Models
+@inject NotificationService NotificationService
+@inject DialogService DialogService
+@inject ILogger<EditScopeDialog> Logger
+@inject IScopesApiService ScopesApi
+
+<RadzenTemplateForm Data="@model" Submit="@(async (UpdateScopeRequest formModel) => await OnSubmit(formModel))">
+    <!-- Tabs Section -->
+    <RadzenTabs @bind-SelectedIndex="@selectedTabIndex" TabPosition="TabPosition.Top" RenderMode="TabRenderMode.Client" 
+               Style="width: 100%; height: 480px;">
+        <Tabs>
+            <!-- Basic Information Tab -->
+            <RadzenTabsItem Text="Basic Information" Icon="info">
+                <div style="padding: 1rem; max-height: 450px; overflow-y: auto;">
+                    <RadzenStack Gap="1rem">
+                        <RadzenFormField Text="Scope Name" Variant="Variant.Outlined">
+                            <ChildContent>
+                                <RadzenTextBox Value="@originalScope.Name" Style="width: 100%;" Disabled="true" />
+                            </ChildContent>
+                            <Helper>
+                                <RadzenText TextStyle="TextStyle.Caption" Text="Scope name cannot be changed" />
+                            </Helper>
+                        </RadzenFormField>
+
+                        <RadzenFormField Text="Display Name" Variant="Variant.Outlined">
+                            <ChildContent>
+                                <RadzenTextBox @bind-Value="@model.DisplayName" Style="width: 100%;" Placeholder="Human-readable name" />
+                            </ChildContent>
+                        </RadzenFormField>
+
+                        <RadzenFormField Text="Description" Variant="Variant.Outlined">
+                            <ChildContent>
+                                <RadzenTextArea @bind-Value="@model.Description" Style="width: 100%; height: 80px;" 
+                                               Placeholder="Description of what this scope provides access to" />
+                            </ChildContent>
+                        </RadzenFormField>
+
+                        <RadzenFormField Text="Scope Type" Variant="Variant.Outlined">
+                            <ChildContent>
+                                <RadzenDropDown @bind-Value="@model.Type" Data="@scopeTypes" TextProperty="Text" ValueProperty="Value" 
+                                               Style="width: 100%;" />
+                            </ChildContent>
+                        </RadzenFormField>
+                    </RadzenStack>
+                </div>
+            </RadzenTabsItem>
+
+            <!-- Configuration Tab -->
+            <RadzenTabsItem Text="Configuration" Icon="settings">
+                <div style="padding: 1rem; max-height: 450px; overflow-y: auto;">
+                    <RadzenStack Gap="1.5rem">
+                        <RadzenText TextStyle="TextStyle.H6" Text="Scope Configuration" />
+                        
+                        <RadzenCard>
+                            <RadzenStack Gap="1rem">
+                                <!-- Enabled Status -->
+                                <RadzenStack Gap="0.5rem">
+                                    <RadzenLabel Text="Enabled Status" />
+                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                        <RadzenCheckBox @bind-Value="@model.IsEnabled" />
+                                        <RadzenLabel Text="Scope is enabled" />
+                                    </RadzenStack>
+                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                        When enabled, this scope can be requested by clients
+                                    </RadzenText>
+                                </RadzenStack>
+
+                                <!-- Required Status -->
+                                <RadzenStack Gap="0.5rem">
+                                    <RadzenLabel Text="Required Scope" />
+                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                        <RadzenCheckBox @bind-Value="@model.IsRequired" />
+                                        <RadzenLabel Text="This scope is required" />
+                                    </RadzenStack>
+                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                        Required scopes are automatically included in token requests
+                                    </RadzenText>
+                                </RadzenStack>
+
+                                <!-- Discovery Document -->
+                                <RadzenStack Gap="0.5rem">
+                                    <RadzenLabel Text="Discovery Document" />
+                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                        <RadzenCheckBox @bind-Value="@model.ShowInDiscoveryDocument" />
+                                        <RadzenLabel Text="Show in discovery document" />
+                                    </RadzenStack>
+                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                        Public scopes are visible in the OpenID Connect discovery document
+                                    </RadzenText>
+                                </RadzenStack>
+                            </RadzenStack>
+                        </RadzenCard>
+                    </RadzenStack>
+                </div>
+            </RadzenTabsItem>
+
+            <!-- Claims Tab -->
+            <RadzenTabsItem Text="Claims" Icon="verified_user">
+                <div style="padding: 1rem; max-height: 450px; overflow-y: auto;">
+                    <RadzenStack Gap="1rem">
+                        <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                            <RadzenText TextStyle="TextStyle.H6" Text="Claims Management" />
+                            <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="@($"{model.Claims?.Count ?? 0} claims")" />
+                        </RadzenStack>
+                        
+                        <RadzenCard>
+                            <RadzenStack Gap="1rem">
+                                <RadzenText TextStyle="TextStyle.Subtitle1" Text="Current Claims" />
+                                
+                                @if (model.Claims != null && model.Claims.Any())
+                                {
+                                    <div style="max-height: 200px; overflow-y: auto; border: 1px solid var(--rz-border-color); border-radius: var(--rz-border-radius); padding: 0.5rem;">
+                                        @for (int i = 0; i < model.Claims.Count; i++)
+                                        {
+                                            var index = i;
+                                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" class="rz-mb-2">
+                                                <RadzenIcon Icon="verified_user" Style="color: var(--rz-info); font-size: 16px;" />
+                                                <RadzenTextBox @bind-Value="@model.Claims[index]" Style="flex: 1;" />
+                                                <RadzenButton Click="@(() => RemoveClaim(model.Claims[index]))" Icon="close" Size="ButtonSize.Small" 
+                                                             ButtonStyle="ButtonStyle.Danger" />
+                                            </RadzenStack>
+                                        }
+                                    </div>
+                                }
+                                else
+                                {
+                                    <RadzenAlert AlertStyle="AlertStyle.Info">
+                                        <RadzenText>No claims are currently associated with this scope.</RadzenText>
+                                    </RadzenAlert>
+                                }
+                                
+                                <RadzenStack Gap="0.5rem">
+                                    <RadzenText TextStyle="TextStyle.Subtitle1" Text="Add New Claim" />
+                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                        <RadzenTextBox @bind-Value="@newClaim" Style="flex: 1;" Placeholder="Enter claim type (e.g., email, profile, role)" />
+                                        <RadzenButton Click="@AddClaim" Icon="add" Size="ButtonSize.Medium" 
+                                                     ButtonStyle="ButtonStyle.Success" Text="Add" Disabled="@string.IsNullOrWhiteSpace(newClaim)" />
+                                    </RadzenStack>
+                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                        Common claims: sub, name, email, profile, role, preferred_username
+                                    </RadzenText>
+                                </RadzenStack>
+                            </RadzenStack>
+                        </RadzenCard>
+                    </RadzenStack>
+                </div>
+            </RadzenTabsItem>
+        </Tabs>
+    </RadzenTabs>
+
+    <!-- Bottom Action Bar -->
+    <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--rz-border-color);">
+        <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" JustifyContent="JustifyContent.End">
+            <RadzenButton Click="@(() => DialogService.Close())" Text="Cancel" ButtonStyle="ButtonStyle.Light" Icon="cancel" />
+            <RadzenButton ButtonType="ButtonType.Submit" Text="Update Scope" ButtonStyle="ButtonStyle.Primary" 
+                         Icon="save" IsBusy="@isSubmitting" />
+        </RadzenStack>
+    </div>
+</RadzenTemplateForm>
+
+@code {
+    [Parameter] public ScopeDto Scope { get; set; } = null!;
+
+    private UpdateScopeRequest model = new();
+    private ScopeDto originalScope = null!;
+    private bool isSubmitting = false;
+    private string newClaim = "";
+    private int selectedTabIndex = 0;
+
+    private readonly List<DropDownItem> scopeTypes = new()
+    {
+        new() { Text = "Identity Scope", Value = ScopeType.Identity },
+        new() { Text = "Resource Scope", Value = ScopeType.Resource }
+    };
+
+    protected override void OnInitialized()
+    {
+        originalScope = Scope;
+        model = new UpdateScopeRequest
+        {
+            DisplayName = Scope.DisplayName,
+            Description = Scope.Description,
+            IsEnabled = Scope.IsEnabled,
+            IsRequired = Scope.IsRequired,
+            ShowInDiscoveryDocument = Scope.ShowInDiscoveryDocument,
+            Type = Scope.Type,
+            Claims = new List<string>(Scope.Claims)
+        };
+    }
+
+    private async Task OnSubmit(UpdateScopeRequest formModel)
+    {
+        if (isSubmitting) return;
+
+        isSubmitting = true;
+        try
+        {
+            var result = await ScopesApi.UpdateScopeAsync(originalScope.Id, formModel);
+            
+            if (result != null)
+            {
+                DialogService.Close(result);
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to update scope");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error updating scope");
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to update scope");
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private void AddClaim()
+    {
+        if (!string.IsNullOrWhiteSpace(newClaim) && model.Claims != null && !model.Claims.Contains(newClaim))
+        {
+            model.Claims.Add(newClaim.Trim());
+            newClaim = "";
+        }
+    }
+
+    private void RemoveClaim(string claim)
+    {
+        model.Claims?.Remove(claim);
+    }
+
+    private class DropDownItem
+    {
+        public string Text { get; set; } = string.Empty;
+        public ScopeType Value { get; set; }
+    }
+}

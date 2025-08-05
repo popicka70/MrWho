@@ -1,0 +1,263 @@
+@using MrWho.Shared.Models
+@inject DialogService DialogService
+
+<!-- Tabs Section -->
+<RadzenTabs @bind-SelectedIndex="@selectedTabIndex" TabPosition="TabPosition.Top" RenderMode="TabRenderMode.Client" 
+           Style="width: 100%; height: 560px;">
+    <Tabs>
+        <!-- Basic Information Tab -->
+        <RadzenTabsItem Text="Basic Information" Icon="info">
+            <div style="padding: 1rem; max-height: 550px; overflow-y: hidden;">
+                <RadzenCard>
+                    <RadzenStack Gap="1rem">
+                        <RadzenStack Orientation="Orientation.Horizontal" Gap="2rem">
+                            <RadzenStack Style="flex: 1;">
+                                <RadzenText TextStyle="TextStyle.Subtitle2" Text="Scope Name" />
+                                <RadzenText Text="@Scope.Name" />
+                            </RadzenStack>
+                            <RadzenStack Style="flex: 1;">
+                                <RadzenText TextStyle="TextStyle.Subtitle2" Text="Display Name" />
+                                <RadzenText Text="@(Scope.DisplayName ?? "-")" />
+                            </RadzenStack>
+                        </RadzenStack>
+
+                        <RadzenStack>
+                            <RadzenText TextStyle="TextStyle.Subtitle2" Text="Description" />
+                            <RadzenText Text="@(Scope.Description ?? "-")" />
+                        </RadzenStack>
+
+                        <RadzenStack Orientation="Orientation.Horizontal" Gap="2rem">
+                            <RadzenStack Style="flex: 1;">
+                                <RadzenText TextStyle="TextStyle.Subtitle2" Text="Type" />
+                                <RadzenBadge BadgeStyle="@GetScopeTypeBadgeStyle(Scope.Type)" 
+                                            Text="@GetScopeTypeText(Scope.Type)" />
+                            </RadzenStack>
+                            <RadzenStack Style="flex: 1;">
+                                <RadzenText TextStyle="TextStyle.Subtitle2" Text="Status" />
+                                <RadzenBadge BadgeStyle="@(Scope.IsEnabled ? BadgeStyle.Success : BadgeStyle.Danger)" 
+                                            Text="@(Scope.IsEnabled ? "Enabled" : "Disabled")" />
+                            </RadzenStack>
+                        </RadzenStack>
+                    </RadzenStack>
+                </RadzenCard>
+            </div>
+        </RadzenTabsItem>
+
+        <!-- Configuration Tab -->
+        <RadzenTabsItem Text="Configuration" Icon="settings">
+            <div style="padding: 1rem; max-height: 550px; overflow-y: hidden;">
+                <RadzenCard>
+                    <RadzenStack Gap="1rem">
+                        <RadzenText TextStyle="TextStyle.H6" Text="Configuration Settings" />
+                        
+                        <RadzenStack Orientation="Orientation.Horizontal" Gap="2rem">
+                            <RadzenStack Style="flex: 1;">
+                                <RadzenText TextStyle="TextStyle.Subtitle2" Text="Required Scope" />
+                                <RadzenBadge BadgeStyle="@(Scope.IsRequired ? BadgeStyle.Warning : BadgeStyle.Secondary)" 
+                                            Text="@(Scope.IsRequired ? "Yes" : "No")" />
+                                <RadzenText TextStyle="TextStyle.Caption" Text="@(Scope.IsRequired ? "This scope is always included in token requests" : "This scope is optional")" />
+                            </RadzenStack>
+                            <RadzenStack Style="flex: 1;">
+                                <RadzenText TextStyle="TextStyle.Subtitle2" Text="Show in Discovery" />
+                                <RadzenBadge BadgeStyle="@(Scope.ShowInDiscoveryDocument ? BadgeStyle.Primary : BadgeStyle.Secondary)" 
+                                            Text="@(Scope.ShowInDiscoveryDocument ? "Yes" : "No")" />
+                                <RadzenText TextStyle="TextStyle.Caption" Text="@(Scope.ShowInDiscoveryDocument ? "Visible in OpenID discovery document" : "Hidden from discovery document")" />
+                            </RadzenStack>
+                            <RadzenStack Style="flex: 1;">
+                                <RadzenText TextStyle="TextStyle.Subtitle2" Text="Standard Scope" />
+                                <RadzenBadge BadgeStyle="@(Scope.IsStandard ? BadgeStyle.Info : BadgeStyle.Secondary)" 
+                                            Text="@(Scope.IsStandard ? "Yes" : "No")" />
+                                <RadzenText TextStyle="TextStyle.Caption" Text="@(Scope.IsStandard ? "System-defined scope (read-only)" : "Custom scope (editable)")" />
+                            </RadzenStack>
+                        </RadzenStack>
+                    </RadzenStack>
+                </RadzenCard>
+            </div>
+        </RadzenTabsItem>
+
+        <!-- Claims Tab -->
+        <RadzenTabsItem Text="Claims" Icon="verified_user">
+            <div style="padding: 1rem; max-height: 550px; overflow-y: hidden;">
+                <RadzenStack Gap="1rem">
+                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                        <RadzenText TextStyle="TextStyle.H6" Text="Claims Information" />
+                        <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="@($"{Scope.Claims.Count} claims")" />
+                    </RadzenStack>
+                    
+                    @if (Scope.Claims.Any())
+                    {
+                        <div style="height: 450px; border: 1px solid var(--rz-border-color); border-radius: var(--rz-border-radius);">
+                            <RadzenDataGrid Data="@filteredClaims" TItem="string" AllowPaging="false" AllowSorting="true" 
+                                           Style="height: 100%;" ShowPagingSummary="false" AllowFiltering="true" FilterMode="FilterMode.Simple">
+                                <Columns>
+                                    <RadzenDataGridColumn TItem="string" Title="Type" Width="60px">
+                                        <Template Context="claim">
+                                            <RadzenIcon Icon="verified_user" Style="color: var(--rz-info);" />
+                                        </Template>
+                                    </RadzenDataGridColumn>
+                                    <RadzenDataGridColumn TItem="string" Property="@nameof(String.Empty)" Title="Claim Name" Sortable="true" Filterable="true">
+                                        <Template Context="claim">
+                                            <RadzenText Text="@claim" Style="font-weight: 500;" />
+                                        </Template>
+                                        <FilterTemplate>
+                                            <RadzenTextBox @oninput="@(args => OnClaimFilter(args.Value?.ToString()))" 
+                                                          Placeholder="Filter claims..." Style="width: 100%;" />
+                                        </FilterTemplate>
+                                    </RadzenDataGridColumn>
+                                    <RadzenDataGridColumn TItem="string" Title="Description">
+                                        <Template Context="claim">
+                                            <RadzenText Text="@GetClaimDescription(claim)" TextStyle="TextStyle.Body2" 
+                                                       Style="color: var(--rz-text-secondary-color);" />
+                                        </Template>
+                                    </RadzenDataGridColumn>
+                                </Columns>
+                            </RadzenDataGrid>
+                        </div>
+                    }
+                    else
+                    {
+                        <RadzenAlert AlertStyle="AlertStyle.Info">
+                            <RadzenText>No claims are associated with this scope.</RadzenText>
+                        </RadzenAlert>
+                    }
+                </RadzenStack>
+            </div>
+        </RadzenTabsItem>
+
+        <!-- Metadata Tab -->
+        <RadzenTabsItem Text="Metadata" Icon="schedule">
+            <div style="padding: 1rem; max-height: 550px; overflow-y: hidden;">
+                <RadzenCard>
+                    <RadzenStack Gap="1rem">
+                        <RadzenText TextStyle="TextStyle.H6" Text="Audit Information" />
+                        
+                        <RadzenStack Orientation="Orientation.Horizontal" Gap="2rem">
+                            <RadzenStack Style="flex: 1;">
+                                <RadzenText TextStyle="TextStyle.Subtitle2" Text="Created" />
+                                <RadzenText Text="@Scope.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")" />
+                                <RadzenText TextStyle="TextStyle.Caption" Text="@($"by {Scope.CreatedBy ?? "System"}")" />
+                            </RadzenStack>
+                            @if (Scope.UpdatedAt.HasValue)
+                            {
+                                <RadzenStack Style="flex: 1;">
+                                    <RadzenText TextStyle="TextStyle.Subtitle2" Text="Last Updated" />
+                                    <RadzenText Text="@Scope.UpdatedAt.Value.ToString("yyyy-MM-dd HH:mm:ss")" />
+                                    <RadzenText TextStyle="TextStyle.Caption" Text="@($"by {Scope.UpdatedBy ?? "System"}")" />
+                                </RadzenStack>
+                            }
+                            else
+                            {
+                                <RadzenStack Style="flex: 1;">
+                                    <RadzenText TextStyle="TextStyle.Subtitle2" Text="Last Updated" />
+                                    <RadzenText Text="Never modified" TextStyle="TextStyle.Caption" />
+                                </RadzenStack>
+                            }
+                        </RadzenStack>
+
+                        <RadzenStack Gap="1rem">
+                            <RadzenText TextStyle="TextStyle.Subtitle1" Text="Additional Properties" />
+                            
+                            <RadzenStack Orientation="Orientation.Horizontal" Gap="2rem">
+                                <RadzenStack Style="flex: 1;">
+                                    <RadzenText TextStyle="TextStyle.Subtitle2" Text="Scope ID" />
+                                    <RadzenText Text="@Scope.Id" TextStyle="TextStyle.Body2" Style="font-family: monospace;" />
+                                </RadzenStack>
+                                <RadzenStack Style="flex: 1;">
+                                    <RadzenText TextStyle="TextStyle.Subtitle2" Text="Scope Type" />
+                                    <RadzenText Text="@Scope.Type.ToString()" />
+                                </RadzenStack>
+                            </RadzenStack>
+                        </RadzenStack>
+                    </RadzenStack>
+                </RadzenCard>
+            </div>
+        </RadzenTabsItem>
+    </Tabs>
+</RadzenTabs>
+
+<!-- Bottom Action Bar -->
+<div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--rz-border-color);">
+    <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" JustifyContent="JustifyContent.End">
+        <RadzenButton Click="@(() => DialogService.Close())" Text="Close" ButtonStyle="ButtonStyle.Primary" Icon="close" />
+    </RadzenStack>
+</div>
+
+@code {
+    [Parameter] public ScopeDto Scope { get; set; } = null!;
+    
+    private IEnumerable<string> filteredClaims = new List<string>();
+    private string claimFilter = "";
+    private int selectedTabIndex = 0;
+
+    protected override void OnInitialized()
+    {
+        filteredClaims = Scope.Claims;
+    }
+
+    private void OnClaimFilter(string? filterValue)
+    {
+        claimFilter = filterValue ?? "";
+        
+        if (string.IsNullOrWhiteSpace(claimFilter))
+        {
+            filteredClaims = Scope.Claims;
+        }
+        else
+        {
+            filteredClaims = Scope.Claims.Where(c => c.Contains(claimFilter, StringComparison.OrdinalIgnoreCase));
+        }
+        
+        StateHasChanged();
+    }
+
+    private BadgeStyle GetScopeTypeBadgeStyle(ScopeType scopeType)
+    {
+        return scopeType switch
+        {
+            ScopeType.Identity => BadgeStyle.Info,
+            ScopeType.Resource => BadgeStyle.Success,
+            _ => BadgeStyle.Secondary
+        };
+    }
+
+    private string GetScopeTypeText(ScopeType scopeType)
+    {
+        return scopeType switch
+        {
+            ScopeType.Identity => "Identity",
+            ScopeType.Resource => "Resource",
+            _ => "Unknown"
+        };
+    }
+
+    private string GetClaimDescription(string claim)
+    {
+        // Provide common claim descriptions
+        return claim.ToLowerInvariant() switch
+        {
+            "sub" => "Subject identifier for the user",
+            "name" => "Full name of the user",
+            "given_name" => "Given name(s) or first name(s) of the user",
+            "family_name" => "Surname(s) or last name(s) of the user",
+            "middle_name" => "Middle name(s) of the user",
+            "nickname" => "Casual name of the user",
+            "preferred_username" => "Shorthand name by which the user wishes to be referred to",
+            "profile" => "URL of the user's profile page",
+            "picture" => "URL of the user's profile picture",
+            "website" => "URL of the user's web page or blog",
+            "email" => "User's preferred e-mail address",
+            "email_verified" => "True if the user's e-mail address has been verified",
+            "gender" => "User's gender",
+            "birthdate" => "User's birthday",
+            "zoneinfo" => "String from zoneinfo time zone database",
+            "locale" => "User's locale",
+            "phone_number" => "User's preferred telephone number",
+            "phone_number_verified" => "True if the user's phone number has been verified",
+            "address" => "User's preferred postal address",
+            "updated_at" => "Time the user's information was last updated",
+            "role" => "Role of the user",
+            "roles" => "Roles assigned to the user",
+            _ => "Custom claim"
+        };
+    }
+}
