@@ -133,6 +133,10 @@ public static class ServiceCollectionExtensions
                        .AllowPasswordFlow()
                        .AllowRefreshTokenFlow();
 
+                // Configure token lifetimes for better refresh token experience
+                options.SetAccessTokenLifetime(TimeSpan.FromMinutes(60))    // 1 hour access tokens
+                       .SetRefreshTokenLifetime(TimeSpan.FromDays(14));     // 14 days refresh tokens
+
                 // Register scopes (including API scopes)
                 options.RegisterScopes("openid",
                                       OpenIddictConstants.Scopes.Email,

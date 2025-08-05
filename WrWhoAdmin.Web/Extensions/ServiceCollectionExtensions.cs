@@ -34,6 +34,9 @@ public static class ServiceCollectionExtensions
         services.AddHttpContextAccessor();
         services.AddTransient<AuthenticationDelegatingHandler>();
         
+        // Add token refresh service
+        services.AddScoped<ITokenRefreshService, TokenRefreshService>();
+        
         return services;
     }
 
@@ -147,6 +150,10 @@ public static class ServiceCollectionExtensions
         // Additional configuration for OpenIddict compatibility
         options.MetadataAddress = $"{options.Authority}.well-known/openid_configuration";
         options.UsePkce = true; // Enable PKCE for better security
+
+        // Configure token refresh settings
+        options.RefreshInterval = TimeSpan.FromMinutes(30); // Check for refresh every 30 minutes
+        options.UseTokenLifetime = true; // Use the token's actual lifetime
 
         ConfigureScopes(options);
         ConfigureClaimActions(options);

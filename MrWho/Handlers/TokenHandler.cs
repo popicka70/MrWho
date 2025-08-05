@@ -46,7 +46,7 @@ public class TokenHandler : ITokenHandler
 
         if (request.IsRefreshTokenGrantType())
         {
-            return HandleRefreshTokenGrant(request);
+            return await HandleRefreshTokenGrantAsync(context, request);
         }
 
         throw new InvalidOperationException($"The specified grant type '{request.GrantType}' is not supported.");
@@ -119,25 +119,59 @@ public class TokenHandler : ITokenHandler
         return Results.SignIn(newPrincipal, authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
     }
 
-    private static IResult HandleRefreshTokenGrant(OpenIddictRequest request)
+    private async Task<IResult> HandleRefreshTokenGrantAsync(HttpContext context, OpenIddictRequest request)
     {
-        // For refresh token flow, we typically want to validate the refresh token
-        // and issue new access tokens with the same or updated claims
+        // Authenticate the refresh token and extract the principal
+        var authenticateResult = await context.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+        var principal = authenticateResult.Principal;
         
-        // Create a basic identity - in a real application, you would validate the refresh token
-        // and extract the user information from it
-        var identity = new ClaimsIdentity(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
-        
-        // For now, use a placeholder subject - this should be replaced with actual user identification
-        // In a production app, you would extract the user info from the refresh token
-        identity.AddClaim(OpenIddictConstants.Claims.Subject, "refreshed_user");
-        identity.AddClaim(OpenIddictConstants.Claims.Name, "Refreshed User");
-        identity.AddClaim(OpenIddictConstants.Claims.Email, "user@example.com");
-        identity.AddClaim(OpenIddictConstants.Claims.PreferredUsername, "user@example.com");
-        
-        var principal = new ClaimsPrincipal(identity);
-        principal.SetScopes(request.GetScopes());
+        if (principal == null)
+        {
+            Console.WriteLine("Refresh token authentication failed: no principal found");
+            return Results.Forbid(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
+        }
 
-        return Results.SignIn(principal, authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+        // Extract the user ID from the refresh token principal
+        var subjectClaim = principal.FindFirst(OpenIddictConstants.Claims.Subject);
+        if (subjectClaim == null)
+        {
+            Console.WriteLine("Refresh token authentication failed: no subject claim found");
+            return Results.Forbid(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
+        }
+
+        // Get the user from the database to ensure they still exist and are valid
+        var user = await _userManager.FindByIdAsync(subjectClaim.Value);
+        if (user == null)
+        {
+            Console.WriteLine($"Refresh token authentication failed: user not found for subject {subjectClaim.Value}");
+            return Results.Forbid(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
+        }
+
+        // Check if the user is still enabled (you can add additional checks here if needed)
+        if (!user.EmailConfirmed && _userManager.Options.SignIn.RequireConfirmedEmail)
+        {
+            Console.WriteLine($"Refresh token authentication failed: user {user.UserName} email not confirmed");
+            return Results.Forbid(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
+        }
+
+        // Create a new identity with fresh user information
+        var identity = new ClaimsIdentity(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+        identity.AddClaim(OpenIddictConstants.Claims.Subject, user.Id);
+        identity.AddClaim(OpenIddictConstants.Claims.Email, user.Email!);
+        identity.AddClaim(OpenIddictConstants.Claims.Name, user.UserName!);
+        identity.AddClaim(OpenIddictConstants.Claims.PreferredUsername, user.UserName!);
+
+        // Add any additional claims you might need (roles, etc.)
+        var roles = await _userManager.GetRolesAsync(user);
+        foreach (var role in roles)
+        {
+            identity.AddClaim(OpenIddictConstants.Claims.Role, role);
+        }
+
+        var newPrincipal = new ClaimsPrincipal(identity);
+        newPrincipal.SetScopes(request.GetScopes());
+
+        Console.WriteLine($"Refresh token grant successful for user: {user.UserName}");
+        return Results.SignIn(newPrincipal, authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
     }
 }

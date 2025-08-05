@@ -1,20 +1,26 @@
 using Microsoft.AspNetCore.Authentication;
 using System.Net.Http.Headers;
+using MrWhoAdmin.Web.Services;
 
 namespace MrWhoAdmin.Web.Extensions;
 
 /// <summary>
-/// Delegating handler to add authentication token to API requests
+/// Delegating handler to add authentication token to API requests with automatic token refresh
 /// </summary>
 public class AuthenticationDelegatingHandler : DelegatingHandler
 {
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly ILogger<AuthenticationDelegatingHandler> _logger;
+    private readonly ITokenRefreshService _tokenRefreshService;
 
-    public AuthenticationDelegatingHandler(IHttpContextAccessor httpContextAccessor, ILogger<AuthenticationDelegatingHandler> logger)
+    public AuthenticationDelegatingHandler(
+        IHttpContextAccessor httpContextAccessor, 
+        ILogger<AuthenticationDelegatingHandler> logger,
+        ITokenRefreshService tokenRefreshService)
     {
         _httpContextAccessor = httpContextAccessor;
         _logger = logger;
+        _tokenRefreshService = tokenRefreshService;
     }
 
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
@@ -24,6 +30,14 @@ public class AuthenticationDelegatingHandler : DelegatingHandler
         {
             try
             {
+                // Ensure we have a valid token (refresh if needed)
+                var hasValidToken = await _tokenRefreshService.EnsureValidTokenAsync(httpContext);
+                if (!hasValidToken)
+                {
+                    _logger.LogWarning("Unable to obtain valid access token for request to {RequestUri}", request.RequestUri);
+                    return await base.SendAsync(request, cancellationToken);
+                }
+
                 var accessToken = await httpContext.GetTokenAsync("access_token");
                 if (!string.IsNullOrEmpty(accessToken))
                 {
@@ -33,19 +47,12 @@ public class AuthenticationDelegatingHandler : DelegatingHandler
                 }
                 else
                 {
-                    _logger.LogWarning("No access token found for authenticated user - checking available tokens");
-                    
-                    // Log available token names for debugging
-                    var tokens = await httpContext.GetTokenAsync("id_token");
-                    _logger.LogDebug("Available tokens - ID Token: {HasIdToken}", !string.IsNullOrEmpty(tokens));
-                    
-                    var refreshToken = await httpContext.GetTokenAsync("refresh_token");
-                    _logger.LogDebug("Available tokens - Refresh Token: {HasRefreshToken}", !string.IsNullOrEmpty(refreshToken));
+                    _logger.LogWarning("No access token found after refresh attempt for request to {RequestUri}", request.RequestUri);
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting access token for request to {RequestUri}", request.RequestUri);
+                _logger.LogError(ex, "Error getting or refreshing access token for request to {RequestUri}", request.RequestUri);
             }
         }
         else

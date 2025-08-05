@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using MrWhoAdmin.Web.Components;
+using MrWhoAdmin.Web.Middleware;
 
 namespace MrWhoAdmin.Web.Extensions;
 
@@ -25,6 +26,10 @@ public static class WebApplicationExtensions
         app.UseHttpsRedirection();
         app.UseAuthentication();
         app.UseAuthorization();
+        
+        // Add token refresh middleware after authentication but before other middleware
+        app.UseMiddleware<TokenRefreshMiddleware>();
+        
         app.UseAntiforgery();
         app.UseOutputCache();
         app.MapStaticAssets();

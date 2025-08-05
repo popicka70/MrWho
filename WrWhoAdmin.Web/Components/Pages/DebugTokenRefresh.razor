@@ -1,0 +1,227 @@
+@page "/debug-token-refresh"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authentication
+@using MrWhoAdmin.Web.Services
+@inject IHttpContextAccessor HttpContextAccessor
+@inject ITokenRefreshService TokenRefreshService
+@inject ILogger<DebugTokenRefresh> Logger
+
+<PageTitle>Token Refresh Debug - MrWho Admin</PageTitle>
+
+<RadzenText TextStyle="TextStyle.H3">Token Refresh Debug</RadzenText>
+
+<RadzenCard class="rz-my-4">
+    <RadzenStack Gap="2rem">
+        <RadzenFieldset Text="Token Status">
+            <RadzenStack Gap="1rem">
+                <RadzenText><strong>Is Token Expired/Expiring:</strong> @isTokenExpiring</RadzenText>
+                <RadzenText><strong>Access Token Available:</strong> @hasAccessToken</RadzenText>
+                <RadzenText><strong>Refresh Token Available:</strong> @hasRefreshToken</RadzenText>
+                @if (tokenExpiryTime.HasValue)
+                {
+                    <RadzenText><strong>Token Expires At:</strong> @tokenExpiryTime.Value.ToString("yyyy-MM-dd HH:mm:ss UTC")</RadzenText>
+                    <RadzenText><strong>Time Until Expiry:</strong> @timeUntilExpiry</RadzenText>
+                }
+            </RadzenStack>
+        </RadzenFieldset>
+
+        <RadzenFieldset Text="Manual Token Operations">
+            <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem">
+                <RadzenButton Click="@CheckTokenStatus" Text="Check Token Status" Icon="refresh" ButtonStyle="ButtonStyle.Primary" IsBusy="@isChecking" />
+                <RadzenButton Click="@ForceRefreshToken" Text="Force Refresh Token" Icon="autorenew" ButtonStyle="ButtonStyle.Warning" IsBusy="@isRefreshing" />
+                <RadzenButton Click="@TestApiCall" Text="Test API Call" Icon="api" ButtonStyle="ButtonStyle.Success" IsBusy="@isTestingApi" />
+            </RadzenStack>
+        </RadzenFieldset>
+
+        <RadzenFieldset Text="Operation Results">
+            @if (!string.IsNullOrEmpty(lastOperationResult))
+            {
+                <RadzenAlert AlertStyle="@(lastOperationSuccess ? AlertStyle.Success : AlertStyle.Danger)" class="rz-mt-3">
+                    <RadzenText>@lastOperationResult</RadzenText>
+                </RadzenAlert>
+            }
+        </RadzenFieldset>
+
+        <RadzenFieldset Text="Token Refresh Configuration">
+            <RadzenStack Gap="1rem">
+                <RadzenText><strong>Refresh Before Expiry:</strong> 5 minutes</RadzenText>
+                <RadzenText><strong>Automatic Refresh:</strong> Enabled via middleware</RadzenText>
+                <RadzenText><strong>API Call Auto-Refresh:</strong> Enabled via delegating handler</RadzenText>
+            </RadzenStack>
+        </RadzenFieldset>
+
+        <RadzenFieldset Text="How Token Refresh Works">
+            <RadzenStack Gap="1rem">
+                <RadzenText><strong>1. Automatic Refresh:</strong> Middleware checks token expiry on interactive requests and refreshes if needed</RadzenText>
+                <RadzenText><strong>2. API Call Refresh:</strong> Delegating handler ensures valid tokens before API calls</RadzenText>
+                <RadzenText><strong>3. Manual Refresh:</strong> Use the buttons above to manually check or refresh tokens</RadzenText>
+                <RadzenText><strong>4. Fallback:</strong> If refresh fails, user will need to log in again</RadzenText>
+            </RadzenStack>
+        </RadzenFieldset>
+    </RadzenStack>
+</RadzenCard>
+
+@code {
+    private bool isTokenExpiring = false;
+    private bool hasAccessToken = false;
+    private bool hasRefreshToken = false;
+    private DateTimeOffset? tokenExpiryTime = null;
+    private string timeUntilExpiry = "";
+    
+    private bool isChecking = false;
+    private bool isRefreshing = false;
+    private bool isTestingApi = false;
+    
+    private string lastOperationResult = "";
+    private bool lastOperationSuccess = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await CheckTokenStatus();
+    }
+
+    private async Task CheckTokenStatus()
+    {
+        isChecking = true;
+        lastOperationResult = "";
+        
+        try
+        {
+            var httpContext = HttpContextAccessor.HttpContext;
+            if (httpContext != null)
+            {
+                // Check if token is expiring
+                isTokenExpiring = await TokenRefreshService.IsTokenExpiredOrExpiringSoonAsync(httpContext);
+                
+                // Check for tokens
+                var accessToken = await httpContext.GetTokenAsync("access_token");
+                hasAccessToken = !string.IsNullOrEmpty(accessToken);
+                
+                var refreshToken = await httpContext.GetTokenAsync("refresh_token");
+                hasRefreshToken = !string.IsNullOrEmpty(refreshToken);
+                
+                // Try to get token expiry
+                var expiresAtString = await httpContext.GetTokenAsync("expires_at");
+                if (!string.IsNullOrEmpty(expiresAtString) && DateTimeOffset.TryParse(expiresAtString, out var expiresAt))
+                {
+                    tokenExpiryTime = expiresAt;
+                    var timeLeft = expiresAt - DateTimeOffset.UtcNow;
+                    timeUntilExpiry = $"{timeLeft.Days}d {timeLeft.Hours}h {timeLeft.Minutes}m {timeLeft.Seconds}s";
+                }
+                else
+                {
+                    tokenExpiryTime = null;
+                    timeUntilExpiry = "Unknown";
+                }
+                
+                lastOperationResult = "Token status checked successfully";
+                lastOperationSuccess = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            lastOperationResult = $"Error checking token status: {ex.Message}";
+            lastOperationSuccess = false;
+            Logger.LogError(ex, "Error checking token status");
+        }
+        finally
+        {
+            isChecking = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ForceRefreshToken()
+    {
+        isRefreshing = true;
+        lastOperationResult = "";
+        
+        try
+        {
+            var httpContext = HttpContextAccessor.HttpContext;
+            if (httpContext != null)
+            {
+                var refreshSuccess = await TokenRefreshService.ForceRefreshTokenAsync(httpContext);
+                
+                if (refreshSuccess)
+                {
+                    lastOperationResult = "Token refreshed successfully";
+                    lastOperationSuccess = true;
+                    
+                    // Update status after refresh
+                    await CheckTokenStatus();
+                }
+                else
+                {
+                    lastOperationResult = "Token refresh failed. Check logs for details.";
+                    lastOperationSuccess = false;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            lastOperationResult = $"Error refreshing token: {ex.Message}";
+            lastOperationSuccess = false;
+            Logger.LogError(ex, "Error refreshing token");
+        }
+        finally
+        {
+            isRefreshing = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task TestApiCall()
+    {
+        isTestingApi = true;
+        lastOperationResult = "";
+        
+        try
+        {
+            var httpContext = HttpContextAccessor.HttpContext;
+            if (httpContext != null)
+            {
+                var accessToken = await httpContext.GetTokenAsync("access_token");
+                
+                if (string.IsNullOrEmpty(accessToken))
+                {
+                    lastOperationResult = "No access token available for API call";
+                    lastOperationSuccess = false;
+                }
+                else
+                {
+                    using var httpClient = new HttpClient();
+                    httpClient.BaseAddress = new Uri("https://localhost:7113/");
+                    httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+                    
+                    var response = await httpClient.GetAsync("api/realms?page=1&pageSize=1");
+                    
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var content = await response.Content.ReadAsStringAsync();
+                        lastOperationResult = $"API call successful! Response length: {content.Length} characters";
+                        lastOperationSuccess = true;
+                    }
+                    else
+                    {
+                        var errorContent = await response.Content.ReadAsStringAsync();
+                        lastOperationResult = $"API call failed: {response.StatusCode} - {errorContent}";
+                        lastOperationSuccess = false;
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            lastOperationResult = $"Exception during API test: {ex.Message}";
+            lastOperationSuccess = false;
+            Logger.LogError(ex, "Error testing API call");
+        }
+        finally
+        {
+            isTestingApi = false;
+            StateHasChanged();
+        }
+    }
+}
