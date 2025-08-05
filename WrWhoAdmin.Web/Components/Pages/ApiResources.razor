@@ -1,0 +1,300 @@
+@page "/identity/api-resources"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject IApiResourcesApiService ApiResourcesApi
+@inject NavigationManager Navigation
+@inject DialogService DialogService
+@inject NotificationService NotificationService
+@inject ILogger<ApiResources> Logger
+
+<PageTitle>API Resources - MrWho Administration</PageTitle>
+
+<RadzenStack Gap="1rem">
+    <RadzenText TextStyle="TextStyle.H2" class="rz-mb-4">
+        <RadzenIcon Icon="api" class="rz-me-2" />
+        API Resources
+    </RadzenText>
+
+    <!-- Header with search and add button -->
+    <RadzenCard class="rz-p-4">
+        <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center" Gap="1rem">
+            <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" AlignItems="AlignItems.Center">
+                <RadzenTextBox @bind-Value="searchTerm" Placeholder="Search API resources..." class="rz-w-300" />
+                <RadzenButton Click="@(async () => await LoadApiResources())" Icon="search" ButtonStyle="ButtonStyle.Light" />
+                <RadzenButton Click="@(async () => await LoadApiResources())" Icon="refresh" ButtonStyle="ButtonStyle.Light" 
+                             Text="Refresh" IsBusy="@isLoading" />
+            </RadzenStack>
+            <RadzenButton Click="@(async () => await ShowCreateApiResourceDialog())" Icon="add" ButtonStyle="ButtonStyle.Primary" 
+                         Text="Add API Resource" />
+        </RadzenStack>
+    </RadzenCard>
+
+    <!-- API Resources table -->
+    <RadzenCard class="rz-p-4">
+        @if (isLoading)
+        {
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" class="rz-p-8">
+                <RadzenProgressBarCircular ProgressBarStyle="ProgressBarStyle.Light" Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+                <RadzenText>Loading API resources...</RadzenText>
+            </RadzenStack>
+        }
+        else if (apiResources.Any())
+        {
+            <RadzenDataGrid @ref="grid" Data="@apiResources" TItem="ApiResourceDto" AllowSorting="true" AllowPaging="true" 
+                           PageSize="20" PagerHorizontalAlign="HorizontalAlign.Left" ShowPagingSummary="true">
+                <Columns>
+                    <RadzenDataGridColumn TItem="ApiResourceDto" Property="Name" Title="Name" Width="200px">
+                        <Template Context="apiResource">
+                            <RadzenStack Orientation="Orientation.Vertical" Gap="0.25rem">
+                                <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-color-primary">@apiResource.Name</RadzenText>
+                                @if (!string.IsNullOrEmpty(apiResource.DisplayName))
+                                {
+                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">@apiResource.DisplayName</RadzenText>
+                                }
+                            </RadzenStack>
+                        </Template>
+                    </RadzenDataGridColumn>
+
+                    <RadzenDataGridColumn TItem="ApiResourceDto" Property="Description" Title="Description" Width="300px">
+                        <Template Context="apiResource">
+                            @if (!string.IsNullOrEmpty(apiResource.Description))
+                            {
+                                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary" 
+                                           Style="max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                    @apiResource.Description
+                                </RadzenText>
+                            }
+                            else
+                            {
+                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-disabled">No description</RadzenText>
+                            }
+                        </Template>
+                    </RadzenDataGridColumn>
+
+                    <RadzenDataGridColumn TItem="ApiResourceDto" Property="Scopes" Title="Scopes" Width="200px">
+                        <Template Context="apiResource">
+                            @if (apiResource.Scopes.Any())
+                            {
+                                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" Wrap="FlexWrap.Wrap">
+                                    @foreach (var scope in apiResource.Scopes.Take(3))
+                                    {
+                                        <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="@scope" class="rz-font-size-xs" />
+                                    }
+                                    @if (apiResource.Scopes.Count > 3)
+                                    {
+                                        <RadzenBadge BadgeStyle="BadgeStyle.Light" Text="@($"+{apiResource.Scopes.Count - 3} more")" class="rz-font-size-xs" />
+                                    }
+                                </RadzenStack>
+                            }
+                            else
+                            {
+                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-disabled">No scopes</RadzenText>
+                            }
+                        </Template>
+                    </RadzenDataGridColumn>
+
+                    <RadzenDataGridColumn TItem="ApiResourceDto" Property="IsEnabled" Title="Status" Width="120px">
+                        <Template Context="apiResource">
+                            <RadzenBadge BadgeStyle="@(apiResource.IsEnabled ? BadgeStyle.Success : BadgeStyle.Danger)" 
+                                        Text="@(apiResource.IsEnabled ? "Enabled" : "Disabled")" />
+                        </Template>
+                    </RadzenDataGridColumn>
+
+                    <RadzenDataGridColumn TItem="ApiResourceDto" Property="IsStandard" Title="Type" Width="100px">
+                        <Template Context="apiResource">
+                            @if (apiResource.IsStandard)
+                            {
+                                <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text="Standard" />
+                            }
+                            else
+                            {
+                                <RadzenBadge BadgeStyle="BadgeStyle.Secondary" Text="Custom" />
+                            }
+                        </Template>
+                    </RadzenDataGridColumn>
+
+                    <RadzenDataGridColumn TItem="ApiResourceDto" Property="CreatedAt" Title="Created" Width="150px">
+                        <Template Context="apiResource">
+                            <RadzenStack Orientation="Orientation.Vertical" Gap="0.25rem">
+                                <RadzenText TextStyle="TextStyle.Body2">@apiResource.CreatedAt.ToString("MMM dd, yyyy")</RadzenText>
+                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">@apiResource.CreatedAt.ToString("HH:mm")</RadzenText>
+                            </RadzenStack>
+                        </Template>
+                    </RadzenDataGridColumn>
+
+                    <RadzenDataGridColumn TItem="ApiResourceDto" Title="Actions" Width="350px" Sortable="false">
+                        <Template Context="apiResource">
+                            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                                <RadzenButton Click="@(async () => await ViewApiResourceDetails(apiResource))" Icon="visibility" Size="ButtonSize.Medium" 
+                                             ButtonStyle="ButtonStyle.Light" Text="View" />
+                                <RadzenButton Click="@(async () => await ShowEditApiResourceDialog(apiResource))" Icon="edit" Size="ButtonSize.Medium" 
+                                             ButtonStyle="ButtonStyle.Light" Text="Edit" 
+                                             Disabled="@apiResource.IsStandard" />
+                                <RadzenButton Click="@(async () => await ToggleApiResourceStatus(apiResource))" 
+                                             Icon="@(apiResource.IsEnabled ? "toggle_on" : "toggle_off")" Size="ButtonSize.Medium" 
+                                             ButtonStyle="ButtonStyle.Secondary" 
+                                             Text="@(apiResource.IsEnabled ? "Disable" : "Enable")" />
+                                <RadzenButton Click="@(async () => await DeleteApiResource(apiResource))" Icon="delete" Size="ButtonSize.Medium" 
+                                             ButtonStyle="ButtonStyle.Danger" Text="Delete" 
+                                             Disabled="@apiResource.IsStandard" />
+                            </RadzenStack>
+                        </Template>
+                    </RadzenDataGridColumn>
+                </Columns>
+            </RadzenDataGrid>
+        }
+        else
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Info">
+                <RadzenText>No API resources found. Click "Add API Resource" to create your first API resource.</RadzenText>
+            </RadzenAlert>
+        }
+    </RadzenCard>
+</RadzenStack>
+
+@code {
+    private List<ApiResourceDto> apiResources = new();
+    private bool isLoading = false;
+    private string searchTerm = "";
+    private RadzenDataGrid<ApiResourceDto>? grid;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadApiResources();
+    }
+
+    private async Task LoadApiResources()
+    {
+        isLoading = true;
+        try
+        {
+            var result = await ApiResourcesApi.GetApiResourcesAsync(page: 1, pageSize: 100, search: searchTerm);
+            
+            if (result != null)
+            {
+                apiResources = result.Items;
+                Logger.LogInformation("Loaded {ApiResourceCount} API resources from API", apiResources.Count);
+            }
+            else
+            {
+                apiResources = new List<ApiResourceDto>();
+                NotificationService.Notify(NotificationSeverity.Warning, "Warning", "Failed to load API resources from API");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading API resources from API");
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to load API resources");
+            apiResources = new List<ApiResourceDto>();
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ShowCreateApiResourceDialog()
+    {
+        var result = await DialogService.OpenAsync<CreateApiResourceDialog>("Create New API Resource", 
+            new Dictionary<string, object>(), 
+            new DialogOptions() { Width = "800px", Height = "700px", Resizable = true });
+
+        if (result != null && result is ApiResourceDto)
+        {
+            await LoadApiResources();
+            NotificationService.Notify(NotificationSeverity.Success, "API Resource Created", "New API resource has been created successfully");
+        }
+    }
+
+    private async Task ShowEditApiResourceDialog(ApiResourceDto apiResource)
+    {
+        if (apiResource.IsStandard)
+        {
+            NotificationService.Notify(NotificationSeverity.Warning, "Cannot Edit", "Standard API resources cannot be modified");
+            return;
+        }
+
+        var result = await DialogService.OpenAsync<EditApiResourceDialog>("Edit API Resource", 
+            new Dictionary<string, object> { { "ApiResource", apiResource } }, 
+            new DialogOptions() { Width = "800px", Height = "700px", Resizable = true });
+
+        if (result != null && result is ApiResourceDto)
+        {
+            await LoadApiResources();
+            NotificationService.Notify(NotificationSeverity.Success, "API Resource Updated", "API resource has been updated successfully");
+        }
+    }
+
+    private async Task ViewApiResourceDetails(ApiResourceDto apiResource)
+    {
+        await DialogService.OpenAsync<ApiResourceDetailsDialog>("API Resource Details", 
+            new Dictionary<string, object> { { "ApiResource", apiResource } }, 
+            new DialogOptions() { Width = "900px", Height = "700px", Resizable = true });
+    }
+
+    private async Task ToggleApiResourceStatus(ApiResourceDto apiResource)
+    {
+        try
+        {
+            var result = await ApiResourcesApi.ToggleApiResourceAsync(apiResource.Id);
+            
+            if (result != null)
+            {
+                // Update the local data with the API response
+                apiResource.IsEnabled = result.IsEnabled;
+                apiResource.UpdatedAt = result.UpdatedAt;
+                
+                var status = apiResource.IsEnabled ? "enabled" : "disabled";
+                NotificationService.Notify(NotificationSeverity.Success, "API Resource Updated", $"API resource '{apiResource.Name}' has been {status}");
+                StateHasChanged();
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to toggle API resource status");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error toggling API resource status for {ApiResourceId}", apiResource.Id);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to toggle API resource status");
+        }
+    }
+
+    private async Task DeleteApiResource(ApiResourceDto apiResource)
+    {
+        if (apiResource.IsStandard)
+        {
+            NotificationService.Notify(NotificationSeverity.Warning, "Cannot Delete", "Standard API resources cannot be deleted");
+            return;
+        }
+
+        var result = await DialogService.Confirm($"Are you sure you want to delete the API resource '{apiResource.Name}'?", 
+            "Delete API Resource", 
+            new ConfirmOptions() { OkButtonText = "Delete", CancelButtonText = "Cancel" });
+        
+        if (result == true)
+        {
+            try
+            {
+                var success = await ApiResourcesApi.DeleteApiResourceAsync(apiResource.Id);
+                
+                if (success)
+                {
+                    await LoadApiResources();
+                    NotificationService.Notify(NotificationSeverity.Success, "API Resource Deleted", 
+                        $"API resource '{apiResource.Name}' has been deleted successfully");
+                }
+                else
+                {
+                    NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to delete API resource");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error deleting API resource {ApiResourceId}", apiResource.Id);
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to delete API resource");
+            }
+        }
+    }
+}

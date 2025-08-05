@@ -1,0 +1,284 @@
+@inject DialogService DialogService
+
+<RadzenStack Gap="1rem">
+    <!-- Header -->
+    <RadzenCard class="rz-p-4" Style="background: linear-gradient(135deg, var(--rz-primary-light) 0%, var(--rz-primary) 100%);">
+        <RadzenStack Gap="0.5rem">
+            <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Start">
+                <RadzenStack Gap="0.25rem">
+                    <RadzenText TextStyle="TextStyle.H4" class="rz-color-on-primary">@ApiResource.Name</RadzenText>
+                    @if (!string.IsNullOrEmpty(ApiResource.DisplayName))
+                    {
+                        <RadzenText TextStyle="TextStyle.H6" class="rz-color-on-primary-light">@ApiResource.DisplayName</RadzenText>
+                    }
+                </RadzenStack>
+                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                    <RadzenBadge BadgeStyle="@(ApiResource.IsEnabled ? BadgeStyle.Success : BadgeStyle.Danger)" 
+                                Text="@(ApiResource.IsEnabled ? "Enabled" : "Disabled")" />
+                    @if (ApiResource.IsStandard)
+                    {
+                        <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text="Standard" />
+                    }
+                    else
+                    {
+                        <RadzenBadge BadgeStyle="BadgeStyle.Secondary" Text="Custom" />
+                    }
+                </RadzenStack>
+            </RadzenStack>
+            
+            @if (!string.IsNullOrEmpty(ApiResource.Description))
+            {
+                <RadzenText TextStyle="TextStyle.Body1" class="rz-color-on-primary-light">@ApiResource.Description</RadzenText>
+            }
+        </RadzenStack>
+    </RadzenCard>
+
+    <RadzenRow>
+        <!-- Left Column - Basic Info and Scopes -->
+        <RadzenColumn Size="12" SizeMD="6">
+            <RadzenStack Gap="1rem">
+                <!-- Basic Information -->
+                <RadzenCard class="rz-p-4">
+                    <RadzenStack Gap="1rem">
+                        <RadzenText TextStyle="TextStyle.H6" class="rz-color-primary">
+                            <RadzenIcon Icon="info" class="rz-me-2" />
+                            Basic Information
+                        </RadzenText>
+                        
+                        <RadzenStack Gap="0.75rem">
+                            <RadzenRow>
+                                <RadzenColumn Size="4">
+                                    <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-color-secondary">ID:</RadzenText>
+                                </RadzenColumn>
+                                <RadzenColumn Size="8">
+                                    <RadzenText TextStyle="TextStyle.Body2" class="rz-font-family-monospace">@ApiResource.Id</RadzenText>
+                                </RadzenColumn>
+                            </RadzenRow>
+                            
+                            <RadzenRow>
+                                <RadzenColumn Size="4">
+                                    <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-color-secondary">Name:</RadzenText>
+                                </RadzenColumn>
+                                <RadzenColumn Size="8">
+                                    <RadzenText TextStyle="TextStyle.Body2">@ApiResource.Name</RadzenText>
+                                </RadzenColumn>
+                            </RadzenRow>
+                            
+                            @if (!string.IsNullOrEmpty(ApiResource.DisplayName))
+                            {
+                                <RadzenRow>
+                                    <RadzenColumn Size="4">
+                                        <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-color-secondary">Display Name:</RadzenText>
+                                    </RadzenColumn>
+                                    <RadzenColumn Size="8">
+                                        <RadzenText TextStyle="TextStyle.Body2">@ApiResource.DisplayName</RadzenText>
+                                    </RadzenColumn>
+                                </RadzenRow>
+                            }
+                            
+                            <RadzenRow>
+                                <RadzenColumn Size="4">
+                                    <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-color-secondary">Status:</RadzenText>
+                                </RadzenColumn>
+                                <RadzenColumn Size="8">
+                                    <RadzenBadge BadgeStyle="@(ApiResource.IsEnabled ? BadgeStyle.Success : BadgeStyle.Danger)" 
+                                                Text="@(ApiResource.IsEnabled ? "Enabled" : "Disabled")" />
+                                </RadzenColumn>
+                            </RadzenRow>
+                            
+                            <RadzenRow>
+                                <RadzenColumn Size="4">
+                                    <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-color-secondary">Type:</RadzenText>
+                                </RadzenColumn>
+                                <RadzenColumn Size="8">
+                                    <RadzenBadge BadgeStyle="@(ApiResource.IsStandard ? BadgeStyle.Warning : BadgeStyle.Secondary)" 
+                                                Text="@(ApiResource.IsStandard ? "Standard" : "Custom")" />
+                                </RadzenColumn>
+                            </RadzenRow>
+                        </RadzenStack>
+                    </RadzenStack>
+                </RadzenCard>
+
+                <!-- Scopes -->
+                <RadzenCard class="rz-p-4">
+                    <RadzenStack Gap="1rem">
+                        <RadzenText TextStyle="TextStyle.H6" class="rz-color-primary">
+                            <RadzenIcon Icon="tune" class="rz-me-2" />
+                            Scopes (@ApiResource.Scopes.Count)
+                        </RadzenText>
+                        
+                        @if (ApiResource.Scopes.Any())
+                        {
+                            <RadzenStack Gap="0.5rem">
+                                @foreach (var scope in ApiResource.Scopes)
+                                {
+                                    <RadzenCard class="rz-p-2" Style="background-color: var(--rz-info-lighter);">
+                                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                            <RadzenIcon Icon="api" class="rz-color-info" />
+                                            <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-color-info-darker">@scope</RadzenText>
+                                        </RadzenStack>
+                                    </RadzenCard>
+                                }
+                            </RadzenStack>
+                        }
+                        else
+                        {
+                            <RadzenAlert AlertStyle="AlertStyle.Info" Size="AlertSize.Small">
+                                No scopes defined for this API resource.
+                            </RadzenAlert>
+                        }
+                    </RadzenStack>
+                </RadzenCard>
+            </RadzenStack>
+        </RadzenColumn>
+
+        <!-- Right Column - Claims and Secrets -->
+        <RadzenColumn Size="12" SizeMD="6">
+            <RadzenStack Gap="1rem">
+                <!-- User Claims -->
+                <RadzenCard class="rz-p-4">
+                    <RadzenStack Gap="1rem">
+                        <RadzenText TextStyle="TextStyle.H6" class="rz-color-primary">
+                            <RadzenIcon Icon="verified_user" class="rz-me-2" />
+                            User Claims (@ApiResource.UserClaims.Count)
+                        </RadzenText>
+                        
+                        @if (ApiResource.UserClaims.Any())
+                        {
+                            <RadzenStack Gap="0.5rem">
+                                @foreach (var claim in ApiResource.UserClaims)
+                                {
+                                    <RadzenCard class="rz-p-2" Style="background-color: var(--rz-success-lighter);">
+                                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                            <RadzenIcon Icon="assignment_ind" class="rz-color-success" />
+                                            <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-color-success-darker">@claim</RadzenText>
+                                        </RadzenStack>
+                                    </RadzenCard>
+                                }
+                            </RadzenStack>
+                        }
+                        else
+                        {
+                            <RadzenAlert AlertStyle="AlertStyle.Info" Size="AlertSize.Small">
+                                No user claims defined for this API resource.
+                            </RadzenAlert>
+                        }
+                    </RadzenStack>
+                </RadzenCard>
+
+                <!-- Secrets -->
+                <RadzenCard class="rz-p-4">
+                    <RadzenStack Gap="1rem">
+                        <RadzenText TextStyle="TextStyle.H6" class="rz-color-primary">
+                            <RadzenIcon Icon="security" class="rz-me-2" />
+                            API Secrets (@ApiResource.Secrets.Count)
+                        </RadzenText>
+                        
+                        @if (ApiResource.Secrets.Any())
+                        {
+                            <RadzenStack Gap="0.5rem">
+                                @foreach (var secret in ApiResource.Secrets)
+                                {
+                                    <RadzenCard class="rz-p-3" Style="background-color: var(--rz-warning-lighter);">
+                                        <RadzenStack Gap="0.5rem">
+                                            <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                                                <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-color-warning-darker">
+                                                    @(!string.IsNullOrEmpty(secret.Description) ? secret.Description : "Secret")
+                                                </RadzenText>
+                                                <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text="@secret.Type" />
+                                            </RadzenStack>
+                                            
+                                            <RadzenStack Gap="0.25rem">
+                                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                    Created: @secret.CreatedAt.ToString("MMM dd, yyyy HH:mm")
+                                                </RadzenText>
+                                                @if (secret.Expiration.HasValue)
+                                                {
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="@(secret.Expiration.Value < DateTime.UtcNow ? "rz-color-danger" : "rz-color-secondary")">
+                                                        @if (secret.Expiration.Value < DateTime.UtcNow)
+                                                        {
+                                                            <RadzenIcon Icon="warning" class="rz-color-danger rz-me-1" />
+                                                            <text>Expired: @secret.Expiration.Value.ToString("MMM dd, yyyy HH:mm")</text>
+                                                        }
+                                                        else
+                                                        {
+                                                            <text>Expires: @secret.Expiration.Value.ToString("MMM dd, yyyy HH:mm")</text>
+                                                        }
+                                                    </RadzenText>
+                                                }
+                                                else
+                                                {
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Never expires</RadzenText>
+                                                }
+                                            </RadzenStack>
+                                        </RadzenStack>
+                                    </RadzenCard>
+                                }
+                            </RadzenStack>
+                        }
+                        else
+                        {
+                            <RadzenAlert AlertStyle="AlertStyle.Info" Size="AlertSize.Small">
+                                No secrets defined for this API resource.
+                            </RadzenAlert>
+                        }
+                    </RadzenStack>
+                </RadzenCard>
+
+                <!-- Metadata -->
+                <RadzenCard class="rz-p-4">
+                    <RadzenStack Gap="1rem">
+                        <RadzenText TextStyle="TextStyle.H6" class="rz-color-primary">
+                            <RadzenIcon Icon="schedule" class="rz-me-2" />
+                            Metadata
+                        </RadzenText>
+                        
+                        <RadzenStack Gap="0.75rem">
+                            <RadzenRow>
+                                <RadzenColumn Size="5">
+                                    <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-color-secondary">Created:</RadzenText>
+                                </RadzenColumn>
+                                <RadzenColumn Size="7">
+                                    <RadzenStack Gap="0.25rem">
+                                        <RadzenText TextStyle="TextStyle.Body2">@ApiResource.CreatedAt.ToString("MMM dd, yyyy HH:mm")</RadzenText>
+                                        @if (!string.IsNullOrEmpty(ApiResource.CreatedBy))
+                                        {
+                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">by @ApiResource.CreatedBy</RadzenText>
+                                        }
+                                    </RadzenStack>
+                                </RadzenColumn>
+                            </RadzenRow>
+                            
+                            @if (ApiResource.UpdatedAt.HasValue)
+                            {
+                                <RadzenRow>
+                                    <RadzenColumn Size="5">
+                                        <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-color-secondary">Updated:</RadzenText>
+                                    </RadzenColumn>
+                                    <RadzenColumn Size="7">
+                                        <RadzenStack Gap="0.25rem">
+                                            <RadzenText TextStyle="TextStyle.Body2">@ApiResource.UpdatedAt.Value.ToString("MMM dd, yyyy HH:mm")</RadzenText>
+                                            @if (!string.IsNullOrEmpty(ApiResource.UpdatedBy))
+                                            {
+                                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">by @ApiResource.UpdatedBy</RadzenText>
+                                            }
+                                        </RadzenStack>
+                                    </RadzenColumn>
+                                </RadzenRow>
+                            }
+                        </RadzenStack>
+                    </RadzenStack>
+                </RadzenCard>
+            </RadzenStack>
+        </RadzenColumn>
+    </RadzenRow>
+
+    <!-- Actions -->
+    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem" class="rz-mt-4">
+        <RadzenButton Click="@(() => DialogService.Close())" Text="Close" ButtonStyle="ButtonStyle.Primary" />
+    </RadzenStack>
+</RadzenStack>
+
+@code {
+    [Parameter] public ApiResourceDto ApiResource { get; set; } = default!;
+}

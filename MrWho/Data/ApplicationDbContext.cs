@@ -23,6 +23,12 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>
     // Scope management entities
     public DbSet<Scope> Scopes { get; set; }
     public DbSet<ScopeClaim> ScopeClaims { get; set; }
+    
+    // API Resource management entities
+    public DbSet<ApiResource> ApiResources { get; set; }
+    public DbSet<ApiResourceScope> ApiResourceScopes { get; set; }
+    public DbSet<ApiResourceClaim> ApiResourceClaims { get; set; }
+    public DbSet<ApiResourceSecret> ApiResourceSecrets { get; set; }
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -125,6 +131,45 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>
                   .HasForeignKey(sc => sc.ScopeId)
                   .OnDelete(DeleteBehavior.Cascade);
             entity.HasIndex(sc => new { sc.ScopeId, sc.ClaimType }).IsUnique();
+        });
+        
+        // Configure ApiResource entity
+        builder.Entity<ApiResource>(entity =>
+        {
+            entity.HasKey(ar => ar.Id);
+            entity.HasIndex(ar => ar.Name).IsUnique();
+        });
+
+        // Configure ApiResourceScope entity
+        builder.Entity<ApiResourceScope>(entity =>
+        {
+            entity.HasKey(ars => ars.Id);
+            entity.HasOne(ars => ars.ApiResource)
+                  .WithMany(ar => ar.Scopes)
+                  .HasForeignKey(ars => ars.ApiResourceId)
+                  .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(ars => new { ars.ApiResourceId, ars.Scope }).IsUnique();
+        });
+
+        // Configure ApiResourceClaim entity
+        builder.Entity<ApiResourceClaim>(entity =>
+        {
+            entity.HasKey(arc => arc.Id);
+            entity.HasOne(arc => arc.ApiResource)
+                  .WithMany(ar => ar.UserClaims)
+                  .HasForeignKey(arc => arc.ApiResourceId)
+                  .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(arc => new { arc.ApiResourceId, arc.ClaimType }).IsUnique();
+        });
+
+        // Configure ApiResourceSecret entity
+        builder.Entity<ApiResourceSecret>(entity =>
+        {
+            entity.HasKey(ars => ars.Id);
+            entity.HasOne(ars => ars.ApiResource)
+                  .WithMany(ar => ar.Secrets)
+                  .HasForeignKey(ars => ars.ApiResourceId)
+                  .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }
