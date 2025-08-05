@@ -1,11 +1,13 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using MrWho.Data;
 using MrWho.Handlers;
 using MrWho.Services;
 using OpenIddict.Abstractions;
 using System.Linq;
+using System.Reflection;
 
 namespace MrWho.Extensions;
 
@@ -381,18 +383,69 @@ public static class WebApplicationExtensions
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
         var oidcClientService = scope.ServiceProvider.GetRequiredService<IOidcClientService>();
         var scopeSeederService = scope.ServiceProvider.GetRequiredService<IScopeSeederService>();
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
         
-        // For development: Delete and recreate database to include new Scope tables
-        if (app.Environment.IsDevelopment())
+        // Check for explicit database configuration options
+        var dbOptions = scope.ServiceProvider.GetService<IOptions<DatabaseInitializationOptions>>()?.Value ?? new DatabaseInitializationOptions();
+        
+        // Detect if we're running in a test environment
+        bool isTestEnvironment = IsTestEnvironment();
+        
+        // Determine database initialization strategy
+        bool shouldUseEnsureCreated = isTestEnvironment || dbOptions.ForceUseEnsureCreated;
+        bool shouldSkipMigrations = dbOptions.SkipMigrations;
+        bool shouldRecreateDatabase = dbOptions.RecreateDatabase;
+
+        if (shouldUseEnsureCreated)
         {
-            await context.Database.EnsureDeletedAsync();
+            // For tests or when explicitly configured: Use EnsureCreated for fast setup
+            logger.LogInformation("Using EnsureCreated strategy for database setup (TestEnv: {IsTest}, Forced: {Forced})", 
+                isTestEnvironment, dbOptions.ForceUseEnsureCreated);
+            
+            if (shouldRecreateDatabase)
+            {
+                logger.LogInformation("Recreating database for clean test state");
+                await context.Database.EnsureDeletedAsync();
+            }
+            
             await context.Database.EnsureCreatedAsync();
-            Console.WriteLine("Database recreated with latest schema");
+            Console.WriteLine("Database created using EnsureCreated strategy");
+        }
+        else if (app.Environment.IsDevelopment())
+        {
+            // For development: Use migrations
+            logger.LogInformation("Development environment - using migrations for database setup");
+            
+            if (!shouldSkipMigrations)
+            {
+                // Check if database exists, if not create it with migrations
+                var pendingMigrations = await context.Database.GetPendingMigrationsAsync();
+                if (pendingMigrations.Any())
+                {
+                    logger.LogInformation("Applying {Count} pending migrations: {Migrations}", 
+                        pendingMigrations.Count(), string.Join(", ", pendingMigrations));
+                    await context.Database.MigrateAsync();
+                    Console.WriteLine($"Applied {pendingMigrations.Count()} pending migrations");
+                }
+                else
+                {
+                    logger.LogInformation("Database is up to date");
+                    Console.WriteLine("Database is up to date - no migrations needed");
+                }
+            }
+            else
+            {
+                logger.LogInformation("Skipping migrations as requested by configuration");
+            }
         }
         else
         {
             // For production: Use migrations
-            await context.Database.MigrateAsync();
+            logger.LogInformation("Production environment - using migrations for database setup");
+            if (!shouldSkipMigrations)
+            {
+                await context.Database.MigrateAsync();
+            }
         }
         
         // Initialize standard scopes first
@@ -443,5 +496,59 @@ public static class WebApplicationExtensions
             Console.WriteLine($"Error initializing dynamic OIDC client configuration: {ex.Message}");
             throw;
         }
+    }
+
+    /// <summary>
+    /// Detects if the application is running in a test environment
+    /// </summary>
+    private static bool IsTestEnvironment()
+    {
+        // Method 1: Check if any test framework assemblies are loaded
+        var loadedAssemblies = AppDomain.CurrentDomain.GetAssemblies();
+        var testAssemblies = new[]
+        {
+            "Microsoft.VisualStudio.TestTools.UnitTesting",
+            "MSTest",
+            "xunit",
+            "nunit",
+            "Aspire.Hosting.Testing"
+        };
+
+        bool hasTestAssemblies = loadedAssemblies.Any(assembly =>
+            testAssemblies.Any(testAssembly => 
+                assembly.FullName?.Contains(testAssembly, StringComparison.OrdinalIgnoreCase) == true));
+
+        // Method 2: Check for environment variables commonly set in test environments
+        bool hasTestEnvironmentVariables = 
+            Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") == "true" ||
+            Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") == "Testing" ||
+            !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("VSTEST_HOST_DEBUG"));
+
+        // Method 3: Check if the entry assembly is a test project (has test-related attributes)
+        bool isTestProject = false;
+        try
+        {
+            var entryAssembly = Assembly.GetEntryAssembly();
+            if (entryAssembly != null)
+            {
+                // Check for common test project indicators
+                var assemblyName = entryAssembly.GetName().Name;
+                isTestProject = assemblyName?.Contains("Test", StringComparison.OrdinalIgnoreCase) == true ||
+                               assemblyName?.Contains("MrWhoAdmin.Tests", StringComparison.OrdinalIgnoreCase) == true;
+            }
+        }
+        catch
+        {
+            // Ignore errors when checking entry assembly
+        }
+
+        bool isTest = hasTestAssemblies || hasTestEnvironmentVariables || isTestProject;
+        
+        if (isTest)
+        {
+            Console.WriteLine($"Test environment detected: TestAssemblies={hasTestAssemblies}, TestEnvVars={hasTestEnvironmentVariables}, TestProject={isTestProject}");
+        }
+        
+        return isTest;
     }
 }

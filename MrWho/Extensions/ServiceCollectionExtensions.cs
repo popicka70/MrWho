@@ -51,6 +51,38 @@ public static class ServiceCollectionExtensions
         return builder.Services;
     }
 
+    /// <summary>
+    /// Configures the database for test scenarios with in-memory database
+    /// This method is specifically for test projects
+    /// </summary>
+    public static IServiceCollection AddMrWhoTestDatabase(this IServiceCollection services)
+    {
+        // Use in-memory database for tests
+        services.AddDbContext<ApplicationDbContext>(options =>
+        {
+            options.UseInMemoryDatabase("TestDatabase");
+            options.UseOpenIddict();
+        });
+
+        return services;
+    }
+
+    /// <summary>
+    /// Forces database to use EnsureCreatedAsync instead of migrations
+    /// Useful for test scenarios where you want predictable database state
+    /// </summary>
+    public static IServiceCollection ConfigureTestDatabaseBehavior(this IServiceCollection services)
+    {
+        // Register a configuration that indicates test database behavior
+        services.Configure<DatabaseInitializationOptions>(options =>
+        {
+            options.ForceUseEnsureCreated = true;
+            options.SkipMigrations = true;
+        });
+
+        return services;
+    }
+
     public static IServiceCollection AddMrWhoIdentity(this IServiceCollection services)
     {
         // Configure Identity
@@ -153,4 +185,25 @@ public static class ServiceCollectionExtensions
 
         return services;
     }
+}
+
+/// <summary>
+/// Configuration options for database initialization behavior
+/// </summary>
+public class DatabaseInitializationOptions
+{
+    /// <summary>
+    /// When true, forces the use of EnsureCreatedAsync regardless of environment
+    /// </summary>
+    public bool ForceUseEnsureCreated { get; set; } = false;
+
+    /// <summary>
+    /// When true, skips migration checks and application
+    /// </summary>
+    public bool SkipMigrations { get; set; } = false;
+
+    /// <summary>
+    /// When true, recreates the database on each initialization (useful for integration tests)
+    /// </summary>
+    public bool RecreateDatabase { get; set; } = false;
 }

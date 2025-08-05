@@ -25,9 +25,42 @@ When executing terminal commands, use the correct PowerShell syntax for Visual S
 ## Project Structure
 This is a Razor Pages project with:
 - OpenIddict OIDC Server implementation
-- Entity Framework Core with SQLite
+- Entity Framework Core with SQL Server (via Aspire)
 - ASP.NET Core Identity
 - Radzen components for Blazor applications
+
+## Database Configuration
+
+### Environment-Specific Database Strategy
+The project uses intelligent database initialization:
+
+- **Development**: Uses Entity Framework migrations for schema management
+- **Production**: Uses Entity Framework migrations for reliable deployments  
+- **Tests**: Uses `EnsureCreatedAsync()` for fast test database creation
+
+### Test Database Configuration
+When writing tests, the system automatically detects test environments and uses the appropriate database strategy:
+
+```csharp
+// Automatic test detection - no configuration needed
+// Database will use EnsureCreatedAsync() in test environments
+
+// Optional: Explicit test database configuration
+services.AddSharedTestDatabase();     // Fast shared database for tests
+services.AddIsolatedTestDatabase();   // Isolated database per test
+```
+
+### Development Database Workflow
+1. Make entity changes
+2. Create migration: `dotnet ef migrations add MigrationName`
+3. Run application - migrations apply automatically
+4. Commit migration files
+
+### Test Database Best Practices
+- Use shared test infrastructure when possible for speed
+- Clean up test data if modifying shared database state
+- Use isolated databases only when complete isolation is required
+- Helper methods available: `RecreateTestDatabaseAsync()`, `ClearTestDatabaseDataAsync()`
 
 ## Code Style
 - Use C# 13.0 syntax features
@@ -42,7 +75,8 @@ This is a Razor Pages project with:
 - Use Visual Studio 2022 for development
 - Commands should be executed in Visual Studio 2022 Developer PowerShell
 - Build and run using `dotnet` CLI commands
-- Database operations use Entity Framework migrations
+- Database operations use Entity Framework migrations (development/production)
+- Tests use EnsureCreatedAsync for fast database setup
 
 ## Blazor with Radzen - Critical Requirements
 
