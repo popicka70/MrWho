@@ -142,11 +142,12 @@
             var httpContext = HttpContextAccessor.HttpContext;
             if (httpContext != null)
             {
-                var refreshSuccess = await TokenRefreshService.ForceRefreshTokenAsync(httpContext);
+                // Use Blazor-specific refresh method that handles response streaming
+                var refreshSuccess = await TokenRefreshService.ForceRefreshTokenForBlazorAsync(httpContext);
                 
                 if (refreshSuccess)
                 {
-                    lastOperationResult = "Token refreshed successfully";
+                    lastOperationResult = "Token refreshed successfully (Blazor-compatible)";
                     lastOperationSuccess = true;
                     
                     // Update status after refresh

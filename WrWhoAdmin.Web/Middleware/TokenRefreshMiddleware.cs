@@ -20,9 +20,11 @@ public class TokenRefreshMiddleware
     public async Task InvokeAsync(HttpContext context, ITokenRefreshService tokenRefreshService)
     {
         // Only check token refresh for authenticated interactive requests (not API calls)
+        // AND avoid refresh during response streaming (Blazor scenarios)
         if (context.User.Identity?.IsAuthenticated == true && 
             IsInteractiveRequest(context) &&
-            !IsApiRequest(context))
+            !IsApiRequest(context) &&
+            !context.Response.HasStarted)  // CRITICAL: Don't refresh if response has started
         {
             try
             {
@@ -36,8 +38,8 @@ public class TokenRefreshMiddleware
                 }
                 else
                 {
-                    // Check if token needs refreshing
-                    if (await tokenRefreshService.IsTokenExpiredOrExpiringSoonAsync(context))
+                    // Check if token needs refreshing (but only on major page navigations, not every request)
+                    if (IsMajorPageNavigation(context) && await tokenRefreshService.IsTokenExpiredOrExpiringSoonAsync(context))
                     {
                         _logger.LogDebug("Token is expired or expiring soon, attempting proactive refresh for path: {Path}", 
                             context.Request.Path);
@@ -93,6 +95,36 @@ public class TokenRefreshMiddleware
             return false;
         }
 
+        return true;
+    }
+
+    /// <summary>
+    /// Determines if this is a major page navigation (not AJAX or partial requests)
+    /// </summary>
+    private static bool IsMajorPageNavigation(HttpContext context)
+    {
+        // Skip refresh on AJAX requests or partial updates
+        var headers = context.Request.Headers;
+        
+        // Check for AJAX indicators
+        if (headers.ContainsKey("X-Requested-With") || 
+            headers.ContainsKey("HX-Request") || // htmx
+            headers.ContainsKey("X-CSRF-TOKEN"))
+        {
+            return false;
+        }
+
+        // Check for Blazor SignalR requests
+        var path = context.Request.Path.Value?.ToLowerInvariant();
+        if (path != null && (
+            path.Contains("/_blazor/") ||
+            path.Contains("/hub/") ||
+            path.Contains("negotiate")))
+        {
+            return false;
+        }
+
+        // Only refresh on full page navigations
         return true;
     }
 

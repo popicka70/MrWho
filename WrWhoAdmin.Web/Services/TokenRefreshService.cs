@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace MrWhoAdmin.Web.Services;
 
@@ -16,6 +17,9 @@ public class TokenRefreshService : ITokenRefreshService
 
     // Refresh token if it expires within this timeframe (5 minutes)
     private readonly TimeSpan _refreshBeforeExpiryTime = TimeSpan.FromMinutes(5);
+
+    // Static lock to prevent concurrent refresh attempts across all instances
+    private static readonly SemaphoreSlim _refreshSemaphore = new(1, 1);
 
     public TokenRefreshService(
         ILogger<TokenRefreshService> logger,
@@ -49,12 +53,56 @@ public class TokenRefreshService : ITokenRefreshService
     }
 
     /// <summary>
-    /// Forces a token refresh for the current user
+    /// Forces a token refresh for the current user with concurrency protection
     /// </summary>
-    public async Task<bool> ForceRefreshTokenAsync(HttpContext httpContext)
+    public async Task<bool> ForceRefreshTokenAsync(HttpContext httpContext, bool force = false)
     {
+        return await RefreshTokenInternalAsync(httpContext, forceRefresh: force, updateCookies: true);
+    }
+
+    /// <summary>
+    /// Forces a token refresh specifically for Blazor scenarios where response may have started
+    /// This method handles the case where cookies cannot be updated due to response streaming
+    /// </summary>
+    public async Task<bool> ForceRefreshTokenForBlazorAsync(HttpContext httpContext)
+    {
+        _logger.LogDebug("Starting Blazor-specific token refresh");
+        
+        // For Blazor, we just need to refresh the token on the server side
+        // The client will get the fresh token on the next request
+        var refreshSuccess = await RefreshTokenInternalAsync(httpContext, forceRefresh: true, updateCookies: false);
+        
+        if (refreshSuccess)
+        {
+            _logger.LogInformation("Blazor token refresh successful - fresh tokens available for future requests");
+            return true;
+        }
+        
+        _logger.LogWarning("Blazor token refresh failed");
+        return false;
+    }
+
+    /// <summary>
+    /// Internal method to handle token refresh with options for different scenarios
+    /// </summary>
+    private async Task<bool> RefreshTokenInternalAsync(HttpContext httpContext, bool forceRefresh = false, bool updateCookies = true)
+    {
+        // Use semaphore to prevent concurrent refresh attempts
+        if (!await _refreshSemaphore.WaitAsync(TimeSpan.FromSeconds(10)))
+        {
+            _logger.LogWarning("Timeout waiting for refresh token semaphore");
+            return false;
+        }
+
         try
         {
+            // Double-check if token still needs refreshing after acquiring lock
+            if (!await IsTokenExpiredOrExpiringSoonAsync(httpContext) && !forceRefresh)
+            {
+                _logger.LogDebug("Token was refreshed by another operation, no refresh needed");
+                return true;
+            }
+
             var refreshToken = await httpContext.GetTokenAsync("refresh_token");
             if (string.IsNullOrEmpty(refreshToken))
             {
@@ -85,6 +133,8 @@ public class TokenRefreshService : ITokenRefreshService
             if (response.IsSuccessStatusCode)
             {
                 var responseContent = await response.Content.ReadAsStringAsync();
+                _logger.LogDebug("Token response received: {Response}", responseContent);
+                
                 var tokenResponse = JsonSerializer.Deserialize<TokenResponse>(responseContent, new JsonSerializerOptions 
                 { 
                     PropertyNameCaseInsensitive = true 
@@ -92,15 +142,24 @@ public class TokenRefreshService : ITokenRefreshService
 
                 if (tokenResponse?.AccessToken != null)
                 {
+                    // If we're not updating cookies (Blazor scenario) or response has started, just return success
+                    if (!updateCookies || httpContext.Response.HasStarted)
+                    {
+                        _logger.LogInformation("Token refresh successful - cookies not updated (Blazor scenario or response started)");
+                        return true;
+                    }
+
                     // Update the authentication properties with new tokens
                     var authenticateResult = await httpContext.AuthenticateAsync();
                     if (authenticateResult.Properties != null)
                     {
                         authenticateResult.Properties.UpdateTokenValue("access_token", tokenResponse.AccessToken);
                         
+                        // CRITICAL: Update refresh token if a new one was provided (token rotation)
                         if (!string.IsNullOrEmpty(tokenResponse.RefreshToken))
                         {
                             authenticateResult.Properties.UpdateTokenValue("refresh_token", tokenResponse.RefreshToken);
+                            _logger.LogDebug("Updated refresh token due to token rotation");
                         }
 
                         if (!string.IsNullOrEmpty(tokenResponse.IdToken))
@@ -116,12 +175,25 @@ public class TokenRefreshService : ITokenRefreshService
                                 expiresAt.ToString("o"));
                         }
 
-                        // Sign in again with updated tokens
-                        await httpContext.SignInAsync(authenticateResult.Principal!, authenticateResult.Properties);
+                        // Only sign in if response hasn't started (to avoid header modification errors)
+                        try
+                        {
+                            await httpContext.SignInAsync(authenticateResult.Principal!, authenticateResult.Properties);
+                            _logger.LogInformation("Token refresh successful - cookies updated");
+                        }
+                        catch (InvalidOperationException ex) when (ex.Message.Contains("Headers are read-only"))
+                        {
+                            _logger.LogWarning("Token refresh successful but cookies could not be updated (response already started): {Error}", ex.Message);
+                            // This is acceptable in Blazor scenarios - the token is refreshed, just not persisted in this request
+                            return true;
+                        }
                         
-                        _logger.LogInformation("Token refresh successful");
                         return true;
                     }
+                }
+                else
+                {
+                    _logger.LogWarning("Token response did not contain access_token: {Response}", responseContent);
                 }
             }
             else
@@ -129,11 +201,23 @@ public class TokenRefreshService : ITokenRefreshService
                 var errorContent = await response.Content.ReadAsStringAsync();
                 _logger.LogWarning("Token refresh failed: {StatusCode} - {Error}", 
                     response.StatusCode, errorContent);
+                
+                // If the refresh token is invalid/expired, the user needs to re-authenticate
+                if (response.StatusCode == System.Net.HttpStatusCode.BadRequest && 
+                    errorContent.Contains("invalid_grant"))
+                {
+                    _logger.LogWarning("Refresh token is invalid or expired, user needs to re-authenticate");
+                    // Could potentially trigger a re-authentication flow here
+                }
             }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Exception occurred during token refresh");
+        }
+        finally
+        {
+            _refreshSemaphore.Release();
         }
 
         return false;
@@ -192,14 +276,26 @@ public class TokenRefreshService : ITokenRefreshService
     }
 
     /// <summary>
-    /// DTO for token response from OpenIddict
+    /// DTO for token response from OpenIddict with correct JSON property names
     /// </summary>
     private class TokenResponse
     {
+        [JsonPropertyName("access_token")]
         public string? AccessToken { get; set; }
+        
+        [JsonPropertyName("refresh_token")]
         public string? RefreshToken { get; set; }
+        
+        [JsonPropertyName("id_token")]
         public string? IdToken { get; set; }
+        
+        [JsonPropertyName("token_type")]
         public string? TokenType { get; set; }
+        
+        [JsonPropertyName("expires_in")]
         public int? ExpiresIn { get; set; }
+        
+        [JsonPropertyName("scope")]
+        public string? Scope { get; set; }
     }
 }

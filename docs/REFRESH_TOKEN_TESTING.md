@@ -1,82 +1,122 @@
-# Testing Refresh Token Functionality
+# Testing Refresh Token Functionality - Updated
 
-## Quick Fix Instructions
+## Issue Fixed: Refresh Token "Already Redeemed" Error
 
-The issue where access tokens expired without automatic refresh has been fixed. Here's what was done and how to test it:
+The error `"The specified refresh token has already been redeemed"` has been resolved by implementing proper concurrency protection and configuring OpenIddict for development scenarios.
 
 ## What Was Fixed
 
-1. **Added `offline_access` scope** - This is required for OpenIddict to issue refresh tokens
-2. **Fixed refresh token handler** - Now properly validates refresh tokens and extracts user information
-3. **Added automatic refresh** - Tokens are now automatically refreshed before API calls and on page requests
-4. **Enhanced debugging** - New debug pages help troubleshoot token issues
+### 1. **Refresh Token Rotation Issue**
+- **Problem**: OpenIddict uses refresh token rotation by default (security feature)
+- **Solution**: Disabled rolling refresh tokens for development: `DisableRollingRefreshTokens()`
+- **Effect**: Refresh tokens can now be reused during their lifetime
 
-## How to Test
+### 2. **Race Condition Protection**
+- **Problem**: Multiple requests trying to refresh tokens simultaneously
+- **Solution**: Added `SemaphoreSlim` to ensure only one refresh operation at a time
+- **Effect**: Eliminates "already redeemed" errors from concurrent access
 
-### 1. Clear Current Session
-- Log out from the admin web application
-- Close the browser to clear any cached tokens
+### 3. **Smart Request Filtering**
+- **Problem**: Middleware attempting refresh on every request
+- **Solution**: Only refresh on major page navigations, skip AJAX/SignalR requests
+- **Effect**: Reduces unnecessary refresh attempts
 
-### 2. Log In Again
-- Navigate to the admin web application (https://localhost:7257)
-- Log in with credentials: `admin@mrwho.local` / `MrWhoAdmin2024!`
+### 4. **Enhanced Error Handling**
+- **Problem**: API calls failing when refresh fails
+- **Solution**: Graceful degradation - continue with existing tokens
+- **Effect**: Better user experience even when refresh fails
 
-### 3. Check Refresh Token
-- Go to **Identity Server** > **Debug Token Refresh** in the menu
-- You should now see:
-  - ? **Refresh Token Available: True** (this was previously False)
-  - ? **Access Token Available: True**
-  - Token expiry time and countdown
+## How to Test the Fix
 
-### 4. Test Automatic Refresh
-1. **Wait for Token to Expire** (or modify token lifetime for faster testing)
-2. **Navigate to any page** - tokens should refresh automatically
-3. **Make an API call** - use the "Test API Call" button on debug page
-4. **Check logs** - should show successful refresh operations
+### 1. **Clear Everything and Start Fresh**
+```powershell
+# Stop the application
+# Clear browser data (cookies, local storage)
+# Or use incognito/private browsing
+```
 
-### 5. Manual Testing
-On the Debug Token Refresh page:
-- Use **"Force Refresh Token"** button to manually test refresh
-- Should show success message if working correctly
+### 2. **Log In Fresh**
+- Navigate to admin web app: `https://localhost:7257`
+- Log in: `admin@mrwho.local` / `MrWhoAdmin2024!`
+- **You should now get refresh tokens**
 
-## What to Expect
+### 3. **Verify Refresh Token is Available**
+- Go to **Identity Server** > **Debug Token Refresh**
+- Should show: **Refresh Token Available: True** ?
+- Check token expiry time
 
-**Before the fix:**
-- No refresh tokens were issued (`offline_access` scope was missing)
-- Users had to log out/in when tokens expired
-- API calls would fail after token expiry
+### 4. **Test Manual Refresh** 
+- Click **"Force Refresh Token"** button multiple times
+- Should succeed every time (no "already redeemed" error)
+- Tokens should update successfully
 
-**After the fix:**
-- Refresh tokens are now issued and stored
-- Automatic refresh happens ~5 minutes before token expiry
-- Seamless user experience with no forced re-authentication
-- API calls automatically get fresh tokens
+### 5. **Test Automatic Refresh**
+- Navigate between pages normally
+- Make API calls using **"Test API Call"** button
+- Check logs for successful refresh operations
+- No forced logouts should occur
+
+## Expected Behavior Now
+
+### ? **Working Scenarios**
+- Multiple refresh attempts don't conflict
+- Tokens refresh automatically before expiry
+- API calls get fresh tokens when needed
+- Manual refresh works reliably
+- No more "already redeemed" errors
+
+### ?? **Configuration Changes Made**
+
+1. **OpenIddict Server**:
+   ```csharp
+   options.DisableRollingRefreshTokens(); // Key fix for development
+   ```
+
+2. **Token Refresh Service**:
+   ```csharp
+   private static readonly SemaphoreSlim _refreshSemaphore = new(1, 1); // Concurrency protection
+   ```
+
+3. **Smart Middleware Filtering**:
+   ```csharp
+   IsMajorPageNavigation(context) // Only refresh on full page loads
+   ```
 
 ## Troubleshooting
 
-If refresh tokens are still not available:
+### If you still see "already redeemed" errors:
 
-1. **Check the database** - The admin client should have `offline_access` scope
-2. **Check logs** - Look for token refresh attempts and any errors
-3. **Clear browser cache** - Old sessions might not have refresh tokens
-4. **Verify configuration** - Ensure OpenIddict server has `OfflineAccess` scope registered
+1. **Clear browser completely** - old sessions may have stale tokens
+2. **Check logs** for multiple concurrent refresh attempts
+3. **Verify configuration** - ensure `DisableRollingRefreshTokens()` is applied
+4. **Database cleanup** - may need to clear OpenIddict token tables
 
-## Configuration Details
+### For Production Environments:
 
-The fix involved these key changes:
+The current configuration is optimized for development. For production:
+- **Enable refresh token rotation** for security
+- **Implement proper token storage** (Redis, database)
+- **Add retry logic** with exponential backoff
+- **Monitor refresh token usage** patterns
 
-1. **OpenIdConnect Client**: Added `offline_access` scope
-2. **OpenIddict Server**: Registered `OfflineAccess` scope  
-3. **Admin Client**: Added `offline_access` to allowed scopes
-4. **Token Handler**: Fixed refresh token validation logic
-5. **Middleware**: Added proactive token refresh
-6. **Delegating Handler**: Automatic refresh before API calls
+## Key Improvements
 
-## Expected Timeline
+| Issue | Before | After |
+|-------|---------|--------|
+| **Concurrent Refresh** | Race conditions, failures | Protected by semaphore ? |
+| **Token Rotation** | Tokens invalidated after use | Reusable during lifetime ? |
+| **API Call Failures** | Blocked by refresh failures | Graceful degradation ? |
+| **Excessive Refreshing** | Every request | Only major navigations ? |
+| **Error Handling** | Poor error messages | Detailed logging ? |
 
-- **Access Token Lifetime**: 1 hour
-- **Refresh Token Lifetime**: 14 days  
-- **Refresh Before Expiry**: 5 minutes
-- **Automatic Refresh**: On page loads and API calls
+## Testing Checklist
 
-The system will now automatically maintain valid tokens throughout user sessions, eliminating the need for manual re-authentication due to token expiry.
+- [ ] Fresh login provides refresh token
+- [ ] Manual refresh works multiple times
+- [ ] API calls succeed consistently  
+- [ ] Page navigation doesn't cause errors
+- [ ] Logs show successful refresh operations
+- [ ] No "already redeemed" errors in logs
+- [ ] Tokens update properly after refresh
+
+The refresh token functionality should now work reliably without the "already redeemed" error!

@@ -30,12 +30,17 @@ public class AuthenticationDelegatingHandler : DelegatingHandler
         {
             try
             {
-                // Ensure we have a valid token (refresh if needed)
-                var hasValidToken = await _tokenRefreshService.EnsureValidTokenAsync(httpContext);
-                if (!hasValidToken)
+                // Check if we need to refresh the token before making the API call
+                if (await _tokenRefreshService.IsTokenExpiredOrExpiringSoonAsync(httpContext))
                 {
-                    _logger.LogWarning("Unable to obtain valid access token for request to {RequestUri}", request.RequestUri);
-                    return await base.SendAsync(request, cancellationToken);
+                    _logger.LogDebug("Access token is expired or expiring, attempting refresh before API call to {RequestUri}", request.RequestUri);
+                    
+                    var refreshSuccess = await _tokenRefreshService.ForceRefreshTokenAsync(httpContext);
+                    if (!refreshSuccess)
+                    {
+                        _logger.LogWarning("Failed to refresh token before API call to {RequestUri}, proceeding with current token", request.RequestUri);
+                        // Continue with existing token - the API might still accept it or we'll get a proper 401
+                    }
                 }
 
                 var accessToken = await httpContext.GetTokenAsync("access_token");
@@ -47,12 +52,13 @@ public class AuthenticationDelegatingHandler : DelegatingHandler
                 }
                 else
                 {
-                    _logger.LogWarning("No access token found after refresh attempt for request to {RequestUri}", request.RequestUri);
+                    _logger.LogWarning("No access token available for request to {RequestUri}", request.RequestUri);
                 }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error getting or refreshing access token for request to {RequestUri}", request.RequestUri);
+                // Continue without token - let the API respond with appropriate error
             }
         }
         else

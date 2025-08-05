@@ -137,6 +137,9 @@ public static class ServiceCollectionExtensions
                 options.SetAccessTokenLifetime(TimeSpan.FromMinutes(60))    // 1 hour access tokens
                        .SetRefreshTokenLifetime(TimeSpan.FromDays(14));     // 14 days refresh tokens
 
+                // Configure refresh token behavior
+                options.DisableRollingRefreshTokens(); // Disable refresh token rotation for development
+
                 // Register scopes (including API scopes)
                 options.RegisterScopes("openid",
                                       OpenIddictConstants.Scopes.Email,
