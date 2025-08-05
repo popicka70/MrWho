@@ -387,8 +387,7 @@ public static class WebApplicationExtensions
         {
             await context.Database.EnsureDeletedAsync();
             await context.Database.EnsureCreatedAsync();
-            //Console.WriteLine("Database recreated with latest schema");
-            //await context.Database.MigrateAsync();
+            Console.WriteLine("Database recreated with latest schema");
         }
         else
         {
