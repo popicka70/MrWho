@@ -115,7 +115,7 @@ public class OidcClientService : IOidcClientService
             }
 
             // Add scopes (INCLUDING API SCOPES)
-            var scopes = new[] { "openid", "email", "profile", "roles", "api.read", "api.write" };
+            var scopes = new[] { "openid", "email", "profile", "roles", "offline_access", "api.read", "api.write" };
             foreach (var scope in scopes)
             {
                 _context.ClientScopes.Add(new ClientScope
@@ -159,6 +159,7 @@ public class OidcClientService : IOidcClientService
             // Check if existing admin client has API scopes and add them if missing
             var existingApiScopes = adminClient.Scopes.Where(s => s.Scope.StartsWith("api.")).ToList();
             var existingCorrectApiPermissions = adminClient.Permissions.Where(p => p.Permission.StartsWith("oidc:scope:api.")).ToList();
+            var hasOfflineAccess = adminClient.Scopes.Any(s => s.Scope == "offline_access");
 
             // Fix existing incorrect permissions - remove old format and add correct format
             var oldApiPermissions = adminClient.Permissions.Where(p => p.Permission.StartsWith("api.") && !p.Permission.StartsWith("oidc:scope:")).ToList();
@@ -187,6 +188,16 @@ public class OidcClientService : IOidcClientService
                 }
             }
 
+            if (!hasOfflineAccess)
+            {
+                _logger.LogInformation("Adding offline_access scope to existing admin client for refresh token support");
+                _context.ClientScopes.Add(new ClientScope
+                {
+                    ClientId = adminClient.Id,
+                    Scope = "offline_access"
+                });
+            }
+
             if (existingCorrectApiPermissions.Count == 0)
             {
                 _logger.LogInformation("Adding API permissions with correct format to existing admin client");
@@ -203,7 +214,7 @@ public class OidcClientService : IOidcClientService
                 }
             }
 
-            if (existingApiScopes.Count == 0 || existingCorrectApiPermissions.Count == 0 || oldApiPermissions.Any())
+            if (existingApiScopes.Count == 0 || existingCorrectApiPermissions.Count == 0 || !hasOfflineAccess || oldApiPermissions.Any())
             {
                 await _context.SaveChangesAsync();
                 _logger.LogInformation("Updated API scopes and permissions on existing admin client");
@@ -459,6 +470,9 @@ public class OidcClientService : IOidcClientService
                         break;
                     case "roles":
                         descriptor.Permissions.Add(OpenIddictConstants.Permissions.Scopes.Roles);
+                        break;
+                    case "offline_access":
+                        descriptor.Permissions.Add($"scp:{scope.Scope}");
                         break;
                     case "api.read":
                     case "api.write":

@@ -1,4 +1,5 @@
 using MrWhoAdmin.Web.Services;
+using Microsoft.AspNetCore.Authentication;
 
 namespace MrWhoAdmin.Web.Middleware;
 
@@ -25,22 +26,33 @@ public class TokenRefreshMiddleware
         {
             try
             {
-                // Check if token needs refreshing
-                if (await tokenRefreshService.IsTokenExpiredOrExpiringSoonAsync(context))
+                // First check if we have a refresh token available
+                var refreshToken = await context.GetTokenAsync("refresh_token");
+                if (string.IsNullOrEmpty(refreshToken))
                 {
-                    _logger.LogDebug("Token is expired or expiring soon, attempting proactive refresh for path: {Path}", 
-                        context.Request.Path);
-                    
-                    var refreshSuccess = await tokenRefreshService.ForceRefreshTokenAsync(context);
-                    if (refreshSuccess)
+                    // No refresh token available, skip proactive refresh
+                    // This is normal for newly authenticated users before they get refresh tokens
+                    _logger.LogDebug("No refresh token available for proactive refresh on path: {Path}", context.Request.Path);
+                }
+                else
+                {
+                    // Check if token needs refreshing
+                    if (await tokenRefreshService.IsTokenExpiredOrExpiringSoonAsync(context))
                     {
-                        _logger.LogInformation("Proactive token refresh successful for path: {Path}", 
+                        _logger.LogDebug("Token is expired or expiring soon, attempting proactive refresh for path: {Path}", 
                             context.Request.Path);
-                    }
-                    else
-                    {
-                        _logger.LogWarning("Proactive token refresh failed for path: {Path}. User may need to re-authenticate.", 
-                            context.Request.Path);
+                        
+                        var refreshSuccess = await tokenRefreshService.ForceRefreshTokenAsync(context);
+                        if (refreshSuccess)
+                        {
+                            _logger.LogInformation("Proactive token refresh successful for path: {Path}", 
+                                context.Request.Path);
+                        }
+                        else
+                        {
+                            _logger.LogWarning("Proactive token refresh failed for path: {Path}. User may need to re-authenticate.", 
+                                context.Request.Path);
+                        }
                     }
                 }
             }

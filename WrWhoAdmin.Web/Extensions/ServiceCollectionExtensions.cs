@@ -170,6 +170,7 @@ public static class ServiceCollectionExtensions
         options.Scope.Add("profile");
         options.Scope.Add("email");
         options.Scope.Add("roles");
+        options.Scope.Add("offline_access"); // CRITICAL: This scope is required for refresh tokens
         options.Scope.Add("api.read");  // Add API read scope
         options.Scope.Add("api.write"); // Add API write scope
     }

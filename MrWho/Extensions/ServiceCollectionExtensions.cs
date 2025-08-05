@@ -142,6 +142,7 @@ public static class ServiceCollectionExtensions
                                       OpenIddictConstants.Scopes.Email,
                                       OpenIddictConstants.Scopes.Profile,
                                       OpenIddictConstants.Scopes.Roles,
+                                      OpenIddictConstants.Scopes.OfflineAccess, // CRITICAL: Required for refresh tokens
                                       "api.read",   // Add this
                                       "api.write"); // Add this
 
