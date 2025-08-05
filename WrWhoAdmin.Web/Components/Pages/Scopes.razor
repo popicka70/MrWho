@@ -48,11 +48,11 @@
                     </Template>
                 </RadzenDataGridColumn>
                 
-                <RadzenDataGridColumn TItem="ScopeDto" Property="DisplayName" Title="Display Name" />
+                <RadzenDataGridColumn TItem="ScopeDto" Property="DisplayName" Title="Display Name" Width="150px" />
                 
                 <RadzenDataGridColumn TItem="ScopeDto" Property="Description" Title="Description">
                     <Template Context="scope">
-                        <RadzenText Text="@(scope.Description ?? "-")" Style="max-width: 300px; overflow: hidden; text-overflow: ellipsis;" />
+                        <RadzenText Text="@(scope.Description ?? "-")" Style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;" />
                     </Template>
                 </RadzenDataGridColumn>
                 
@@ -85,7 +85,7 @@
                     </Template>
                 </RadzenDataGridColumn>
                 
-                <RadzenDataGridColumn TItem="ScopeDto" Title="Claims" Width="200px">
+                <RadzenDataGridColumn TItem="ScopeDto" Title="Claims" Width="180px">
                     <Template Context="scope">
                         @if (scope.Claims.Any())
                         {
@@ -102,17 +102,17 @@
                     </Template>
                 </RadzenDataGridColumn>
                 
-                <RadzenDataGridColumn TItem="ScopeDto" Title="Actions" Width="300px" Sortable="false">
+                <RadzenDataGridColumn TItem="ScopeDto" Title="Actions" Width="470px" Sortable="false">
                     <Template Context="scope">
                         <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
                             <RadzenButton Click="@(async () => await ShowEditScopeDialog(scope))" Icon="edit" Size="ButtonSize.Medium" 
-                                         ButtonStyle="ButtonStyle.Light" Text="Edit" Disabled="@scope.IsStandard" />
+                                         ButtonStyle="ButtonStyle.Light" Text="Edit" Disabled="@scope.IsStandard" Style="min-width: 100px;" />
                             <RadzenButton Click="@(async () => await ViewScopeDetails(scope))" Icon="visibility" Size="ButtonSize.Medium" 
-                                         ButtonStyle="ButtonStyle.Info" Text="View" />
+                                         ButtonStyle="ButtonStyle.Info" Text="View" Style="min-width: 100px;" />
                             <RadzenButton Click="@(async () => await ToggleScopeStatus(scope))" Icon="@(scope.IsEnabled ? "toggle_on" : "toggle_off")" 
-                                         Size="ButtonSize.Medium" ButtonStyle="ButtonStyle.Warning" Text="Toggle" />
+                                         Size="ButtonSize.Medium" ButtonStyle="ButtonStyle.Warning" Text="Toggle" Style="min-width: 100px;" />
                             <RadzenButton Click="@(async () => await DeleteScope(scope))" Icon="delete" Size="ButtonSize.Medium" 
-                                         ButtonStyle="ButtonStyle.Danger" Text="Delete" Disabled="@scope.IsStandard" />
+                                         ButtonStyle="ButtonStyle.Danger" Text="Delete" Disabled="@scope.IsStandard" Style="min-width: 100px;" />
                         </RadzenStack>
                     </Template>
                 </RadzenDataGridColumn>
@@ -322,4 +322,4 @@
         public string Text { get; set; } = string.Empty;
         public ScopeType Value { get; set; }
     }
-}}
+}
