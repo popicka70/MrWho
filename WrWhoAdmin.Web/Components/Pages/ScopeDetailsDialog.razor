@@ -63,20 +63,39 @@
 
     <RadzenCard>
         <RadzenStack Gap="1rem">
-            <RadzenText TextStyle="TextStyle.H6" Text="Claims" />
+            <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                <RadzenText TextStyle="TextStyle.H6" Text="Claims" />
+                <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="@($"{Scope.Claims.Count} claims")" />
+            </RadzenStack>
             
             @if (Scope.Claims.Any())
             {
-                <RadzenDataList Data="@Scope.Claims" TItem="string">
-                    <Template Context="claim">
-                        <RadzenCard Style="margin-bottom: 0.5rem;">
-                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                <RadzenIcon Icon="verified_user" Style="color: var(--rz-info);" />
-                                <RadzenText Text="@claim" />
-                            </RadzenStack>
-                        </RadzenCard>
-                    </Template>
-                </RadzenDataList>
+                <div style="height: 300px; overflow-y: auto; border: 1px solid var(--rz-border-color); border-radius: var(--rz-border-radius);">
+                    <RadzenDataGrid Data="@filteredClaims" TItem="string" AllowPaging="false" AllowSorting="true" 
+                                   Style="height: 100%;" ShowPagingSummary="false" AllowFiltering="true" FilterMode="FilterMode.Simple">
+                        <Columns>
+                            <RadzenDataGridColumn TItem="string" Title="Claim Type" Width="80px">
+                                <Template Context="claim">
+                                    <RadzenIcon Icon="verified_user" Style="color: var(--rz-info);" />
+                                </Template>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn TItem="string" Property="@nameof(String.Empty)" Title="Claim Name" Sortable="true" Filterable="true">
+                                <Template Context="claim">
+                                    <RadzenText Text="@claim" />
+                                </Template>
+                                <FilterTemplate>
+                                    <RadzenTextBox @oninput="@(args => OnClaimFilter(args.Value?.ToString()))" 
+                                                  Placeholder="Filter claims..." Style="width: 100%;" />
+                                </FilterTemplate>
+                            </RadzenDataGridColumn>
+                            <RadzenDataGridColumn TItem="string" Title="Description" Width="200px">
+                                <Template Context="claim">
+                                    <RadzenText Text="@GetClaimDescription(claim)" TextStyle="TextStyle.Caption" />
+                                </Template>
+                            </RadzenDataGridColumn>
+                        </Columns>
+                    </RadzenDataGrid>
+                </div>
             }
             else
             {
@@ -116,6 +135,30 @@
 
 @code {
     [Parameter] public ScopeDto Scope { get; set; } = null!;
+    
+    private IEnumerable<string> filteredClaims = new List<string>();
+    private string claimFilter = "";
+
+    protected override void OnInitialized()
+    {
+        filteredClaims = Scope.Claims;
+    }
+
+    private void OnClaimFilter(string? filterValue)
+    {
+        claimFilter = filterValue ?? "";
+        
+        if (string.IsNullOrWhiteSpace(claimFilter))
+        {
+            filteredClaims = Scope.Claims;
+        }
+        else
+        {
+            filteredClaims = Scope.Claims.Where(c => c.Contains(claimFilter, StringComparison.OrdinalIgnoreCase));
+        }
+        
+        StateHasChanged();
+    }
 
     private BadgeStyle GetScopeTypeBadgeStyle(ScopeType scopeType)
     {
@@ -134,6 +177,37 @@
             ScopeType.Identity => "Identity",
             ScopeType.Resource => "Resource",
             _ => "Unknown"
+        };
+    }
+
+    private string GetClaimDescription(string claim)
+    {
+        // Provide common claim descriptions
+        return claim.ToLowerInvariant() switch
+        {
+            "sub" => "Subject identifier for the user",
+            "name" => "Full name of the user",
+            "given_name" => "Given name(s) or first name(s) of the user",
+            "family_name" => "Surname(s) or last name(s) of the user",
+            "middle_name" => "Middle name(s) of the user",
+            "nickname" => "Casual name of the user",
+            "preferred_username" => "Shorthand name by which the user wishes to be referred to",
+            "profile" => "URL of the user's profile page",
+            "picture" => "URL of the user's profile picture",
+            "website" => "URL of the user's web page or blog",
+            "email" => "User's preferred e-mail address",
+            "email_verified" => "True if the user's e-mail address has been verified",
+            "gender" => "User's gender",
+            "birthdate" => "User's birthday",
+            "zoneinfo" => "String from zoneinfo time zone database",
+            "locale" => "User's locale",
+            "phone_number" => "User's preferred telephone number",
+            "phone_number_verified" => "True if the user's phone number has been verified",
+            "address" => "User's preferred postal address",
+            "updated_at" => "Time the user's information was last updated",
+            "role" => "Role of the user",
+            "roles" => "Roles assigned to the user",
+            _ => "Custom claim"
         };
     }
 }

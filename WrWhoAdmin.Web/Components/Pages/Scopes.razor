@@ -211,7 +211,7 @@
     {
         await DialogService.OpenAsync<ScopeDetailsDialog>("Scope Details", 
             new Dictionary<string, object> { { "Scope", scope } }, 
-            new DialogOptions() { Width = "500px", Height = "500px" });
+            new DialogOptions() { Width = "900px", Height = "700px", Resizable = true });
     }
 
     private async Task ToggleScopeStatus(ScopeDto scope)
