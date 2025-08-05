@@ -198,7 +198,7 @@
 
         var result = await DialogService.OpenAsync<EditScopeDialog>("Edit Scope", 
             new Dictionary<string, object> { { "Scope", scope } }, 
-            new DialogOptions() { Width = "600px", Height = "600px" });
+            new DialogOptions() { Width = "800px", Height = "650px", Resizable = true });
 
         if (result != null && result is ScopeDto)
         {
