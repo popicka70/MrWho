@@ -22,6 +22,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ISeedingService, SeedingService>();
         services.AddScoped<IScopeSeederService, ScopeSeederService>();
         services.AddScoped<IApiResourceSeederService, ApiResourceSeederService>();
+        services.AddScoped<IIdentityResourceSeederService, IdentityResourceSeederService>();
 
         // Register token handler
         services.AddScoped<ITokenHandler, TokenHandler>();

@@ -5,16 +5,6 @@ using MrWho.Shared.Models;
 
 namespace MrWhoAdmin.Web.Services;
 
-public interface IApiResourcesApiService
-{
-    Task<PagedResult<ApiResourceDto>?> GetApiResourcesAsync(int page = 1, int pageSize = 10, string? search = null);
-    Task<ApiResourceDto?> GetApiResourceAsync(string id);
-    Task<ApiResourceDto?> CreateApiResourceAsync(CreateApiResourceRequest request);
-    Task<ApiResourceDto?> UpdateApiResourceAsync(string id, UpdateApiResourceRequest request);
-    Task<bool> DeleteApiResourceAsync(string id);
-    Task<ApiResourceDto?> ToggleApiResourceAsync(string id);
-}
-
 public class ApiResourcesApiService : IApiResourcesApiService
 {
     private readonly HttpClient _httpClient;

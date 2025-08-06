@@ -30,6 +30,11 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>
     public DbSet<ApiResourceClaim> ApiResourceClaims { get; set; }
     public DbSet<ApiResourceSecret> ApiResourceSecrets { get; set; }
 
+    // Identity Resource management entities
+    public DbSet<IdentityResource> IdentityResources { get; set; }
+    public DbSet<IdentityResourceClaim> IdentityResourceClaims { get; set; }
+    public DbSet<IdentityResourceProperty> IdentityResourceProperties { get; set; }
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
@@ -69,6 +74,33 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>
             entity.Property(c => c.AuthorizationCodeLifetime).HasConversion(
                 v => v.HasValue ? v.Value.TotalMinutes : (double?)null,
                 v => v.HasValue ? TimeSpan.FromMinutes(v.Value) : null);
+        });
+
+        // Configure Identity Resource entities
+        builder.Entity<IdentityResource>(entity =>
+        {
+            entity.HasKey(ir => ir.Id);
+            entity.HasIndex(ir => ir.Name).IsUnique();
+        });
+
+        builder.Entity<IdentityResourceClaim>(entity =>
+        {
+            entity.HasKey(irc => irc.Id);
+            entity.HasOne(irc => irc.IdentityResource)
+                  .WithMany(ir => ir.UserClaims)
+                  .HasForeignKey(irc => irc.IdentityResourceId)
+                  .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(irc => new { irc.IdentityResourceId, irc.ClaimType }).IsUnique();
+        });
+
+        builder.Entity<IdentityResourceProperty>(entity =>
+        {
+            entity.HasKey(irp => irp.Id);
+            entity.HasOne(irp => irp.IdentityResource)
+                  .WithMany(ir => ir.Properties)
+                  .HasForeignKey(irp => irp.IdentityResourceId)
+                  .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(irp => new { irp.IdentityResourceId, irp.Key }).IsUnique();
         });
 
         // Configure ClientRedirectUri entity

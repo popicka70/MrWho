@@ -1,5 +1,6 @@
 using MrWhoAdmin.Web.Components;
 using MrWhoAdmin.Web.Extensions;
+using MrWhoAdmin.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -21,6 +22,8 @@ builder.Services.AddHttpServices();
 builder.Services.AddApiServices(builder.Configuration);
 builder.Services.AddAuthenticationServices(builder.Configuration);
 builder.Services.AddAuthorizationServices();
+
+// API Services are already registered in AddApiServices() method above
 
 var app = builder.Build();
 

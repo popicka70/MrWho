@@ -17,4 +17,8 @@
 	  <ProjectReference Include="..\WrWhoAdmin.ServiceDefaults\MrWhoAdmin.ServiceDefaults.csproj" />
 	</ItemGroup>
 
+	<ItemGroup>
+	  <Folder Include="Components\Dialogs\" />
+	</ItemGroup>
+
 </Project>

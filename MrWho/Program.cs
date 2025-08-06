@@ -13,6 +13,9 @@ builder.Services.AddMrWhoServices();
 builder.Services.AddMrWhoOpenIddict();
 builder.Services.AddMrWhoAuthorization();
 
+// Business Logic Services
+// Registration is handled in AddMrWhoServices() extension method
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline using extension methods

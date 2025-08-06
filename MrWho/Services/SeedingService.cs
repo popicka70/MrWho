@@ -17,6 +17,7 @@ public class SeedingService : ISeedingService
     private readonly IOidcClientService _oidcClientService;
     private readonly IScopeSeederService _scopeSeederService;
     private readonly IApiResourceSeederService _apiResourceSeederService;
+    private readonly IIdentityResourceSeederService _identityResourceSeederService;
     private readonly ILogger<SeedingService> _logger;
 
     public SeedingService(
@@ -27,6 +28,7 @@ public class SeedingService : ISeedingService
         IOidcClientService oidcClientService,
         IScopeSeederService scopeSeederService,
         IApiResourceSeederService apiResourceSeederService,
+        IIdentityResourceSeederService identityResourceSeederService,
         ILogger<SeedingService> logger)
     {
         _context = context;
@@ -36,6 +38,7 @@ public class SeedingService : ISeedingService
         _oidcClientService = oidcClientService;
         _scopeSeederService = scopeSeederService;
         _apiResourceSeederService = apiResourceSeederService;
+        _identityResourceSeederService = identityResourceSeederService;
         _logger = logger;
     }
 
@@ -57,6 +60,9 @@ public class SeedingService : ISeedingService
         
         // Seed standard API resources
         await _apiResourceSeederService.SeedStandardApiResourcesAsync();
+        
+        // Seed standard Identity resources
+        await _identityResourceSeederService.SeedStandardIdentityResourcesAsync();
         
         // Seed default OIDC applications
         await SeedDefaultApplications();
