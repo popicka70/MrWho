@@ -61,6 +61,23 @@ public class UsersApiService : IUsersApiService
         }
     }
 
+    public async Task<UserWithClaimsDto?> GetUserWithClaimsAsync(string id)
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync($"api/users/{id}/with-claims");
+            response.EnsureSuccessStatusCode();
+
+            var json = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<UserWithClaimsDto>(json, _jsonOptions);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting user with claims {UserId}", id);
+            return null;
+        }
+    }
+
     public async Task<UserDto?> CreateUserAsync(CreateUserRequest request)
     {
         try
@@ -200,6 +217,160 @@ public class UsersApiService : IUsersApiService
         {
             _logger.LogError(ex, "Error forcing logout for user {UserId}", id);
             return false;
+        }
+    }
+
+    // Claims management methods
+    public async Task<List<UserClaimDto>?> GetUserClaimsAsync(string userId)
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync($"api/users/{userId}/claims");
+            response.EnsureSuccessStatusCode();
+
+            var json = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<List<UserClaimDto>>(json, _jsonOptions);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting claims for user {UserId}", userId);
+            return null;
+        }
+    }
+
+    public async Task<bool> AddUserClaimAsync(string userId, AddUserClaimRequest request)
+    {
+        try
+        {
+            var json = JsonSerializer.Serialize(request, _jsonOptions);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            var response = await _httpClient.PostAsync($"api/users/{userId}/claims", content);
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error adding claim to user {UserId}", userId);
+            return false;
+        }
+    }
+
+    public async Task<bool> RemoveUserClaimAsync(string userId, RemoveUserClaimRequest request)
+    {
+        try
+        {
+            var json = JsonSerializer.Serialize(request, _jsonOptions);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            var requestMessage = new HttpRequestMessage(HttpMethod.Delete, $"api/users/{userId}/claims")
+            {
+                Content = content
+            };
+
+            var response = await _httpClient.SendAsync(requestMessage);
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error removing claim from user {UserId}", userId);
+            return false;
+        }
+    }
+
+    public async Task<bool> UpdateUserClaimAsync(string userId, string oldClaimType, string oldClaimValue, AddUserClaimRequest newClaim)
+    {
+        try
+        {
+            var request = new
+            {
+                OldClaimType = oldClaimType,
+                OldClaimValue = oldClaimValue,
+                NewClaimType = newClaim.ClaimType,
+                NewClaimValue = newClaim.ClaimValue
+            };
+
+            var json = JsonSerializer.Serialize(request, _jsonOptions);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            var response = await _httpClient.PutAsync($"api/users/{userId}/claims", content);
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating claim for user {UserId}", userId);
+            return false;
+        }
+    }
+
+    // Role management methods  
+    public async Task<List<RoleDto>?> GetUserRolesAsync(string userId)
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync($"api/users/{userId}/roles");
+            response.EnsureSuccessStatusCode();
+
+            var json = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<List<RoleDto>>(json, _jsonOptions);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting roles for user {UserId}", userId);
+            return null;
+        }
+    }
+
+    public async Task<bool> AssignUserRoleAsync(string userId, AssignRoleRequest request)
+    {
+        try
+        {
+            var json = JsonSerializer.Serialize(request, _jsonOptions);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+            var response = await _httpClient.PostAsync($"api/users/{userId}/roles", content);
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error assigning role to user {UserId}", userId);
+            return false;
+        }
+    }
+
+    public async Task<bool> RemoveUserRoleAsync(string userId, string roleId)
+    {
+        try
+        {
+            var response = await _httpClient.DeleteAsync($"api/users/{userId}/roles/{roleId}");
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error removing role from user {UserId}", userId);
+            return false;
+        }
+    }
+
+    public async Task<PagedResult<RoleDto>?> GetRolesAsync(int page = 1, int pageSize = 10, string? search = null)
+    {
+        try
+        {
+            var queryString = $"?page={page}&pageSize={pageSize}";
+            if (!string.IsNullOrWhiteSpace(search))
+            {
+                queryString += $"&search={Uri.EscapeDataString(search)}";
+            }
+
+            var response = await _httpClient.GetAsync($"api/users/roles{queryString}");
+            response.EnsureSuccessStatusCode();
+
+            var json = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<PagedResult<RoleDto>>(json, _jsonOptions);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting roles");
+            return null;
         }
     }
 }

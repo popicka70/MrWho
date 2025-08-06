@@ -5,6 +5,7 @@ using MrWho.Handlers.Users;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using MrWho.Shared.Models;
+using System.Security.Claims;
 
 namespace MrWho.Controllers;
 
@@ -67,6 +68,45 @@ public class UsersController : ControllerBase
             return NotFound($"User with ID '{id}' not found.");
         }
         return Ok(user);
+    }
+
+    /// <summary>
+    /// Get a specific user with claims and roles
+    /// </summary>
+    [HttpGet("{id}/with-claims")]
+    public async Task<ActionResult<UserWithClaimsDto>> GetUserWithClaims(string id)
+    {
+        var user = await _userManager.FindByIdAsync(id);
+        if (user == null)
+        {
+            return NotFound($"User with ID '{id}' not found.");
+        }
+
+        var claims = await _userManager.GetClaimsAsync(user);
+        var roles = await _userManager.GetRolesAsync(user);
+
+        var userWithClaims = new UserWithClaimsDto
+        {
+            Id = user.Id,
+            UserName = user.UserName!,
+            Email = user.Email!,
+            EmailConfirmed = user.EmailConfirmed,
+            PhoneNumber = user.PhoneNumber,
+            PhoneNumberConfirmed = user.PhoneNumberConfirmed,
+            TwoFactorEnabled = user.TwoFactorEnabled,
+            LockoutEnabled = user.LockoutEnabled,
+            LockoutEnd = user.LockoutEnd,
+            AccessFailedCount = user.AccessFailedCount,
+            Claims = claims.Select(c => new UserClaimDto
+            {
+                ClaimType = c.Type,
+                ClaimValue = c.Value,
+                Issuer = c.Issuer
+            }).ToList(),
+            Roles = roles.ToList()
+        };
+
+        return Ok(userWithClaims);
     }
 
     /// <summary>
@@ -152,6 +192,173 @@ public class UsersController : ControllerBase
         _logger.LogInformation("User with ID {UserId} deleted successfully", id);
         return NoContent();
     }
+
+    #region User Claims Management
+
+    /// <summary>
+    /// Get all claims for a specific user
+    /// </summary>
+    [HttpGet("{id}/claims")]
+    public async Task<ActionResult<List<UserClaimDto>>> GetUserClaims(string id)
+    {
+        var user = await _userManager.FindByIdAsync(id);
+        if (user == null)
+        {
+            return NotFound($"User with ID '{id}' not found.");
+        }
+
+        var claims = await _userManager.GetClaimsAsync(user);
+        var claimDtos = claims.Select(c => new UserClaimDto
+        {
+            ClaimType = c.Type,
+            ClaimValue = c.Value,
+            Issuer = c.Issuer
+        }).ToList();
+
+        return Ok(claimDtos);
+    }
+
+    /// <summary>
+    /// Add a claim to a user
+    /// </summary>
+    [HttpPost("{id}/claims")]
+    public async Task<ActionResult> AddUserClaim(string id, [FromBody] AddUserClaimRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var user = await _userManager.FindByIdAsync(id);
+        if (user == null)
+        {
+            return NotFound($"User with ID '{id}' not found.");
+        }
+
+        // Check if claim already exists
+        var existingClaims = await _userManager.GetClaimsAsync(user);
+        if (existingClaims.Any(c => c.Type == request.ClaimType && c.Value == request.ClaimValue))
+        {
+            return BadRequest($"User already has claim '{request.ClaimType}' with value '{request.ClaimValue}'.");
+        }
+
+        var claim = new Claim(request.ClaimType, request.ClaimValue);
+        var result = await _userManager.AddClaimAsync(user, claim);
+
+        if (!result.Succeeded)
+        {
+            foreach (var error in result.Errors)
+            {
+                ModelState.AddModelError("", error.Description);
+            }
+            return BadRequest(ModelState);
+        }
+
+        _logger.LogInformation("Successfully added claim '{ClaimType}' with value '{ClaimValue}' to user {UserName}", 
+            request.ClaimType, request.ClaimValue, user.UserName);
+
+        return Ok($"Claim '{request.ClaimType}' added to user '{user.UserName}' successfully.");
+    }
+
+    /// <summary>
+    /// Remove a claim from a user
+    /// </summary>
+    [HttpDelete("{id}/claims")]
+    public async Task<ActionResult> RemoveUserClaim(string id, [FromBody] RemoveUserClaimRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var user = await _userManager.FindByIdAsync(id);
+        if (user == null)
+        {
+            return NotFound($"User with ID '{id}' not found.");
+        }
+
+        // Check if claim exists
+        var existingClaims = await _userManager.GetClaimsAsync(user);
+        var claimToRemove = existingClaims.FirstOrDefault(c => c.Type == request.ClaimType && c.Value == request.ClaimValue);
+        
+        if (claimToRemove == null)
+        {
+            return NotFound($"User does not have claim '{request.ClaimType}' with value '{request.ClaimValue}'.")
+;        }
+
+        var result = await _userManager.RemoveClaimAsync(user, claimToRemove);
+
+        if (!result.Succeeded)
+        {
+            foreach (var error in result.Errors)
+            {
+                ModelState.AddModelError("", error.Description);
+            }
+            return BadRequest(ModelState);
+        }
+
+        _logger.LogInformation("Successfully removed claim '{ClaimType}' with value '{ClaimValue}' from user {UserName}", 
+            request.ClaimType, request.ClaimValue, user.UserName);
+
+        return Ok($"Claim '{request.ClaimType}' removed from user '{user.UserName}' successfully.");
+    }
+
+    /// <summary>
+    /// Update a claim for a user
+    /// </summary>
+    [HttpPut("{id}/claims")]
+    public async Task<ActionResult> UpdateUserClaim(string id, [FromBody] UpdateUserClaimRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
+        }
+
+        var user = await _userManager.FindByIdAsync(id);
+        if (user == null)
+        {
+            return NotFound($"User with ID '{id}' not found.");
+        }
+
+        // Check if old claim exists
+        var existingClaims = await _userManager.GetClaimsAsync(user);
+        var oldClaim = existingClaims.FirstOrDefault(c => c.Type == request.OldClaimType && c.Value == request.OldClaimValue);
+        
+        if (oldClaim == null)
+        {
+            return NotFound($"User does not have claim '{request.OldClaimType}' with value '{request.OldClaimValue}'.")
+;        }
+
+        // Check if new claim already exists (unless it's the same claim)
+        if (!(request.OldClaimType == request.NewClaimType && request.OldClaimValue == request.NewClaimValue))
+        {
+            if (existingClaims.Any(c => c.Type == request.NewClaimType && c.Value == request.NewClaimValue))
+            {
+                return BadRequest($"User already has claim '{request.NewClaimType}' with value '{request.NewClaimValue}'.");
+            }
+        }
+
+        var newClaim = new Claim(request.NewClaimType, request.NewClaimValue);
+        var result = await _userManager.ReplaceClaimAsync(user, oldClaim, newClaim);
+
+        if (!result.Succeeded)
+        {
+            foreach (var error in result.Errors)
+            {
+                ModelState.AddModelError("", error.Description);
+            }
+            return BadRequest(ModelState);
+        }
+
+        _logger.LogInformation("Successfully updated claim for user {UserName} from '{OldType}:{OldValue}' to '{NewType}:{NewValue}'", 
+            user.UserName, request.OldClaimType, request.OldClaimValue, request.NewClaimType, request.NewClaimValue);
+
+        return Ok($"Claim updated successfully for user '{user.UserName}'.");
+    }
+
+    #endregion
+
+    #region User Roles Management
 
     /// <summary>
     /// Get roles for a specific user
@@ -271,6 +478,10 @@ public class UsersController : ControllerBase
         return Ok($"Role '{role.Name}' removed from user '{user.UserName}' successfully.");
     }
 
+    #endregion
+
+    #region Roles Management
+
     /// <summary>
     /// Get all roles with pagination
     /// </summary>
@@ -358,4 +569,17 @@ public class UsersController : ControllerBase
 
         return Ok(roleDto);
     }
+
+    #endregion
+}
+
+/// <summary>
+/// Request model for updating user claims
+/// </summary>
+public class UpdateUserClaimRequest
+{
+    public string OldClaimType { get; set; } = string.Empty;
+    public string OldClaimValue { get; set; } = string.Empty;
+    public string NewClaimType { get; set; } = string.Empty;
+    public string NewClaimValue { get; set; } = string.Empty;
 }

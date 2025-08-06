@@ -9,6 +9,7 @@ public interface IUsersApiService
 {
     Task<PagedResult<UserDto>?> GetUsersAsync(int page = 1, int pageSize = 10, string? search = null);
     Task<UserDto?> GetUserAsync(string id);
+    Task<UserWithClaimsDto?> GetUserWithClaimsAsync(string id);
     Task<UserDto?> CreateUserAsync(CreateUserRequest request);
     Task<UserDto?> UpdateUserAsync(string id, UpdateUserRequest request);
     Task<bool> DeleteUserAsync(string id);
@@ -17,4 +18,16 @@ public interface IUsersApiService
     Task<bool> SetLockoutAsync(string id, DateTimeOffset? lockoutEnd);
     Task<bool> SendConfirmationEmailAsync(string id);
     Task<bool> ForceLogoutAsync(string id);
+    
+    // Claims management
+    Task<List<UserClaimDto>?> GetUserClaimsAsync(string userId);
+    Task<bool> AddUserClaimAsync(string userId, AddUserClaimRequest request);
+    Task<bool> RemoveUserClaimAsync(string userId, RemoveUserClaimRequest request);
+    Task<bool> UpdateUserClaimAsync(string userId, string oldClaimType, string oldClaimValue, AddUserClaimRequest newClaim);
+
+    // Role management
+    Task<List<RoleDto>?> GetUserRolesAsync(string userId);
+    Task<bool> AssignUserRoleAsync(string userId, AssignRoleRequest request);
+    Task<bool> RemoveUserRoleAsync(string userId, string roleId);
+    Task<PagedResult<RoleDto>?> GetRolesAsync(int page = 1, int pageSize = 10, string? search = null);
 }
