@@ -6,6 +6,7 @@
 @inject IHttpContextAccessor HttpContextAccessor
 @inject ITokenRefreshService TokenRefreshService
 @inject ILogger<DebugTokenRefresh> Logger
+@inject NavigationManager Navigation
 
 <PageTitle>Token Refresh Debug - MrWho Admin</PageTitle>
 
@@ -29,8 +30,9 @@
         <RadzenFieldset Text="Manual Token Operations">
             <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem">
                 <RadzenButton Click="@CheckTokenStatus" Text="Check Token Status" Icon="refresh" ButtonStyle="ButtonStyle.Primary" IsBusy="@isChecking" />
-                <RadzenButton Click="@ForceRefreshToken" Text="Force Refresh Token" Icon="autorenew" ButtonStyle="ButtonStyle.Warning" IsBusy="@isRefreshing" />
-                <RadzenButton Click="@TestApiCall" Text="Test API Call" Icon="api" ButtonStyle="ButtonStyle.Success" IsBusy="@isTestingApi" />
+                <RadzenButton Click="@ForceRefreshTokenRedirect" Text="Force Refresh Token (Redirect)" Icon="autorenew" ButtonStyle="ButtonStyle.Success" IsBusy="@isRefreshing" />
+                <RadzenButton Click="@ForceRefreshTokenBlazor" Text="Force Refresh Token (Blazor)" Icon="sync" ButtonStyle="ButtonStyle.Warning" IsBusy="@isRefreshingBlazor" />
+                <RadzenButton Click="@TestApiCall" Text="Test API Call" Icon="api" ButtonStyle="ButtonStyle.Secondary" IsBusy="@isTestingApi" />
             </RadzenStack>
         </RadzenFieldset>
 
@@ -41,13 +43,20 @@
                     <RadzenText>@lastOperationResult</RadzenText>
                 </RadzenAlert>
             }
+            
+            @if (showRefreshError)
+            {
+                <RadzenAlert AlertStyle="AlertStyle.Warning" class="rz-mt-3">
+                    <RadzenText>Token refresh completed, but there may have been an issue. Check the token status above.</RadzenText>
+                </RadzenAlert>
+            }
         </RadzenFieldset>
 
-        <RadzenFieldset Text="Token Refresh Configuration">
+        <RadzenFieldset Text="Token Refresh Methods">
             <RadzenStack Gap="1rem">
-                <RadzenText><strong>Refresh Before Expiry:</strong> 5 minutes</RadzenText>
-                <RadzenText><strong>Automatic Refresh:</strong> Enabled via middleware</RadzenText>
-                <RadzenText><strong>API Call Auto-Refresh:</strong> Enabled via delegating handler</RadzenText>
+                <RadzenText><strong>1. Redirect Method (Recommended):</strong> Uses standard HTTP context outside Blazor - most reliable</RadzenText>
+                <RadzenText><strong>2. Blazor Method:</strong> Attempts refresh within Blazor context - may have limitations</RadzenText>
+                <RadzenText><strong>3. Automatic:</strong> Middleware and delegating handler refresh automatically</RadzenText>
             </RadzenStack>
         </RadzenFieldset>
 
@@ -71,14 +80,21 @@
     
     private bool isChecking = false;
     private bool isRefreshing = false;
+    private bool isRefreshingBlazor = false;
     private bool isTestingApi = false;
     
     private string lastOperationResult = "";
     private bool lastOperationSuccess = false;
+    private bool showRefreshError = false;
 
     protected override async Task OnInitializedAsync()
     {
         await CheckTokenStatus();
+        
+        // Check if we returned from a redirect with an error
+        var uri = new Uri(Navigation.Uri);
+        var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
+        showRefreshError = query["refreshError"] == "true";
     }
 
     private async Task CheckTokenStatus()
@@ -132,9 +148,32 @@
         }
     }
 
-    private async Task ForceRefreshToken()
+    private async Task ForceRefreshTokenRedirect()
     {
         isRefreshing = true;
+        
+        try
+        {
+            // Build the return URL for after refresh
+            var currentUrl = Navigation.Uri;
+            var refreshUrl = $"/token/refresh?returnUrl={Uri.EscapeDataString(currentUrl)}";
+            
+            // Use NavigationManager for safer navigation
+            Navigation.NavigateTo(refreshUrl, forceLoad: true);
+        }
+        catch (Exception ex)
+        {
+            lastOperationResult = $"Error initiating token refresh redirect: {ex.Message}";
+            lastOperationSuccess = false;
+            Logger.LogError(ex, "Error initiating token refresh redirect");
+            isRefreshing = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ForceRefreshTokenBlazor()
+    {
+        isRefreshingBlazor = true;
         lastOperationResult = "";
         
         try
@@ -147,7 +186,7 @@
                 
                 if (refreshSuccess)
                 {
-                    lastOperationResult = "Token refreshed successfully (Blazor-compatible)";
+                    lastOperationResult = "Token refreshed successfully (Blazor method)";
                     lastOperationSuccess = true;
                     
                     // Update status after refresh
@@ -168,7 +207,7 @@
         }
         finally
         {
-            isRefreshing = false;
+            isRefreshingBlazor = false;
             StateHasChanged();
         }
     }
@@ -225,4 +264,4 @@
             StateHasChanged();
         }
     }
-}
+}}}

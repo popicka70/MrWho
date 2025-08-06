@@ -10,6 +10,9 @@ builder.AddServiceDefaults();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+// Add MVC controllers for token refresh endpoint
+builder.Services.AddControllers();
+
 builder.Services.AddOutputCache();
 
 // Configure services using extension methods
@@ -24,6 +27,10 @@ var app = builder.Build();
 // Configure middleware pipeline using extension methods
 app.ConfigureMiddlewarePipeline();
 app.ConfigureAuthenticationEndpoints();
+
+// Map controllers for token refresh
+app.MapControllers();
+
 app.ConfigureBlazorRouting();
 
 app.MapDefaultEndpoints();

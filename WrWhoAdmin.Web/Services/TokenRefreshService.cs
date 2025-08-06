@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authentication;
+﻿using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text.Json;
@@ -68,13 +68,12 @@ public class TokenRefreshService : ITokenRefreshService
     {
         _logger.LogDebug("Starting Blazor-specific token refresh");
         
-        // For Blazor, we just need to refresh the token on the server side
-        // The client will get the fresh token on the next request
-        var refreshSuccess = await RefreshTokenInternalAsync(httpContext, forceRefresh: true, updateCookies: false);
+        // Try to update cookies if possible, but don't fail if we can't
+        var refreshSuccess = await RefreshTokenInternalAsync(httpContext, forceRefresh: true, updateCookies: true);
         
         if (refreshSuccess)
         {
-            _logger.LogInformation("Blazor token refresh successful - fresh tokens available for future requests");
+            _logger.LogInformation("Blazor token refresh successful - tokens refreshed");
             return true;
         }
         
@@ -184,8 +183,7 @@ public class TokenRefreshService : ITokenRefreshService
                         catch (InvalidOperationException ex) when (ex.Message.Contains("Headers are read-only"))
                         {
                             _logger.LogWarning("Token refresh successful but cookies could not be updated (response already started): {Error}", ex.Message);
-                            // This is acceptable in Blazor scenarios - the token is refreshed, just not persisted in this request
-                            return true;
+                            return true; // ❌ Returns here WITHOUT updating expiry time!
                         }
                         
                         return true;

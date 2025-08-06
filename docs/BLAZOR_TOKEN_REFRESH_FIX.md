@@ -128,3 +128,151 @@ The fix handles these scenarios:
 - Test with realistic Blazor usage patterns
 
 The solution provides robust token refresh functionality that works reliably in both traditional HTTP scenarios and modern Blazor Server applications with streaming responses.
+
+# Token Refresh Implementation - Updated with Redirect Solution
+
+## Problem Solved: Blazor Server Token Refresh Limitations
+
+The token refresh functionality now includes both **Blazor-compatible** and **redirect-based** approaches to handle different scenarios effectively.
+
+## Solution Overview
+
+### ?? **Two Refresh Methods**
+
+#### **1. Redirect-Based Refresh (Recommended)**
+- **Endpoint**: `/token/refresh?returnUrl=...`
+- **How it works**: Redirects to MVC controller outside Blazor context
+- **Benefits**: Full HTTP context control, reliable cookie updates
+- **Use case**: Manual refresh, guaranteed token updates
+
+#### **2. Blazor-Compatible Refresh** 
+- **Method**: `ForceRefreshTokenForBlazorAsync()`
+- **How it works**: Handles response streaming limitations gracefully
+- **Benefits**: No page redirect, smoother UX
+- **Use case**: Automatic refresh, background operations
+
+## Implementation Details
+
+### **TokenController (New)**
+
+```csharp
+[HttpGet("/token/refresh")]
+public async Task<IActionResult> RefreshToken(string? returnUrl = null)
+{
+    // Works with standard HTTP context (no Blazor limitations)
+    var refreshSuccess = await _tokenRefreshService.ForceRefreshTokenAsync(HttpContext, force: true);
+    
+    if (refreshSuccess)
+    {
+        // Redirect back to where user came from
+        var redirectUrl = !string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl) 
+            ? returnUrl 
+            : "/debug-token-refresh";
+        return Redirect(redirectUrl);
+    }
+    
+    // Handle errors...
+}
+```
+
+### **Debug Page Updates**
+
+The debug page now offers both refresh methods:
+
+1. **"Force Refresh Token (Redirect)"** - Uses MVC controller
+2. **"Force Refresh Token (Blazor)"** - Uses Blazor-compatible method
+
+## Usage Patterns
+
+### **Manual Refresh (User-Initiated)**
+```csharp
+// Redirect-based (most reliable)
+private async Task ForceRefreshTokenRedirect()
+{
+    var currentUrl = Navigation.Uri;
+    var refreshUrl = $"/token/refresh?returnUrl={Uri.EscapeDataString(currentUrl)}";
+    await JSRuntime.InvokeVoidAsync("window.location.href", refreshUrl);
+}
+```
+
+### **Automatic Refresh (Background)**
+```csharp
+// Blazor-compatible (for automatic scenarios)
+private async Task AutoRefresh()
+{
+    var refreshSuccess = await TokenRefreshService.ForceRefreshTokenForBlazorAsync(httpContext);
+    // Handle gracefully if cookies can't be updated
+}
+```
+
+## Expected Behavior
+
+### **Redirect Method**
+1. User clicks "Force Refresh Token (Redirect)"
+2. Browser navigates to `/token/refresh?returnUrl=...`
+3. MVC controller refreshes tokens with full HTTP context
+4. User is redirected back to original page
+5. **New expiry time is immediately visible** ?
+
+### **Blazor Method**
+1. User clicks "Force Refresh Token (Blazor)"
+2. Tokens refreshed in current Blazor context
+3. May or may not update cookies immediately
+4. Fresh tokens available for subsequent requests
+
+## Benefits of This Approach
+
+### ? **Redirect Method**
+- **Guaranteed token updates** - Full HTTP context control
+- **Immediate cookie updates** - New expiry visible right away
+- **No Blazor limitations** - Works with any response state
+- **Standard HTTP patterns** - Well-understood behavior
+
+### ? **Blazor Method**
+- **No page navigation** - Smoother user experience
+- **Background operation** - No interruption to user flow
+- **Automatic fallback** - Works even when cookies can't be updated
+
+## Configuration
+
+### **Program.cs Updates**
+```csharp
+// Add MVC controllers for token refresh
+builder.Services.AddControllers();
+
+// Map controllers after middleware
+app.MapControllers();
+```
+
+## Testing the Solutions
+
+### **Test Redirect Method**
+1. Go to `/debug-token-refresh`
+2. Click **"Force Refresh Token (Redirect)"**
+3. Browser navigates briefly to `/token/refresh`
+4. Returns to debug page with **updated expiry time** ?
+
+### **Test Blazor Method**
+1. Go to `/debug-token-refresh`
+2. Click **"Force Refresh Token (Blazor)"**
+3. No page navigation
+4. May see updated expiry (depends on response state)
+
+## Production Recommendations
+
+### **For Manual User Actions**
+- Use **redirect method** for reliable token updates
+- Provide clear feedback about the refresh process
+- Handle errors gracefully with user-friendly messages
+
+### **For Automatic Background Refresh**
+- Use **Blazor method** in middleware and delegating handlers
+- Accept that immediate cookie updates may not always work
+- Ensure fresh tokens are available for subsequent requests
+
+### **Error Handling**
+- Monitor both methods in production logs
+- Provide fallback authentication flows
+- Alert users when re-authentication is needed
+
+The dual approach ensures robust token refresh functionality that works reliably in all Blazor Server scenarios!
