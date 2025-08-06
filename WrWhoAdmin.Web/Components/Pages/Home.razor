@@ -1,6 +1,7 @@
 ﻿@page "/"
 @attribute [Authorize]
 @rendermode InteractiveServer
+@inherits AuthenticatedComponentBase
 @inject NavigationManager Navigation
 @inject IRealmsApiService RealmsApi
 @inject IClientsApiService ClientsApi
@@ -9,121 +10,157 @@
 
 <PageTitle>Dashboard - MrWho Administration</PageTitle>
 
-<RadzenText TextStyle="TextStyle.H2" class="rz-mb-4">
-    <RadzenIcon Icon="dashboard" class="rz-me-2" />
-    MrWho Administration Dashboard
-</RadzenText>
+@if (IsLoading)
+{
+    <div class="d-flex justify-content-center align-items-center" style="min-height: 50vh;">
+        <div class="text-center">
+            <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+            <RadzenText class="rz-mt-2">Loading dashboard...</RadzenText>
+        </div>
+    </div>
+}
+else if (!IsAuthenticated)
+{
+    @RenderAuthenticationStatus()
+}
+else
+{
+    <RadzenText TextStyle="TextStyle.H2" class="rz-mb-4">
+        <RadzenIcon Icon="dashboard" class="rz-me-2" />
+        MrWho Administration Dashboard
+    </RadzenText>
 
-<RadzenRow Gap="2rem">
-    <RadzenColumn Size="12" SizeMD="6" SizeLG="3">
-        <RadzenCard class="rz-text-align-center rz-p-4" Style="min-height: 150px;">
-            <RadzenIcon Icon="domain" class="rz-color-primary" Style="font-size: 3rem;" />
-            <RadzenText TextStyle="TextStyle.H4" class="rz-mt-2">@totalRealms</RadzenText>
-            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Active Realms</RadzenText>
-            <RadzenButton Click="@(() => Navigation.NavigateTo("/realms"))" 
-                         ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" 
-                         Text="Manage" class="rz-mt-2" />
-        </RadzenCard>
-    </RadzenColumn>
-    
-    <RadzenColumn Size="12" SizeMD="6" SizeLG="3">
-        <RadzenCard class="rz-text-align-center rz-p-4" Style="min-height: 150px;">
-            <RadzenIcon Icon="apps" class="rz-color-success" Style="font-size: 3rem;" />
-            <RadzenText TextStyle="TextStyle.H4" class="rz-mt-2">@totalClients</RadzenText>
-            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">OIDC Clients</RadzenText>
-            <RadzenButton Click="@(() => Navigation.NavigateTo("/clients"))" 
-                         ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" 
-                         Text="Manage" class="rz-mt-2" />
-        </RadzenCard>
-    </RadzenColumn>
-    
-    <RadzenColumn Size="12" SizeMD="6" SizeLG="3">
-        <RadzenCard class="rz-text-align-center rz-p-4" Style="min-height: 150px;">
-            <RadzenIcon Icon="people" class="rz-color-info" Style="font-size: 3rem;" />
-            <RadzenText TextStyle="TextStyle.H4" class="rz-mt-2">@totalUsers</RadzenText>
-            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Registered Users</RadzenText>
-            <RadzenButton Click="@(() => Navigation.NavigateTo("/users"))" 
-                         ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" 
-                         Text="Manage" class="rz-mt-2" />
-        </RadzenCard>
-    </RadzenColumn>
-    
-    <RadzenColumn Size="12" SizeMD="6" SizeLG="3">
-        <RadzenCard class="rz-text-align-center rz-p-4" Style="min-height: 150px;">
-            <RadzenIcon Icon="verified_user" class="rz-color-warning" Style="font-size: 3rem;" />
-            <RadzenText TextStyle="TextStyle.H4" class="rz-mt-2">Online</RadzenText>
-            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">System Status</RadzenText>
-            <RadzenButton Click="@(() => Navigation.NavigateTo("/debug-api"))" 
-                         ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" 
-                         Text="Debug API" class="rz-mt-2" />
-        </RadzenCard>
-    </RadzenColumn>
-</RadzenRow>
-
-<RadzenRow Gap="2rem" class="rz-mt-4">
-    <RadzenColumn Size="12" SizeMD="8">
-        <RadzenCard>
-            <RadzenText TextStyle="TextStyle.H6" class="rz-mb-3">
-                <RadzenIcon Icon="timeline" class="rz-me-1" />
-                Recent Activity
-            </RadzenText>
-            
-            @if (isLoadingActivity)
-            {
-                <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.Small" />
-                <RadzenText class="rz-ml-2">Loading recent activity...</RadzenText>
-            }
-            else if (hasApiError)
-            {
-                <RadzenAlert AlertStyle="AlertStyle.Warning">
-                    <RadzenText>Unable to load recent activity. API connection may be unavailable.</RadzenText>
-                    <RadzenButton Click="@LoadDashboardData" Text="Retry" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" class="rz-mt-2" />
-                </RadzenAlert>
-            }
-            else
-            {
-                <RadzenDataList Data="@recentActivity" TItem="ActivityItem">
-                    <Template>
-                        <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" AlignItems="AlignItems.Center" class="rz-py-2">
-                            <RadzenIcon Icon="@context.Icon" Style="@($"color: {context.Color}")" />
-                            <RadzenStack Gap="0.2rem">
-                                <RadzenText>@context.Description</RadzenText>
-                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">@context.Timestamp.ToString("MMM dd, yyyy HH:mm")</RadzenText>
-                            </RadzenStack>
-                        </RadzenStack>
-                    </Template>
-                </RadzenDataList>
-            }
-        </RadzenCard>
-    </RadzenColumn>
-    
-    <RadzenColumn Size="12" SizeMD="4">
-        <RadzenCard>
-            <RadzenText TextStyle="TextStyle.H6" class="rz-mb-3">
-                <RadzenIcon Icon="info" class="rz-me-1" />
-                System Information
-            </RadzenText>
-            
-            <RadzenStack Gap="1rem">
-                <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween">
-                    <RadzenText>API Status:</RadzenText>
-                    <RadzenBadge BadgeStyle="@(hasApiError ? BadgeStyle.Danger : BadgeStyle.Success)" 
-                                Text="@(hasApiError ? "Offline" : "Online")" />
-                </RadzenStack>
-                
-                <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween">
-                    <RadzenText>Version:</RadzenText>
-                    <RadzenText>1.0.0</RadzenText>
-                </RadzenStack>
-                
-                <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween">
-                    <RadzenText>Environment:</RadzenText>
-                    <RadzenText>Development</RadzenText>
+    @if (!string.IsNullOrEmpty(AuthErrorMessage))
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Warning" class="rz-mb-4">
+            <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                <RadzenText>@AuthErrorMessage</RadzenText>
+                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                    <RadzenButton Text="Retry Login" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Small" 
+                                  Click="@(async () => await TriggerReauthenticationAsync())" />
+                    <RadzenButton Text="Dismiss" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" 
+                                  Click="@(() => ClearAuthError())" />
                 </RadzenStack>
             </RadzenStack>
-        </RadzenCard>
-    </RadzenColumn>
-</RadzenRow>
+        </RadzenAlert>
+    }
+
+    <RadzenRow Gap="2rem">
+        <RadzenColumn Size="12" SizeMD="6" SizeLG="3">
+            <RadzenCard class="rz-text-align-center rz-p-4" Style="min-height: 150px;">
+                <RadzenIcon Icon="domain" class="rz-color-primary" Style="font-size: 3rem;" />
+                <RadzenText TextStyle="TextStyle.H4" class="rz-mt-2">@totalRealms</RadzenText>
+                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Active Realms</RadzenText>
+                <RadzenButton Click="@(() => Navigation.NavigateTo("/realms"))" 
+                             ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" 
+                             Text="Manage" class="rz-mt-2" />
+            </RadzenCard>
+        </RadzenColumn>
+        
+        <RadzenColumn Size="12" SizeMD="6" SizeLG="3">
+            <RadzenCard class="rz-text-align-center rz-p-4" Style="min-height: 150px;">
+                <RadzenIcon Icon="apps" class="rz-color-success" Style="font-size: 3rem;" />
+                <RadzenText TextStyle="TextStyle.H4" class="rz-mt-2">@totalClients</RadzenText>
+                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">OIDC Clients</RadzenText>
+                <RadzenButton Click="@(() => Navigation.NavigateTo("/clients"))" 
+                             ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" 
+                             Text="Manage" class="rz-mt-2" />
+            </RadzenCard>
+        </RadzenColumn>
+        
+        <RadzenColumn Size="12" SizeMD="6" SizeLG="3">
+            <RadzenCard class="rz-text-align-center rz-p-4" Style="min-height: 150px;">
+                <RadzenIcon Icon="people" class="rz-color-info" Style="font-size: 3rem;" />
+                <RadzenText TextStyle="TextStyle.H4" class="rz-mt-2">@totalUsers</RadzenText>
+                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Registered Users</RadzenText>
+                <RadzenButton Click="@(() => Navigation.NavigateTo("/users"))" 
+                             ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" 
+                             Text="Manage" class="rz-mt-2" />
+            </RadzenCard>
+        </RadzenColumn>
+        
+        <RadzenColumn Size="12" SizeMD="6" SizeLG="3">
+            <RadzenCard class="rz-text-align-center rz-p-4" Style="min-height: 150px;">
+                <RadzenIcon Icon="verified_user" class="rz-color-warning" Style="font-size: 3rem;" />
+                <RadzenText TextStyle="TextStyle.H4" class="rz-mt-2">Online</RadzenText>
+                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">System Status</RadzenText>
+                <RadzenButton Click="@(() => Navigation.NavigateTo("/debug-api"))" 
+                             ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" 
+                             Text="Debug API" class="rz-mt-2" />
+            </RadzenCard>
+        </RadzenColumn>
+    </RadzenRow>
+
+    <RadzenRow Gap="2rem" class="rz-mt-4">
+        <RadzenColumn Size="12" SizeMD="8">
+            <RadzenCard>
+                <RadzenText TextStyle="TextStyle.H6" class="rz-mb-3">
+                    <RadzenIcon Icon="timeline" class="rz-me-1" />
+                    Recent Activity
+                </RadzenText>
+                
+                @if (isLoadingActivity)
+                {
+                    <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.Small" />
+                    <RadzenText class="rz-ml-2">Loading recent activity...</RadzenText>
+                }
+                else if (hasApiError)
+                {
+                    <RadzenAlert AlertStyle="AlertStyle.Warning">
+                        <RadzenText>Unable to load recent activity. API connection may be unavailable.</RadzenText>
+                        <RadzenButton Click="@(async () => await LoadDashboardData())" Text="Retry" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" class="rz-mt-2" />
+                    </RadzenAlert>
+                }
+                else
+                {
+                    <RadzenDataList Data="@recentActivity" TItem="ActivityItem">
+                        <Template>
+                            <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" AlignItems="AlignItems.Center" class="rz-py-2">
+                                <RadzenIcon Icon="@context.Icon" Style="@($"color: {context.Color}")" />
+                                <RadzenStack Gap="0.2rem">
+                                    <RadzenText>@context.Description</RadzenText>
+                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">@context.Timestamp.ToString("MMM dd, yyyy HH:mm")</RadzenText>
+                                </RadzenStack>
+                            </RadzenStack>
+                        </Template>
+                    </RadzenDataList>
+                }
+            </RadzenCard>
+        </RadzenColumn>
+        
+        <RadzenColumn Size="12" SizeMD="4">
+            <RadzenCard>
+                <RadzenText TextStyle="TextStyle.H6" class="rz-mb-3">
+                    <RadzenIcon Icon="info" class="rz-me-1" />
+                    System Information
+                </RadzenText>
+                
+                <RadzenStack Gap="1rem">
+                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween">
+                        <RadzenText>API Status:</RadzenText>
+                        <RadzenBadge BadgeStyle="@(hasApiError ? BadgeStyle.Danger : BadgeStyle.Success)" 
+                                    Text="@(hasApiError ? "Offline" : "Online")" />
+                    </RadzenStack>
+                    
+                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween">
+                        <RadzenText>Version:</RadzenText>
+                        <RadzenText>1.0.0</RadzenText>
+                    </RadzenStack>
+                    
+                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween">
+                        <RadzenText>Environment:</RadzenText>
+                        <RadzenText>Development</RadzenText>
+                    </RadzenStack>
+
+                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween">
+                        <RadzenText>Auth Status:</RadzenText>
+                        <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="Authenticated" />
+                    </RadzenStack>
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+    </RadzenRow>
+}
 
 @code {
     private int totalRealms = 0;
@@ -135,6 +172,16 @@
 
     protected override async Task OnInitializedAsync()
     {
+        await base.OnInitializedAsync(); // This calls CheckAuthenticationAsync()
+        
+        if (IsAuthenticated)
+        {
+            await OnAuthenticatedAsync();
+        }
+    }
+
+    protected override async Task OnAuthenticatedAsync()
+    {
         await LoadDashboardData();
     }
 
@@ -142,9 +189,12 @@
     {
         isLoadingActivity = true;
         hasApiError = false;
+        StateHasChanged();
         
         try
         {
+            Logger.LogInformation("Starting to load dashboard data");
+            
             // Load dashboard statistics from APIs
             var realmsTask = RealmsApi.GetRealmsAsync(page: 1, pageSize: 1);
             var clientsTask = ClientsApi.GetClientsAsync(page: 1, pageSize: 1);
@@ -180,8 +230,14 @@
                 new() { Icon = "login", Color = "var(--rz-warning)", Description = "Admin user logged in", Timestamp = DateTime.Now.AddMinutes(-20) }
             };
 
-            Logger.LogInformation("Dashboard loaded - Realms: {Realms}, Clients: {Clients}, Users: {Users}, HasError: {HasError}", 
+            Logger.LogInformation("Dashboard loaded successfully - Realms: {Realms}, Clients: {Clients}, Users: {Users}, HasError: {HasError}", 
                 totalRealms, totalClients, totalUsers, hasApiError);
+        }
+        catch (HttpRequestException httpEx) when (httpEx.Message.Contains("Unauthorized") || httpEx.Message.Contains("401"))
+        {
+            Logger.LogWarning("Authentication required for dashboard data: {Message}", httpEx.Message);
+            AuthErrorMessage = "Authentication expired. Please log in again.";
+            hasApiError = true;
         }
         catch (Exception ex)
         {

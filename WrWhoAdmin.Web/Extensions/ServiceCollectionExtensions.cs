@@ -37,6 +37,9 @@ public static class ServiceCollectionExtensions
         // Add token refresh service
         services.AddScoped<ITokenRefreshService, TokenRefreshService>();
         
+        // Add Blazor authentication service
+        services.AddScoped<IBlazorAuthService, BlazorAuthService>();
+        
         return services;
     }
 
@@ -150,18 +153,24 @@ public static class ServiceCollectionExtensions
         options.SaveTokens = true; // CRITICAL: This saves tokens for API calls
         options.GetClaimsFromUserInfoEndpoint = true;
         options.RequireHttpsMetadata = false; // Only for development
+        options.UsePkce = true; // Enable PKCE for better security
 
         // Set explicit callback paths for the admin web app (port 7257)
         options.CallbackPath = "/signin-oidc";
         options.SignedOutCallbackPath = "/signout-callback-oidc";
+        
+        // IMPORTANT: Set the correct remote signout path
+        options.RemoteSignOutPath = "/signout-oidc";
 
         // Additional configuration for OpenIddict compatibility
         options.MetadataAddress = $"{options.Authority}.well-known/openid_configuration";
-        options.UsePkce = true; // Enable PKCE for better security
 
         // Configure token refresh settings
         options.RefreshInterval = TimeSpan.FromMinutes(30); // Check for refresh every 30 minutes
         options.UseTokenLifetime = true; // Use the token's actual lifetime
+        
+        // CRITICAL: Skip unrecognized requests to prevent loops
+        options.SkipUnrecognizedRequests = true;
 
         ConfigureScopes(options);
         ConfigureClaimActions(options);
@@ -218,15 +227,19 @@ public static class ServiceCollectionExtensions
             OnRedirectToIdentityProvider = context =>
             {
                 var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-                logger.LogInformation("Redirecting to identity provider: {Authority}", options.Authority);
+                logger.LogInformation("Redirecting to identity provider: {Authority} with return URL: {ReturnUrl}", 
+                    options.Authority, context.Properties.RedirectUri);
                 return Task.CompletedTask;
             },
+            
             OnTokenValidated = context =>
             {
                 var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-                logger.LogInformation("Token validated successfully");
+                logger.LogInformation("Token validated successfully for user: {UserName}", 
+                    context.Principal?.Identity?.Name ?? "Unknown");
                 return Task.CompletedTask;
             },
+            
             OnTokenResponseReceived = context =>
             {
                 var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
@@ -235,10 +248,53 @@ public static class ServiceCollectionExtensions
                     !string.IsNullOrEmpty(context.TokenEndpointResponse.RefreshToken));
                 return Task.CompletedTask;
             },
+            
+            OnAuthenticationFailed = context =>
+            {
+                var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+                logger.LogError("Authentication failed: {Error} - {ErrorDescription}", 
+                    context.Exception?.Message, context.Exception?.ToString());
+                
+                // Handle authentication failures by redirecting to an error page
+                var errorMessage = Uri.EscapeDataString(context.Exception?.Message ?? "Unknown error");
+                context.Response.Redirect($"/auth-error?error={errorMessage}");
+                context.HandleResponse();
+                
+                return Task.CompletedTask;
+            },
+            
             OnRemoteFailure = context =>
             {
                 var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
                 logger.LogError("Remote authentication failure: {Error}", context.Failure?.Message);
+                
+                // Handle remote failures by redirecting to an error page
+                var errorMessage = Uri.EscapeDataString(context.Failure?.Message ?? "Remote authentication failed");
+                context.Response.Redirect($"/auth-error?error={errorMessage}");
+                context.HandleResponse();
+                
+                return Task.CompletedTask;
+            },
+            
+            OnAuthorizationCodeReceived = context =>
+            {
+                var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+                logger.LogInformation("Authorization code received, exchanging for tokens");
+                return Task.CompletedTask;
+            },
+            
+            OnRedirectToIdentityProviderForSignOut = context =>
+            {
+                var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+                logger.LogInformation("Redirecting to identity provider for sign out");
+                return Task.CompletedTask;
+            },
+            
+            OnSignedOutCallbackRedirect = context =>
+            {
+                var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+                logger.LogInformation("Processing signed out callback redirect to: {RedirectUri}", 
+                    context.Options.SignedOutRedirectUri);
                 return Task.CompletedTask;
             }
         };

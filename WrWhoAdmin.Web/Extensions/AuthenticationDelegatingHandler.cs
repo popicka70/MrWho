@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authentication;
 using System.Net.Http.Headers;
 using MrWhoAdmin.Web.Services;
 using MrWho.Shared;
+using System.Net;
 
 namespace MrWhoAdmin.Web.Extensions;
 
@@ -36,11 +37,27 @@ public class AuthenticationDelegatingHandler : DelegatingHandler
                 {
                     _logger.LogDebug("Access token is expired or expiring, attempting refresh before API call to {RequestUri}", request.RequestUri);
                     
-                    var refreshSuccess = await _tokenRefreshService.ForceRefreshTokenAsync(httpContext);
-                    if (!refreshSuccess)
+                    var refreshResult = await _tokenRefreshService.RefreshTokenWithReauthAsync(httpContext);
+                    if (!refreshResult.Success)
                     {
-                        _logger.LogWarning("Failed to refresh token before API call to {RequestUri}, proceeding with current token", request.RequestUri);
-                        // Continue with existing token - the API might still accept it or we'll get a proper 401
+                        if (refreshResult.RequiresReauth)
+                        {
+                            _logger.LogWarning("Token refresh failed with re-auth required before API call to {RequestUri}. Reason: {Reason}", 
+                                request.RequestUri, refreshResult.Reason);
+                            
+                            // For API calls, we can't redirect to login, so return 401 to let the client handle it
+                            return new HttpResponseMessage(HttpStatusCode.Unauthorized)
+                            {
+                                Content = new StringContent($"Authentication required: {refreshResult.Reason}"),
+                                ReasonPhrase = "Token refresh failed - re-authentication required"
+                            };
+                        }
+                        else
+                        {
+                            _logger.LogWarning("Failed to refresh token before API call to {RequestUri}, proceeding with current token. Reason: {Reason}", 
+                                request.RequestUri, refreshResult.Reason);
+                            // Continue with existing token - the API might still accept it or we'll get a proper 401
+                        }
                     }
                 }
 
@@ -67,6 +84,15 @@ public class AuthenticationDelegatingHandler : DelegatingHandler
             _logger.LogDebug("User not authenticated, skipping token attachment for: {RequestUri}", request.RequestUri);
         }
 
-        return await base.SendAsync(request, cancellationToken);
+        var response = await base.SendAsync(request, cancellationToken);
+        
+        // If we get a 401 response, it might indicate token issues
+        if (response.StatusCode == HttpStatusCode.Unauthorized && httpContext?.User.Identity?.IsAuthenticated == true)
+        {
+            _logger.LogWarning("Received 401 Unauthorized response from {RequestUri} despite being authenticated. Token might be invalid.", 
+                request.RequestUri);
+        }
+
+        return response;
     }
 }

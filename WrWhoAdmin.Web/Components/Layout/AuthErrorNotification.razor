@@ -1,0 +1,78 @@
+@using MrWhoAdmin.Web.Services
+@implements IDisposable
+@inject IBlazorAuthService BlazorAuthService
+@inject ILogger<AuthErrorNotification> Logger
+
+@if (_showError && !string.IsNullOrEmpty(_errorMessage))
+{
+    <div class="alert alert-warning alert-dismissible fade show" role="alert">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+        @_errorMessage
+        <button type="button" class="btn-close" @onclick="DismissError" aria-label="Close"></button>
+    </div>
+}
+
+@code {
+    private bool _showError = false;
+    private string? _errorMessage;
+    private Timer? _autoHideTimer;
+    private bool _hasRendered = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _hasRendered = true;
+            await CheckForAuthenticationErrors();
+        }
+        
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    private async Task CheckForAuthenticationErrors()
+    {
+        try
+        {
+            if (BlazorAuthService.HasAuthenticationError())
+            {
+                _errorMessage = BlazorAuthService.GetAuthenticationErrorMessage();
+                _showError = true;
+                
+                Logger.LogInformation("Displaying authentication error: {ErrorMessage}", _errorMessage);
+                
+                // Auto-hide after 10 seconds
+                _autoHideTimer = new Timer(AutoHideError, null, TimeSpan.FromSeconds(10), Timeout.InfiniteTimeSpan);
+                
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error checking for authentication errors");
+        }
+    }
+
+    private void DismissError()
+    {
+        _showError = false;
+        _autoHideTimer?.Dispose();
+        StateHasChanged();
+    }
+
+    private void AutoHideError(object? state)
+    {
+        if (_hasRendered)
+        {
+            InvokeAsync(() =>
+            {
+                _showError = false;
+                StateHasChanged();
+            });
+        }
+    }
+
+    public void Dispose()
+    {
+        _autoHideTimer?.Dispose();
+    }
+}

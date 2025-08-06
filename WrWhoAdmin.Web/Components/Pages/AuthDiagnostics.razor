@@ -1,0 +1,378 @@
+@page "/debug/auth-diagnostics"
+@rendermode InteractiveServer
+@inject ILogger<AuthDiagnostics> Logger
+@inject IConfiguration Configuration
+@inject NavigationManager Navigation
+@inject ITokenRefreshService TokenRefreshService
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Authentication Diagnostics</PageTitle>
+
+<div class="container mt-4">
+    <h2>?? Authentication Diagnostics</h2>
+    <p class="text-muted">This page helps diagnose infinite login loop issues</p>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Configuration Check</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <strong>Authority:</strong> <code>@Authority</code>
+                        <div class="@GetStatusClass(AuthorityStatus)">@AuthorityStatusMessage</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <strong>Client ID:</strong> <code>@ClientId</code>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <strong>Current URL:</strong> <code>@CurrentUrl</code>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <strong>Expected Callback:</strong> <code>@ExpectedCallback</code>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Authentication State</h5>
+                </div>
+                <div class="card-body">
+                    <AuthorizeView>
+                        <Authorized>
+                            <div class="alert alert-success">
+                                ? User is authenticated as: <strong>@context.User.Identity?.Name</strong>
+                            </div>
+                            
+                            <div class="mb-2">
+                                <strong>Claims Count:</strong> @context.User.Claims.Count()
+                            </div>
+                            
+                            <div class="mb-2">
+                                <strong>Auth Type:</strong> @context.User.Identity?.AuthenticationType
+                            </div>
+                            
+                            <button @onclick="CheckTokenStatus" class="btn btn-info btn-sm">
+                                Check Token Status
+                            </button>
+                        </Authorized>
+                        <NotAuthorized>
+                            <div class="alert alert-warning">
+                                ?? User is not authenticated
+                            </div>
+                        </NotAuthorized>
+                    </AuthorizeView>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Quick Actions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="btn-group" role="group">
+                        <button @onclick="TestOidcDiscovery" class="btn btn-primary">
+                            Test OIDC Discovery
+                        </button>
+                        <button @onclick="TestClientConfig" class="btn btn-primary">
+                            Test Client Config
+                        </button>
+                        <button @onclick="ClearAuthState" class="btn btn-warning">
+                            Clear Auth State
+                        </button>
+                        <button @onclick="TestLogin" class="btn btn-success">
+                            Test Login Flow
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (!string.IsNullOrEmpty(DiagnosticsResult))
+    {
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Diagnostics Results</h5>
+                    </div>
+                    <div class="card-body">
+                        <pre class="bg-light p-3" style="max-height: 400px; overflow-y: auto;">@DiagnosticsResult</pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Expected Authentication Flow</h5>
+                </div>
+                <div class="card-body">
+                    <ol>
+                        <li>User accesses protected page ? <code>/realms</code></li>
+                        <li>Redirect to login ? <code>/login?returnUrl=/realms</code></li>
+                        <li>OIDC challenge ? <code>https://localhost:7113/connect/authorize?...</code></li>
+                        <li>User authenticates at OIDC server</li>
+                        <li>Callback with code ? <code>/signin-oidc</code></li>
+                        <li>Token exchange and redirect ? <code>/realms</code></li>
+                    </ol>
+                    
+                    <div class="alert alert-info mt-3">
+                        <strong>If you see infinite loops:</strong> The flow stops at step 5 or 6 and redirects back to step 2.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string Authority = "";
+    private string ClientId = "";
+    private string CurrentUrl = "";
+    private string ExpectedCallback = "";
+    private string AuthorityStatusMessage = "Checking...";
+    private string AuthorityStatus = "unknown";
+    private string DiagnosticsResult = "";
+    private bool _hasRendered = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authConfig = Configuration.GetSection("Authentication");
+        Authority = authConfig.GetValue<string>("Authority") ?? "https://localhost:7113/";
+        ClientId = authConfig.GetValue<string>("ClientId") ?? "mrwho_admin_web";
+        CurrentUrl = Navigation.Uri;
+        ExpectedCallback = Navigation.BaseUri + "signin-oidc";
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _hasRendered = true;
+            await CheckAuthorityStatus();
+        }
+        
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    private async Task CheckAuthorityStatus()
+    {
+        try
+        {
+            using var httpClient = new HttpClient();
+            httpClient.Timeout = TimeSpan.FromSeconds(5);
+            
+            var response = await httpClient.GetAsync($"{Authority}.well-known/openid_configuration");
+            if (response.IsSuccessStatusCode)
+            {
+                AuthorityStatus = "success";
+                AuthorityStatusMessage = "? OIDC discovery endpoint is accessible";
+            }
+            else
+            {
+                AuthorityStatus = "error";
+                AuthorityStatusMessage = $"? OIDC discovery returned: {response.StatusCode}";
+            }
+        }
+        catch (Exception ex)
+        {
+            AuthorityStatus = "error";
+            AuthorityStatusMessage = $"? Cannot reach OIDC server: {ex.Message}";
+        }
+        
+        StateHasChanged();
+    }
+
+    private async Task CheckTokenStatus()
+    {
+        if (!_hasRendered)
+        {
+            DiagnosticsResult = "Token status check is only available after interactive rendering.\n";
+            StateHasChanged();
+            return;
+        }
+
+        DiagnosticsResult = "Checking token status...\n";
+        StateHasChanged();
+
+        try
+        {
+            // This will only work if we have HttpContext access
+            DiagnosticsResult += "Token status check is only available server-side.\n";
+            DiagnosticsResult += "Use /auth/status endpoint for detailed token information.\n";
+        }
+        catch (Exception ex)
+        {
+            DiagnosticsResult += $"Error checking token: {ex.Message}\n";
+        }
+        
+        StateHasChanged();
+    }
+
+    private async Task TestOidcDiscovery()
+    {
+        if (!_hasRendered)
+        {
+            DiagnosticsResult = "OIDC Discovery test is only available after interactive rendering.\n";
+            StateHasChanged();
+            return;
+        }
+
+        DiagnosticsResult = "Testing OIDC Discovery...\n";
+        StateHasChanged();
+
+        try
+        {
+            using var httpClient = new HttpClient();
+            var response = await httpClient.GetAsync($"{Authority}.well-known/openid_configuration");
+            var content = await response.Content.ReadAsStringAsync();
+            
+            DiagnosticsResult += $"Status: {response.StatusCode}\n";
+            if (response.IsSuccessStatusCode)
+            {
+                var discovery = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(content);
+                
+                DiagnosticsResult += $"Authorization Endpoint: {discovery.GetProperty("authorization_endpoint").GetString()}\n";
+                DiagnosticsResult += $"Token Endpoint: {discovery.GetProperty("token_endpoint").GetString()}\n";
+                DiagnosticsResult += $"End Session Endpoint: {discovery.GetProperty("end_session_endpoint").GetString()}\n";
+            }
+            else
+            {
+                DiagnosticsResult += $"Error: {content}\n";
+            }
+        }
+        catch (Exception ex)
+        {
+            DiagnosticsResult += $"Exception: {ex.Message}\n";
+        }
+        
+        StateHasChanged();
+    }
+
+    private async Task TestClientConfig()
+    {
+        if (!_hasRendered)
+        {
+            DiagnosticsResult = "Client Config test is only available after interactive rendering.\n";
+            StateHasChanged();
+            return;
+        }
+
+        DiagnosticsResult = "Testing Client Configuration...\n";
+        StateHasChanged();
+
+        try
+        {
+            using var httpClient = new HttpClient();
+            var response = await httpClient.GetAsync($"{Authority}debug/admin-client-info");
+            var content = await response.Content.ReadAsStringAsync();
+            
+            DiagnosticsResult += $"Status: {response.StatusCode}\n";
+            if (response.IsSuccessStatusCode)
+            {
+                var clientInfo = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(content);
+                
+                DiagnosticsResult += $"Client ID: {clientInfo.GetProperty("ClientId").GetString()}\n";
+                DiagnosticsResult += $"Client Name: {clientInfo.GetProperty("Name").GetString()}\n";
+                DiagnosticsResult += $"Is Enabled: {clientInfo.GetProperty("IsEnabled").GetBoolean()}\n";
+                
+                var redirectUris = clientInfo.GetProperty("RedirectUris").EnumerateArray()
+                    .Select(x => x.GetString()).ToList();
+                DiagnosticsResult += $"Redirect URIs: {string.Join(", ", redirectUris)}\n";
+                
+                var expectedUri = Navigation.BaseUri.TrimEnd('/') + "/signin-oidc";
+                if (redirectUris.Contains(expectedUri))
+                {
+                    DiagnosticsResult += "? Expected redirect URI is configured\n";
+                }
+                else
+                {
+                    DiagnosticsResult += $"? Expected redirect URI '{expectedUri}' is NOT configured\n";
+                    DiagnosticsResult += "This is likely the cause of your infinite loop!\n";
+                }
+            }
+            else
+            {
+                DiagnosticsResult += $"Error: {content}\n";
+            }
+        }
+        catch (Exception ex)
+        {
+            DiagnosticsResult += $"Exception: {ex.Message}\n";
+        }
+        
+        StateHasChanged();
+    }
+
+    private async Task ClearAuthState()
+    {
+        if (!_hasRendered)
+        {
+            DiagnosticsResult = "Clear Auth State is only available after interactive rendering.\n";
+            StateHasChanged();
+            return;
+        }
+
+        DiagnosticsResult = "Clearing authentication state...\n";
+        StateHasChanged();
+
+        try
+        {
+            Navigation.NavigateTo("/debug/clear-auth", forceLoad: true);
+        }
+        catch (Exception ex)
+        {
+            DiagnosticsResult += $"Error: {ex.Message}\n";
+            StateHasChanged();
+        }
+    }
+
+    private async Task TestLogin()
+    {
+        if (!_hasRendered)
+        {
+            DiagnosticsResult = "Test Login is only available after interactive rendering.\n";
+            StateHasChanged();
+            return;
+        }
+
+        DiagnosticsResult = "Starting login test...\n";
+        StateHasChanged();
+
+        try
+        {
+            Navigation.NavigateTo("/login?returnUrl=/debug/auth-diagnostics", forceLoad: true);
+        }
+        catch (Exception ex)
+        {
+            DiagnosticsResult += $"Error: {ex.Message}\n";
+            StateHasChanged();
+        }
+    }
+
+    private string GetStatusClass(string status)
+    {
+        return status switch
+        {
+            "success" => "text-success",
+            "error" => "text-danger",
+            _ => "text-warning"
+        };
+    }
+}

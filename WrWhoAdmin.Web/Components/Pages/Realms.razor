@@ -1,6 +1,7 @@
 @page "/realms"
 @attribute [Authorize]
 @rendermode InteractiveServer
+@inherits AuthenticatedComponentBase
 @inject NavigationManager Navigation
 @inject ILogger<Realms> Logger
 @inject NotificationService NotificationService
@@ -8,88 +9,125 @@
 
 <PageTitle>Realms - MrWho Admin</PageTitle>
 
-<RadzenText TextStyle="TextStyle.H3" TagName="TagName.H1" class="rz-pt-8">
-    <RadzenIcon Icon="domain" class="rz-me-1" />
-    Realms Management
-</RadzenText>
+@if (IsLoading)
+{
+    <div class="d-flex justify-content-center align-items-center" style="min-height: 50vh;">
+        <div class="text-center">
+            <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+            <RadzenText class="rz-mt-2">Loading realms...</RadzenText>
+        </div>
+    </div>
+}
+else if (!IsAuthenticated)
+{
+    @RenderAuthenticationStatus()
+}
+else
+{
+    <RadzenText TextStyle="TextStyle.H3" TagName="TagName.H1" class="rz-pt-8">
+        <RadzenIcon Icon="domain" class="rz-me-1" />
+        Realms Management
+    </RadzenText>
 
-<RadzenCard class="rz-my-4">
-    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" class="rz-mb-4">
-        <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem">
-            <RadzenTextBox @bind-Value="@searchTerm" Placeholder="Search realms..." Style="width: 300px;" />
-            <RadzenButton Click="@LoadRealms" Icon="search" ButtonStyle="ButtonStyle.Secondary" />
+    <RadzenCard class="rz-my-4">
+        <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" class="rz-mb-4">
+            <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem">
+                <RadzenTextBox @bind-Value="@searchTerm" Placeholder="Search realms..." Style="width: 300px;" />
+                <RadzenButton Click="@(async () => await LoadRealms())" Icon="search" ButtonStyle="ButtonStyle.Secondary" />
+            </RadzenStack>
+            <RadzenButton Click="@(() => Navigation.NavigateTo("/realms/add"))" Icon="add" ButtonStyle="ButtonStyle.Primary" Text="Add Realm" />
         </RadzenStack>
-        <RadzenButton Click="@(() => Navigation.NavigateTo("/realms/add"))" Icon="add" ButtonStyle="ButtonStyle.Primary" Text="Add Realm" />
-    </RadzenStack>
 
-    @if (isLoading)
-    {
-        <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
-    }
-    else if (realms.Any())
-    {
-        <RadzenDataGrid Data="@realms" TItem="RealmDto" AllowPaging="true" PageSize="10" AllowSorting="true">
-            <Columns>
-                <RadzenDataGridColumn TItem="RealmDto" Property="Name" Title="Name" Width="200px">
-                    <Template Context="realm">
-                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
-                            <RadzenIcon Icon="@(realm.IsEnabled ? "domain" : "domain_disabled")" 
-                                       Style="@($"color: {(realm.IsEnabled ? "var(--rz-success)" : "var(--rz-danger)")}")" />
-                            <RadzenText Text="@realm.Name" />
-                        </RadzenStack>
-                    </Template>
-                </RadzenDataGridColumn>
-                
-                <RadzenDataGridColumn TItem="RealmDto" Property="DisplayName" Title="Display Name" />
-                
-                <RadzenDataGridColumn TItem="RealmDto" Property="Description" Title="Description">
-                    <Template Context="realm">
-                        <RadzenText Text="@(realm.Description ?? "-")" Style="@(string.IsNullOrEmpty(realm.Description) ? "color: var(--rz-text-disabled-color)" : "")" />
-                    </Template>
-                </RadzenDataGridColumn>
-                
-                <RadzenDataGridColumn TItem="RealmDto" Property="IsEnabled" Title="Status" Width="100px">
-                    <Template Context="realm">
-                        <RadzenBadge BadgeStyle="@(realm.IsEnabled ? BadgeStyle.Success : BadgeStyle.Danger)" 
-                                    Text="@(realm.IsEnabled ? "Enabled" : "Disabled")" />
-                    </Template>
-                </RadzenDataGridColumn>
-                
-                <RadzenDataGridColumn TItem="RealmDto" Property="ClientCount" Title="Clients" Width="80px">
-                    <Template Context="realm">
-                        <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="@realm.ClientCount.ToString()" />
-                    </Template>
-                </RadzenDataGridColumn>
-                
-                <RadzenDataGridColumn TItem="RealmDto" Title="Actions" Width="350px" Sortable="false">
-                    <Template Context="realm">
-                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
-                            <RadzenButton Click="@(() => EditRealm(realm.Id))" Icon="edit" Size="ButtonSize.Medium" 
-                                         ButtonStyle="ButtonStyle.Light" Text="Edit" />
-                            <RadzenButton Click="@(() => ViewClients(realm.Id))" Icon="apps" Size="ButtonSize.Medium" 
-                                         ButtonStyle="ButtonStyle.Info" Text="Clients" />
-                            <RadzenButton Click="@(() => ToggleRealmStatus(realm))" Icon="@(realm.IsEnabled ? "toggle_on" : "toggle_off")" 
-                                         Size="ButtonSize.Medium" ButtonStyle="ButtonStyle.Warning" Text="Toggle" />
-                        </RadzenStack>
-                    </Template>
-                </RadzenDataGridColumn>
-            </Columns>
-        </RadzenDataGrid>
-    }
-    else
-    {
-        <RadzenAlert AlertStyle="AlertStyle.Info">
-            <RadzenText>No realms found. Click "Add Realm" to create your first realm.</RadzenText>
-        </RadzenAlert>
-    }
-</RadzenCard>
+        @if (isLoading)
+        {
+            <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+        }
+        else if (hasAuthError)
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Warning">
+                <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                    <RadzenText>Authentication required to load realms. Your session may have expired.</RadzenText>
+                    <RadzenButton Text="Re-authenticate" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Small" 
+                                  Click="@(async () => await TriggerReauthenticationAsync())" />
+                </RadzenStack>
+            </RadzenAlert>
+        }
+        else if (realms.Any())
+        {
+            <RadzenDataGrid Data="@realms" TItem="RealmDto" AllowPaging="true" PageSize="10" AllowSorting="true">
+                <Columns>
+                    <RadzenDataGridColumn TItem="RealmDto" Property="Name" Title="Name" Width="200px">
+                        <Template Context="realm">
+                            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
+                                <RadzenIcon Icon="@(realm.IsEnabled ? "domain" : "domain_disabled")" 
+                                           Style="@($"color: {(realm.IsEnabled ? "var(--rz-success)" : "var(--rz-danger)")}")" />
+                                <RadzenText Text="@realm.Name" />
+                            </RadzenStack>
+                        </Template>
+                    </RadzenDataGridColumn>
+                    
+                    <RadzenDataGridColumn TItem="RealmDto" Property="DisplayName" Title="Display Name" />
+                    
+                    <RadzenDataGridColumn TItem="RealmDto" Property="Description" Title="Description">
+                        <Template Context="realm">
+                            <RadzenText Text="@(realm.Description ?? "-")" Style="@(string.IsNullOrEmpty(realm.Description) ? "color: var(--rz-text-disabled-color)" : "")" />
+                        </Template>
+                    </RadzenDataGridColumn>
+                    
+                    <RadzenDataGridColumn TItem="RealmDto" Property="IsEnabled" Title="Status" Width="100px">
+                        <Template Context="realm">
+                            <RadzenBadge BadgeStyle="@(realm.IsEnabled ? BadgeStyle.Success : BadgeStyle.Danger)" 
+                                        Text="@(realm.IsEnabled ? "Enabled" : "Disabled")" />
+                        </Template>
+                    </RadzenDataGridColumn>
+                    
+                    <RadzenDataGridColumn TItem="RealmDto" Property="ClientCount" Title="Clients" Width="80px">
+                        <Template Context="realm">
+                            <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="@realm.ClientCount.ToString()" />
+                        </Template>
+                    </RadzenDataGridColumn>
+                    
+                    <RadzenDataGridColumn TItem="RealmDto" Title="Actions" Width="350px" Sortable="false">
+                        <Template Context="realm">
+                            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                                <RadzenButton Click="@(() => EditRealm(realm.Id))" Icon="edit" Size="ButtonSize.Medium" 
+                                             ButtonStyle="ButtonStyle.Light" Text="Edit" />
+                                <RadzenButton Click="@(() => ViewClients(realm.Id))" Icon="apps" Size="ButtonSize.Medium" 
+                                             ButtonStyle="ButtonStyle.Info" Text="Clients" />
+                                <RadzenButton Click="@(async () => await ToggleRealmStatus(realm))" Icon="@(realm.IsEnabled ? "toggle_on" : "toggle_off")" 
+                                             Size="ButtonSize.Medium" ButtonStyle="ButtonStyle.Warning" Text="Toggle" />
+                            </RadzenStack>
+                        </Template>
+                    </RadzenDataGridColumn>
+                </Columns>
+            </RadzenDataGrid>
+        }
+        else
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Info">
+                <RadzenText>No realms found. Click "Add Realm" to create your first realm.</RadzenText>
+            </RadzenAlert>
+        }
+    </RadzenCard>
+}
 
 @code {
     private List<RealmDto> realms = new();
     private bool isLoading = false;
+    private bool hasAuthError = false;
     private string searchTerm = "";
 
     protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync(); // This calls CheckAuthenticationAsync()
+        
+        if (IsAuthenticated)
+        {
+            await OnAuthenticatedAsync();
+        }
+    }
+
+    protected override async Task OnAuthenticatedAsync()
     {
         await LoadRealms();
     }
@@ -97,14 +135,20 @@
     private async Task LoadRealms()
     {
         isLoading = true;
+        hasAuthError = false;
+        StateHasChanged();
+        
         try
         {
+            Logger.LogInformation("Loading realms with search term: '{SearchTerm}'", searchTerm);
+            
             var result = await RealmsApi.GetRealmsAsync(page: 1, pageSize: 50, search: searchTerm);
             
             if (result != null)
             {
                 realms = result.Items;
                 Logger.LogInformation("Loaded {RealmCount} realms from API", realms.Count);
+                hasAuthError = false;
             }
             else
             {
@@ -112,6 +156,14 @@
                 realms = new List<RealmDto>();
                 NotificationService.Notify(NotificationSeverity.Warning, "Warning", "Failed to load realms from API");
             }
+        }
+        catch (HttpRequestException httpEx) when (httpEx.Message.Contains("Unauthorized") || httpEx.Message.Contains("401"))
+        {
+            Logger.LogWarning("Authentication required for realms API: {Message}", httpEx.Message);
+            hasAuthError = true;
+            realms = new List<RealmDto>();
+            NotificationService.Notify(NotificationSeverity.Warning, "Authentication Required", 
+                "Your session has expired. Please re-authenticate to view realms.");
         }
         catch (Exception ex)
         {
@@ -158,6 +210,14 @@
             {
                 NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to toggle realm status");
             }
+        }
+        catch (HttpRequestException httpEx) when (httpEx.Message.Contains("Unauthorized") || httpEx.Message.Contains("401"))
+        {
+            Logger.LogWarning("Authentication required for realm toggle: {Message}", httpEx.Message);
+            NotificationService.Notify(NotificationSeverity.Warning, "Authentication Required", 
+                "Your session has expired. Please re-authenticate to modify realms.");
+            hasAuthError = true;
+            StateHasChanged();
         }
         catch (Exception ex)
         {

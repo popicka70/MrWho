@@ -1,0 +1,528 @@
+@{
+    ViewData["Title"] = "JWT Token Inspector";
+}
+
+<div class="container-fluid">
+    <div class="row justify-content-center">
+        <div class="col-12">
+            <div class="card shadow-lg border-0">
+                <div class="card-header bg-gradient text-white text-center py-4" style="background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);">
+                    <h1 class="display-5 mb-2">?? JWT Token Inspector</h1>
+                    <p class="lead mb-0">Decode and inspect JWT tokens securely</p>
+                </div>
+                
+                <div class="card-body p-4">
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="form-group mb-4">
+                                <label for="tokenInput" class="form-label fw-bold text-secondary">JWT Token:</label>
+                                <textarea id="tokenInput" class="form-control font-monospace" rows="4" 
+                                          placeholder="Paste your JWT token here (with or without 'Bearer ' prefix)..."
+                                          style="border: 2px solid #e1e8ed; border-radius: 8px; transition: border-color 0.3s ease;"></textarea>
+                            </div>
+                            
+                            <div class="d-flex flex-wrap gap-3 mb-4">
+                                <button type="button" class="btn btn-primary btn-lg" onclick="decodeToken()">
+                                    <i class="fas fa-search me-2"></i>?? Decode Token
+                                </button>
+                                <button type="button" class="btn btn-secondary" onclick="clearToken()">
+                                    <i class="fas fa-trash me-2"></i>??? Clear
+                                </button>
+                                <button type="button" class="btn btn-success" onclick="getCurrentToken()">
+                                    <i class="fas fa-user me-2"></i>?? Get Current Token
+                                </button>
+                                <button type="button" class="btn btn-info" onclick="introspectToken()">
+                                    <i class="fas fa-search-plus me-2"></i>?? Introspect Token
+                                </button>
+                            </div>
+                            
+                            <div id="result" class="alert" style="display: none;">
+                                <div id="resultContent"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <div class="card bg-light border-info border-start border-4">
+                                <div class="card-body">
+                                    <h5 class="card-title">?? Quick Actions</h5>
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <div class="card h-100 cursor-pointer" onclick="getCurrentToken()" style="cursor: pointer;">
+                                                <div class="card-body">
+                                                    <h6 class="card-title fw-bold">Current User Token</h6>
+                                                    <p class="card-text small text-muted">Click to inspect your current authentication token</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="card h-100 cursor-pointer" onclick="showSampleToken()" style="cursor: pointer;">
+                                                <div class="card-body">
+                                                    <h6 class="card-title fw-bold">Sample JWT Token</h6>
+                                                    <p class="card-text small text-muted">Click to load a sample token for demonstration</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    const API_BASE = window.location.origin + '/identity/token-inspector';
+    
+    // Auto-focus on token input
+    document.getElementById('tokenInput').focus();
+    
+    // Allow Ctrl+Enter to decode token
+    document.getElementById('tokenInput').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter' && e.ctrlKey) {
+            decodeToken();
+        }
+    });
+    
+    async function decodeToken() {
+        const token = document.getElementById('tokenInput').value.trim();
+        if (!token) {
+            showError('Please enter a JWT token');
+            return;
+        }
+        
+        showLoading();
+        
+        try {
+            const response = await fetch(`${API_BASE}/decode`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ token: token })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                showTokenInfo(data);
+            } else {
+                showError(data.error || 'Failed to decode token');
+            }
+        } catch (error) {
+            showError('Network error: ' + error.message);
+        }
+    }
+    
+    async function introspectToken() {
+        const token = document.getElementById('tokenInput').value.trim();
+        if (!token) {
+            showError('Please enter a JWT token');
+            return;
+        }
+        
+        showLoading();
+        
+        try {
+            const response = await fetch(`${API_BASE}/introspect`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ token: token })
+            });
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                showIntrospectionResult(data);
+            } else {
+                showError('Failed to introspect token');
+            }
+        } catch (error) {
+            showError('Network error: ' + error.message);
+        }
+    }
+    
+    async function getCurrentToken() {
+        showLoading();
+        
+        try {
+            const response = await fetch(`${API_BASE}/current`, {
+                method: 'GET',
+                credentials: 'same-origin'
+            });
+            
+            if (response.status === 401) {
+                showError('You are not authenticated. Please log in first.');
+                return;
+            }
+            
+            const data = await response.json();
+            
+            if (response.ok) {
+                showCurrentTokenInfo(data);
+            } else {
+                showError('Failed to get current token info');
+            }
+        } catch (error) {
+            showError('Network error: ' + error.message);
+        }
+    }
+    
+    function clearToken() {
+        document.getElementById('tokenInput').value = '';
+        hideResult();
+    }
+    
+    function showSampleToken() {
+        // Sample JWT token for demonstration
+        const sampleToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyLCJleHAiOjk5OTk5OTk5OTksInNjb3BlIjoib3BlbmlkIGVtYWlsIHByb2ZpbGUiLCJjbGllbnRfaWQiOiJzYW1wbGVfY2xpZW50In0.4Adcj3UFYzPUVaVF43FmMab6RlaQD8A9V8wFzzht-bE';
+        document.getElementById('tokenInput').value = sampleToken;
+    }
+    
+    function showLoading() {
+        const result = document.getElementById('result');
+        const content = document.getElementById('resultContent');
+        
+        content.innerHTML = '<div class="text-center"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div><p class="mt-2">?? Processing...</p></div>';
+        result.className = 'alert alert-info';
+        result.style.display = 'block';
+    }
+    
+    function showError(message) {
+        const result = document.getElementById('result');
+        const content = document.getElementById('resultContent');
+        
+        content.innerHTML = `<h5 class="alert-heading">? Error</h5><p class="mb-0">${message}</p>`;
+        result.className = 'alert alert-danger';
+        result.style.display = 'block';
+    }
+    
+    function hideResult() {
+        document.getElementById('result').style.display = 'none';
+    }
+    
+    function showTokenInfo(data) {
+        const result = document.getElementById('result');
+        const content = document.getElementById('resultContent');
+        
+        const validityClass = data.validity.isValid ? 'success' : 
+                              data.validity.isExpired ? 'danger' : 'warning';
+        const validityText = data.validity.isValid ? 'Valid' : 
+                            data.validity.isExpired ? 'Expired' : 'Not Yet Valid';
+        
+        content.innerHTML = `
+            <h5 class="alert-heading">? Token Decoded Successfully</h5>
+            <div class="row g-3 mt-3">
+                <div class="col-md-6">
+                    <div class="card border-primary">
+                        <div class="card-header bg-primary text-white">
+                            <h6 class="mb-0">?? Header</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-sm mb-0">
+                                    <tr><td class="fw-bold">Algorithm:</td><td class="font-monospace">${data.header.alg}</td></tr>
+                                    <tr><td class="fw-bold">Type:</td><td class="font-monospace">${data.header.typ}</td></tr>
+                                    ${data.header.kid ? `<tr><td class="fw-bold">Key ID:</td><td class="font-monospace">${data.header.kid}</td></tr>` : ''}
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="card border-info">
+                        <div class="card-header bg-info text-white">
+                            <h6 class="mb-0">?? Payload</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-sm mb-0">
+                                    <tr><td class="fw-bold">Issuer:</td><td class="font-monospace small">${data.payload.iss || 'N/A'}</td></tr>
+                                    <tr><td class="fw-bold">Subject:</td><td class="font-monospace small">${data.payload.sub || 'N/A'}</td></tr>
+                                    <tr><td class="fw-bold">Audience:</td><td class="font-monospace small">${Array.isArray(data.payload.aud) ? data.payload.aud.join(', ') : (data.payload.aud || 'N/A')}</td></tr>
+                                    ${data.payload.jti ? `<tr><td class="fw-bold">Token ID:</td><td class="font-monospace small">${data.payload.jti}</td></tr>` : ''}
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="card border-${validityClass}">
+                        <div class="card-header bg-${validityClass} text-white">
+                            <h6 class="mb-0">? Validity</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-sm mb-0">
+                                    <tr><td class="fw-bold">Status:</td><td><span class="badge bg-${validityClass}">${validityText}</span></td></tr>
+                                    <tr><td class="fw-bold">Valid From:</td><td class="font-monospace small">${data.validity.validFrom}</td></tr>
+                                    <tr><td class="fw-bold">Valid To:</td><td class="font-monospace small">${data.validity.validTo}</td></tr>
+                                    <tr><td class="fw-bold">Time Until Expiry:</td><td class="font-monospace small">${data.validity.timeUntilExpiry}</td></tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="card border-secondary">
+                        <div class="card-header bg-secondary text-white">
+                            <h6 class="mb-0">?? Metadata</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-sm mb-0">
+                                    <tr><td class="fw-bold">Token Type:</td><td class="font-monospace">${data.metadata.tokenType}</td></tr>
+                                    <tr><td class="fw-bold">Token Length:</td><td class="font-monospace">${data.metadata.tokenLength} chars</td></tr>
+                                    <tr><td class="fw-bold">Claims Count:</td><td class="font-monospace">${data.metadata.claimsCount}</td></tr>
+                                    <tr><td class="fw-bold">Audience Count:</td><td class="font-monospace">${data.metadata.audienceCount}</td></tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            ${data.payload.claims && data.payload.claims.length > 0 ? `
+            <div class="mt-4">
+                <div class="card border-dark">
+                    <div class="card-header bg-dark text-white">
+                        <h6 class="mb-0">??? All Claims (${data.payload.claims.length})</h6>
+                    </div>
+                    <div class="card-body">
+                        <div style="max-height: 300px; overflow-y: auto;">
+                            <div class="table-responsive">
+                                <table class="table table-striped table-sm mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Claim Type</th>
+                                            <th>Value</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${data.payload.claims.map(claim => `
+                                            <tr>
+                                                <td class="font-monospace fw-bold">${claim.type}</td>
+                                                <td class="font-monospace small">${claim.value}</td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>` : ''}
+        `;
+        
+        result.className = 'alert alert-success';
+        result.style.display = 'block';
+    }
+    
+    function showIntrospectionResult(data) {
+        const result = document.getElementById('result');
+        const content = document.getElementById('resultContent');
+        
+        if (data.active) {
+            content.innerHTML = `
+                <h5 class="alert-heading">? Token Introspection Result</h5>
+                <div class="card border-success mt-3">
+                    <div class="card-header bg-success text-white">
+                        <h6 class="mb-0">?? Introspection Result</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-sm mb-0">
+                                <tr><td class="fw-bold">Active:</td><td><span class="badge bg-success">True</span></td></tr>
+                                <tr><td class="fw-bold">Client ID:</td><td class="font-monospace">${data.client_id || 'N/A'}</td></tr>
+                                <tr><td class="fw-bold">Username:</td><td class="font-monospace">${data.username || 'N/A'}</td></tr>
+                                <tr><td class="fw-bold">Subject:</td><td class="font-monospace">${data.sub || 'N/A'}</td></tr>
+                                <tr><td class="fw-bold">Scope:</td><td class="font-monospace">${data.scope || 'N/A'}</td></tr>
+                                <tr><td class="fw-bold">Token Type:</td><td class="font-monospace">${data.token_type || 'N/A'}</td></tr>
+                                <tr><td class="fw-bold">Token Use:</td><td class="font-monospace">${data.token_use || 'N/A'}</td></tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            `;
+            result.className = 'alert alert-success';
+        } else {
+            content.innerHTML = `
+                <h5 class="alert-heading">? Token Introspection Result</h5>
+                <div class="card border-danger mt-3">
+                    <div class="card-body">
+                        <p><strong>Active:</strong> <span class="badge bg-danger">False</span></p>
+                        ${data.error ? `<p class="mb-0"><strong>Error:</strong> ${data.error}</p>` : ''}
+                    </div>
+                </div>
+            `;
+            result.className = 'alert alert-danger';
+        }
+        
+        result.style.display = 'block';
+    }
+    
+    function showCurrentTokenInfo(data) {
+        const result = document.getElementById('result');
+        const content = document.getElementById('resultContent');
+        
+        content.innerHTML = `
+            <h5 class="alert-heading">?? Current User Token Information</h5>
+            <div class="row g-3 mt-3">
+                <div class="col-md-4">
+                    <div class="card border-primary">
+                        <div class="card-header bg-primary text-white">
+                            <h6 class="mb-0">?? Authentication</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-sm mb-0">
+                                    <tr><td class="fw-bold">Authenticated:</td><td><span class="badge bg-${data.isAuthenticated ? 'success' : 'danger'}">${data.isAuthenticated}</span></td></tr>
+                                    <tr><td class="fw-bold">Type:</td><td class="font-monospace small">${data.authenticationType || 'N/A'}</td></tr>
+                                    <tr><td class="fw-bold">Name:</td><td class="font-monospace small">${data.name || 'N/A'}</td></tr>
+                                    <tr><td class="fw-bold">Subject:</td><td class="font-monospace small">${data.subject || 'N/A'}</td></tr>
+                                    <tr><td class="fw-bold">Email:</td><td class="font-monospace small">${data.email || 'N/A'}</td></tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-4">
+                    <div class="card border-info">
+                        <div class="card-header bg-info text-white">
+                            <h6 class="mb-0">?? Authorization</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-sm mb-0">
+                                    <tr><td class="fw-bold">Client ID:</td><td class="font-monospace small">${data.clientId || 'N/A'}</td></tr>
+                                    <tr><td class="fw-bold">Issuer:</td><td class="font-monospace small">${data.issuer || 'N/A'}</td></tr>
+                                    <tr><td class="fw-bold">Audience:</td><td class="font-monospace small">${data.audience && data.audience.length > 0 ? data.audience.join(', ') : 'N/A'}</td></tr>
+                                    <tr><td class="fw-bold">Token Expiry:</td><td class="font-monospace small">${data.tokenExpiry || 'N/A'}</td></tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-4">
+                    <div class="card border-secondary">
+                        <div class="card-header bg-secondary text-white">
+                            <h6 class="mb-0">?? Statistics</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-sm mb-0">
+                                    <tr><td class="fw-bold">Total Claims:</td><td class="font-monospace">${data.claimsCount}</td></tr>
+                                    <tr><td class="fw-bold">Roles Count:</td><td class="font-monospace">${data.metadata.rolesCount}</td></tr>
+                                    <tr><td class="fw-bold">Scopes Count:</td><td class="font-monospace">${data.metadata.scopesCount}</td></tr>
+                                    <tr><td class="fw-bold">Has Subject:</td><td><span class="badge bg-${data.metadata.hasSubject ? 'success' : 'danger'}">${data.metadata.hasSubject}</span></td></tr>
+                                    <tr><td class="fw-bold">Has Email:</td><td><span class="badge bg-${data.metadata.hasEmail ? 'success' : 'danger'}">${data.metadata.hasEmail}</span></td></tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            ${data.roles && data.roles.length > 0 ? `
+            <div class="mt-4">
+                <div class="card border-warning">
+                    <div class="card-header bg-warning text-dark">
+                        <h6 class="mb-0">?? Roles (${data.roles.length})</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex flex-wrap gap-2">
+                            ${data.roles.map(role => `<span class="badge bg-warning text-dark">${role}</span>`).join('')}
+                        </div>
+                    </div>
+                </div>
+            </div>` : ''}
+            
+            ${data.scopes && data.scopes.length > 0 ? `
+            <div class="mt-3">
+                <div class="card border-success">
+                    <div class="card-header bg-success text-white">
+                        <h6 class="mb-0">?? Scopes (${data.scopes.length})</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex flex-wrap gap-2">
+                            ${data.scopes.map(scope => `<span class="badge bg-success">${scope}</span>`).join('')}
+                        </div>
+                    </div>
+                </div>
+            </div>` : ''}
+            
+            ${data.claims && data.claims.length > 0 ? `
+            <div class="mt-3">
+                <div class="card border-dark">
+                    <div class="card-header bg-dark text-white">
+                        <h6 class="mb-0">??? All Claims (${data.claims.length})</h6>
+                    </div>
+                    <div class="card-body">
+                        <div style="max-height: 300px; overflow-y: auto;">
+                            <div class="table-responsive">
+                                <table class="table table-striped table-sm mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Claim Type</th>
+                                            <th>Value</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${data.claims.map(claim => `
+                                            <tr>
+                                                <td class="font-monospace fw-bold">${claim.type}</td>
+                                                <td class="font-monospace small">${claim.value}</td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>` : ''}
+        `;
+        
+        result.className = 'alert alert-info';
+        result.style.display = 'block';
+    }
+</script>
+}
+
+<style>
+    .cursor-pointer {
+        cursor: pointer;
+    }
+    
+    .card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        transition: all 0.3s ease;
+    }
+    
+    .font-monospace {
+        font-family: 'Courier New', monospace;
+    }
+    
+    .bg-gradient {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    
+    #tokenInput:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+    }
+</style>

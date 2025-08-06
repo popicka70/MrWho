@@ -1,5 +1,9 @@
 using MrWhoAdmin.Web.Services;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.Abstractions;
+using Microsoft.AspNetCore.Routing;
 using MrWho.Shared;
 
 namespace MrWhoAdmin.Web.Middleware;
@@ -45,16 +49,30 @@ public class TokenRefreshMiddleware
                         _logger.LogDebug("Token is expired or expiring soon, attempting proactive refresh for path: {Path}", 
                             context.Request.Path);
                         
-                        var refreshSuccess = await tokenRefreshService.ForceRefreshTokenAsync(context);
-                        if (refreshSuccess)
+                        // Use the new method that can trigger re-authentication
+                        var refreshResult = await tokenRefreshService.RefreshTokenWithReauthAsync(context);
+                        
+                        if (refreshResult.Success)
                         {
                             _logger.LogInformation("Proactive token refresh successful for path: {Path}", 
                                 context.Request.Path);
                         }
+                        else if (refreshResult.RequiresReauth)
+                        {
+                            _logger.LogWarning("Token refresh failed, triggering re-authentication for path: {Path}. Reason: {Reason}", 
+                                context.Request.Path, refreshResult.Reason);
+                            
+                            // Instead of executing action result, redirect to auth controller
+                            var returnUrl = Uri.EscapeDataString(context.Request.Path);
+                            var redirectUrl = $"/auth/check-and-reauth?returnUrl={returnUrl}";
+                            
+                            context.Response.Redirect(redirectUrl);
+                            return;
+                        }
                         else
                         {
-                            _logger.LogWarning("Proactive token refresh failed for path: {Path}. User may need to re-authenticate.", 
-                                context.Request.Path);
+                            _logger.LogWarning("Proactive token refresh failed for path: {Path}. Reason: {Reason}", 
+                                context.Request.Path, refreshResult.Reason);
                         }
                     }
                 }
