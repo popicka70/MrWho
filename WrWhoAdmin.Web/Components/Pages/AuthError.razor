@@ -1,0 +1,105 @@
+@page "/auth-error"
+@inject ILogger<AuthError> Logger
+@inject NavigationManager Navigation
+
+<PageTitle>Authentication Error - MrWho Admin</PageTitle>
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Authentication Error
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-danger">
+                        <h5>Unable to authenticate</h5>
+                        @if (!string.IsNullOrEmpty(ErrorMessage))
+                        {
+                            <p class="mb-0">@ErrorMessage</p>
+                        }
+                        else
+                        {
+                            <p class="mb-0">An error occurred during the authentication process. Please try again.</p>
+                        }
+                    </div>
+                    
+                    <div class="mt-4">
+                        <h6>What you can do:</h6>
+                        <ul>
+                            <li>Try logging in again</li>
+                            <li>Clear your browser cookies and cache</li>
+                            <li>Contact support if the problem persists</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="mt-4 d-grid gap-2 d-md-flex justify-content-md-end">
+                        <button @onclick="TryAgain" class="btn btn-primary">
+                            <i class="fas fa-redo me-1"></i>
+                            Try Again
+                        </button>
+                        <button @onclick="GoHome" class="btn btn-secondary">
+                            <i class="fas fa-home me-1"></i>
+                            Go Home
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            @if (ShowTechnicalDetails)
+            {
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h6 class="mb-0">Technical Details</h6>
+                    </div>
+                    <div class="card-body">
+                        <small class="text-muted">
+                            <strong>Error:</strong> @ErrorMessage<br/>
+                            <strong>Time:</strong> @DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss UTC")<br/>
+                            <strong>Request ID:</strong> @RequestId
+                        </small>
+                    </div>
+                </div>
+            }
+            
+            <div class="text-center mt-3">
+                <button @onclick="ToggleTechnicalDetails" class="btn btn-link btn-sm">
+                    @(ShowTechnicalDetails ? "Hide" : "Show") Technical Details
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, SupplyParameterFromQuery] public string? Error { get; set; }
+    
+    private string? ErrorMessage => Error;
+    private string RequestId = Guid.NewGuid().ToString("N")[..8];
+    private bool ShowTechnicalDetails = false;
+
+    protected override void OnInitialized()
+    {
+        Logger.LogWarning("Authentication error page displayed. Error: {Error}", ErrorMessage ?? "Unknown");
+    }
+
+    private void TryAgain()
+    {
+        Logger.LogInformation("User retrying authentication from error page");
+        Navigation.NavigateTo("/login", forceLoad: true);
+    }
+
+    private void GoHome()
+    {
+        Logger.LogInformation("User navigating to home from auth error page");
+        Navigation.NavigateTo("/", forceLoad: true);
+    }
+
+    private void ToggleTechnicalDetails()
+    {
+        ShowTechnicalDetails = !ShowTechnicalDetails;
+    }
+}

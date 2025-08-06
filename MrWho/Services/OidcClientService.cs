@@ -114,8 +114,8 @@ public class OidcClientService : IOidcClientService
                 });
             }
 
-            // Add scopes (INCLUDING API SCOPES)
-            var scopes = new[] { "openid", "email", "profile", "roles", "offline_access", "api.read", "api.write" };
+            // Add scopes (INCLUDING API SCOPES AND MRWHO.USE)
+            var scopes = new[] { "openid", "email", "profile", "roles", "offline_access", "api.read", "api.write", "mrwho.use" };
             foreach (var scope in scopes)
             {
                 _context.ClientScopes.Add(new ClientScope
@@ -125,7 +125,7 @@ public class OidcClientService : IOidcClientService
                 });
             }
 
-            // Add permissions (INCLUDING API PERMISSIONS)
+            // Add permissions (INCLUDING API PERMISSIONS AND MRWHO.USE)
             var permissions = new[]
             {
                 OpenIddictConstants.Permissions.Endpoints.Authorization,
@@ -139,7 +139,8 @@ public class OidcClientService : IOidcClientService
                 OpenIddictConstants.Permissions.Scopes.Roles,
                 OpenIddictConstants.Permissions.ResponseTypes.Code,
                 "oidc:scope:api.read",   // Use oidc:scope: prefix for API read permission
-                "oidc:scope:api.write"   // Use oidc:scope: prefix for API write permission
+                "oidc:scope:api.write",  // Use oidc:scope: prefix for API write permission
+                "scp:mrwho.use"          // Use scp: prefix for custom mrwho.use permission
             };
 
             foreach (var permission in permissions)
@@ -160,6 +161,7 @@ public class OidcClientService : IOidcClientService
             var existingApiScopes = adminClient.Scopes.Where(s => s.Scope.StartsWith("api.")).ToList();
             var existingCorrectApiPermissions = adminClient.Permissions.Where(p => p.Permission.StartsWith("oidc:scope:api.")).ToList();
             var hasOfflineAccess = adminClient.Scopes.Any(s => s.Scope == "offline_access");
+            var hasMrWhoUse = adminClient.Scopes.Any(s => s.Scope == "mrwho.use");
 
             // Fix existing incorrect permissions - remove old format and add correct format
             var oldApiPermissions = adminClient.Permissions.Where(p => p.Permission.StartsWith("api.") && !p.Permission.StartsWith("oidc:scope:")).ToList();
@@ -198,6 +200,16 @@ public class OidcClientService : IOidcClientService
                 });
             }
 
+            if (!hasMrWhoUse)
+            {
+                _logger.LogInformation("Adding mrwho.use scope to existing admin client");
+                _context.ClientScopes.Add(new ClientScope
+                {
+                    ClientId = adminClient.Id,
+                    Scope = "mrwho.use"
+                });
+            }
+
             if (existingCorrectApiPermissions.Count == 0)
             {
                 _logger.LogInformation("Adding API permissions with correct format to existing admin client");
@@ -214,7 +226,19 @@ public class OidcClientService : IOidcClientService
                 }
             }
 
-            if (existingApiScopes.Count == 0 || existingCorrectApiPermissions.Count == 0 || !hasOfflineAccess || oldApiPermissions.Any())
+            // Add mrwho.use permission if missing
+            var hasMrWhoUsePermission = adminClient.Permissions.Any(p => p.Permission == "scp:mrwho.use");
+            if (!hasMrWhoUsePermission)
+            {
+                _logger.LogInformation("Adding mrwho.use permission to existing admin client");
+                _context.ClientPermissions.Add(new ClientPermission
+                {
+                    ClientId = adminClient.Id,
+                    Permission = "scp:mrwho.use"
+                });
+            }
+
+            if (existingApiScopes.Count == 0 || existingCorrectApiPermissions.Count == 0 || !hasOfflineAccess || !hasMrWhoUse || !hasMrWhoUsePermission || oldApiPermissions.Any())
             {
                 await _context.SaveChangesAsync();
                 _logger.LogInformation("Updated API scopes and permissions on existing admin client");
@@ -243,11 +267,50 @@ public class OidcClientService : IOidcClientService
             var result = await _userManager.CreateAsync(adminUser, "MrWhoAdmin2024!");
             if (result.Succeeded)
             {
-                _logger.LogInformation("Created admin user 'admin@mrwho.local'");
+                // Add name claims to admin user for proper display name
+                await _userManager.AddClaimAsync(adminUser, new System.Security.Claims.Claim("name", "MrWho Administrator"));
+                await _userManager.AddClaimAsync(adminUser, new System.Security.Claims.Claim("given_name", "MrWho"));
+                await _userManager.AddClaimAsync(adminUser, new System.Security.Claims.Claim("family_name", "Administrator"));
+                await _userManager.AddClaimAsync(adminUser, new System.Security.Claims.Claim("preferred_username", "admin"));
+                
+                _logger.LogInformation("Created admin user 'admin@mrwho.local' with name claims");
             }
             else
             {
                 _logger.LogError("Failed to create admin user: {Errors}", string.Join(", ", result.Errors.Select(e => e.Description)));
+            }
+        }
+        else
+        {
+            // Check if existing admin user has name claims, and add them if missing
+            var existingClaims = await _userManager.GetClaimsAsync(adminUser);
+            var hasNameClaim = existingClaims.Any(c => c.Type == "name");
+            var hasGivenNameClaim = existingClaims.Any(c => c.Type == "given_name");
+            var hasFamilyNameClaim = existingClaims.Any(c => c.Type == "family_name");
+            var hasPreferredUsernameClaim = existingClaims.Any(c => c.Type == "preferred_username");
+
+            if (!hasNameClaim)
+            {
+                await _userManager.AddClaimAsync(adminUser, new System.Security.Claims.Claim("name", "MrWho Administrator"));
+                _logger.LogInformation("Added 'name' claim to existing admin user");
+            }
+
+            if (!hasGivenNameClaim)
+            {
+                await _userManager.AddClaimAsync(adminUser, new System.Security.Claims.Claim("given_name", "MrWho"));
+                _logger.LogInformation("Added 'given_name' claim to existing admin user");
+            }
+
+            if (!hasFamilyNameClaim)
+            {
+                await _userManager.AddClaimAsync(adminUser, new System.Security.Claims.Claim("family_name", "Administrator"));
+                _logger.LogInformation("Added 'family_name' claim to existing admin user");
+            }
+
+            if (!hasPreferredUsernameClaim)
+            {
+                await _userManager.AddClaimAsync(adminUser, new System.Security.Claims.Claim("preferred_username", "admin"));
+                _logger.LogInformation("Added 'preferred_username' claim to existing admin user");
             }
         }
 

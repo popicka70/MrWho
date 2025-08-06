@@ -37,6 +37,9 @@ public static class ServiceCollectionExtensions
         // Add token refresh service
         services.AddScoped<ITokenRefreshService, TokenRefreshService>();
         
+        // Add Blazor authentication service
+        services.AddScoped<IBlazorAuthService, BlazorAuthService>();
+        
         return services;
     }
 
@@ -96,6 +99,14 @@ public static class ServiceCollectionExtensions
         })
         .AddHttpMessageHandler<AuthenticationDelegatingHandler>();
 
+        services.AddHttpClient<IIdentityResourcesApiService, IdentityResourcesApiService>(client =>
+        {
+            client.BaseAddress = new Uri(mrWhoApiBaseUrl);
+            client.DefaultRequestHeaders.Add("Accept", "application/json");
+            client.Timeout = TimeSpan.FromSeconds(30);
+        })
+        .AddHttpMessageHandler<AuthenticationDelegatingHandler>();
+
         return services;
     }
 
@@ -142,18 +153,24 @@ public static class ServiceCollectionExtensions
         options.SaveTokens = true; // CRITICAL: This saves tokens for API calls
         options.GetClaimsFromUserInfoEndpoint = true;
         options.RequireHttpsMetadata = false; // Only for development
+        options.UsePkce = true; // Enable PKCE for better security
 
         // Set explicit callback paths for the admin web app (port 7257)
         options.CallbackPath = "/signin-oidc";
         options.SignedOutCallbackPath = "/signout-callback-oidc";
+        
+        // IMPORTANT: Set the correct remote signout path
+        options.RemoteSignOutPath = "/signout-oidc";
 
         // Additional configuration for OpenIddict compatibility
         options.MetadataAddress = $"{options.Authority}.well-known/openid_configuration";
-        options.UsePkce = true; // Enable PKCE for better security
 
         // Configure token refresh settings
         options.RefreshInterval = TimeSpan.FromMinutes(30); // Check for refresh every 30 minutes
         options.UseTokenLifetime = true; // Use the token's actual lifetime
+        
+        // CRITICAL: Skip unrecognized requests to prevent loops
+        options.SkipUnrecognizedRequests = true;
 
         ConfigureScopes(options);
         ConfigureClaimActions(options);
@@ -173,6 +190,7 @@ public static class ServiceCollectionExtensions
         options.Scope.Add("offline_access"); // CRITICAL: This scope is required for refresh tokens
         options.Scope.Add("api.read");  // Add API read scope
         options.Scope.Add("api.write"); // Add API write scope
+        options.Scope.Add("mrwho.use"); // Add mrwho.use scope
     }
 
     /// <summary>
@@ -193,10 +211,16 @@ public static class ServiceCollectionExtensions
         options.ClaimActions.DeleteClaim("oi_tbn_id");
 
         // Only map claims from UserInfo endpoint
+        options.ClaimActions.MapJsonKey("sub", "sub");
         options.ClaimActions.MapJsonKey("name", "name");
         options.ClaimActions.MapJsonKey("given_name", "given_name");
         options.ClaimActions.MapJsonKey("family_name", "family_name");
         options.ClaimActions.MapJsonKey("email", "email");
+        options.ClaimActions.MapJsonKey("email_verified", "email_verified");
+        options.ClaimActions.MapJsonKey("preferred_username", "preferred_username");
+        options.ClaimActions.MapJsonKey("phone_number", "phone_number");
+        options.ClaimActions.MapJsonKey("phone_number_verified", "phone_number_verified");
+        options.ClaimActions.MapJsonKey("role", "role");
     }
 
     /// <summary>
@@ -209,15 +233,44 @@ public static class ServiceCollectionExtensions
             OnRedirectToIdentityProvider = context =>
             {
                 var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-                logger.LogInformation("Redirecting to identity provider: {Authority}", options.Authority);
+                logger.LogInformation("Redirecting to identity provider: {Authority} with return URL: {ReturnUrl}", 
+                    options.Authority, context.Properties.RedirectUri);
                 return Task.CompletedTask;
             },
+            
             OnTokenValidated = context =>
             {
                 var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-                logger.LogInformation("Token validated successfully");
+                logger.LogInformation("Token validated successfully for user: {UserName}. Claims count: {ClaimsCount}", 
+                    context.Principal?.Identity?.Name ?? "Unknown", context.Principal?.Claims?.Count() ?? 0);
+                
+                // Log the claims we have at this point
+                if (context.Principal?.Claims != null)
+                {
+                    foreach (var claim in context.Principal.Claims)
+                    {
+                        logger.LogDebug("Token claim: {ClaimType} = {ClaimValue}", claim.Type, claim.Value);
+                    }
+                }
+                
                 return Task.CompletedTask;
             },
+
+            OnUserInformationReceived = context =>
+            {
+                var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+                logger.LogInformation("UserInfo received from endpoint. User document contains {PropertyCount} properties", 
+                    context.User.RootElement.EnumerateObject().Count());
+                
+                // Log what we received from UserInfo endpoint
+                foreach (var property in context.User.RootElement.EnumerateObject())
+                {
+                    logger.LogDebug("UserInfo property: {PropertyName} = {PropertyValue}", property.Name, property.Value.ToString());
+                }
+                
+                return Task.CompletedTask;
+            },
+            
             OnTokenResponseReceived = context =>
             {
                 var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
@@ -226,10 +279,53 @@ public static class ServiceCollectionExtensions
                     !string.IsNullOrEmpty(context.TokenEndpointResponse.RefreshToken));
                 return Task.CompletedTask;
             },
+            
+            OnAuthenticationFailed = context =>
+            {
+                var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+                logger.LogError("Authentication failed: {Error} - {ErrorDescription}", 
+                    context.Exception?.Message, context.Exception?.ToString());
+                
+                // Handle authentication failures by redirecting to an error page
+                var errorMessage = Uri.EscapeDataString(context.Exception?.Message ?? "Unknown error");
+                context.Response.Redirect($"/auth-error?error={errorMessage}");
+                context.HandleResponse();
+                
+                return Task.CompletedTask;
+            },
+            
             OnRemoteFailure = context =>
             {
                 var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
                 logger.LogError("Remote authentication failure: {Error}", context.Failure?.Message);
+                
+                // Handle remote failures by redirecting to an error page
+                var errorMessage = Uri.EscapeDataString(context.Failure?.Message ?? "Remote authentication failed");
+                context.Response.Redirect($"/auth-error?error={errorMessage}");
+                context.HandleResponse();
+                
+                return Task.CompletedTask;
+            },
+            
+            OnAuthorizationCodeReceived = context =>
+            {
+                var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+                logger.LogInformation("Authorization code received, exchanging for tokens");
+                return Task.CompletedTask;
+            },
+            
+            OnRedirectToIdentityProviderForSignOut = context =>
+            {
+                var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+                logger.LogInformation("Redirecting to identity provider for sign out");
+                return Task.CompletedTask;
+            },
+            
+            OnSignedOutCallbackRedirect = context =>
+            {
+                var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+                logger.LogInformation("Processing signed out callback redirect to: {RedirectUri}", 
+                    context.Options.SignedOutRedirectUri);
                 return Task.CompletedTask;
             }
         };

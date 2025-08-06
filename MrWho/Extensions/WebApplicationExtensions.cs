@@ -42,6 +42,9 @@ public static class WebApplicationExtensions
             name: "default",
             pattern: "{controller=Home}/{action=Index}/{id?}");
 
+        // CRITICAL: Map API controllers for token inspector and other API endpoints
+        app.MapControllers();
+
         return app;
     }
 
@@ -70,6 +73,23 @@ public static class WebApplicationExtensions
 
     public static WebApplication AddMrWhoDebugEndpoints(this WebApplication app)
     {
+        // Debug endpoints discovery
+        app.MapGet("/debug", () => Results.Ok(new
+        {
+            Title = "MrWho Identity Server Debug Endpoints",
+            Endpoints = new
+            {
+                TokenInspector = "/identity/token-inspector",
+                TokenInspectorAlt = "/identity/tokeninspector",
+                ClientInfo = "/debug/client-info", 
+                AdminClientInfo = "/debug/admin-client-info",
+                EssentialData = "/debug/essential-data",
+                ClientPermissions = "/debug/client-permissions",
+                OpenIddictScopes = "/debug/openiddict-scopes"
+            },
+            Documentation = "Visit any endpoint above for debug information or tools"
+        }));
+
         app.MapGet("/debug/client-info", async (IOidcClientService oidcClientService) =>
         {
             var clients = await oidcClientService.GetEnabledClientsAsync();
@@ -237,7 +257,7 @@ public static class WebApplicationExtensions
         });
 
         // Debug endpoint to reset admin client (DEVELOPMENT ONLY)
-        app.MapPost("/debug/reset-admin-client", async (ApplicationDbContext context, IOidcClientService oidcClientService, ILogger<Program> logger) =>
+        app.MapPost("/debug/reset-admin-client", async (ApplicationDbContext context, IOidcClientService oidClientService, ILogger<Program> logger) =>
         {
             if (!app.Environment.IsDevelopment())
             {
@@ -264,7 +284,7 @@ public static class WebApplicationExtensions
             // Recreate the client with correct permissions
             try 
             {
-                await oidcClientService.InitializeEssentialDataAsync();
+                await oidClientService.InitializeEssentialDataAsync();
                 return Results.Ok(new { message = "Admin client reset successfully", timestamp = DateTime.UtcNow });
             }
             catch (Exception ex)
@@ -373,6 +393,184 @@ public static class WebApplicationExtensions
             }
         });
 
+        // Debug endpoint to show OpenIddict scope information (DEVELOPMENT ONLY)
+        app.MapGet("/debug/openiddict-scopes", async (IOpenIddictScopeManager scopeManager, ApplicationDbContext context) =>
+        {
+            var openIddictScopes = new List<object>();
+            var databaseScopes = await context.Scopes
+                .Where(s => s.IsEnabled)
+                .OrderBy(s => s.Name)
+                .ToListAsync();
+
+            foreach (var dbScope in databaseScopes)
+            {
+                var openIddictScope = await scopeManager.FindByNameAsync(dbScope.Name);
+                openIddictScopes.Add(new
+                {
+                    ScopeName = dbScope.Name,
+                    DatabaseScope = new
+                    {
+                        dbScope.Id,
+                        dbScope.Name,
+                        dbScope.DisplayName,
+                        dbScope.Description,
+                        dbScope.IsEnabled,
+                        dbScope.IsStandard,
+                        dbScope.Type
+                    },
+                    OpenIddictScope = openIddictScope != null ? new
+                    {
+                        Id = await scopeManager.GetIdAsync(openIddictScope),
+                        Name = await scopeManager.GetNameAsync(openIddictScope),
+                        DisplayName = await scopeManager.GetDisplayNameAsync(openIddictScope),
+                        Description = await scopeManager.GetDescriptionAsync(openIddictScope),
+                        Resources = await scopeManager.GetResourcesAsync(openIddictScope)
+                    } : null,
+                    IsSynchronized = openIddictScope != null
+                });
+            }
+
+            return Results.Ok(new
+            {
+                TotalDatabaseScopes = databaseScopes.Count,
+                EnabledDatabaseScopes = databaseScopes.Count(s => s.IsEnabled),
+                SynchronizedScopes = openIddictScopes.Count(s => ((dynamic)s).IsSynchronized),
+                Scopes = openIddictScopes,
+                Timestamp = DateTime.UtcNow
+            });
+        });
+
+        // Debug endpoint to manually synchronize all scopes (DEVELOPMENT ONLY)
+        app.MapPost("/debug/sync-scopes", async (IOpenIddictScopeSyncService scopeSyncService, ILogger<Program> logger) =>
+        {
+            if (!app.Environment.IsDevelopment())
+            {
+                return Results.BadRequest("This endpoint is only available in development");
+            }
+            
+            try
+            {
+                await scopeSyncService.SynchronizeAllScopesAsync();
+                return Results.Ok(new 
+                { 
+                    message = "All scopes synchronized with OpenIddict successfully", 
+                    timestamp = DateTime.UtcNow 
+                });
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to synchronize scopes with OpenIddict");
+                return Results.Problem($"Failed to synchronize scopes: {ex.Message}");
+            }
+        });
+ 
+        // Debug endpoint to test UserInfo handler directly
+        app.MapGet("/debug/userinfo-test", async (HttpContext context, IUserInfoHandler userInfoHandler, ILogger<Program> logger) =>
+        {
+            logger.LogInformation("Testing UserInfo handler directly");
+            
+            if (!context.User.Identity?.IsAuthenticated == true)
+            {
+                return Results.Unauthorized();
+            }
+            
+            try
+            {
+                var result = await userInfoHandler.HandleUserInfoRequestAsync(context);
+                logger.LogInformation("UserInfo handler returned result type: {ResultType}", result.GetType().Name);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error testing UserInfo handler");
+                return Results.Problem($"Error testing UserInfo handler: {ex.Message}");
+            }
+        }).RequireAuthorization();
+
+        // Debug endpoint to check current claims in ClaimsPrincipal
+        app.MapGet("/debug/current-claims", (HttpContext context, ILogger<Program> logger) =>
+        {
+            logger.LogInformation("Checking current claims in ClaimsPrincipal");
+            
+            if (!context.User.Identity?.IsAuthenticated == true)
+            {
+                return Results.Json(new { IsAuthenticated = false, Message = "User is not authenticated" });
+            }
+            
+            var claims = context.User.Claims.Select(c => new { Type = c.Type, Value = c.Value, Issuer = c.Issuer }).ToList();
+            
+            return Results.Json(new 
+            { 
+                IsAuthenticated = true,
+                ClaimsCount = claims.Count,
+                IdentityName = context.User.Identity.Name,
+                AuthenticationType = context.User.Identity.AuthenticationType,
+                Claims = claims
+            });
+        }).RequireAuthorization();
+
+        // Debug endpoint to check identity resources in database
+        app.MapGet("/debug/identity-resources", async (ApplicationDbContext context, ILogger<Program> logger) =>
+        {
+            logger.LogInformation("Checking identity resources in database");
+            
+            var identityResources = await context.IdentityResources
+                .Include(ir => ir.UserClaims)
+                .ToListAsync();
+
+            var result = new
+            {
+                TotalIdentityResources = identityResources.Count,
+                EnabledIdentityResources = identityResources.Count(ir => ir.IsEnabled),
+                Resources = identityResources.Select(ir => new
+                {
+                    ir.Id,
+                    ir.Name,
+                    ir.DisplayName,
+                    ir.Description,
+                    ir.IsEnabled,
+                    ir.IsRequired,
+                    ir.IsStandard,
+                    ClaimsCount = ir.UserClaims.Count,
+                    Claims = ir.UserClaims.Select(c => c.ClaimType).ToArray()
+                }).ToList(),
+                Message = identityResources.Count == 0 
+                    ? "No identity resources found - UserInfo handler will use scope-based fallback"
+                    : $"Found {identityResources.Count} identity resources"
+            };
+
+            return Results.Json(result);
+        });
+
+        // Debug endpoint to check user claims for a specific user
+        app.MapGet("/debug/user-claims/{userId}", async (string userId, UserManager<IdentityUser> userManager, ILogger<Program> logger) =>
+        {
+            logger.LogInformation("Checking claims for user {UserId}", userId);
+            
+            var user = await userManager.FindByIdAsync(userId);
+            if (user == null)
+            {
+                return Results.NotFound($"User with ID '{userId}' not found");
+            }
+
+            var claims = await userManager.GetClaimsAsync(user);
+            var roles = await userManager.GetRolesAsync(user);
+
+            var result = new
+            {
+                UserId = user.Id,
+                UserName = user.UserName,
+                Email = user.Email,
+                EmailConfirmed = user.EmailConfirmed,
+                ClaimsCount = claims.Count,
+                Claims = claims.Select(c => new { Type = c.Type, Value = c.Value }).ToArray(),
+                RolesCount = roles.Count,
+                Roles = roles.ToArray()
+            };
+
+            return Results.Json(result);
+        });
+        
         return app;
     }
 
@@ -452,11 +650,36 @@ public static class WebApplicationExtensions
         try
         {
             await scopeSeederService.InitializeStandardScopesAsync();
-            Console.WriteLine("Standard scopes initialized successfully");
+            Console.WriteLine("Standard scopes initialized successfully in database");
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Error initializing standard scopes: {ex.Message}");
+            throw;
+        }
+
+        // Initialize standard identity resources
+        try
+        {
+            await scopeSeederService.InitializeStandardIdentityResourcesAsync();
+            Console.WriteLine("Standard identity resources initialized successfully in database");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error initializing standard identity resources: {ex.Message}");
+            throw;
+        }
+        
+        // CRITICAL: Synchronize all scopes from database with OpenIddict
+        try
+        {
+            var scopeSyncService = scope.ServiceProvider.GetRequiredService<IOpenIddictScopeSyncService>();
+            await scopeSyncService.SynchronizeAllScopesAsync();
+            Console.WriteLine("All database scopes synchronized with OpenIddict successfully");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error synchronizing scopes with OpenIddict: {ex.Message}");
             throw;
         }
         
@@ -481,8 +704,55 @@ public static class WebApplicationExtensions
                 Email = "test@example.com", 
                 EmailConfirmed = true 
             };
-            await userManager.CreateAsync(testUser, "Test123!");
-            Console.WriteLine("Created test user");
+            var result = await userManager.CreateAsync(testUser, "Test123!");
+            if (result.Succeeded)
+            {
+                // Add name claims to test user
+                await userManager.AddClaimAsync(testUser, new System.Security.Claims.Claim("name", "John Doe"));
+                await userManager.AddClaimAsync(testUser, new System.Security.Claims.Claim("given_name", "John"));
+                await userManager.AddClaimAsync(testUser, new System.Security.Claims.Claim("family_name", "Doe"));
+                await userManager.AddClaimAsync(testUser, new System.Security.Claims.Claim("preferred_username", "john.doe"));
+                Console.WriteLine("Created test user with name claims");
+            }
+        }
+
+        // Create additional test users with different name scenarios
+        if (!await context.Users.AnyAsync(u => u.UserName == "jane.smith@example.com"))
+        {
+            var janeUser = new IdentityUser 
+            { 
+                UserName = "jane.smith@example.com", 
+                Email = "jane.smith@example.com", 
+                EmailConfirmed = true 
+            };
+            var result = await userManager.CreateAsync(janeUser, "Test123!");
+            if (result.Succeeded)
+            {
+                // Add name claims to Jane
+                await userManager.AddClaimAsync(janeUser, new System.Security.Claims.Claim("name", "Jane Smith"));
+                await userManager.AddClaimAsync(janeUser, new System.Security.Claims.Claim("given_name", "Jane"));
+                await userManager.AddClaimAsync(janeUser, new System.Security.Claims.Claim("family_name", "Smith"));
+                await userManager.AddClaimAsync(janeUser, new System.Security.Claims.Claim("preferred_username", "jane.smith"));
+                Console.WriteLine("Created Jane Smith test user with name claims");
+            }
+        }
+
+        // Create a test user without name claims to test email-based fallback
+        if (!await context.Users.AnyAsync(u => u.UserName == "bob.wilson@example.com"))
+        {
+            var bobUser = new IdentityUser 
+            { 
+                UserName = "bob.wilson@example.com", 
+                Email = "bob.wilson@example.com", 
+                EmailConfirmed = true 
+            };
+            var result = await userManager.CreateAsync(bobUser, "Test123!");
+            if (result.Succeeded)
+            {
+                // Intentionally not adding name claims to test email-based fallback
+                // The GetUserDisplayName method should convert "bob.wilson@example.com" to "Bob Wilson"
+                Console.WriteLine("Created Bob Wilson test user without name claims (for email-based fallback testing)");
+            }
         }
         
         // Initialize default realm and clients using the dynamic service (keeping for backwards compatibility)

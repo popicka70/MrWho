@@ -21,7 +21,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IOidcClientService, OidcClientService>();
         services.AddScoped<ISeedingService, SeedingService>();
         services.AddScoped<IScopeSeederService, ScopeSeederService>();
+        services.AddScoped<IOpenIddictScopeSyncService, OpenIddictScopeSyncService>();
         services.AddScoped<IApiResourceSeederService, ApiResourceSeederService>();
+        services.AddScoped<IIdentityResourceSeederService, IdentityResourceSeederService>();
 
         // Register token handler
         services.AddScoped<ITokenHandler, TokenHandler>();
@@ -148,7 +150,8 @@ public static class ServiceCollectionExtensions
                                       OpenIddictConstants.Scopes.Roles,
                                       OpenIddictConstants.Scopes.OfflineAccess, // CRITICAL: Required for refresh tokens
                                       StandardScopes.ApiRead,   // Use constant
-                                      StandardScopes.ApiWrite); // Use constant
+                                      StandardScopes.ApiWrite,  // Use constant
+                                      StandardScopes.MrWhoUse); // Add mrwho.use scope
 
                 // Register the signing and encryption credentials
                 options.AddDevelopmentEncryptionCertificate()

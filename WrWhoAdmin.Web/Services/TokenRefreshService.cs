@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.AspNetCore.Mvc;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -59,6 +60,56 @@ public class TokenRefreshService : ITokenRefreshService
     public async Task<bool> ForceRefreshTokenAsync(HttpContext httpContext, bool force = false)
     {
         return await RefreshTokenInternalAsync(httpContext, forceRefresh: force, updateCookies: true);
+    }
+
+    /// <summary>
+    /// Attempts to refresh the token and triggers re-authentication if refresh fails
+    /// </summary>
+    public async Task<TokenRefreshResult> RefreshTokenWithReauthAsync(HttpContext httpContext, bool force = false)
+    {
+        var refreshSuccess = await RefreshTokenInternalAsync(httpContext, forceRefresh: force, updateCookies: true);
+        
+        if (refreshSuccess)
+        {
+            return new TokenRefreshResult { Success = true, RequiresReauth = false };
+        }
+
+        // Check if the failure was due to invalid refresh token
+        var refreshToken = await httpContext.GetTokenAsync(TokenConstants.TokenNames.RefreshToken);
+        if (string.IsNullOrEmpty(refreshToken))
+        {
+            _logger.LogWarning("No refresh token available, user needs to re-authenticate");
+            return new TokenRefreshResult { Success = false, RequiresReauth = true, Reason = "No refresh token available" };
+        }
+
+        // Refresh failed - likely invalid/expired refresh token
+        _logger.LogWarning("Token refresh failed, user needs to re-authenticate");
+        return new TokenRefreshResult { Success = false, RequiresReauth = true, Reason = "Refresh token invalid or expired" };
+    }
+
+    /// <summary>
+    /// Triggers re-authentication by clearing cookies and redirecting to login
+    /// </summary>
+    public async Task<IActionResult> TriggerReauthenticationAsync(HttpContext httpContext, string? returnUrl = null)
+    {
+        _logger.LogInformation("Triggering re-authentication for user");
+
+        // Clear the current authentication cookies
+        await httpContext.SignOutAsync();
+
+        // Determine return URL
+        var redirectUrl = !string.IsNullOrEmpty(returnUrl) && IsLocalUrl(httpContext, returnUrl) 
+            ? returnUrl 
+            : httpContext.Request.Path.ToString();
+
+        // Trigger OpenID Connect challenge which will redirect to login
+        var properties = new AuthenticationProperties
+        {
+            RedirectUri = redirectUrl
+        };
+
+        // Return challenge result that will redirect to OIDC provider
+        return new ChallengeResult(OpenIdConnectDefaults.AuthenticationScheme, properties);
     }
 
     /// <summary>
@@ -185,7 +236,7 @@ public class TokenRefreshService : ITokenRefreshService
                     errorContent.Contains(TokenConstants.ErrorCodes.InvalidGrant))
                 {
                     _logger.LogWarning("Refresh token is invalid or expired, user needs to re-authenticate");
-                    // Could potentially trigger a re-authentication flow here
+                    // The calling code should handle re-authentication based on the return value
                 }
             }
         }
@@ -254,6 +305,23 @@ public class TokenRefreshService : ITokenRefreshService
     }
 
     /// <summary>
+    /// Validates if a URL is safe for local redirection
+    /// </summary>
+    private static bool IsLocalUrl(HttpContext httpContext, string url)
+    {
+        if (string.IsNullOrEmpty(url))
+            return false;
+
+        // Must be a relative URL (not absolute with protocol)
+        if (url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+            url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        // Must start with / but not //
+        return url.StartsWith("/") && !url.StartsWith("//");
+    }
+
+    /// <summary>
     /// DTO for token response from OpenIddict with correct JSON property names
     /// </summary>
     private class TokenResponse
@@ -276,4 +344,14 @@ public class TokenRefreshService : ITokenRefreshService
         [JsonPropertyName(TokenConstants.JsonPropertyNames.Scope)]
         public string? Scope { get; set; }
     }
+}
+
+/// <summary>
+/// Result of token refresh operation
+/// </summary>
+public class TokenRefreshResult
+{
+    public bool Success { get; set; }
+    public bool RequiresReauth { get; set; }
+    public string? Reason { get; set; }
 }

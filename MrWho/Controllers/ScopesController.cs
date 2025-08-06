@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using MrWho.Data;
 using MrWho.Models;
 using MrWho.Shared.Models;
+using MrWho.Services;
 
 namespace MrWho.Controllers;
 
@@ -13,13 +14,16 @@ namespace MrWho.Controllers;
 public class ScopesController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
+    private readonly IOpenIddictScopeSyncService _scopeSyncService;
     private readonly ILogger<ScopesController> _logger;
 
     public ScopesController(
         ApplicationDbContext context,
+        IOpenIddictScopeSyncService scopeSyncService,
         ILogger<ScopesController> logger)
     {
         _context = context;
+        _scopeSyncService = scopeSyncService;
         _logger = logger;
     }
 
@@ -163,6 +167,26 @@ public class ScopesController : ControllerBase
 
         _logger.LogInformation("Scope '{ScopeName}' created successfully with ID {Id}", scope.Name, scope.Id);
 
+        // CRITICAL: Synchronize the new scope with OpenIddict if it's enabled
+        if (scope.IsEnabled)
+        {
+            try
+            {
+                // Reload the scope with claims to pass to OpenIddict
+                var scopeWithClaims = await _context.Scopes
+                    .Include(s => s.Claims)
+                    .FirstAsync(s => s.Id == scope.Id);
+                
+                await _scopeSyncService.RegisterScopeAsync(scopeWithClaims);
+                _logger.LogInformation("Successfully registered new scope '{ScopeName}' with OpenIddict", scope.Name);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to register new scope '{ScopeName}' with OpenIddict", scope.Name);
+                // Note: We don't throw here as the scope was created successfully in our database
+            }
+        }
+
         var scopeDto = new ScopeDto
         {
             Id = scope.Id,
@@ -236,6 +260,28 @@ public class ScopesController : ControllerBase
 
         _logger.LogInformation("Scope '{ScopeName}' updated successfully", scope.Name);
 
+        // CRITICAL: Synchronize the updated scope with OpenIddict
+        try
+        {
+            if (scope.IsEnabled)
+            {
+                // Update the scope in OpenIddict
+                await _scopeSyncService.RegisterScopeAsync(scope);
+                _logger.LogInformation("Successfully updated scope '{ScopeName}' in OpenIddict", scope.Name);
+            }
+            else
+            {
+                // Remove disabled scope from OpenIddict
+                await _scopeSyncService.RemoveScopeAsync(scope.Name);
+                _logger.LogInformation("Successfully removed disabled scope '{ScopeName}' from OpenIddict", scope.Name);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to synchronize updated scope '{ScopeName}' with OpenIddict", scope.Name);
+            // Note: We don't throw here as the scope was updated successfully in our database
+        }
+
         var scopeDto = new ScopeDto
         {
             Id = scope.Id,
@@ -282,10 +328,24 @@ public class ScopesController : ControllerBase
             return BadRequest($"Scope '{scope.Name}' is being used by one or more clients and cannot be deleted.");
         }
 
+        var scopeName = scope.Name; // Store for logging
+
         _context.Scopes.Remove(scope);
         await _context.SaveChangesAsync();
 
-        _logger.LogInformation("Scope '{ScopeName}' deleted successfully", scope.Name);
+        _logger.LogInformation("Scope '{ScopeName}' deleted successfully", scopeName);
+
+        // CRITICAL: Remove the deleted scope from OpenIddict
+        try
+        {
+            await _scopeSyncService.RemoveScopeAsync(scopeName);
+            _logger.LogInformation("Successfully removed deleted scope '{ScopeName}' from OpenIddict", scopeName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to remove deleted scope '{ScopeName}' from OpenIddict", scopeName);
+            // Note: We don't throw here as the scope was deleted successfully from our database
+        }
 
         return NoContent();
     }
@@ -310,6 +370,28 @@ public class ScopesController : ControllerBase
 
         var action = scope.IsEnabled ? "enabled" : "disabled";
         _logger.LogInformation("Scope '{ScopeName}' {Action} successfully", scope.Name, action);
+
+        // CRITICAL: Synchronize the toggled scope with OpenIddict
+        try
+        {
+            if (scope.IsEnabled)
+            {
+                // Register the enabled scope with OpenIddict
+                await _scopeSyncService.RegisterScopeAsync(scope);
+                _logger.LogInformation("Successfully registered enabled scope '{ScopeName}' with OpenIddict", scope.Name);
+            }
+            else
+            {
+                // Remove the disabled scope from OpenIddict
+                await _scopeSyncService.RemoveScopeAsync(scope.Name);
+                _logger.LogInformation("Successfully removed disabled scope '{ScopeName}' from OpenIddict", scope.Name);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to synchronize toggled scope '{ScopeName}' with OpenIddict", scope.Name);
+            // Note: We don't throw here as the scope was toggled successfully in our database
+        }
 
         var scopeDto = new ScopeDto
         {

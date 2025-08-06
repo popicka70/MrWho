@@ -3,11 +3,13 @@
 @attribute [Authorize]
 @rendermode InteractiveServer
 @using MrWho.Shared
+@using MrWho.Shared.Models
 @inject NavigationManager Navigation
 @inject NotificationService NotificationService
 @inject DialogService DialogService
 @inject IClientsApiService ClientsApiService
 @inject IRealmsApiService RealmsApiService
+@inject IScopesApiService ScopesApiService
 @inject ILogger<EditClient> Logger
 
 <PageTitle>@(IsEdit ? "Edit Client" : "Add Client") - MrWho Admin</PageTitle>
@@ -153,6 +155,91 @@
                     </RadzenStack>
                 </RadzenFieldset>
 
+                <!-- Scopes Configuration -->
+                <RadzenFieldset Text="Scopes & Permissions">
+                    <RadzenStack Gap="1rem">
+                        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
+                            Configure which scopes this client can request and access
+                        </RadzenText>
+                        
+                        @if (loadingScopes)
+                        {
+                            <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.Small" />
+                            <RadzenText TextStyle="TextStyle.Caption">Loading available scopes...</RadzenText>
+                        }
+                        else
+                        {
+                            <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-mb-2">Available Scopes</RadzenText>
+                            
+                            @if (availableScopes.Any())
+                            {
+                                <RadzenDataGrid Data="@availableScopes" TItem="ScopeDto" AllowPaging="false" 
+                                               AllowSorting="true" PageSize="100" Style="max-height: 400px; overflow-y: auto;">
+                                    <Columns>
+                                        <RadzenDataGridColumn TItem="ScopeDto" Title="Select" Width="80px" Sortable="false">
+                                            <Template Context="scope">
+                                                <RadzenCheckBox TValue="bool" 
+                                                               Value="@(selectedScopes.ContainsKey(scope.Name) ? selectedScopes[scope.Name] : false)" 
+                                                               Change="@((bool value) => OnScopeSelectionChanged(scope.Name, value))" />
+                                            </Template>
+                                        </RadzenDataGridColumn>
+                                        
+                                        <RadzenDataGridColumn TItem="ScopeDto" Property="Name" Title="Scope Name" Width="200px">
+                                            <Template Context="scope">
+                                                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
+                                                    <RadzenIcon Icon="@GetScopeTypeIcon(scope.Type)" 
+                                                               Style="@($"color: {GetScopeTypeColor(scope.Type)}")" />
+                                                    <RadzenText Text="@scope.Name" />
+                                                    @if (scope.IsStandard)
+                                                    {
+                                                        <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="Standard" Size="BadgeSize.ExtraSmall" />
+                                                    }
+                                                </RadzenStack>
+                                            </Template>
+                                        </RadzenDataGridColumn>
+                                        
+                                        <RadzenDataGridColumn TItem="ScopeDto" Property="DisplayName" Title="Display Name" Width="150px" />
+                                        
+                                        <RadzenDataGridColumn TItem="ScopeDto" Property="Description" Title="Description">
+                                            <Template Context="scope">
+                                                <RadzenText Text="@(scope.Description ?? "-")" Style="max-width: 300px; overflow: hidden; text-overflow: ellipsis;" />
+                                            </Template>
+                                        </RadzenDataGridColumn>
+                                        
+                                        <RadzenDataGridColumn TItem="ScopeDto" Property="Type" Title="Type" Width="100px">
+                                            <Template Context="scope">
+                                                <RadzenBadge BadgeStyle="@GetScopeTypeBadgeStyle(scope.Type)" 
+                                                            Text="@GetScopeTypeText(scope.Type)" />
+                                            </Template>
+                                        </RadzenDataGridColumn>
+                                    </Columns>
+                                </RadzenDataGrid>
+                            }
+                            else
+                            {
+                                <RadzenAlert AlertStyle="AlertStyle.Info">
+                                    <RadzenText>No scopes available. Create some scopes first in the Scopes management section.</RadzenText>
+                                </RadzenAlert>
+                            }
+
+                            <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-mt-3 rz-mb-2">Selected Scopes (@model.Scopes.Count)</RadzenText>
+                            @if (model.Scopes.Any())
+                            {
+                                <RadzenStack Wrap="FlexWrap.Wrap" Gap="0.5rem">
+                                    @foreach (var scope in model.Scopes)
+                                    {
+                                        <RadzenBadge BadgeStyle="BadgeStyle.Primary" Text="@scope" />
+                                    }
+                                </RadzenStack>
+                            }
+                            else
+                            {
+                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">No scopes selected</RadzenText>
+                            }
+                        }
+                    </RadzenStack>
+                </RadzenFieldset>
+
                 <!-- Redirect URIs -->
                 <RadzenFieldset Text="Redirect URIs">
                     <RadzenStack Gap="1rem">
@@ -206,8 +293,11 @@
     private bool isSaving = false;
     private bool isDeleting = false;
     private bool showSecret = false;
+    private bool loadingScopes = false;
     
     private CreateClientRequest model = new();
+    private List<ScopeDto> availableScopes = new();
+    private Dictionary<string, bool> selectedScopes = new();
     
     private List<RealmDto> availableRealms = new();
     private List<dynamic> clientTypes = new()
@@ -220,6 +310,7 @@
     protected override async Task OnInitializedAsync()
     {
         await LoadRealms();
+        await LoadScopes();
         
         if (IsEdit)
         {
@@ -251,6 +342,9 @@
             model.Permissions.Add("Scopes.Profile");
             model.Permissions.Add("Scopes.Email");
             model.Permissions.Add("ResponseTypes.Code");
+            
+            // Initialize selected scopes
+            UpdateSelectedScopes();
         }
     }
 
@@ -279,6 +373,40 @@
         }
     }
 
+    private async Task LoadScopes()
+    {
+        loadingScopes = true;
+        try
+        {
+            var result = await ScopesApiService.GetScopesAsync(page: 1, pageSize: 100);
+            if (result != null)
+            {
+                availableScopes = result.Items.Where(s => s.IsEnabled).ToList();
+                Logger.LogInformation("Loaded {ScopeCount} scopes from API", availableScopes.Count);
+                
+                // Initialize selected scopes dictionary
+                selectedScopes = availableScopes.ToDictionary(s => s.Name, s => false);
+                UpdateSelectedScopes();
+            }
+            else
+            {
+                Logger.LogWarning("Failed to load scopes from API");
+                NotificationService.Notify(NotificationSeverity.Warning, "Warning", "Failed to load scopes from API");
+                availableScopes = new List<ScopeDto>();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading scopes");
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to load scopes");
+            availableScopes = new List<ScopeDto>();
+        }
+        finally
+        {
+            loadingScopes = false;
+        }
+    }
+
     private async Task LoadClient()
     {
         isLoading = true;
@@ -304,6 +432,9 @@
                 model.Scopes = client.Scopes.ToList();
                 model.Permissions = client.Permissions.ToList();
                 
+                // Update selected scopes after loading client data
+                UpdateSelectedScopes();
+                
                 Logger.LogInformation("Loaded client {ClientId} from API", Id);
             }
             else
@@ -322,6 +453,80 @@
         {
             isLoading = false;
         }
+    }
+
+    private void UpdateSelectedScopes()
+    {
+        // Update the selectedScopes dictionary based on current model.Scopes
+        foreach (var scope in availableScopes)
+        {
+            if (selectedScopes.ContainsKey(scope.Name))
+                selectedScopes[scope.Name] = model.Scopes.Contains(scope.Name);
+            else
+                selectedScopes.Add(scope.Name, model.Scopes.Contains(scope.Name));
+        }
+    }
+
+    private void OnScopeSelectionChanged(string scopeName, bool isSelected)
+    {
+        if (isSelected)
+        {
+            if (!model.Scopes.Contains(scopeName))
+            {
+                model.Scopes.Add(scopeName);
+                
+                // Auto-add corresponding permissions for common scopes
+                if (scopeName == "openid" && !model.Permissions.Contains("oidc:scope:openid"))
+                {
+                    model.Permissions.Add("oidc:scope:openid");
+                }
+                else if (scopeName == "profile" && !model.Permissions.Contains("Scopes.Profile"))
+                {
+                    model.Permissions.Add("Scopes.Profile");
+                }
+                else if (scopeName == "email" && !model.Permissions.Contains("Scopes.Email"))
+                {
+                    model.Permissions.Add("Scopes.Email");
+                }
+                else if (scopeName == "roles" && !model.Permissions.Contains("Scopes.Roles"))
+                {
+                    model.Permissions.Add("Scopes.Roles");
+                }
+                else if (scopeName.StartsWith("api.") && !model.Permissions.Contains($"oidc:scope:{scopeName}"))
+                {
+                    model.Permissions.Add($"oidc:scope:{scopeName}");
+                }
+                else if (!scopeName.StartsWith("api.") && !model.Permissions.Contains($"scp:{scopeName}"))
+                {
+                    // For custom scopes, add with scp: prefix
+                    model.Permissions.Add($"scp:{scopeName}");
+                }
+                
+                // Update the selectedScopes dictionary
+                selectedScopes[scopeName] = true;
+            }
+        }
+        else
+        {
+            model.Scopes.Remove(scopeName);
+            
+            // Remove corresponding permissions
+            model.Permissions.Remove($"oidc:scope:{scopeName}");
+            model.Permissions.Remove($"scp:{scopeName}");
+            
+            // Remove standard scope permissions
+            if (scopeName == "profile")
+                model.Permissions.Remove("Scopes.Profile");
+            else if (scopeName == "email")
+                model.Permissions.Remove("Scopes.Email");
+            else if (scopeName == "roles")
+                model.Permissions.Remove("Scopes.Roles");
+            
+            // Update the selectedScopes dictionary
+            selectedScopes[scopeName] = false;
+        }
+        
+        StateHasChanged();
     }
 
     private async Task OnSave(CreateClientRequest args)
@@ -422,5 +627,45 @@
     private void Cancel()
     {
         Navigation.NavigateTo("/clients");
+    }
+
+    private string GetScopeTypeIcon(ScopeType scopeType)
+    {
+        return scopeType switch
+        {
+            ScopeType.Identity => "fingerprint",
+            ScopeType.Resource => "api",
+            _ => "tune"
+        };
+    }
+
+    private string GetScopeTypeColor(ScopeType scopeType)
+    {
+        return scopeType switch
+        {
+            ScopeType.Identity => "var(--rz-info)",
+            ScopeType.Resource => "var(--rz-success)",
+            _ => "var(--rz-text-color)"
+        };
+    }
+
+    private BadgeStyle GetScopeTypeBadgeStyle(ScopeType scopeType)
+    {
+        return scopeType switch
+        {
+            ScopeType.Identity => BadgeStyle.Info,
+            ScopeType.Resource => BadgeStyle.Success,
+            _ => BadgeStyle.Secondary
+        };
+    }
+
+    private string GetScopeTypeText(ScopeType scopeType)
+    {
+        return scopeType switch
+        {
+            ScopeType.Identity => "Identity",
+            ScopeType.Resource => "Resource",
+            _ => "Unknown"
+        };
     }
 }

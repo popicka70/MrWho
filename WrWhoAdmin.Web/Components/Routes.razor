@@ -9,18 +9,43 @@
                             <div class="text-center">
                                 <h3>Authentication Required</h3>
                                 <p>You need to be logged in to access this page.</p>
-                                <a href="/login?returnUrl=@Uri.EscapeDataString(NavigationManager.Uri)" class="btn btn-primary">Login</a>
+                                <div class="spinner-border text-primary me-2" role="status" aria-hidden="true"></div>
+                                <span>Redirecting to login...</span>
                             </div>
                         </div>
+                        <script>
+                            // Redirect to login with the current page as return URL
+                            setTimeout(function() {
+                                window.location.href = '/login?returnUrl=' + encodeURIComponent(window.location.pathname + window.location.search);
+                            }, 1000);
+                        </script>
                     }
                     else
                     {
-                        <p role="alert">You are not authorized to access this resource.</p>
+                        <div class="d-flex justify-content-center align-items-center" style="height: 50vh;">
+                            <div class="text-center">
+                                <h3>Access Denied</h3>
+                                <p>You are not authorized to access this resource.</p>
+                                <a href="/" class="btn btn-primary">Return to Home</a>
+                            </div>
+                        </div>
                     }
                 </NotAuthorized>
             </AuthorizeRouteView>
             <FocusOnNavigate RouteData="routeData" Selector="h1" />
         </Found>
+        <NotFound>
+            <PageTitle>Not found</PageTitle>
+            <LayoutView Layout="@typeof(Layout.MainLayout)">
+                <div class="d-flex justify-content-center align-items-center" style="height: 50vh;">
+                    <div class="text-center">
+                        <h1>404</h1>
+                        <p>Sorry, there's nothing at this address.</p>
+                        <a href="/" class="btn btn-primary">Return to Home</a>
+                    </div>
+                </div>
+            </LayoutView>
+        </NotFound>
     </Router>
 </CascadingAuthenticationState>
 

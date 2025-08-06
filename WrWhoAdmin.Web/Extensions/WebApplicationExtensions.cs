@@ -42,21 +42,64 @@ public static class WebApplicationExtensions
     /// </summary>
     public static WebApplication ConfigureAuthenticationEndpoints(this WebApplication app)
     {
-        // Map authentication endpoints
+        // Login endpoint - trigger OIDC challenge
         app.MapGet("/login", async (HttpContext context, string? returnUrl = null) =>
         {
-            await context.ChallengeAsync(OpenIdConnectDefaults.AuthenticationScheme,
-                new AuthenticationProperties
-                {
-                    RedirectUri = returnUrl ?? "/"
-                });
+            // Ensure we have a valid return URL
+            var redirectUri = string.IsNullOrEmpty(returnUrl) || !Uri.IsWellFormedUriString(returnUrl, UriKind.Relative) 
+                ? "/" 
+                : returnUrl;
+
+            var properties = new AuthenticationProperties
+            {
+                RedirectUri = redirectUri
+            };
+
+            // Clear any existing authentication state before challenging
+            await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            
+            // Trigger OpenIdConnect challenge
+            await context.ChallengeAsync(OpenIdConnectDefaults.AuthenticationScheme, properties);
         });
 
-        app.MapGet("/logout", async (HttpContext context) =>
+        // Logout endpoint
+        app.MapGet("/logout", async (HttpContext context, string? returnUrl = null) =>
         {
+            var redirectUri = string.IsNullOrEmpty(returnUrl) || !Uri.IsWellFormedUriString(returnUrl, UriKind.Relative) 
+                ? "/" 
+                : returnUrl;
+
+            var properties = new AuthenticationProperties
+            {
+                RedirectUri = redirectUri
+            };
+
+            // Sign out from both cookie and OIDC schemes
             await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-            await context.SignOutAsync(OpenIdConnectDefaults.AuthenticationScheme);
+            await context.SignOutAsync(OpenIdConnectDefaults.AuthenticationScheme, properties);
         });
+
+        // Add explicit handling for OIDC callback paths to prevent 404s
+        app.MapGet("/signin-oidc", () => "OIDC callback endpoint - this should not be called directly");
+        app.MapGet("/signout-callback-oidc", () => "OIDC signout callback endpoint - this should not be called directly");
+
+        // Debug endpoint to clear authentication state (development only)
+        if (app.Environment.IsDevelopment())
+        {
+            app.MapGet("/debug/clear-auth", async (HttpContext context) =>
+            {
+                await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                await context.SignOutAsync(OpenIdConnectDefaults.AuthenticationScheme);
+                
+                // Clear all cookies
+                foreach (var cookie in context.Request.Cookies.Keys)
+                {
+                    context.Response.Cookies.Delete(cookie);
+                }
+                
+                return Results.Redirect("/");
+            });
+        }
 
         return app;
     }

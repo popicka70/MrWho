@@ -1,0 +1,132 @@
+@inject DialogService DialogService
+@inject ILogger<IdentityResourceDetailsDialog> Logger
+
+<RadzenStack Gap="1rem">
+    <RadzenCard class="rz-p-4">
+        <RadzenText TextStyle="TextStyle.H4" class="rz-mb-3">Basic Information</RadzenText>
+        
+        <RadzenRow Gap="1rem">
+            <RadzenColumn Size="6">
+                <RadzenFormField Text="Name" Variant="Variant.Outlined">
+                    <RadzenTextBox Value="@IdentityResource.Name" ReadOnly="true" Style="width: 100%;" />
+                </RadzenFormField>
+            </RadzenColumn>
+            <RadzenColumn Size="6">
+                <RadzenFormField Text="Display Name" Variant="Variant.Outlined">
+                    <RadzenTextBox Value="@IdentityResource.DisplayName" ReadOnly="true" Style="width: 100%;" />
+                </RadzenFormField>
+            </RadzenColumn>
+        </RadzenRow>
+
+        <RadzenFormField Text="Description" Variant="Variant.Outlined">
+            <RadzenTextArea Value="@IdentityResource.Description" ReadOnly="true" Rows="3" Style="width: 100%;" />
+        </RadzenFormField>
+
+        <RadzenRow Gap="1rem">
+            <RadzenColumn Size="3">
+                <RadzenFormField Text="Status" Variant="Variant.Outlined">
+                    <RadzenBadge BadgeStyle="@(IdentityResource.IsEnabled ? BadgeStyle.Success : BadgeStyle.Danger)" 
+                               Text="@(IdentityResource.IsEnabled ? "Enabled" : "Disabled")" />
+                </RadzenFormField>
+            </RadzenColumn>
+            <RadzenColumn Size="3">
+                <RadzenFormField Text="Type" Variant="Variant.Outlined">
+                    <RadzenBadge BadgeStyle="@(IdentityResource.IsStandard ? BadgeStyle.Info : BadgeStyle.Light)" 
+                               Text="@(IdentityResource.IsStandard ? "Standard" : "Custom")" />
+                </RadzenFormField>
+            </RadzenColumn>
+            <RadzenColumn Size="3">
+                <RadzenFormField Text="Required" Variant="Variant.Outlined">
+                    <RadzenBadge BadgeStyle="@(IdentityResource.IsRequired ? BadgeStyle.Warning : BadgeStyle.Light)" 
+                               Text="@(IdentityResource.IsRequired ? "Yes" : "No")" />
+                </RadzenFormField>
+            </RadzenColumn>
+            <RadzenColumn Size="3">
+                <RadzenFormField Text="Show in Discovery" Variant="Variant.Outlined">
+                    <RadzenBadge BadgeStyle="@(IdentityResource.ShowInDiscoveryDocument ? BadgeStyle.Success : BadgeStyle.Light)" 
+                               Text="@(IdentityResource.ShowInDiscoveryDocument ? "Yes" : "No")" />
+                </RadzenFormField>
+            </RadzenColumn>
+        </RadzenRow>
+    </RadzenCard>
+
+    <RadzenCard class="rz-p-4">
+        <RadzenText TextStyle="TextStyle.H4" class="rz-mb-3">User Claims</RadzenText>
+        
+        @if (IdentityResource.UserClaims.Any())
+        {
+            <RadzenDataList Data="@IdentityResource.UserClaims" TItem="string" WrapItems="true">
+                <Template Context="claim">
+                    <RadzenCard class="rz-p-2" Style="margin: 4px; background: var(--rz-primary-light);">
+                        <RadzenText Text="@claim" Style="color: var(--rz-primary-darker);" />
+                    </RadzenCard>
+                </Template>
+            </RadzenDataList>
+        }
+        else
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Info" ShowIcon="false">
+                <RadzenText>No user claims defined for this identity resource.</RadzenText>
+            </RadzenAlert>
+        }
+    </RadzenCard>
+
+    @if (IdentityResource.Properties.Any())
+    {
+        <RadzenCard class="rz-p-4">
+            <RadzenText TextStyle="TextStyle.H4" class="rz-mb-3">Properties</RadzenText>
+            
+            <RadzenDataGrid Data="@IdentityResource.Properties" TItem="KeyValuePair<string, string>" AllowSorting="true">
+                <Columns>
+                    <RadzenDataGridColumn TItem="KeyValuePair<string, string>" Property="Key" Title="Key" Width="200px" />
+                    <RadzenDataGridColumn TItem="KeyValuePair<string, string>" Property="Value" Title="Value" />
+                </Columns>
+            </RadzenDataGrid>
+        </RadzenCard>
+    }
+
+    <RadzenCard class="rz-p-4">
+        <RadzenText TextStyle="TextStyle.H4" class="rz-mb-3">Audit Information</RadzenText>
+        
+        <RadzenRow Gap="1rem">
+            <RadzenColumn Size="6">
+                <RadzenFormField Text="Created At" Variant="Variant.Outlined">
+                    <RadzenTextBox Value="@IdentityResource.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")" ReadOnly="true" Style="width: 100%;" />
+                </RadzenFormField>
+            </RadzenColumn>
+            <RadzenColumn Size="6">
+                <RadzenFormField Text="Created By" Variant="Variant.Outlined">
+                    <RadzenTextBox Value="@IdentityResource.CreatedBy" ReadOnly="true" Style="width: 100%;" />
+                </RadzenFormField>
+            </RadzenColumn>
+        </RadzenRow>
+
+        <RadzenRow Gap="1rem">
+            <RadzenColumn Size="6">
+                <RadzenFormField Text="Updated At" Variant="Variant.Outlined">
+                    <RadzenTextBox Value="@IdentityResource.UpdatedAt.ToString("yyyy-MM-dd HH:mm:ss")" ReadOnly="true" Style="width: 100%;" />
+                </RadzenFormField>
+            </RadzenColumn>
+            <RadzenColumn Size="6">
+                <RadzenFormField Text="Updated By" Variant="Variant.Outlined">
+                    <RadzenTextBox Value="@IdentityResource.UpdatedBy" ReadOnly="true" Style="width: 100%;" />
+                </RadzenFormField>
+            </RadzenColumn>
+        </RadzenRow>
+    </RadzenCard>
+
+    <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" class="rz-mt-4">
+        <RadzenButton Text="Close" Icon="close" ButtonStyle="ButtonStyle.Secondary" 
+                    Click="@(async () => await Close())" />
+    </RadzenStack>
+</RadzenStack>
+
+@code {
+    [Parameter] public IdentityResourceDto IdentityResource { get; set; } = new();
+
+    private async Task Close()
+    {
+        DialogService?.Close();
+        await Task.CompletedTask;
+    }
+}

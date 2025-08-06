@@ -3,10 +3,9 @@
 @attribute [Authorize]
 @rendermode InteractiveServer
 @inject NavigationManager Navigation
-@inject NotificationService NotificationService  
+@inject NotificationService NotificationService
 @inject DialogService DialogService
 @inject IUsersApiService UsersApiService
-@inject IRolesApiService RolesApiService
 @inject ILogger<EditUser> Logger
 
 <PageTitle>@(IsEdit ? "Edit User" : "Add User") - MrWho Admin</PageTitle>
@@ -23,163 +22,325 @@
     </RadzenText>
 </RadzenStack>
 
-<RadzenCard class="rz-my-4">
-    @if (isLoading)
-    {
+@if (isLoading)
+{
+    <RadzenCard class="rz-my-4">
         <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
         <RadzenText class="rz-mt-3">Loading user data...</RadzenText>
-    }
-    else
-    {
-        <RadzenTemplateForm Data="@model" TItem="CreateUserRequest" Submit="@OnSave">
-            <RadzenStack Gap="2rem">
-                <!-- Basic Information -->
-                <RadzenFieldset Text="Basic Information">
-                    <RadzenStack Gap="1rem">
-                        <RadzenRow>
-                            <RadzenColumn Size="12" SizeMD="6">
-                                <RadzenFormField Text="Email Address" Variant="Variant.Outlined">
-                                    <RadzenTextBox @bind-Value="@model.Email" 
-                                                  Placeholder="user@example.com" 
-                                                  Style="width: 100%;" 
-                                                  Disabled="@IsEdit" />
-                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                        @(IsEdit ? "Email cannot be changed after creation" : "This will be used for login")
-                                    </RadzenText>
-                                </RadzenFormField>
-                            </RadzenColumn>
-                            <RadzenColumn Size="12" SizeMD="6">
-                                <RadzenFormField Text="Username" Variant="Variant.Outlined">
-                                    <RadzenTextBox @bind-Value="@model.UserName" 
-                                                  Placeholder="Enter username" 
-                                                  Style="width: 100%;" 
-                                                  Disabled="@IsEdit" />
-                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                        @(IsEdit ? "Username cannot be changed after creation" : "Leave blank to use email as username")
-                                    </RadzenText>
-                                </RadzenFormField>
-                            </RadzenColumn>
-                        </RadzenRow>
+    </RadzenCard>
+}
+else
+{
+    <RadzenCard class="rz-my-4">
+        <RadzenTabs @bind-SelectedIndex="selectedTabIndex" RenderMode="TabRenderMode.Client">
+            <Tabs>
+                <!-- Basic Information Tab -->
+                <RadzenTabsItem Text="Basic Information" Icon="person">
+                    <div style="padding: 1rem;">
+                        <RadzenTemplateForm Data="@userModel" TItem="object" Submit="@OnSaveUser">
+                            <RadzenStack Gap="2rem">
+                                <RadzenFieldset Text="User Information">
+                                    <RadzenStack Gap="1rem">
+                                        <RadzenRow>
+                                            <RadzenColumn Size="12" SizeMD="6">
+                                                <RadzenFormField Text="Email Address" Variant="Variant.Outlined">
+                                                    <RadzenTextBox @bind-Value="@userModel.Email" 
+                                                                  Placeholder="user@example.com" 
+                                                                  Style="width: 100%;" 
+                                                                  Disabled="@IsEdit" />
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                        @(IsEdit ? "Email cannot be changed after creation" : "This will be used for login")
+                                                    </RadzenText>
+                                                </RadzenFormField>
+                                            </RadzenColumn>
+                                            <RadzenColumn Size="12" SizeMD="6">
+                                                <RadzenFormField Text="Username" Variant="Variant.Outlined">
+                                                    <RadzenTextBox @bind-Value="@userModel.UserName" 
+                                                                  Placeholder="Enter username" 
+                                                                  Style="width: 100%;" 
+                                                                  Disabled="@IsEdit" />
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                        @(IsEdit ? "Username cannot be changed after creation" : "Leave blank to use email as username")
+                                                    </RadzenText>
+                                                </RadzenFormField>
+                                            </RadzenColumn>
+                                        </RadzenRow>
 
-                        @if (!IsEdit)
-                        {
-                            <RadzenRow>
-                                <RadzenColumn Size="12" SizeMD="6">
-                                    <RadzenFormField Text="Password" Variant="Variant.Outlined">
-                                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Stretch">
-                                            <RadzenTextBox @bind-Value="@model.Password" 
-                                                          Type="@(showPassword ? "text" : "password")"
-                                                          Placeholder="Enter password" 
-                                                          Style="flex: 1;" />
-                                            <RadzenButton Icon="@(showPassword ? "visibility_off" : "visibility")" 
-                                                         ButtonStyle="ButtonStyle.Light" 
-                                                         Click="@(() => showPassword = !showPassword)" />
-                                            <RadzenButton Icon="refresh" 
-                                                         ButtonStyle="ButtonStyle.Secondary" 
-                                                         Text="Generate" 
-                                                         Click="@GeneratePassword" />
-                                        </RadzenStack>
-                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                            Minimum 8 characters with mixed case, numbers, and symbols
-                                        </RadzenText>
-                                    </RadzenFormField>
-                                </RadzenColumn>
-                                <RadzenColumn Size="12" SizeMD="6">
-                                    <RadzenFormField Text="Confirm Password" Variant="Variant.Outlined">
-                                        <RadzenTextBox @bind-Value="@confirmPassword" 
-                                                      Type="password"
-                                                      Placeholder="Confirm password" 
-                                                      Style="width: 100%;" />
-                                    </RadzenFormField>
-                                </RadzenColumn>
-                            </RadzenRow>
-                        }
+                                        @if (!IsEdit)
+                                        {
+                                            <RadzenRow>
+                                                <RadzenColumn Size="12" SizeMD="6">
+                                                    <RadzenFormField Text="Password" Variant="Variant.Outlined">
+                                                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Stretch">
+                                                            <RadzenTextBox @bind-Value="@userModel.Password" 
+                                                                          Type="@(showPassword ? "text" : "password")"
+                                                                          Placeholder="Enter password" 
+                                                                          Style="flex: 1;" />
+                                                            <RadzenButton Icon="@(showPassword ? "visibility_off" : "visibility")" 
+                                                                         ButtonStyle="ButtonStyle.Light" 
+                                                                         Click="@(() => showPassword = !showPassword)" />
+                                                            <RadzenButton Icon="refresh" 
+                                                                         ButtonStyle="ButtonStyle.Secondary" 
+                                                                         Text="Generate" 
+                                                                         Click="@GeneratePassword" />
+                                                        </RadzenStack>
+                                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                            Minimum 8 characters with mixed case, numbers, and symbols
+                                                        </RadzenText>
+                                                    </RadzenFormField>
+                                                </RadzenColumn>
+                                                <RadzenColumn Size="12" SizeMD="6">
+                                                    <RadzenFormField Text="Confirm Password" Variant="Variant.Outlined">
+                                                        <RadzenTextBox @bind-Value="@confirmPassword" 
+                                                                      Type="password"
+                                                                      Placeholder="Confirm password" 
+                                                                      Style="width: 100%;" />
+                                                    </RadzenFormField>
+                                                </RadzenColumn>
+                                            </RadzenRow>
+                                        }
+                                        else
+                                        {
+                                            <RadzenRow>
+                                                <RadzenColumn Size="12" SizeMD="6">
+                                                    <RadzenFormField Text="User ID" Variant="Variant.Outlined">
+                                                        <RadzenTextBox Value="@(currentUser?.Id ?? "")" 
+                                                                      ReadOnly="true" 
+                                                                      Style="width: 100%;" />
+                                                    </RadzenFormField>
+                                                </RadzenColumn>
+                                                <RadzenColumn Size="12" SizeMD="6">
+                                                    <RadzenFormField Text="Phone Number" Variant="Variant.Outlined">
+                                                        <RadzenTextBox @bind-Value="@userModel.PhoneNumber" 
+                                                                      Placeholder="+1 (555) 123-4567" 
+                                                                      Style="width: 100%;" />
+                                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                            Optional - used for two-factor authentication
+                                                        </RadzenText>
+                                                    </RadzenFormField>
+                                                </RadzenColumn>
+                                            </RadzenRow>
+                                        }
 
-                        <RadzenFormField Text="Phone Number" Variant="Variant.Outlined">
-                            <RadzenTextBox @bind-Value="@model.PhoneNumber" 
-                                          Placeholder="+1 (555) 123-4567" 
-                                          Style="width: 100%;" />
-                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                Optional - used for two-factor authentication
-                            </RadzenText>
-                        </RadzenFormField>
-                    </RadzenStack>
-                </RadzenFieldset>
+                                        @if (!IsEdit)
+                                        {
+                                            <RadzenFormField Text="Phone Number" Variant="Variant.Outlined">
+                                                <RadzenTextBox @bind-Value="@userModel.PhoneNumber" 
+                                                              Placeholder="+1 (555) 123-4567" 
+                                                              Style="width: 100%;" />
+                                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                    Optional - used for two-factor authentication
+                                                </RadzenText>
+                                            </RadzenFormField>
+                                        }
 
-                <!-- Account Settings -->
-                <RadzenFieldset Text="Account Settings">
-                    <RadzenStack Gap="1rem">
-                        <RadzenRow>
-                            <RadzenColumn Size="12" SizeMD="6">
-                                <RadzenStack Gap="0.5rem">
-                                    <RadzenLabel Text="Email Status" class="rz-text-align-left" />
-                                    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
-                                        <RadzenCheckBox @bind-Value="@emailConfirmed" />
-                                        <RadzenLabel Text="Email is confirmed" class="rz-ml-1" />
+                                        <RadzenFieldset Text="Status">
+                                            <RadzenRow Gap="1rem">
+                                                <RadzenColumn Size="4">
+                                                    <RadzenCheckBox @bind-Value="@userModel.EmailConfirmed" Name="emailConfirmed" />
+                                                    <RadzenLabel Text="Email Confirmed" Component="emailConfirmed" Style="margin-left: 8px;" />
+                                                </RadzenColumn>
+                                                <RadzenColumn Size="4">
+                                                    <RadzenCheckBox @bind-Value="@userModel.PhoneNumberConfirmed" Name="phoneConfirmed" />
+                                                    <RadzenLabel Text="Phone Confirmed" Component="phoneConfirmed" Style="margin-left: 8px;" />
+                                                </RadzenColumn>
+                                                <RadzenColumn Size="4">
+                                                    <RadzenCheckBox @bind-Value="@userModel.TwoFactorEnabled" Name="twoFactor" />
+                                                    <RadzenLabel Text="Two Factor Enabled" Component="twoFactor" Style="margin-left: 8px;" />
+                                                </RadzenColumn>
+                                            </RadzenRow>
+                                        </RadzenFieldset>
                                     </RadzenStack>
-                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                        Confirmed users can receive email notifications
-                                    </RadzenText>
-                                </RadzenStack>
-                            </RadzenColumn>
-                            <RadzenColumn Size="12" SizeMD="6">
-                                <RadzenStack Gap="0.5rem">
-                                    <RadzenLabel Text="Phone Status" class="rz-text-align-left" />
-                                    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
-                                        <RadzenCheckBox @bind-Value="@phoneConfirmed" />
-                                        <RadzenLabel Text="Phone number is confirmed" class="rz-ml-1" />
-                                    </RadzenStack>
-                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                        Required for SMS-based two-factor authentication
-                                    </RadzenText>
-                                </RadzenStack>
-                            </RadzenColumn>
-                        </RadzenRow>
+                                </RadzenFieldset>
 
-                        <RadzenStack Gap="0.5rem">
-                            <RadzenLabel Text="Two-Factor Authentication" class="rz-text-align-left" />
-                            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
-                                <RadzenCheckBox @bind-Value="@twoFactorEnabled" />
-                                <RadzenLabel Text="Enable two-factor authentication" class="rz-ml-1" />
+                                <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" class="rz-mt-4">
+                                    <RadzenButton Click="@Cancel" Icon="cancel" ButtonStyle="ButtonStyle.Light" Text="Cancel" />
+                                    <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem">
+                                        @if (IsEdit)
+                                        {
+                                            <RadzenButton Click="@(async () => await DeleteUser())" Icon="delete" ButtonStyle="ButtonStyle.Danger" 
+                                                         Text="Delete User" Disabled="@isSaving" IsBusy="@isDeleting" />
+                                        }
+                                        <RadzenButton ButtonType="ButtonType.Submit" Icon="save" ButtonStyle="ButtonStyle.Primary" 
+                                                     Text="@(IsEdit ? "Update User" : "Create User")" 
+                                                     IsBusy="@isSaving" Disabled="@isSaving" />
+                                    </RadzenStack>
+                                </RadzenStack>
                             </RadzenStack>
-                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                Requires additional verification during login
-                            </RadzenText>
-                        </RadzenStack>
-                    </RadzenStack>
-                </RadzenFieldset>
+                        </RadzenTemplateForm>
+                    </div>
+                </RadzenTabsItem>
 
+                <!-- Claims Management Tab -->
                 @if (IsEdit)
                 {
-                    <!-- User Roles Management -->
-                    <RadzenFieldset Text="User Roles">
-                        <RadzenStack Gap="1rem">
-                            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
-                                Manage roles assigned to this user
-                            </RadzenText>
-                            
-                            @if (isLoadingRoles)
-                            {
-                                <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" Size="ProgressBarCircularSize.Small" />
-                                <RadzenText TextStyle="TextStyle.Caption">Loading user roles...</RadzenText>
-                            }
-                            else
-                            {
-                                <!-- Current User Roles -->
-                                <RadzenStack Gap="1rem">
-                                    <RadzenText TextStyle="TextStyle.H6">Current Roles</RadzenText>
+                    <RadzenTabsItem Text="Claims" Icon="verified_user">
+                        <div style="padding: 1rem;">
+                            <RadzenStack Gap="2rem">
+                                <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                                    <RadzenText TextStyle="TextStyle.H6" Text="User Claims Management" />
+                                    <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="@($"{userClaims.Count} claims")" />
+                                </RadzenStack>
+                                
+                                <!-- Add New Claim Section -->
+                                <RadzenCard Style="background-color: var(--rz-base-50);">
+                                    <RadzenStack Gap="1rem">
+                                        <RadzenText TextStyle="TextStyle.Subtitle1" Text="Add New Claim" />
+                                        
+                                        <RadzenRow>
+                                            <RadzenColumn Size="12" SizeMD="4">
+                                                <RadzenFormField Text="Claim Type" Variant="Variant.Outlined">
+                                                    <RadzenDropDown @bind-Value="@newClaimType" 
+                                                                   Data="@CommonClaimTypes.StandardClaims" 
+                                                                   TextProperty="DisplayName" 
+                                                                   ValueProperty="Type"
+                                                                   AllowClear="true" 
+                                                                   Placeholder="Select or type custom claim type"
+                                                                   AllowFiltering="true"
+                                                                   FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                                                   Style="width: 100%;" />
+                                                </RadzenFormField>
+                                            </RadzenColumn>
+                                            <RadzenColumn Size="12" SizeMD="4">
+                                                <RadzenFormField Text="Claim Value" Variant="Variant.Outlined">
+                                                    <RadzenTextBox @bind-Value="@newClaimValue" 
+                                                                  Placeholder="Enter claim value" 
+                                                                  Style="width: 100%;" />
+                                                </RadzenFormField>
+                                            </RadzenColumn>
+                                            <RadzenColumn Size="12" SizeMD="4">
+                                                <RadzenFormField Text="Action" Variant="Variant.Outlined">
+                                                    <RadzenButton Click="@(async () => await AddClaim())" 
+                                                                 Icon="add" 
+                                                                 ButtonStyle="ButtonStyle.Success" 
+                                                                 Text="Add Claim" 
+                                                                 Disabled="@(string.IsNullOrWhiteSpace(newClaimType) || string.IsNullOrWhiteSpace(newClaimValue))" 
+                                                                 IsBusy="@isAddingClaim"
+                                                                 Style="width: 100%;" />
+                                                </RadzenFormField>
+                                            </RadzenColumn>
+                                        </RadzenRow>
+                                        
+                                        @if (!string.IsNullOrWhiteSpace(newClaimType))
+                                        {
+                                            var claimInfo = CommonClaimTypes.StandardClaims.FirstOrDefault(c => c.Type == newClaimType);
+                                            if (claimInfo != default)
+                                            {
+                                                <RadzenAlert AlertStyle="AlertStyle.Info" Size="AlertSize.Small">
+                                                    <RadzenText><strong>@claimInfo.DisplayName:</strong> @claimInfo.Description</RadzenText>
+                                                </RadzenAlert>
+                                            }
+                                        }
+                                    </RadzenStack>
+                                </RadzenCard>
+
+                                <!-- Current Claims List -->
+                                <RadzenFieldset Text="Current Claims">
+                                    @if (userClaims.Any())
+                                    {
+                                        <div style="max-height: 400px; overflow-y: auto;">
+                                            <RadzenDataGrid Data="@userClaims" TItem="UserClaimDto" AllowPaging="false" AllowSorting="true">
+                                                <Columns>
+                                                    <RadzenDataGridColumn TItem="UserClaimDto" Property="ClaimType" Title="Claim Type" Width="200px">
+                                                        <Template Context="claim">
+                                                            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
+                                                                <RadzenIcon Icon="verified_user" Style="color: var(--rz-info); font-size: 16px;" />
+                                                                <RadzenText Text="@claim.ClaimType" />
+                                                            </RadzenStack>
+                                                        </Template>
+                                                    </RadzenDataGridColumn>
+                                                
+                                                    <RadzenDataGridColumn TItem="UserClaimDto" Property="ClaimValue" Title="Value">
+                                                        <Template Context="claim">
+                                                            <RadzenText Text="@claim.ClaimValue" Style="word-break: break-all;" />
+                                                        </Template>
+                                                    </RadzenDataGridColumn>
+                                                
+                                                    <RadzenDataGridColumn TItem="UserClaimDto" Title="Actions" Width="120px" Sortable="false">
+                                                        <Template Context="claim">
+                                                            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                                                                <RadzenButton Click="@(async () => await RemoveClaim(claim))" 
+                                                                             Icon="delete" 
+                                                                             Size="ButtonSize.Small" 
+                                                                             ButtonStyle="ButtonStyle.Danger" 
+                                                                             Variant="Variant.Text" />
+                                                            </RadzenStack>
+                                                        </Template>
+                                                    </RadzenDataGridColumn>
+                                                </Columns>
+                                            </RadzenDataGrid>
+                                        </div>
+                                    }
+                                    else
+                                    {
+                                        <RadzenAlert AlertStyle="AlertStyle.Info">
+                                            <RadzenText>No claims assigned to this user. Add claims above to provide additional user information.</RadzenText>
+                                        </RadzenAlert>
+                                    }
+                                </RadzenFieldset>
+                            </RadzenStack>
+                        </div>
+                    </RadzenTabsItem>
+
+                    <!-- Roles Management Tab -->
+                    <RadzenTabsItem Text="Roles" Icon="group">
+                        <div style="padding: 1rem;">
+                            <RadzenStack Gap="2rem">
+                                <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                                    <RadzenText TextStyle="TextStyle.H6" Text="User Roles" />
+                                    <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="@($"{userRoles.Count} roles")" />
+                                </RadzenStack>
+                                
+                                <!-- Role Assignment Section -->
+                                <RadzenCard Style="background-color: var(--rz-base-50);">
+                                    <RadzenStack Gap="1rem">
+                                        <RadzenText TextStyle="TextStyle.Subtitle1" Text="Assign Role" />
+                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                            Roles provide groups of permissions and appear in the 'role' claim when the roles scope is requested.
+                                        </RadzenText>
+                                        
+                                        <RadzenRow>
+                                            <RadzenColumn Size="12" SizeMD="8">
+                                                <RadzenFormField Text="Available Roles" Variant="Variant.Outlined">
+                                                    <RadzenDropDown @bind-Value="@selectedRoleId" 
+                                                                   Data="@availableRoles" 
+                                                                   TextProperty="Name" 
+                                                                   ValueProperty="Id"
+                                                                   Placeholder="Select a role to assign"
+                                                                   Style="width: 100%;" />
+                                                </RadzenFormField>
+                                            </RadzenColumn>
+                                            <RadzenColumn Size="12" SizeMD="4">
+                                                <RadzenFormField Text="Action" Variant="Variant.Outlined">
+                                                    <RadzenButton Click="@(async () => await AssignRole())" 
+                                                                 Icon="add" 
+                                                                 ButtonStyle="ButtonStyle.Success" 
+                                                                 Text="Assign Role" 
+                                                                 Disabled="@(string.IsNullOrWhiteSpace(selectedRoleId))" 
+                                                                 IsBusy="@isAssigningRole"
+                                                                 Style="width: 100%;" />
+                                                </RadzenFormField>
+                                            </RadzenColumn>
+                                        </RadzenRow>
+                                    </RadzenStack>
+                                </RadzenCard>
+
+                                <!-- Current Roles List -->
+                                <RadzenFieldset Text="Assigned Roles">
                                     @if (userRoles.Any())
                                     {
-                                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" Wrap="FlexWrap.Wrap">
+                                        <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" Wrap="FlexWrap.Wrap">
                                             @foreach (var role in userRoles)
                                             {
-                                                <RadzenBadge BadgeStyle="BadgeStyle.Success" class="rz-p-2">
+                                                <RadzenBadge BadgeStyle="BadgeStyle.Success" class="rz-p-3">
                                                     <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
-                                                        <RadzenIcon Icon="security" />
+                                                        <RadzenIcon Icon="group" />
                                                         <RadzenText Text="@role.Name" />
-                                                        <RadzenButton Icon="close" Size="ButtonSize.ExtraSmall" ButtonStyle="ButtonStyle.Danger" 
-                                                                     Click="@(async () => await RemoveRoleFromUser(role.Id))" 
-                                                                     Disabled="@isManagingRoles" />
+                                                        <RadzenButton Click="@(async () => await RemoveRole(role.Id))" 
+                                                                     Icon="close" 
+                                                                     Size="ButtonSize.ExtraSmall" 
+                                                                     ButtonStyle="ButtonStyle.Danger" 
+                                                                     Variant="Variant.Text" />
                                                     </RadzenStack>
                                                 </RadzenBadge>
                                             }
@@ -188,103 +349,127 @@
                                     else
                                     {
                                         <RadzenAlert AlertStyle="AlertStyle.Info">
-                                            <RadzenText>This user has no roles assigned.</RadzenText>
+                                            <RadzenText>No roles assigned to this user. Assign roles above to grant permissions.</RadzenText>
                                         </RadzenAlert>
                                     }
-                                </RadzenStack>
-
-                                <!-- Assign New Role -->
-                                <RadzenStack Gap="1rem">
-                                    <RadzenText TextStyle="TextStyle.H6">Assign New Role</RadzenText>
-                                    <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" AlignItems="AlignItems.End">
-                                        <RadzenStack Gap="0.5rem" Style="flex: 1;">
-                                            <RadzenLabel Text="Select Role" />
-                                            <RadzenDropDown @bind-Value="@selectedRoleId" 
-                                                           Data="@availableRoles" 
-                                                           TextProperty="Name" 
-                                                           ValueProperty="Id" 
-                                                           Placeholder="Select a role to assign..."
-                                                           Style="width: 100%;"
-                                                           Disabled="@isManagingRoles" />
-                                        </RadzenStack>
-                                        <RadzenButton Icon="add" ButtonStyle="ButtonStyle.Primary" Text="Assign Role" 
-                                                     Click="@(async () => await AssignRoleToUser())" 
-                                                     Disabled="@(string.IsNullOrEmpty(selectedRoleId) || isManagingRoles)"
-                                                     IsBusy="@isManagingRoles" />
-                                    </RadzenStack>
-                                </RadzenStack>
-                            }
-                        </RadzenStack>
-                    </RadzenFieldset>
-
-                    <!-- Security Actions (Edit Mode Only) -->
-                    <RadzenFieldset Text="Security Actions">
-                        <RadzenStack Gap="1rem">
-                            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
-                                Administrative actions for user account management
-                            </RadzenText>
-                            
-                            <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" Wrap="FlexWrap.Wrap">
-                                <RadzenButton Icon="lock_reset" ButtonStyle="ButtonStyle.Warning" Text="Reset Password" 
-                                             Click="@ResetPassword" IsBusy="@isResettingPassword" />
-                                <RadzenButton Icon="email" ButtonStyle="ButtonStyle.Info" Text="Send Confirmation Email" 
-                                             Click="@SendConfirmationEmail" IsBusy="@isSendingEmail" />
-                                <RadzenButton Icon="@(isLocked ? "lock_open" : "lock")" 
-                                             ButtonStyle="@(isLocked ? ButtonStyle.Success : ButtonStyle.Danger)" 
-                                             Text="@(isLocked ? "Unlock Account" : "Lock Account")" 
-                                             Click="@ToggleLockAccount" IsBusy="@isTogglingLock" />
-                                <RadzenButton Icon="logout" ButtonStyle="ButtonStyle.Secondary" Text="Force Logout" 
-                                             Click="@ForceLogout" IsBusy="@isForcingLogout" />
+                                </RadzenFieldset>
                             </RadzenStack>
-                        </RadzenStack>
-                    </RadzenFieldset>
-                }
+                        </div>
+                    </RadzenTabsItem>
 
-                <!-- Action Buttons -->
-                <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" class="rz-mt-4">
-                    <RadzenButton Click="@Cancel" Icon="cancel" ButtonStyle="ButtonStyle.Light" Text="Cancel" />
-                    <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem">
-                        @if (IsEdit)
-                        {
-                            <RadzenButton Click="@DeleteUser" Icon="delete" ButtonStyle="ButtonStyle.Danger" 
-                                         Text="Delete User" Disabled="@isSaving" IsBusy="@isDeleting" />
-                        }
-                        <RadzenButton ButtonType="ButtonType.Submit" Icon="save" ButtonStyle="ButtonStyle.Primary" 
-                                     Text="@(IsEdit ? "Update User" : "Create User")" 
-                                     IsBusy="@isSaving" Disabled="@isSaving" />
-                    </RadzenStack>
-                </RadzenStack>
-            </RadzenStack>
-        </RadzenTemplateForm>
-    }
-</RadzenCard>
+                    <!-- Security Tab -->
+                    <RadzenTabsItem Text="Security" Icon="security">
+                        <div style="padding: 1rem;">
+                            <RadzenStack Gap="2rem">
+                                <RadzenText TextStyle="TextStyle.H6" Text="Security Management" />
+                                
+                                <!-- Account Status -->
+                                <RadzenFieldset Text="Account Status">
+                                    <RadzenStack Gap="1rem">
+                                        <RadzenRow>
+                                            <RadzenColumn Size="12" SizeMD="6">
+                                                <RadzenCard>
+                                                    <RadzenStack Gap="1rem">
+                                                        <RadzenText TextStyle="TextStyle.Subtitle1" Text="Account Lock Status" />
+                                                        @if (IsUserLocked())
+                                                        {
+                                                            <RadzenBadge BadgeStyle="BadgeStyle.Danger" Text="LOCKED" />
+                                                            <RadzenText TextStyle="TextStyle.Caption">
+                                                                Locked until: @(currentUser?.LockoutEnd?.ToString("yyyy-MM-dd HH:mm"))
+                                                            </RadzenText>
+                                                            <RadzenButton Click="@(async () => await UnlockUser())" 
+                                                                         Icon="lock_open" 
+                                                                         ButtonStyle="ButtonStyle.Success" 
+                                                                         Text="Unlock Account" 
+                                                                         IsBusy="@isTogglingLock" />
+                                                        }
+                                                        else
+                                                        {
+                                                            <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="ACTIVE" />
+                                                            <RadzenButton Click="@(async () => await LockUser())" 
+                                                                         Icon="lock" 
+                                                                         ButtonStyle="ButtonStyle.Warning" 
+                                                                         Text="Lock Account" 
+                                                                         IsBusy="@isTogglingLock" />
+                                                        }
+                                                    </RadzenStack>
+                                                </RadzenCard>
+                                            </RadzenColumn>
+                                            <RadzenColumn Size="12" SizeMD="6">
+                                                <RadzenCard>
+                                                    <RadzenStack Gap="1rem">
+                                                        <RadzenText TextStyle="TextStyle.Subtitle1" Text="Password Management" />
+                                                        <RadzenButton Click="@(async () => await ResetPassword())" 
+                                                                     Icon="key" 
+                                                                     ButtonStyle="ButtonStyle.Primary" 
+                                                                     Text="Reset Password" 
+                                                                     IsBusy="@isResettingPassword" />
+                                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                            Generates a new temporary password and notifies the user
+                                                        </RadzenText>
+                                                    </RadzenStack>
+                                                </RadzenCard>
+                                            </RadzenColumn>
+                                        </RadzenRow>
+                                    </RadzenStack>
+                                </RadzenFieldset>
+
+                                <!-- Session Management -->
+                                <RadzenFieldset Text="Session Management">
+                                    <RadzenCard>
+                                        <RadzenStack Gap="1rem">
+                                            <RadzenText TextStyle="TextStyle.Subtitle1" Text="Active Sessions" />
+                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                Force logout will invalidate all active sessions for this user
+                                            </RadzenText>
+                                            <RadzenButton Click="@(async () => await ForceLogout())" 
+                                                         Icon="logout" 
+                                                         ButtonStyle="ButtonStyle.Danger" 
+                                                         Text="Force Logout All Sessions" 
+                                                         IsBusy="@isForcingLogout" />
+                                        </RadzenStack>
+                                    </RadzenCard>
+                                </RadzenFieldset>
+                            </RadzenStack>
+                        </div>
+                    </RadzenTabsItem>
+                }
+            </Tabs>
+        </RadzenTabs>
+    </RadzenCard>
+}
 
 @code {
     [Parameter] public string? Id { get; set; }
 
     private bool IsEdit => !string.IsNullOrEmpty(Id);
+    private int selectedTabIndex = 0;
+
+    // Loading states
     private bool isLoading = false;
     private bool isSaving = false;
     private bool isDeleting = false;
-    private bool isResettingPassword = false;
-    private bool isSendingEmail = false;
+    private bool isAddingClaim = false;
+    private bool isAssigningRole = false;
     private bool isTogglingLock = false;
+    private bool isResettingPassword = false;
     private bool isForcingLogout = false;
     private bool showPassword = false;
-    private bool isLocked = false;
-    
-    // Role management fields
-    private bool isLoadingRoles = false;
-    private bool isManagingRoles = false;
+
+    // User data
+    private UserWithClaimsDto? currentUser = null;
+    private UserEditModel userModel = new();
+    private string confirmPassword = "";
+    private List<UserClaimDto> userClaims = new();
     private List<RoleDto> userRoles = new();
     private List<RoleDto> availableRoles = new();
-    private string selectedRoleId = "";
-    
-    private CreateUserRequest model = new();
-    private string confirmPassword = "";
-    private bool emailConfirmed = false;
-    private bool phoneConfirmed = false;
-    private bool twoFactorEnabled = false;
+
+    // Claims management
+    private string newClaimType = string.Empty;
+    private string newClaimValue = string.Empty;
+
+    // Roles management
+    private string selectedRoleId = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
@@ -297,9 +482,9 @@
         else
         {
             // Set defaults for new user
-            emailConfirmed = false;
-            phoneConfirmed = false;
-            twoFactorEnabled = false;
+            userModel.EmailConfirmed = false;
+            userModel.PhoneNumberConfirmed = false;
+            userModel.TwoFactorEnabled = false;
         }
     }
 
@@ -308,87 +493,78 @@
         isLoading = true;
         try
         {
-            var user = await UsersApiService.GetUserAsync(Id!);
-            
-            if (user != null)
+            currentUser = await UsersApiService.GetUserWithClaimsAsync(Id!);
+            if (currentUser != null)
             {
-                model.Email = user.Email;
-                model.UserName = user.UserName;
-                model.PhoneNumber = user.PhoneNumber;
-                emailConfirmed = user.EmailConfirmed;
-                phoneConfirmed = user.PhoneNumberConfirmed;
-                twoFactorEnabled = user.TwoFactorEnabled;
-                isLocked = user.LockoutEnd.HasValue && user.LockoutEnd > DateTimeOffset.UtcNow;
-                
-                Logger.LogInformation("Loaded user {UserId} from API", Id);
+                userModel = new UserEditModel
+                {
+                    UserName = currentUser.UserName,
+                    Email = currentUser.Email,
+                    PhoneNumber = currentUser.PhoneNumber,
+                    EmailConfirmed = currentUser.EmailConfirmed,
+                    PhoneNumberConfirmed = currentUser.PhoneNumberConfirmed,
+                    TwoFactorEnabled = currentUser.TwoFactorEnabled
+                };
+
+                userClaims = currentUser.Claims;
             }
             else
             {
-                NotificationService.Notify(NotificationSeverity.Error, "Error", $"User with ID '{Id}' not found");
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "User not found");
                 Navigation.NavigateTo("/users");
             }
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error loading user {UserId}", Id);
-            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to load user data");
-            Navigation.NavigateTo("/users");
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to load user");
         }
         finally
         {
             isLoading = false;
+            StateHasChanged();
         }
     }
 
     private async Task LoadUserRoles()
     {
-        if (!IsEdit) return;
-
-        isLoadingRoles = true;
         try
         {
-            var roles = await RolesApiService.GetUserRolesAsync(Id!);
+            var roles = await UsersApiService.GetUserRolesAsync(Id!);
             userRoles = roles ?? new List<RoleDto>();
-            
-            Logger.LogInformation("Loaded {RoleCount} roles for user {UserId}", userRoles.Count, Id);
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Error loading roles for user {UserId}", Id);
-            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to load user roles");
+            Logger.LogError(ex, "Error loading user roles {UserId}", Id);
             userRoles = new List<RoleDto>();
-        }
-        finally
-        {
-            isLoadingRoles = false;
         }
     }
 
     private async Task LoadAvailableRoles()
     {
-        if (!IsEdit) return;
-
         try
         {
-            var result = await RolesApiService.GetRolesAsync(page: 1, pageSize: 100);
-            var allRoles = result?.Items ?? new List<RoleDto>();
-            
-            // Filter out roles already assigned to the user
-            availableRoles = allRoles.Where(r => !userRoles.Any(ur => ur.Id == r.Id)).ToList();
-            
-            Logger.LogInformation("Loaded {AvailableRoleCount} available roles for assignment", availableRoles.Count);
+            var result = await UsersApiService.GetRolesAsync(page: 1, pageSize: 100);
+            if (result != null)
+            {
+                // Filter out roles already assigned to the user
+                availableRoles = result.Items.Where(r => !userRoles.Any(ur => ur.Id == r.Id)).ToList();
+            }
+            else
+            {
+                availableRoles = new List<RoleDto>();
+            }
         }
         catch (Exception ex)
         {
             Logger.LogError(ex, "Error loading available roles");
-            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to load available roles");
             availableRoles = new List<RoleDto>();
         }
     }
 
-    private async Task OnSave(CreateUserRequest args)
+    private async Task OnSaveUser()
     {
-        if (string.IsNullOrWhiteSpace(model.Email))
+        if (string.IsNullOrWhiteSpace(userModel.Email))
         {
             NotificationService.Notify(NotificationSeverity.Warning, "Validation Error", "Email address is required");
             return;
@@ -396,13 +572,13 @@
 
         if (!IsEdit)
         {
-            if (string.IsNullOrWhiteSpace(model.Password))
+            if (string.IsNullOrWhiteSpace(userModel.Password))
             {
                 NotificationService.Notify(NotificationSeverity.Warning, "Validation Error", "Password is required for new users");
                 return;
             }
 
-            if (model.Password != confirmPassword)
+            if (userModel.Password != confirmPassword)
             {
                 NotificationService.Notify(NotificationSeverity.Warning, "Validation Error", "Passwords do not match");
                 return;
@@ -413,49 +589,57 @@
         try
         {
             // Set username to email if not provided
-            if (string.IsNullOrWhiteSpace(model.UserName))
+            if (string.IsNullOrWhiteSpace(userModel.UserName))
             {
-                model.UserName = model.Email;
+                userModel.UserName = userModel.Email;
             }
-
-            // Set confirmation statuses
-            model.EmailConfirmed = emailConfirmed;
-            model.PhoneNumberConfirmed = phoneConfirmed;
-            model.TwoFactorEnabled = twoFactorEnabled;
 
             if (IsEdit)
             {
                 var updateRequest = new UpdateUserRequest
                 {
-                    Email = model.Email,
-                    UserName = model.UserName,
-                    PhoneNumber = model.PhoneNumber,
-                    EmailConfirmed = emailConfirmed,
-                    PhoneNumberConfirmed = phoneConfirmed,
-                    TwoFactorEnabled = twoFactorEnabled
+                    Email = userModel.Email,
+                    UserName = userModel.UserName,
+                    PhoneNumber = userModel.PhoneNumber,
+                    EmailConfirmed = userModel.EmailConfirmed,
+                    PhoneNumberConfirmed = userModel.PhoneNumberConfirmed,
+                    TwoFactorEnabled = userModel.TwoFactorEnabled
                 };
 
                 var updatedUser = await UsersApiService.UpdateUserAsync(Id!, updateRequest);
-                if (updatedUser == null)
+                if (updatedUser != null)
+                {
+                    NotificationService.Notify(NotificationSeverity.Success, "Success", "User updated successfully");
+                }
+                else
                 {
                     NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to update user");
-                    return;
                 }
             }
             else
             {
-                var createdUser = await UsersApiService.CreateUserAsync(model);
-                if (createdUser == null)
+                var createRequest = new CreateUserRequest
+                {
+                    UserName = userModel.UserName,
+                    Email = userModel.Email,
+                    Password = userModel.Password!,
+                    PhoneNumber = userModel.PhoneNumber,
+                    EmailConfirmed = userModel.EmailConfirmed,
+                    PhoneNumberConfirmed = userModel.PhoneNumberConfirmed,
+                    TwoFactorEnabled = userModel.TwoFactorEnabled
+                };
+
+                var createdUser = await UsersApiService.CreateUserAsync(createRequest);
+                if (createdUser != null)
+                {
+                    NotificationService.Notify(NotificationSeverity.Success, "Success", "User created successfully");
+                    Navigation.NavigateTo($"/users/edit/{createdUser.Id}");
+                }
+                else
                 {
                     NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to create user");
-                    return;
                 }
             }
-
-            var action = IsEdit ? "updated" : "created";
-            NotificationService.Notify(NotificationSeverity.Success, "Success", $"User '{model.Email}' has been {action} successfully");
-            
-            Navigation.NavigateTo("/users");
         }
         catch (Exception ex)
         {
@@ -465,40 +649,271 @@
         finally
         {
             isSaving = false;
+            StateHasChanged();
         }
     }
 
-    private void GeneratePassword()
+    private async Task AddClaim()
     {
-        var random = new Random();
-        var chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
-        model.Password = new string(Enumerable.Repeat(chars, 16)
-            .Select(s => s[random.Next(s.Length)]).ToArray());
-        confirmPassword = model.Password;
-        
-        NotificationService.Notify(NotificationSeverity.Info, "Generated", "New password generated");
+        if (string.IsNullOrWhiteSpace(newClaimType) || string.IsNullOrWhiteSpace(newClaimValue))
+            return;
+
+        isAddingClaim = true;
+        try
+        {
+            var request = new AddUserClaimRequest
+            {
+                ClaimType = newClaimType.Trim(),
+                ClaimValue = newClaimValue.Trim()
+            };
+
+            var success = await UsersApiService.AddUserClaimAsync(Id!, request);
+            if (success)
+            {
+                userClaims.Add(new UserClaimDto 
+                { 
+                    ClaimType = request.ClaimType, 
+                    ClaimValue = request.ClaimValue 
+                });
+
+                newClaimType = string.Empty;
+                newClaimValue = string.Empty;
+
+                NotificationService.Notify(NotificationSeverity.Success, "Success", "Claim added successfully");
+                StateHasChanged();
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to add claim");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error adding claim to user {UserId}", Id);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to add claim");
+        }
+        finally
+        {
+            isAddingClaim = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RemoveClaim(UserClaimDto claim)
+    {
+        var confirmed = await DialogService.Confirm(
+            $"Are you sure you want to remove the claim '{claim.ClaimType}' with value '{claim.ClaimValue}'?",
+            "Remove Claim",
+            new ConfirmOptions() { OkButtonText = "Remove", CancelButtonText = "Cancel" });
+
+        if (confirmed != true) return;
+
+        try
+        {
+            var request = new RemoveUserClaimRequest
+            {
+                ClaimType = claim.ClaimType,
+                ClaimValue = claim.ClaimValue
+            };
+
+            var success = await UsersApiService.RemoveUserClaimAsync(Id!, request);
+            if (success)
+            {
+                userClaims.Remove(claim);
+                NotificationService.Notify(NotificationSeverity.Success, "Success", "Claim removed successfully");
+                StateHasChanged();
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to remove claim");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error removing claim from user {UserId}", Id);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to remove claim");
+        }
+    }
+
+    private async Task AssignRole()
+    {
+        if (string.IsNullOrWhiteSpace(selectedRoleId))
+            return;
+
+        isAssigningRole = true;
+        try
+        {
+            var request = new AssignRoleRequest { RoleId = selectedRoleId };
+            var success = await UsersApiService.AssignUserRoleAsync(Id!, request);
+            
+            if (success)
+            {
+                var role = availableRoles.FirstOrDefault(r => r.Id == selectedRoleId);
+                if (role != null)
+                {
+                    userRoles.Add(role);
+                    availableRoles.Remove(role);
+                    selectedRoleId = string.Empty;
+                    
+                    NotificationService.Notify(NotificationSeverity.Success, "Success", $"Role '{role.Name}' assigned successfully");
+                    StateHasChanged();
+                }
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to assign role");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error assigning role to user {UserId}", Id);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to assign role");
+        }
+        finally
+        {
+            isAssigningRole = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task RemoveRole(string roleId)
+    {
+        var role = userRoles.FirstOrDefault(r => r.Id == roleId);
+        if (role == null) return;
+
+        var confirmed = await DialogService.Confirm(
+            $"Are you sure you want to remove the role '{role.Name}' from this user?",
+            "Remove Role",
+            new ConfirmOptions() { OkButtonText = "Remove", CancelButtonText = "Cancel" });
+
+        if (confirmed != true) return;
+
+        try
+        {
+            var success = await UsersApiService.RemoveUserRoleAsync(Id!, roleId);
+            if (success)
+            {
+                userRoles.Remove(role);
+                availableRoles.Add(role);
+                
+                NotificationService.Notify(NotificationSeverity.Success, "Success", $"Role '{role.Name}' removed successfully");
+                StateHasChanged();
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to remove role");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error removing role from user {UserId}", Id);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to remove role");
+        }
+    }
+
+    private bool IsUserLocked()
+    {
+        return currentUser?.LockoutEnd.HasValue == true && currentUser.LockoutEnd > DateTimeOffset.UtcNow;
+    }
+
+    private async Task LockUser()
+    {
+        var confirmed = await DialogService.Confirm(
+            "Are you sure you want to lock this user account?",
+            "Lock Account",
+            new ConfirmOptions() { OkButtonText = "Lock", CancelButtonText = "Cancel" });
+
+        if (confirmed != true) return;
+
+        isTogglingLock = true;
+        try
+        {
+            var lockoutEnd = DateTimeOffset.UtcNow.AddYears(100); // Effectively permanent
+            var success = await UsersApiService.SetLockoutAsync(Id!, lockoutEnd);
+            
+            if (success)
+            {
+                if (currentUser != null)
+                    currentUser.LockoutEnd = lockoutEnd;
+                
+                NotificationService.Notify(NotificationSeverity.Success, "Success", "User account locked");
+                StateHasChanged();
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to lock account");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error locking user {UserId}", Id);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to lock account");
+        }
+        finally
+        {
+            isTogglingLock = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task UnlockUser()
+    {
+        var confirmed = await DialogService.Confirm(
+            "Are you sure you want to unlock this user account?",
+            "Unlock Account",
+            new ConfirmOptions() { OkButtonText = "Unlock", CancelButtonText = "Cancel" });
+
+        if (confirmed != true) return;
+
+        isTogglingLock = true;
+        try
+        {
+            var success = await UsersApiService.SetLockoutAsync(Id!, null);
+            
+            if (success)
+            {
+                if (currentUser != null)
+                    currentUser.LockoutEnd = null;
+                
+                NotificationService.Notify(NotificationSeverity.Success, "Success", "User account unlocked");
+                StateHasChanged();
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to unlock account");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error unlocking user {UserId}", Id);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to unlock account");
+        }
+        finally
+        {
+            isTogglingLock = false;
+            StateHasChanged();
+        }
     }
 
     private async Task ResetPassword()
     {
-        if (!IsEdit) return;
-
-        var result = await DialogService.Confirm("Are you sure you want to reset this user's password?", "Reset Password", 
+        var confirmed = await DialogService.Confirm(
+            "Are you sure you want to reset this user's password? A new temporary password will be generated.",
+            "Reset Password",
             new ConfirmOptions() { OkButtonText = "Reset", CancelButtonText = "Cancel" });
-        
-        if (result != true) return;
+
+        if (confirmed != true) return;
 
         isResettingPassword = true;
         try
         {
-            // Generate a temporary password
-            var tempPassword = GenerateTemporaryPassword();
-            var success = await UsersApiService.ResetPasswordAsync(Id!, tempPassword);
+            var newPassword = GenerateTemporaryPassword();
+            var success = await UsersApiService.ResetPasswordAsync(Id!, newPassword);
             
             if (success)
             {
-                NotificationService.Notify(NotificationSeverity.Success, 
-                    $"Password has been reset. Temporary password: {tempPassword}");
+                await DialogService.Alert($"Password has been reset to: {newPassword}\n\nPlease provide this to the user securely.", "Password Reset");
+                NotificationService.Notify(NotificationSeverity.Success, "Success", "Password reset successfully");
             }
             else
             {
@@ -513,86 +928,18 @@
         finally
         {
             isResettingPassword = false;
-        }
-    }
-
-    private async Task SendConfirmationEmail()
-    {
-        if (!IsEdit) return;
-        
-        isSendingEmail = true;
-        try
-        {
-            var success = await UsersApiService.SendConfirmationEmailAsync(Id!);
-            
-            if (success)
-            {
-                NotificationService.Notify(NotificationSeverity.Success, 
-                    "Confirmation email has been sent to the user");
-            }
-            else
-            {
-                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to send confirmation email");
-            }
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Error sending confirmation email for user {UserId}", Id);
-            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to send confirmation email");
-        }
-        finally
-        {
-            isSendingEmail = false;
-        }
-    }
-
-    private async Task ToggleLockAccount()
-    {
-        if (!IsEdit) return;
-
-        var action = isLocked ? "unlock" : "lock";
-        var result = await DialogService.Confirm($"Are you sure you want to {action} this user's account?", 
-            $"{char.ToUpper(action[0])}{action[1..]} Account", 
-            new ConfirmOptions() { OkButtonText = char.ToUpper(action[0]) + action[1..], CancelButtonText = "Cancel" });
-        
-        if (result != true) return;
-
-        isTogglingLock = true;
-        try
-        {
-            var lockoutEnd = isLocked ? (DateTimeOffset?)null : DateTimeOffset.UtcNow.AddYears(1);
-            var success = await UsersApiService.SetLockoutAsync(Id!, lockoutEnd);
-            
-            if (success)
-            {
-                isLocked = !isLocked;
-                NotificationService.Notify(NotificationSeverity.Success, 
-                    $"User account has been {(isLocked ? "locked" : "unlocked")}");
-            }
-            else
-            {
-                NotificationService.Notify(NotificationSeverity.Error, $"Failed to {action} account");
-            }
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Error toggling lockout for user {UserId}", Id);
-            NotificationService.Notify(NotificationSeverity.Error, $"Failed to {action} account");
-        }
-        finally
-        {
-            isTogglingLock = false;
+            StateHasChanged();
         }
     }
 
     private async Task ForceLogout()
     {
-        if (!IsEdit) return;
+        var confirmed = await DialogService.Confirm(
+            "Are you sure you want to force logout all sessions for this user?",
+            "Force Logout",
+            new ConfirmOptions() { OkButtonText = "Force Logout", CancelButtonText = "Cancel" });
 
-        var result = await DialogService.Confirm("Are you sure you want to force logout all sessions for this user?", 
-            "Force Logout", new ConfirmOptions() { OkButtonText = "Force Logout", CancelButtonText = "Cancel" });
-        
-        if (result != true) return;
+        if (confirmed != true) return;
 
         isForcingLogout = true;
         try
@@ -601,8 +948,7 @@
             
             if (success)
             {
-                NotificationService.Notify(NotificationSeverity.Success, 
-                    "All user sessions have been terminated");
+                NotificationService.Notify(NotificationSeverity.Success, "Success", "All user sessions terminated");
             }
             else
             {
@@ -617,27 +963,26 @@
         finally
         {
             isForcingLogout = false;
+            StateHasChanged();
         }
     }
 
     private async Task DeleteUser()
     {
-        if (!IsEdit) return;
+        var confirmed = await DialogService.Confirm(
+            $"Are you sure you want to delete the user '{currentUser?.UserName}'? This action cannot be undone.",
+            "Delete User",
+            new ConfirmOptions() { OkButtonText = "Delete", CancelButtonText = "Cancel" });
 
-        var result = await DialogService.Confirm($"Are you sure you want to delete the user '{model.Email}'?", 
-            "Delete User", new ConfirmOptions() { OkButtonText = "Delete", CancelButtonText = "Cancel" });
-        
-        if (result != true) return;
+        if (confirmed != true) return;
 
         isDeleting = true;
         try
         {
             var success = await UsersApiService.DeleteUserAsync(Id!);
-            
             if (success)
             {
-                NotificationService.Notify(NotificationSeverity.Success, 
-                    $"User '{model.Email}' has been deleted");
+                NotificationService.Notify(NotificationSeverity.Success, "Success", "User deleted successfully");
                 Navigation.NavigateTo("/users");
             }
             else
@@ -653,6 +998,7 @@
         finally
         {
             isDeleting = false;
+            StateHasChanged();
         }
     }
 
@@ -661,99 +1007,34 @@
         Navigation.NavigateTo("/users");
     }
 
-    private string GenerateTemporaryPassword()
+    private void GeneratePassword()
     {
         var random = new Random();
-        var chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        var chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
+        userModel.Password = new string(Enumerable.Repeat(chars, 16)
+            .Select(s => s[random.Next(s.Length)]).ToArray());
+        confirmPassword = userModel.Password;
+        
+        NotificationService.Notify(NotificationSeverity.Info, "Generated", "New password generated");
+    }
+
+    private string GenerateTemporaryPassword()
+    {
+        const string chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+        var random = new Random();
         return new string(Enumerable.Repeat(chars, 12)
             .Select(s => s[random.Next(s.Length)]).ToArray());
     }
 
-    private async Task AssignRoleToUser()
+    // Helper model for user editing
+    public class UserEditModel
     {
-        if (string.IsNullOrEmpty(selectedRoleId) || !IsEdit) return;
-
-        var selectedRole = availableRoles.FirstOrDefault(r => r.Id == selectedRoleId);
-        if (selectedRole == null)
-        {
-            NotificationService.Notify(NotificationSeverity.Warning, "Warning", "Please select a valid role");
-            return;
-        }
-
-        isManagingRoles = true;
-        try
-        {
-            var success = await RolesApiService.AssignRoleAsync(Id!, selectedRoleId);
-            
-            if (success)
-            {
-                NotificationService.Notify(NotificationSeverity.Success, 
-                    $"Role '{selectedRole.Name}' assigned to user successfully");
-                
-                // Refresh the role lists
-                await LoadUserRoles();
-                await LoadAvailableRoles();
-                selectedRoleId = "";
-            }
-            else
-            {
-                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to assign role to user");
-            }
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Error assigning role {RoleId} to user {UserId}", selectedRoleId, Id);
-            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to assign role to user");
-        }
-        finally
-        {
-            isManagingRoles = false;
-        }
-    }
-
-    private async Task RemoveRoleFromUser(string roleId)
-    {
-        if (!IsEdit) return;
-
-        var role = userRoles.FirstOrDefault(r => r.Id == roleId);
-        if (role == null)
-        {
-            NotificationService.Notify(NotificationSeverity.Warning, "Warning", "Role not found");
-            return;
-        }
-
-        var result = await DialogService.Confirm($"Are you sure you want to remove the role '{role.Name}' from this user?", 
-            "Remove Role", new ConfirmOptions() { OkButtonText = "Remove", CancelButtonText = "Cancel" });
-        
-        if (result != true) return;
-
-        isManagingRoles = true;
-        try
-        {
-            var success = await RolesApiService.RemoveRoleAsync(Id!, roleId);
-            
-            if (success)
-            {
-                NotificationService.Notify(NotificationSeverity.Success, 
-                    $"Role '{role.Name}' removed from user successfully");
-                
-                // Refresh the role lists
-                await LoadUserRoles();
-                await LoadAvailableRoles();
-            }
-            else
-            {
-                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to remove role from user");
-            }
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Error removing role {RoleId} from user {UserId}", roleId, Id);
-            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to remove role from user");
-        }
-        finally
-        {
-            isManagingRoles = false;
-        }
+        public string? UserName { get; set; }
+        public string? Email { get; set; }
+        public string? Password { get; set; }
+        public string? PhoneNumber { get; set; }
+        public bool EmailConfirmed { get; set; }
+        public bool PhoneNumberConfirmed { get; set; }
+        public bool TwoFactorEnabled { get; set; }
     }
 }

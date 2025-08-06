@@ -506,6 +506,108 @@ namespace MrWho.Migrations
                     b.ToTable("ClientScopes");
                 });
 
+            modelBuilder.Entity("MrWho.Models.IdentityResource", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("DisplayName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<bool>("Emphasize")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsRequired")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsStandard")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<bool>("ShowInDiscoveryDocument")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("IdentityResources");
+                });
+
+            modelBuilder.Entity("MrWho.Models.IdentityResourceClaim", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("ClaimType")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("IdentityResourceId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IdentityResourceId", "ClaimType")
+                        .IsUnique();
+
+                    b.ToTable("IdentityResourceClaims");
+                });
+
+            modelBuilder.Entity("MrWho.Models.IdentityResourceProperty", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("IdentityResourceId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IdentityResourceId", "Key")
+                        .IsUnique();
+
+                    b.ToTable("IdentityResourceProperties");
+                });
+
             modelBuilder.Entity("MrWho.Models.Realm", b =>
                 {
                     b.Property<string>("Id")
@@ -981,6 +1083,28 @@ namespace MrWho.Migrations
                     b.Navigation("Client");
                 });
 
+            modelBuilder.Entity("MrWho.Models.IdentityResourceClaim", b =>
+                {
+                    b.HasOne("MrWho.Models.IdentityResource", "IdentityResource")
+                        .WithMany("UserClaims")
+                        .HasForeignKey("IdentityResourceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("IdentityResource");
+                });
+
+            modelBuilder.Entity("MrWho.Models.IdentityResourceProperty", b =>
+                {
+                    b.HasOne("MrWho.Models.IdentityResource", "IdentityResource")
+                        .WithMany("Properties")
+                        .HasForeignKey("IdentityResourceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("IdentityResource");
+                });
+
             modelBuilder.Entity("MrWho.Models.ScopeClaim", b =>
                 {
                     b.HasOne("MrWho.Models.Scope", "Scope")
@@ -1034,6 +1158,13 @@ namespace MrWho.Migrations
                     b.Navigation("RedirectUris");
 
                     b.Navigation("Scopes");
+                });
+
+            modelBuilder.Entity("MrWho.Models.IdentityResource", b =>
+                {
+                    b.Navigation("Properties");
+
+                    b.Navigation("UserClaims");
                 });
 
             modelBuilder.Entity("MrWho.Models.Realm", b =>

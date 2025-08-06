@@ -1,0 +1,334 @@
+@page "/identity/identity-resources"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject IIdentityResourcesApiService IdentityResourcesApi
+@inject NavigationManager Navigation
+@inject DialogService DialogService
+@inject NotificationService NotificationService
+@inject ILogger<IdentityResources> Logger
+
+<PageTitle>Identity Resources - MrWho Administration</PageTitle>
+
+<RadzenStack Gap="1rem">
+    <RadzenText TextStyle="TextStyle.H2" class="rz-mb-4">
+        <RadzenIcon Icon="fingerprint" class="rz-me-2" />
+        Identity Resources
+    </RadzenText>
+
+    <!-- Header with search and add button -->
+    <RadzenCard class="rz-p-4">
+        <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center" Gap="1rem">
+            <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" AlignItems="AlignItems.Center">
+                <RadzenTextBox @bind-Value="searchTerm" Placeholder="Search identity resources..." class="rz-w-300" />
+                <RadzenButton Click="@(async () => await LoadIdentityResources())" Icon="search" ButtonStyle="ButtonStyle.Light" />
+                <RadzenButton Click="@(async () => await LoadIdentityResources())" Icon="refresh" ButtonStyle="ButtonStyle.Light" 
+                             Text="Refresh" IsBusy="@isLoading" />
+            </RadzenStack>
+            <RadzenButton Click="@(async () => await ShowCreateIdentityResourceDialog())" Icon="add" ButtonStyle="ButtonStyle.Primary" 
+                         Text="Add Identity Resource" />
+        </RadzenStack>
+    </RadzenCard>
+
+    <!-- Identity Resources table -->
+    <RadzenCard class="rz-p-4">
+        @if (isLoading)
+        {
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" class="rz-p-8">
+                <RadzenProgressBarCircular ProgressBarStyle="ProgressBarStyle.Light" Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+                <RadzenText>Loading identity resources...</RadzenText>
+            </RadzenStack>
+        }
+        else if (identityResources.Any())
+        {
+            <RadzenDataGrid @ref="grid" Data="@identityResources" TItem="IdentityResourceDto" AllowSorting="true" AllowPaging="true" 
+                           PageSize="20" PagerHorizontalAlign="HorizontalAlign.Left" ShowPagingSummary="true">
+                <Columns>
+                    <RadzenDataGridColumn TItem="IdentityResourceDto" Property="Name" Title="Name" Width="150px">
+                        <Template Context="identityResource">
+                            <RadzenBadge BadgeStyle="@(identityResource.IsStandard ? BadgeStyle.Info : BadgeStyle.Secondary)" 
+                                       Text="@identityResource.Name" />
+                        </Template>
+                    </RadzenDataGridColumn>
+                    <RadzenDataGridColumn TItem="IdentityResourceDto" Property="DisplayName" Title="Display Name" Width="150px" />
+                    <RadzenDataGridColumn TItem="IdentityResourceDto" Property="Description" Title="Description" Width="250px">
+                        <Template Context="identityResource">
+                            <RadzenText class="rz-text-truncate" Title="@identityResource.Description">
+                                @(identityResource.Description?.Length > 50 ? identityResource.Description.Substring(0, 50) + "..." : identityResource.Description)
+                            </RadzenText>
+                        </Template>
+                    </RadzenDataGridColumn>
+                    <RadzenDataGridColumn TItem="IdentityResourceDto" Title="Claims" Width="200px">
+                        <Template Context="identityResource">
+                            <RadzenText class="rz-text-truncate" Title="@string.Join(", ", identityResource.UserClaims)">
+                                @(string.Join(", ", identityResource.UserClaims.Take(3)))@(identityResource.UserClaims.Count > 3 ? "..." : "")
+                            </RadzenText>
+                        </Template>
+                    </RadzenDataGridColumn>
+                    <RadzenDataGridColumn TItem="IdentityResourceDto" Title="Status" Width="100px">
+                        <Template Context="identityResource">
+                            <RadzenBadge BadgeStyle="@(identityResource.IsEnabled ? BadgeStyle.Success : BadgeStyle.Danger)" 
+                                       Text="@(identityResource.IsEnabled ? "Enabled" : "Disabled")" />
+                        </Template>
+                    </RadzenDataGridColumn>
+                    <RadzenDataGridColumn TItem="IdentityResourceDto" Title="Type" Width="80px">
+                        <Template Context="identityResource">
+                            <RadzenBadge BadgeStyle="@(identityResource.IsStandard ? BadgeStyle.Info : BadgeStyle.Light)" 
+                                       Text="@(identityResource.IsStandard ? "Standard" : "Custom")" />
+                        </Template>
+                    </RadzenDataGridColumn>
+                    <RadzenDataGridColumn TItem="IdentityResourceDto" Title="Required" Width="80px">
+                        <Template Context="identityResource">
+                            @if (identityResource.IsRequired)
+                            {
+                                <RadzenIcon Icon="check_circle" Style="color: var(--rz-success);" />
+                            }
+                            else
+                            {
+                                <RadzenIcon Icon="cancel" Style="color: var(--rz-text-disabled-color);" />
+                            }
+                        </Template>
+                    </RadzenDataGridColumn>
+                    <RadzenDataGridColumn TItem="IdentityResourceDto" Title="Actions" Width="150px" Sortable="false">
+                        <Template Context="identityResource">
+                            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                                <RadzenButton Icon="visibility" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" 
+                                            Click="@(async () => await ShowIdentityResourceDetails(identityResource))" 
+                                            Title="View Details" />
+                                @if (!identityResource.IsStandard)
+                                {
+                                    <RadzenButton Icon="edit" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" 
+                                                Click="@(async () => await ShowEditIdentityResourceDialog(identityResource))" 
+                                                Title="Edit" />
+                                    <RadzenButton Icon="@(identityResource.IsEnabled ? "toggle_off" : "toggle_on")" 
+                                                ButtonStyle="@(identityResource.IsEnabled ? ButtonStyle.Warning : ButtonStyle.Success)" 
+                                                Size="ButtonSize.Small" 
+                                                Click="@(async () => await ToggleIdentityResource(identityResource))" 
+                                                Title="@(identityResource.IsEnabled ? "Disable" : "Enable")" />
+                                    <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.Small" 
+                                                Click="@(async () => await DeleteIdentityResource(identityResource))" 
+                                                Title="Delete" />
+                                }
+                            </RadzenStack>
+                        </Template>
+                    </RadzenDataGridColumn>
+                </Columns>
+            </RadzenDataGrid>
+        }
+        else
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Info" ShowIcon="true">
+                <RadzenText>No identity resources found.</RadzenText>
+            </RadzenAlert>
+        }
+    </RadzenCard>
+
+    <!-- Information Card -->
+    <RadzenCard class="rz-p-4">
+        <RadzenAlert AlertStyle="AlertStyle.Info" ShowIcon="true">
+            <RadzenText>
+                <strong>Identity Resources</strong> define user information (claims) that can be requested by OIDC clients through ID tokens.
+                Standard identity resources are automatically managed by the system and cannot be modified or deleted.
+            </RadzenText>
+        </RadzenAlert>
+    </RadzenCard>
+</RadzenStack>
+
+@code {
+    private RadzenDataGrid<IdentityResourceDto>? grid;
+    private List<IdentityResourceDto> identityResources = new();
+    private string searchTerm = string.Empty;
+    private bool isLoading = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadIdentityResources();
+    }
+
+    private async Task LoadIdentityResources()
+    {
+        try
+        {
+            isLoading = true;
+            StateHasChanged();
+
+            var result = await IdentityResourcesApi.GetIdentityResourcesAsync(1, 100, searchTerm);
+            identityResources = result.Items.ToList();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading identity resources");
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Error",
+                Detail = "Failed to load identity resources",
+                Duration = 5000
+            });
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task ShowCreateIdentityResourceDialog()
+    {
+        try
+        {
+            var result = await DialogService.OpenAsync<CreateIdentityResourceDialog>("Create Identity Resource",
+                new Dictionary<string, object>(),
+                new DialogOptions() { Width = "800px", Height = "600px", Resizable = true, Draggable = true });
+
+            if (result == true)
+            {
+                await LoadIdentityResources();
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Success,
+                    Summary = "Success",
+                    Detail = "Identity resource created successfully",
+                    Duration = 5000
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error showing create identity resource dialog");
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Error",
+                Detail = "Failed to open create dialog",
+                Duration = 5000
+            });
+        }
+    }
+
+    private async Task ShowEditIdentityResourceDialog(IdentityResourceDto identityResource)
+    {
+        try
+        {
+            var result = await DialogService.OpenAsync<EditIdentityResourceDialog>("Edit Identity Resource",
+                new Dictionary<string, object> { { "IdentityResource", identityResource } },
+                new DialogOptions() { Width = "800px", Height = "600px", Resizable = true, Draggable = true });
+
+            if (result == true)
+            {
+                await LoadIdentityResources();
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Success,
+                    Summary = "Success",
+                    Detail = "Identity resource updated successfully",
+                    Duration = 5000
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error showing edit identity resource dialog");
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Error",
+                Detail = "Failed to open edit dialog",
+                Duration = 5000
+            });
+        }
+    }
+
+    private async Task ShowIdentityResourceDetails(IdentityResourceDto identityResource)
+    {
+        try
+        {
+            await DialogService.OpenAsync<IdentityResourceDetailsDialog>("Identity Resource Details",
+                new Dictionary<string, object> { { "IdentityResource", identityResource } },
+                new DialogOptions() { Width = "800px", Height = "600px", Resizable = true, Draggable = true });
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error showing identity resource details");
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Error",
+                Detail = "Failed to open details dialog",
+                Duration = 5000
+            });
+        }
+    }
+
+    private async Task ToggleIdentityResource(IdentityResourceDto identityResource)
+    {
+        try
+        {
+            var action = identityResource.IsEnabled ? "disable" : "enable";
+            var confirmed = await DialogService.Confirm(
+                $"Are you sure you want to {action} the identity resource '{identityResource.Name}'?",
+                $"Confirm {action.ToUpper()}",
+                new ConfirmOptions() { OkButtonText = "Yes", CancelButtonText = "No" });
+
+            if (confirmed == true)
+            {
+                await IdentityResourcesApi.ToggleIdentityResourceAsync(identityResource.Id);
+                await LoadIdentityResources();
+
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Success,
+                    Summary = "Success",
+                    Detail = $"Identity resource {action}d successfully",
+                    Duration = 5000
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error toggling identity resource {IdentityResourceId}", identityResource.Id);
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Error",
+                Detail = "Failed to toggle identity resource",
+                Duration = 5000
+            });
+        }
+    }
+
+    private async Task DeleteIdentityResource(IdentityResourceDto identityResource)
+    {
+        try
+        {
+            var confirmed = await DialogService.Confirm(
+                $"Are you sure you want to delete the identity resource '{identityResource.Name}'? This action cannot be undone.",
+                "Confirm Delete",
+                new ConfirmOptions() { OkButtonText = "Yes, Delete", CancelButtonText = "Cancel" });
+
+            if (confirmed == true)
+            {
+                await IdentityResourcesApi.DeleteIdentityResourceAsync(identityResource.Id);
+                await LoadIdentityResources();
+
+                NotificationService.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Success,
+                    Summary = "Success",
+                    Detail = "Identity resource deleted successfully",
+                    Duration = 5000
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error deleting identity resource {IdentityResourceId}", identityResource.Id);
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Error",
+                Detail = "Failed to delete identity resource",
+                Duration = 5000
+            });
+        }
+    }
+}
