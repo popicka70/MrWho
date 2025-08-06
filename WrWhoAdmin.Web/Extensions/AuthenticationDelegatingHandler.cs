@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authentication;
 using System.Net.Http.Headers;
 using MrWhoAdmin.Web.Services;
+using MrWho.Shared;
 
 namespace MrWhoAdmin.Web.Extensions;
 
@@ -43,10 +44,10 @@ public class AuthenticationDelegatingHandler : DelegatingHandler
                     }
                 }
 
-                var accessToken = await httpContext.GetTokenAsync("access_token");
+                var accessToken = await httpContext.GetTokenAsync(TokenConstants.TokenNames.AccessToken);
                 if (!string.IsNullOrEmpty(accessToken))
                 {
-                    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+                    request.Headers.Authorization = new AuthenticationHeaderValue(TokenConstants.TokenTypes.Bearer, accessToken);
                     _logger.LogDebug("Added Bearer token to request: {RequestUri} (Token preview: {TokenPreview})", 
                         request.RequestUri, accessToken.Substring(0, Math.Min(20, accessToken.Length)) + "...");
                 }

@@ -3,6 +3,7 @@
 @rendermode InteractiveServer
 @using Microsoft.AspNetCore.Authentication
 @using MrWhoAdmin.Web.Services
+@using MrWho.Shared
 @inject IHttpContextAccessor HttpContextAccessor
 @inject ITokenRefreshService TokenRefreshService
 @inject ILogger<DebugTokenRefresh> Logger
@@ -118,14 +119,14 @@
                 isTokenExpiring = await TokenRefreshService.IsTokenExpiredOrExpiringSoonAsync(httpContext);
                 
                 // Check for tokens
-                var accessToken = await httpContext.GetTokenAsync("access_token");
+                var accessToken = await httpContext.GetTokenAsync(TokenConstants.TokenNames.AccessToken);
                 hasAccessToken = !string.IsNullOrEmpty(accessToken);
                 
-                var refreshToken = await httpContext.GetTokenAsync("refresh_token");
+                var refreshToken = await httpContext.GetTokenAsync(TokenConstants.TokenNames.RefreshToken);
                 hasRefreshToken = !string.IsNullOrEmpty(refreshToken);
                 
                 // Try to get token expiry
-                var expiresAtString = await httpContext.GetTokenAsync("expires_at");
+                var expiresAtString = await httpContext.GetTokenAsync(TokenConstants.TokenNames.ExpiresAt);
                 if (!string.IsNullOrEmpty(expiresAtString) && DateTimeOffset.TryParse(expiresAtString, out var expiresAt))
                 {
                     tokenExpiryTime = expiresAt;
@@ -188,7 +189,7 @@
             var httpContext = HttpContextAccessor.HttpContext;
             if (httpContext != null)
             {
-                var accessToken = await httpContext.GetTokenAsync("access_token");
+                var accessToken = await httpContext.GetTokenAsync(TokenConstants.TokenNames.AccessToken);
                 
                 if (string.IsNullOrEmpty(accessToken))
                 {
@@ -199,7 +200,7 @@
                 {
                     using var httpClient = new HttpClient();
                     httpClient.BaseAddress = new Uri("https://localhost:7113/");
-                    httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+                    httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue(TokenConstants.TokenTypes.Bearer, accessToken);
                     
                     var response = await httpClient.GetAsync("api/realms?page=1&pageSize=1");
                     
