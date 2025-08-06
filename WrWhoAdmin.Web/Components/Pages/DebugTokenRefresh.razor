@@ -30,8 +30,7 @@
         <RadzenFieldset Text="Manual Token Operations">
             <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem">
                 <RadzenButton Click="@CheckTokenStatus" Text="Check Token Status" Icon="refresh" ButtonStyle="ButtonStyle.Primary" IsBusy="@isChecking" />
-                <RadzenButton Click="@ForceRefreshTokenRedirect" Text="Force Refresh Token (Redirect)" Icon="autorenew" ButtonStyle="ButtonStyle.Success" IsBusy="@isRefreshing" />
-                <RadzenButton Click="@ForceRefreshTokenBlazor" Text="Force Refresh Token (Blazor)" Icon="sync" ButtonStyle="ButtonStyle.Warning" IsBusy="@isRefreshingBlazor" />
+                <RadzenButton Click="@ForceRefreshTokenRedirect" Text="Force Refresh Token" Icon="autorenew" ButtonStyle="ButtonStyle.Success" IsBusy="@isRefreshing" />
                 <RadzenButton Click="@TestApiCall" Text="Test API Call" Icon="api" ButtonStyle="ButtonStyle.Secondary" IsBusy="@isTestingApi" />
             </RadzenStack>
         </RadzenFieldset>
@@ -64,8 +63,17 @@
             <RadzenStack Gap="1rem">
                 <RadzenText><strong>1. Automatic Refresh:</strong> Middleware checks token expiry on interactive requests and refreshes if needed</RadzenText>
                 <RadzenText><strong>2. API Call Refresh:</strong> Delegating handler ensures valid tokens before API calls</RadzenText>
-                <RadzenText><strong>3. Manual Refresh:</strong> Use the buttons above to manually check or refresh tokens</RadzenText>
+                <RadzenText><strong>3. Manual Refresh:</strong> Uses redirect to MVC controller for reliable token updates</RadzenText>
                 <RadzenText><strong>4. Fallback:</strong> If refresh fails, user will need to log in again</RadzenText>
+            </RadzenStack>
+        </RadzenFieldset>
+
+        <RadzenFieldset Text="Token Refresh Configuration">
+            <RadzenStack Gap="1rem">
+                <RadzenText><strong>Refresh Before Expiry:</strong> 5 minutes</RadzenText>
+                <RadzenText><strong>Automatic Refresh:</strong> Enabled via middleware</RadzenText>
+                <RadzenText><strong>API Call Auto-Refresh:</strong> Enabled via delegating handler</RadzenText>
+                <RadzenText><strong>Manual Refresh:</strong> Uses redirect-based approach for reliable token updates</RadzenText>
             </RadzenStack>
         </RadzenFieldset>
     </RadzenStack>
@@ -80,7 +88,6 @@
     
     private bool isChecking = false;
     private bool isRefreshing = false;
-    private bool isRefreshingBlazor = false;
     private bool isTestingApi = false;
     
     private string lastOperationResult = "";
@@ -167,47 +174,6 @@
             lastOperationSuccess = false;
             Logger.LogError(ex, "Error initiating token refresh redirect");
             isRefreshing = false;
-            StateHasChanged();
-        }
-    }
-
-    private async Task ForceRefreshTokenBlazor()
-    {
-        isRefreshingBlazor = true;
-        lastOperationResult = "";
-        
-        try
-        {
-            var httpContext = HttpContextAccessor.HttpContext;
-            if (httpContext != null)
-            {
-                // Use Blazor-specific refresh method that handles response streaming
-                var refreshSuccess = await TokenRefreshService.ForceRefreshTokenForBlazorAsync(httpContext);
-                
-                if (refreshSuccess)
-                {
-                    lastOperationResult = "Token refreshed successfully (Blazor method)";
-                    lastOperationSuccess = true;
-                    
-                    // Update status after refresh
-                    await CheckTokenStatus();
-                }
-                else
-                {
-                    lastOperationResult = "Token refresh failed. Check logs for details.";
-                    lastOperationSuccess = false;
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            lastOperationResult = $"Error refreshing token: {ex.Message}";
-            lastOperationSuccess = false;
-            Logger.LogError(ex, "Error refreshing token");
-        }
-        finally
-        {
-            isRefreshingBlazor = false;
             StateHasChanged();
         }
     }

@@ -61,27 +61,6 @@ public class TokenRefreshService : ITokenRefreshService
     }
 
     /// <summary>
-    /// Forces a token refresh specifically for Blazor scenarios where response may have started
-    /// This method handles the case where cookies cannot be updated due to response streaming
-    /// </summary>
-    public async Task<bool> ForceRefreshTokenForBlazorAsync(HttpContext httpContext)
-    {
-        _logger.LogDebug("Starting Blazor-specific token refresh");
-        
-        // Try to update cookies if possible, but don't fail if we can't
-        var refreshSuccess = await RefreshTokenInternalAsync(httpContext, forceRefresh: true, updateCookies: true);
-        
-        if (refreshSuccess)
-        {
-            _logger.LogInformation("Blazor token refresh successful - tokens refreshed");
-            return true;
-        }
-        
-        _logger.LogWarning("Blazor token refresh failed");
-        return false;
-    }
-
-    /// <summary>
     /// Internal method to handle token refresh with options for different scenarios
     /// </summary>
     private async Task<bool> RefreshTokenInternalAsync(HttpContext httpContext, bool forceRefresh = false, bool updateCookies = true)
