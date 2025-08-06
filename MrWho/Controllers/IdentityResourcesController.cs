@@ -45,29 +45,33 @@ public class IdentityResourcesController : ControllerBase
             }
 
             var totalCount = await query.CountAsync();
-            var items = await query
+            
+            // First load the entities from database
+            var identityResources = await query
                 .OrderBy(ir => ir.Name)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
-                .Select(ir => new IdentityResourceDto
-                {
-                    Id = ir.Id,
-                    Name = ir.Name,
-                    DisplayName = ir.DisplayName,
-                    Description = ir.Description,
-                    IsEnabled = ir.IsEnabled,
-                    IsRequired = ir.IsRequired,
-                    IsStandard = ir.IsStandard,
-                    ShowInDiscoveryDocument = ir.ShowInDiscoveryDocument,
-                    Emphasize = ir.Emphasize,
-                    CreatedAt = ir.CreatedAt,
-                    UpdatedAt = ir.UpdatedAt,
-                    CreatedBy = ir.CreatedBy,
-                    UpdatedBy = ir.UpdatedBy,
-                    UserClaims = ir.UserClaims.Select(c => c.ClaimType).ToList(),
-                    Properties = ir.Properties.ToDictionary(p => p.Key, p => p.Value)
-                })
                 .ToListAsync();
+
+            // Then create DTOs in memory where we can use ToDictionary
+            var items = identityResources.Select(ir => new IdentityResourceDto
+            {
+                Id = ir.Id,
+                Name = ir.Name,
+                DisplayName = ir.DisplayName,
+                Description = ir.Description,
+                IsEnabled = ir.IsEnabled,
+                IsRequired = ir.IsRequired,
+                IsStandard = ir.IsStandard,
+                ShowInDiscoveryDocument = ir.ShowInDiscoveryDocument,
+                Emphasize = ir.Emphasize,
+                CreatedAt = ir.CreatedAt,
+                UpdatedAt = ir.UpdatedAt,
+                CreatedBy = ir.CreatedBy,
+                UpdatedBy = ir.UpdatedBy,
+                UserClaims = ir.UserClaims.Select(c => c.ClaimType).ToList(),
+                Properties = ir.Properties.ToDictionary(p => p.Key, p => p.Value)
+            }).ToList();
 
             return Ok(new PagedResult<IdentityResourceDto>
             {
@@ -103,6 +107,7 @@ public class IdentityResourcesController : ControllerBase
                 return NotFound($"Identity resource with ID '{id}' not found");
             }
 
+            // Create DTO in memory to allow ToDictionary
             var dto = new IdentityResourceDto
             {
                 Id = identityResource.Id,
@@ -195,6 +200,7 @@ public class IdentityResourcesController : ControllerBase
                 .Include(ir => ir.Properties)
                 .FirstOrDefaultAsync(ir => ir.Id == identityResource.Id);
 
+            // Create DTO in memory to allow ToDictionary
             var dto = new IdentityResourceDto
             {
                 Id = createdIdentityResource!.Id,
@@ -303,6 +309,7 @@ public class IdentityResourcesController : ControllerBase
                 .Include(ir => ir.Properties)
                 .FirstOrDefaultAsync(ir => ir.Id == id);
 
+            // Create DTO in memory to allow ToDictionary
             var dto = new IdentityResourceDto
             {
                 Id = updatedIdentityResource!.Id,
@@ -391,6 +398,7 @@ public class IdentityResourcesController : ControllerBase
 
             await _context.SaveChangesAsync();
 
+            // Create DTO in memory to allow ToDictionary
             var dto = new IdentityResourceDto
             {
                 Id = identityResource.Id,
