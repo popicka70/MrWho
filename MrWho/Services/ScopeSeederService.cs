@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using MrWho.Data;
 using MrWho.Models;
 using MrWho.Shared.Models;
+using OpenIddict.Abstractions;
 
 namespace MrWho.Services;
 
@@ -13,11 +14,16 @@ public interface IScopeSeederService
 public class ScopeSeederService : IScopeSeederService
 {
     private readonly ApplicationDbContext _context;
+    private readonly IOpenIddictScopeManager _scopeManager;
     private readonly ILogger<ScopeSeederService> _logger;
 
-    public ScopeSeederService(ApplicationDbContext context, ILogger<ScopeSeederService> logger)
+    public ScopeSeederService(
+        ApplicationDbContext context, 
+        IOpenIddictScopeManager scopeManager,
+        ILogger<ScopeSeederService> logger)
     {
         _context = context;
+        _scopeManager = scopeManager;
         _logger = logger;
     }
 
@@ -73,107 +79,177 @@ public class ScopeSeederService : IScopeSeederService
                 Description = "Write access to API resources",
                 Type = ScopeType.Resource,
                 Claims = new[] { "scope" }
+            },
+            new StandardScopeDefinition
+            {
+                Name = "mrwho.use",
+                DisplayName = "MrWho API Usage",
+                Description = "Use MrWho API services and features",
+                Type = ScopeType.Resource,
+                Claims = new[] { "department" }
             }
         };
 
         foreach (var standardScope in standardScopes)
         {
-            var existingScope = await _context.Scopes
-                .Include(s => s.Claims)
-                .FirstOrDefaultAsync(s => s.Name == standardScope.Name);
+            // 1. Create/update scope in our database
+            await CreateOrUpdateDatabaseScopeAsync(standardScope);
+            
+            // 2. Register scope with OpenIddict
+            await RegisterScopeWithOpenIddictAsync(standardScope);
+        }
+    }
 
-            if (existingScope == null)
+    private async Task CreateOrUpdateDatabaseScopeAsync(StandardScopeDefinition standardScope)
+    {
+        var existingScope = await _context.Scopes
+            .Include(s => s.Claims)
+            .FirstOrDefaultAsync(s => s.Name == standardScope.Name);
+
+        if (existingScope == null)
+        {
+            var scope = new Scope
             {
-                var scope = new Scope
+                Name = standardScope.Name,
+                DisplayName = standardScope.DisplayName,
+                Description = standardScope.Description,
+                IsEnabled = true,
+                IsRequired = standardScope.IsRequired,
+                ShowInDiscoveryDocument = true,
+                IsStandard = true,
+                Type = standardScope.Type,
+                CreatedBy = "System"
+            };
+
+            _context.Scopes.Add(scope);
+            await _context.SaveChangesAsync();
+
+            // Add claims
+            foreach (var claimType in standardScope.Claims)
+            {
+                _context.ScopeClaims.Add(new ScopeClaim
                 {
-                    Name = standardScope.Name,
-                    DisplayName = standardScope.DisplayName,
-                    Description = standardScope.Description,
-                    IsEnabled = true,
-                    IsRequired = standardScope.IsRequired,
-                    ShowInDiscoveryDocument = true,
-                    IsStandard = true,
-                    Type = standardScope.Type,
-                    CreatedBy = "System"
-                };
+                    ScopeId = scope.Id,
+                    ClaimType = claimType
+                });
+            }
 
-                _context.Scopes.Add(scope);
-                await _context.SaveChangesAsync();
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Created standard scope '{ScopeName}' in database", scope.Name);
+        }
+        else
+        {
+            // Update existing scope if needed
+            var updated = false;
+            
+            if (existingScope.DisplayName != standardScope.DisplayName)
+            {
+                existingScope.DisplayName = standardScope.DisplayName;
+                updated = true;
+            }
+            
+            if (existingScope.Description != standardScope.Description)
+            {
+                existingScope.Description = standardScope.Description;
+                updated = true;
+            }
 
-                // Add claims
+            if (existingScope.IsRequired != standardScope.IsRequired)
+            {
+                existingScope.IsRequired = standardScope.IsRequired;
+                updated = true;
+            }
+
+            if (existingScope.Type != standardScope.Type)
+            {
+                existingScope.Type = standardScope.Type;
+                updated = true;
+            }
+
+            if (!existingScope.IsStandard)
+            {
+                existingScope.IsStandard = true;
+                updated = true;
+            }
+
+            // Check if claims need updating
+            var existingClaims = existingScope.Claims.Select(c => c.ClaimType).ToHashSet();
+            var expectedClaims = standardScope.Claims.ToHashSet();
+
+            if (!existingClaims.SetEquals(expectedClaims))
+            {
+                _context.ScopeClaims.RemoveRange(existingScope.Claims);
                 foreach (var claimType in standardScope.Claims)
                 {
                     _context.ScopeClaims.Add(new ScopeClaim
                     {
-                        ScopeId = scope.Id,
+                        ScopeId = existingScope.Id,
                         ClaimType = claimType
                     });
                 }
+                updated = true;
+            }
 
+            if (updated)
+            {
+                existingScope.UpdatedAt = DateTime.UtcNow;
+                existingScope.UpdatedBy = "System";
                 await _context.SaveChangesAsync();
-                _logger.LogInformation("Created standard scope '{ScopeName}'", standardScope.Name);
+                _logger.LogInformation("Updated standard scope '{ScopeName}' in database", existingScope.Name);
+            }
+        }
+    }
+
+    private async Task RegisterScopeWithOpenIddictAsync(StandardScopeDefinition standardScope)
+    {
+        try
+        {
+            // Check if scope already exists in OpenIddict
+            var existingOpenIddictScope = await _scopeManager.FindByNameAsync(standardScope.Name);
+            
+            if (existingOpenIddictScope != null)
+            {
+                // Update existing scope
+                var descriptor = new OpenIddictScopeDescriptor
+                {
+                    Name = standardScope.Name,
+                    DisplayName = standardScope.DisplayName,
+                    Description = standardScope.Description
+                };
+
+                // Add claims (resources for the scope)
+                foreach (var claim in standardScope.Claims)
+                {
+                    descriptor.Resources.Add(claim);
+                }
+
+                await _scopeManager.UpdateAsync(existingOpenIddictScope, descriptor);
+                _logger.LogInformation("Updated scope '{ScopeName}' in OpenIddict", standardScope.Name);
             }
             else
             {
-                // Update existing standard scope if needed
-                var needsUpdate = false;
-
-                if (existingScope.DisplayName != standardScope.DisplayName)
+                // Create new scope in OpenIddict
+                var descriptor = new OpenIddictScopeDescriptor
                 {
-                    existingScope.DisplayName = standardScope.DisplayName;
-                    needsUpdate = true;
+                    Name = standardScope.Name,
+                    DisplayName = standardScope.DisplayName,
+                    Description = standardScope.Description
+                };
+
+                // Add claims (resources for the scope)
+                foreach (var claim in standardScope.Claims)
+                {
+                    descriptor.Resources.Add(claim);
                 }
 
-                if (existingScope.Description != standardScope.Description)
-                {
-                    existingScope.Description = standardScope.Description;
-                    needsUpdate = true;
-                }
-
-                if (existingScope.IsRequired != standardScope.IsRequired)
-                {
-                    existingScope.IsRequired = standardScope.IsRequired;
-                    needsUpdate = true;
-                }
-
-                if (existingScope.Type != standardScope.Type)
-                {
-                    existingScope.Type = standardScope.Type;
-                    needsUpdate = true;
-                }
-
-                if (!existingScope.IsStandard)
-                {
-                    existingScope.IsStandard = true;
-                    needsUpdate = true;
-                }
-
-                // Check if claims need updating
-                var existingClaims = existingScope.Claims.Select(c => c.ClaimType).ToHashSet();
-                var expectedClaims = standardScope.Claims.ToHashSet();
-
-                if (!existingClaims.SetEquals(expectedClaims))
-                {
-                    _context.ScopeClaims.RemoveRange(existingScope.Claims);
-                    foreach (var claimType in standardScope.Claims)
-                    {
-                        _context.ScopeClaims.Add(new ScopeClaim
-                        {
-                            ScopeId = existingScope.Id,
-                            ClaimType = claimType
-                        });
-                    }
-                    needsUpdate = true;
-                }
-
-                if (needsUpdate)
-                {
-                    existingScope.UpdatedAt = DateTime.UtcNow;
-                    existingScope.UpdatedBy = "System";
-                    await _context.SaveChangesAsync();
-                    _logger.LogInformation("Updated standard scope '{ScopeName}'", standardScope.Name);
-                }
+                await _scopeManager.CreateAsync(descriptor);
+                _logger.LogInformation("Created scope '{ScopeName}' in OpenIddict", standardScope.Name);
             }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to register scope '{ScopeName}' with OpenIddict", standardScope.Name);
+            throw;
         }
     }
 

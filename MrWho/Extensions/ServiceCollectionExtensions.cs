@@ -149,7 +149,8 @@ public static class ServiceCollectionExtensions
                                       OpenIddictConstants.Scopes.Roles,
                                       OpenIddictConstants.Scopes.OfflineAccess, // CRITICAL: Required for refresh tokens
                                       StandardScopes.ApiRead,   // Use constant
-                                      StandardScopes.ApiWrite); // Use constant
+                                      StandardScopes.ApiWrite,  // Use constant
+                                      StandardScopes.MrWhoUse); // Add mrwho.use scope
 
                 // Register the signing and encryption credentials
                 options.AddDevelopmentEncryptionCertificate()

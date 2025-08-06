@@ -181,6 +181,7 @@ public static class ServiceCollectionExtensions
         options.Scope.Add("offline_access"); // CRITICAL: This scope is required for refresh tokens
         options.Scope.Add("api.read");  // Add API read scope
         options.Scope.Add("api.write"); // Add API write scope
+        options.Scope.Add("mrwho.use"); // Add mrwho.use scope
     }
 
     /// <summary>
