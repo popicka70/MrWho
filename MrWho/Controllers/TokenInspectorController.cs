@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -25,7 +25,7 @@ public class TokenInspectorController : ControllerBase
     /// <summary>
     /// Token inspector endpoint - provides a UI for inspecting JWT tokens
     /// </summary>
-    [HttpGet("")]
+    [HttpGet()]
     public IActionResult Index()
     {
         var html = GenerateTokenInspectorHtml();
@@ -592,7 +592,7 @@ public class TokenInspectorController : ControllerBase
 <body>
     <div class="container">
         <div class="header">
-            <h1>?? JWT Token Inspector</h1>
+            <h1>🔍 JWT Token Inspector</h1>
             <p>Decode and inspect JWT tokens securely</p>
         </div>
         
@@ -603,10 +603,10 @@ public class TokenInspectorController : ControllerBase
             </div>
             
             <div class="button-group">
-                <button class="btn-primary" onclick="decodeToken()">?? Decode Token</button>
-                <button class="btn-secondary" onclick="clearToken()">??? Clear</button>
-                <button class="btn-success" onclick="getCurrentToken()">?? Get Current Token</button>
-                <button class="btn-info" onclick="introspectToken()">?? Introspect Token</button>
+                <button class="btn-primary" onclick="decodeToken()">🔍 Decode Token</button>
+                <button class="btn-secondary" onclick="clearToken()">🗑️ Clear</button>
+                <button class="btn-success" onclick="getCurrentToken()">👤 Get Current Token</button>
+                <button class="btn-info" onclick="introspectToken()">🔎 Introspect Token</button>
             </div>
             
             <div id="result" class="result">
@@ -614,7 +614,7 @@ public class TokenInspectorController : ControllerBase
             </div>
             
             <div class="example-tokens">
-                <h3>?? Quick Actions</h3>
+                <h3>🎯 Quick Actions</h3>
                 <div class="example-token" onclick="getCurrentToken()">
                     <div class="example-token-label">Current User Token</div>
                     <div class="example-token-value">Click to inspect your current authentication token</div>
@@ -628,7 +628,7 @@ public class TokenInspectorController : ControllerBase
     </div>
 
     <script>
-        const API_BASE = window.location.origin + '/identity/tokeninspector';
+        const API_BASE = window.location.origin + '/identity/token-inspector';
         
         async function decodeToken() {
             const token = document.getElementById('tokenInput').value.trim();
@@ -732,7 +732,7 @@ public class TokenInspectorController : ControllerBase
             const result = document.getElementById('result');
             const content = document.getElementById('resultContent');
             
-            content.innerHTML = '<div class="loading">?? Processing...</div>';
+            content.innerHTML = '<div class="loading">🔄 Processing...</div>';
             result.className = 'result';
             result.style.display = 'block';
         }
@@ -741,7 +741,7 @@ public class TokenInspectorController : ControllerBase
             const result = document.getElementById('result');
             const content = document.getElementById('resultContent');
             
-            content.innerHTML = `<h3>? Error</h3><p>${message}</p>`;
+            content.innerHTML = `<h3>❌ Error</h3><p>${message}</p>`;
             result.className = 'result error';
             result.style.display = 'block';
         }
@@ -760,10 +760,10 @@ public class TokenInspectorController : ControllerBase
                                 data.validity.isExpired ? 'Expired' : 'Not Yet Valid';
             
             content.innerHTML = `
-                <h3>? Token Decoded Successfully</h3>
+                <h3>✅ Token Decoded Successfully</h3>
                 <div class="token-info">
                     <div class="info-section">
-                        <h3>?? Header</h3>
+                        <h3>📋 Header</h3>
                         <div class="info-item">
                             <span class="info-label">Algorithm:</span>
                             <span class="info-value">${data.header.alg}</span>
@@ -780,7 +780,7 @@ public class TokenInspectorController : ControllerBase
                     </div>
                     
                     <div class="info-section">
-                        <h3>?? Payload</h3>
+                        <h3>🎯 Payload</h3>
                         <div class="info-item">
                             <span class="info-label">Issuer:</span>
                             <span class="info-value">${data.payload.iss || 'N/A'}</span>
@@ -801,7 +801,7 @@ public class TokenInspectorController : ControllerBase
                     </div>
                     
                     <div class="info-section">
-                        <h3>? Validity</h3>
+                        <h3>⏰ Validity</h3>
                         <div class="info-item">
                             <span class="info-label">Status:</span>
                             <span class="validity-indicator ${validityClass}">${validityText}</span>
@@ -821,7 +821,7 @@ public class TokenInspectorController : ControllerBase
                     </div>
                     
                     <div class="info-section">
-                        <h3>?? Metadata</h3>
+                        <h3>📊 Metadata</h3>
                         <div class="info-item">
                             <span class="info-label">Token Type:</span>
                             <span class="info-value">${data.metadata.tokenType}</span>
@@ -843,7 +843,7 @@ public class TokenInspectorController : ControllerBase
                 
                 ${data.payload.claims && data.payload.claims.length > 0 ? `
                 <div class="info-section" style="grid-column: 1 / -1; margin-top: 20px;">
-                    <h3>??? All Claims (${data.payload.claims.length})</h3>
+                    <h3>🏷️ All Claims (${data.payload.claims.length})</h3>
                     <div class="claims-list">
                         ${data.payload.claims.map(claim => `
                             <div class="claim-item">
@@ -865,10 +865,10 @@ public class TokenInspectorController : ControllerBase
             
             if (data.active) {
                 content.innerHTML = `
-                    <h3>? Token Introspection Result</h3>
+                    <h3>✅ Token Introspection Result</h3>
                     <div class="token-info">
                         <div class="info-section">
-                            <h3>?? Introspection Result</h3>
+                            <h3>🔍 Introspection Result</h3>
                             <div class="info-item">
                                 <span class="info-label">Active:</span>
                                 <span class="validity-indicator valid">True</span>
@@ -903,7 +903,7 @@ public class TokenInspectorController : ControllerBase
                 result.className = 'result success';
             } else {
                 content.innerHTML = `
-                    <h3>? Token Introspection Result</h3>
+                    <h3>❌ Token Introspection Result</h3>
                     <div class="info-item">
                         <span class="info-label">Active:</span>
                         <span class="validity-indicator expired">False</span>
@@ -921,10 +921,10 @@ public class TokenInspectorController : ControllerBase
             const content = document.getElementById('resultContent');
             
             content.innerHTML = `
-                <h3>?? Current User Token Information</h3>
+                <h3>👤 Current User Token Information</h3>
                 <div class="token-info">
                     <div class="info-section">
-                        <h3>?? Authentication</h3>
+                        <h3>🔐 Authentication</h3>
                         <div class="info-item">
                             <span class="info-label">Authenticated:</span>
                             <span class="validity-indicator ${data.isAuthenticated ? 'valid' : 'expired'}">${data.isAuthenticated}</span>
@@ -948,7 +948,7 @@ public class TokenInspectorController : ControllerBase
                     </div>
                     
                     <div class="info-section">
-                        <h3>?? Authorization</h3>
+                        <h3>🎯 Authorization</h3>
                         <div class="info-item">
                             <span class="info-label">Client ID:</span>
                             <span class="info-value">${data.clientId || 'N/A'}</span>
@@ -968,7 +968,7 @@ public class TokenInspectorController : ControllerBase
                     </div>
                     
                     <div class="info-section">
-                        <h3>?? Statistics</h3>
+                        <h3>📊 Statistics</h3>
                         <div class="info-item">
                             <span class="info-label">Total Claims:</span>
                             <span class="info-value">${data.claimsCount}</span>
@@ -994,7 +994,7 @@ public class TokenInspectorController : ControllerBase
                 
                 ${data.roles && data.roles.length > 0 ? `
                 <div class="info-section" style="grid-column: 1 / -1; margin-top: 20px;">
-                    <h3>?? Roles (${data.roles.length})</h3>
+                    <h3>👥 Roles (${data.roles.length})</h3>
                     <div class="claims-list">
                         ${data.roles.map(role => `
                             <div class="claim-item">
@@ -1007,7 +1007,7 @@ public class TokenInspectorController : ControllerBase
                 
                 ${data.scopes && data.scopes.length > 0 ? `
                 <div class="info-section" style="grid-column: 1 / -1; margin-top: 20px;">
-                    <h3>?? Scopes (${data.scopes.length})</h3>
+                    <h3>🔑 Scopes (${data.scopes.length})</h3>
                     <div class="claims-list">
                         ${data.scopes.map(scope => `
                             <div class="claim-item">
@@ -1020,7 +1020,7 @@ public class TokenInspectorController : ControllerBase
                 
                 ${data.claims && data.claims.length > 0 ? `
                 <div class="info-section" style="grid-column: 1 / -1; margin-top: 20px;">
-                    <h3>??? All Claims (${data.claims.length})</h3>
+                    <h3>🏷️ All Claims (${data.claims.length})</h3>
                     <div class="claims-list">
                         ${data.claims.map(claim => `
                             <div class="claim-item">

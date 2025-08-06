@@ -1,4 +1,4 @@
-@page "/identity/token-inspector"
+﻿@page "/identity/token-inspector"
 @attribute [Authorize]
 @rendermode InteractiveServer
 @inject NavigationManager Navigation
@@ -6,7 +6,7 @@
 
 <PageTitle>Token Inspector - MrWho Admin</PageTitle>
 
-<RadzenText TextStyle="TextStyle.H3" class="rz-mb-4">?? JWT Token Inspector</RadzenText>
+<RadzenText TextStyle="TextStyle.H3" class="rz-mb-4">🔍 JWT Token Inspector</RadzenText>
 
 <RadzenCard class="rz-mb-4">
     <RadzenText TextStyle="TextStyle.Body1">
@@ -18,21 +18,21 @@
 <RadzenCard>
     <RadzenStack Gap="1rem">
         <RadzenButton 
-            Text="?? Open Token Inspector" 
+            Text="🔍 Open Token Inspector" 
             Icon="token"
             ButtonStyle="ButtonStyle.Primary" 
             Size="ButtonSize.Large"
             Click="@OpenTokenInspector" />
         
         <RadzenButton 
-            Text="?? Debug Current Token" 
+            Text="📊 Debug Current Token" 
             Icon="bug_report"
             ButtonStyle="ButtonStyle.Secondary" 
             Size="ButtonSize.Medium"
             Click="@(() => Navigation.NavigateTo("/debug-tokens"))" />
             
         <RadzenButton 
-            Text="?? Token Refresh Debug" 
+            Text="🔄 Token Refresh Debug" 
             Icon="autorenew"
             ButtonStyle="ButtonStyle.Info" 
             Size="ButtonSize.Medium"
@@ -41,11 +41,11 @@
 </RadzenCard>
 
 <RadzenCard class="rz-mt-4">
-    <RadzenText TextStyle="TextStyle.H6" class="rz-mb-3">?? Quick Reference</RadzenText>
+    <RadzenText TextStyle="TextStyle.H6" class="rz-mb-3">📋 Quick Reference</RadzenText>
     
     <RadzenAccordion>
         <Items>
-            <RadzenAccordionItem Text="?? How to Use Token Inspector" Icon="help">
+            <RadzenAccordionItem Text="🎯 How to Use Token Inspector" Icon="help">
                 <ol>
                     <li><strong>Get a Token:</strong> Use the "Debug Current Token" button or copy a token from your application</li>
                     <li><strong>Open Inspector:</strong> Click "Open Token Inspector" to access the JWT decoder</li>
@@ -55,7 +55,7 @@
                 </ol>
             </RadzenAccordionItem>
             
-            <RadzenAccordionItem Text="?? Token Types" Icon="info">
+            <RadzenAccordionItem Text="🔑 Token Types" Icon="info">
                 <ul>
                     <li><strong>Access Token:</strong> Used for API authorization (contains scopes)</li>
                     <li><strong>ID Token:</strong> Contains user identity information (OpenID Connect)</li>
@@ -63,7 +63,7 @@
                 </ul>
             </RadzenAccordionItem>
             
-            <RadzenAccordionItem Text="?? Security Notes" Icon="security">
+            <RadzenAccordionItem Text="⚠️ Security Notes" Icon="security">
                 <ul>
                     <li>Never share tokens in production environments</li>
                     <li>Tokens contain sensitive information - handle with care</li>
@@ -72,12 +72,12 @@
                 </ul>
             </RadzenAccordionItem>
             
-            <RadzenAccordionItem Text="??? Available Endpoints" Icon="api">
+            <RadzenAccordionItem Text="🛠️ Available Endpoints" Icon="api">
                 <ul>
-                    <li><strong>Token Inspector UI:</strong> @GetIdentityServerUrl()/identity/token-inspector</li>
-                    <li><strong>Decode API:</strong> POST @GetIdentityServerUrl()/identity/tokeninspector/decode</li>
-                    <li><strong>Introspect API:</strong> POST @GetIdentityServerUrl()/identity/tokeninspector/introspect</li>
-                    <li><strong>Current Token API:</strong> GET @GetIdentityServerUrl()/identity/tokeninspector/current</li>
+                    <li><strong>Token Inspector UI:</strong> @BuildUrl(GetIdentityServerUrl(), "identity/token-inspector")</li>
+                    <li><strong>Decode API:</strong> POST @BuildUrl(GetIdentityServerUrl(), "identity/token-inspector/decode")</li>
+                    <li><strong>Introspect API:</strong> POST @BuildUrl(GetIdentityServerUrl(), "identity/token-inspector/introspect")</li>
+                    <li><strong>Current Token API:</strong> GET @BuildUrl(GetIdentityServerUrl(), "identity/token-inspector/current")</li>
                 </ul>
             </RadzenAccordionItem>
         </Items>
@@ -88,7 +88,7 @@
     private void OpenTokenInspector()
     {
         var identityServerUrl = GetIdentityServerUrl();
-        var inspectorUrl = $"{identityServerUrl}/identity/token-inspector";
+        var inspectorUrl = BuildUrl(identityServerUrl, "identity/token-inspector");
         Navigation.NavigateTo(inspectorUrl, true); // Open in new tab/window
     }
     
@@ -96,5 +96,35 @@
     {
         // Get the identity server URL from configuration
         return Configuration.GetValue<string>("Authentication:Authority") ?? "https://localhost:7113";
+    }
+    
+    /// <summary>
+    /// Safely combines a base URL with a path using Uri class for proper URL handling
+    /// </summary>
+    /// <param name="baseUrl">The base URL (may or may not have trailing slash)</param>
+    /// <param name="path">The path to append (should not start with slash)</param>
+    /// <returns>Properly formatted URL</returns>
+    private static string BuildUrl(string baseUrl, string path)
+    {
+        if (string.IsNullOrEmpty(baseUrl))
+            throw new ArgumentException("Base URL cannot be null or empty", nameof(baseUrl));
+        
+        if (string.IsNullOrEmpty(path))
+            return baseUrl;
+        
+        try
+        {
+            // Use Uri class for safe URL construction
+            var baseUri = new Uri(baseUrl.TrimEnd('/') + "/");
+            var resultUri = new Uri(baseUri, path.TrimStart('/'));
+            return resultUri.ToString();
+        }
+        catch (UriFormatException)
+        {
+            // Fallback to string concatenation if Uri parsing fails
+            var cleanBaseUrl = baseUrl.TrimEnd('/');
+            var cleanPath = path.TrimStart('/');
+            return $"{cleanBaseUrl}/{cleanPath}";
+        }
     }
 }
