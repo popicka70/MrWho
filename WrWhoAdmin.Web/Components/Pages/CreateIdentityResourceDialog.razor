@@ -1,10 +1,12 @@
 @inject IIdentityResourcesApiService IdentityResourcesApi
 @inject NotificationService NotificationService
+@inject DialogService DialogService
 @inject ILogger<CreateIdentityResourceDialog> Logger
 
 <RadzenStack Gap="1rem">
     <RadzenFormField Text="Name" Variant="Variant.Outlined">
         <RadzenTextBox @bind-Value="@request.Name" MaxLength="200" Style="width: 100%;" />
+        <RadzenRequiredValidator Component="Name" Text="Name is required" />
     </RadzenFormField>
 
     <RadzenFormField Text="Display Name" Variant="Variant.Outlined">
@@ -42,7 +44,7 @@
                             Click="@(async () => await AddClaim())" Disabled="@string.IsNullOrWhiteSpace(newClaim)" />
             </RadzenStack>
 
-            @if (request.UserClaims.Any())
+            @if (request?.UserClaims?.Any() == true)
             {
                 <RadzenDataList Data="@request.UserClaims" TItem="string" WrapItems="true">
                     <Template Context="claim">
@@ -75,7 +77,7 @@
                             Disabled="@(string.IsNullOrWhiteSpace(newPropertyKey) || string.IsNullOrWhiteSpace(newPropertyValue))" />
             </RadzenStack>
 
-            @if (request.Properties.Any())
+            @if (request?.Properties?.Any() == true)
             {
                 <RadzenDataList Data="@request.Properties" TItem="KeyValuePair<string, string>" WrapItems="true">
                     <Template Context="property">
@@ -107,8 +109,6 @@
 </RadzenStack>
 
 @code {
-    [CascadingParameter] public DialogService DialogService { get; set; } = default!;
-
     private CreateIdentityResourceRequest request = new();
     private string newClaim = string.Empty;
     private string newPropertyKey = string.Empty;
@@ -117,16 +117,24 @@
 
     protected override void OnInitialized()
     {
+        // Initialize request with proper default values
         request = new CreateIdentityResourceRequest
         {
+            Name = string.Empty,
+            DisplayName = null,
+            Description = null,
             IsEnabled = true,
-            ShowInDiscoveryDocument = true
+            IsRequired = false,
+            ShowInDiscoveryDocument = true,
+            Emphasize = false,
+            UserClaims = new List<string>(),
+            Properties = new Dictionary<string, string>()
         };
     }
 
     private async Task AddClaim()
     {
-        if (!string.IsNullOrWhiteSpace(newClaim) && !request.UserClaims.Contains(newClaim))
+        if (!string.IsNullOrWhiteSpace(newClaim) && request?.UserClaims != null && !request.UserClaims.Contains(newClaim))
         {
             request.UserClaims.Add(newClaim.Trim());
             newClaim = string.Empty;
@@ -137,15 +145,18 @@
 
     private async Task RemoveClaim(string claim)
     {
-        request.UserClaims.Remove(claim);
-        StateHasChanged();
+        if (request?.UserClaims != null)
+        {
+            request.UserClaims.Remove(claim);
+            StateHasChanged();
+        }
         await Task.CompletedTask;
     }
 
     private async Task AddProperty()
     {
         if (!string.IsNullOrWhiteSpace(newPropertyKey) && !string.IsNullOrWhiteSpace(newPropertyValue) 
-            && !request.Properties.ContainsKey(newPropertyKey.Trim()))
+            && request?.Properties != null && !request.Properties.ContainsKey(newPropertyKey.Trim()))
         {
             request.Properties[newPropertyKey.Trim()] = newPropertyValue.Trim();
             newPropertyKey = string.Empty;
@@ -157,8 +168,11 @@
 
     private async Task RemoveProperty(string key)
     {
-        request.Properties.Remove(key);
-        StateHasChanged();
+        if (request?.Properties != null)
+        {
+            request.Properties.Remove(key);
+            StateHasChanged();
+        }
         await Task.CompletedTask;
     }
 
@@ -166,9 +180,36 @@
     {
         try
         {
+            // Validate required services
+            if (IdentityResourcesApi == null)
+            {
+                Logger?.LogError("IdentityResourcesApi service is null");
+                NotificationService?.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Service Error",
+                    Detail = "Identity Resources API service is not available",
+                    Duration = 5000
+                });
+                return;
+            }
+
+            if (request == null)
+            {
+                Logger?.LogError("Request object is null");
+                NotificationService?.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Error",
+                    Detail = "Request data is not initialized",
+                    Duration = 5000
+                });
+                return;
+            }
+
             if (string.IsNullOrWhiteSpace(request.Name))
             {
-                NotificationService.Notify(new NotificationMessage
+                NotificationService?.Notify(new NotificationMessage
                 {
                     Severity = NotificationSeverity.Warning,
                     Summary = "Validation Error",
@@ -181,17 +222,38 @@
             isCreating = true;
             StateHasChanged();
 
-            await IdentityResourcesApi.CreateIdentityResourceAsync(request);
-            DialogService.Close(true);
+            var result = await IdentityResourcesApi.CreateIdentityResourceAsync(request);
+            
+            if (result != null)
+            {
+                DialogService?.Close(true);
+                NotificationService?.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Success,
+                    Summary = "Success",
+                    Detail = "Identity resource created successfully",
+                    Duration = 5000
+                });
+            }
+            else
+            {
+                NotificationService?.Notify(new NotificationMessage
+                {
+                    Severity = NotificationSeverity.Error,
+                    Summary = "Error",
+                    Detail = "Failed to create identity resource - API returned null",
+                    Duration = 5000
+                });
+            }
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Error creating identity resource");
-            NotificationService.Notify(new NotificationMessage
+            Logger?.LogError(ex, "Error creating identity resource");
+            NotificationService?.Notify(new NotificationMessage
             {
                 Severity = NotificationSeverity.Error,
                 Summary = "Error",
-                Detail = "Failed to create identity resource",
+                Detail = $"Failed to create identity resource: {ex.Message}",
                 Duration = 5000
             });
         }
@@ -204,7 +266,7 @@
 
     private async Task Cancel()
     {
-        DialogService.Close(false);
+        DialogService?.Close(false);
         await Task.CompletedTask;
     }
 }

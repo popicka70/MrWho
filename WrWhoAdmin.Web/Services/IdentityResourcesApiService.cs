@@ -83,7 +83,7 @@ public class IdentityResourcesApiService : IIdentityResourcesApiService
         }
     }
 
-    public async Task<IdentityResourceDto> CreateIdentityResourceAsync(CreateIdentityResourceRequest request)
+    public async Task<IdentityResourceDto?> CreateIdentityResourceAsync(CreateIdentityResourceRequest request)
     {
         try
         {
@@ -96,22 +96,22 @@ public class IdentityResourcesApiService : IIdentityResourcesApiService
             {
                 var errorContent = await response.Content.ReadAsStringAsync();
                 _logger.LogError("Failed to create identity resource. Status: {StatusCode}, Error: {Error}", response.StatusCode, errorContent);
-                throw new HttpRequestException($"Failed to create identity resource: {response.StatusCode} - {errorContent}");
+                return null;
             }
 
             var responseJson = await response.Content.ReadAsStringAsync();
             var result = JsonSerializer.Deserialize<IdentityResourceDto>(responseJson, _jsonOptions);
 
-            return result ?? throw new InvalidOperationException("Failed to deserialize created identity resource");
+            return result;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error creating identity resource");
-            throw;
+            return null;
         }
     }
 
-    public async Task<IdentityResourceDto> UpdateIdentityResourceAsync(string id, UpdateIdentityResourceRequest request)
+    public async Task<IdentityResourceDto?> UpdateIdentityResourceAsync(string id, UpdateIdentityResourceRequest request)
     {
         try
         {
@@ -124,18 +124,18 @@ public class IdentityResourcesApiService : IIdentityResourcesApiService
             {
                 var errorContent = await response.Content.ReadAsStringAsync();
                 _logger.LogError("Failed to update identity resource {Id}. Status: {StatusCode}, Error: {Error}", id, response.StatusCode, errorContent);
-                throw new HttpRequestException($"Failed to update identity resource: {response.StatusCode} - {errorContent}");
+                return null;
             }
 
             var responseJson = await response.Content.ReadAsStringAsync();
             var result = JsonSerializer.Deserialize<IdentityResourceDto>(responseJson, _jsonOptions);
 
-            return result ?? throw new InvalidOperationException("Failed to deserialize updated identity resource");
+            return result;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error updating identity resource {Id}", id);
-            throw;
+            return null;
         }
     }
 
@@ -159,7 +159,7 @@ public class IdentityResourcesApiService : IIdentityResourcesApiService
         }
     }
 
-    public async Task<IdentityResourceDto> ToggleIdentityResourceAsync(string id)
+    public async Task<IdentityResourceDto?> ToggleIdentityResourceAsync(string id)
     {
         try
         {
@@ -169,18 +169,18 @@ public class IdentityResourcesApiService : IIdentityResourcesApiService
             {
                 var errorContent = await response.Content.ReadAsStringAsync();
                 _logger.LogError("Failed to toggle identity resource {Id}. Status: {StatusCode}, Error: {Error}", id, response.StatusCode, errorContent);
-                throw new HttpRequestException($"Failed to toggle identity resource: {response.StatusCode} - {errorContent}");
+                return null;
             }
 
             var responseJson = await response.Content.ReadAsStringAsync();
             var result = JsonSerializer.Deserialize<IdentityResourceDto>(responseJson, _jsonOptions);
 
-            return result ?? throw new InvalidOperationException("Failed to deserialize toggled identity resource");
+            return result;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error toggling identity resource {Id}", id);
-            throw;
+            return null;
         }
     }
 }

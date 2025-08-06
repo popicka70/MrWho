@@ -1,3 +1,4 @@
+@inject DialogService DialogService
 @inject ILogger<IdentityResourceDetailsDialog> Logger
 
 <RadzenStack Gap="1rem">
@@ -122,11 +123,10 @@
 
 @code {
     [Parameter] public IdentityResourceDto IdentityResource { get; set; } = new();
-    [CascadingParameter] public DialogService DialogService { get; set; } = default!;
 
     private async Task Close()
     {
-        DialogService.Close();
+        DialogService?.Close();
         await Task.CompletedTask;
     }
 }
