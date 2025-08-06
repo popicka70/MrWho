@@ -5,6 +5,7 @@ using MrWho.Data;
 using MrWho.Handlers;
 using MrWho.Handlers.Users;
 using MrWho.Services;
+using MrWho.Shared;
 using OpenIddict.Abstractions;
 using OpenIddict.Server.AspNetCore;
 using OpenIddict.Validation.AspNetCore;
@@ -141,13 +142,13 @@ public static class ServiceCollectionExtensions
                 options.DisableRollingRefreshTokens(); // Disable refresh token rotation for development
 
                 // Register scopes (including API scopes)
-                options.RegisterScopes("openid",
+                options.RegisterScopes(StandardScopes.OpenId,
                                       OpenIddictConstants.Scopes.Email,
                                       OpenIddictConstants.Scopes.Profile,
                                       OpenIddictConstants.Scopes.Roles,
                                       OpenIddictConstants.Scopes.OfflineAccess, // CRITICAL: Required for refresh tokens
-                                      "api.read",   // Add this
-                                      "api.write"); // Add this
+                                      StandardScopes.ApiRead,   // Use constant
+                                      StandardScopes.ApiWrite); // Use constant
 
                 // Register the signing and encryption credentials
                 options.AddDevelopmentEncryptionCertificate()

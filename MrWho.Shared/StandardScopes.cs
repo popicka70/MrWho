@@ -9,6 +9,7 @@ public static class StandardScopes
     public const string Email = "email";
     public const string Profile = "profile";
     public const string Roles = "roles";
+    public const string OfflineAccess = "offline_access";
     public const string ApiRead = "api.read";
     public const string ApiWrite = "api.write";
 }

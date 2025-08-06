@@ -1,5 +1,6 @@
 using MrWhoAdmin.Web.Services;
 using Microsoft.AspNetCore.Authentication;
+using MrWho.Shared;
 
 namespace MrWhoAdmin.Web.Middleware;
 
@@ -29,7 +30,7 @@ public class TokenRefreshMiddleware
             try
             {
                 // First check if we have a refresh token available
-                var refreshToken = await context.GetTokenAsync("refresh_token");
+                var refreshToken = await context.GetTokenAsync(TokenConstants.TokenNames.RefreshToken);
                 if (string.IsNullOrEmpty(refreshToken))
                 {
                     // No refresh token available, skip proactive refresh

@@ -23,14 +23,6 @@ public interface ITokenRefreshService
     Task<bool> ForceRefreshTokenAsync(HttpContext httpContext, bool force = false);
 
     /// <summary>
-    /// Forces a token refresh specifically for Blazor scenarios where response may have started
-    /// This method handles the case where cookies cannot be updated due to response streaming
-    /// </summary>
-    /// <param name="httpContext">The current HTTP context</param>
-    /// <returns>True if refresh was successful (even if cookies couldn't be updated), false otherwise</returns>
-    Task<bool> ForceRefreshTokenForBlazorAsync(HttpContext httpContext);
-
-    /// <summary>
     /// Checks if the current access token is expired or will expire soon
     /// </summary>
     /// <param name="httpContext">The current HTTP context</param>

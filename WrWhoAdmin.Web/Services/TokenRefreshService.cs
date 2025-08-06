@@ -1,8 +1,9 @@
-using Microsoft.AspNetCore.Authentication;
+﻿using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using MrWho.Shared;
 
 namespace MrWhoAdmin.Web.Services;
 
@@ -61,28 +62,6 @@ public class TokenRefreshService : ITokenRefreshService
     }
 
     /// <summary>
-    /// Forces a token refresh specifically for Blazor scenarios where response may have started
-    /// This method handles the case where cookies cannot be updated due to response streaming
-    /// </summary>
-    public async Task<bool> ForceRefreshTokenForBlazorAsync(HttpContext httpContext)
-    {
-        _logger.LogDebug("Starting Blazor-specific token refresh");
-        
-        // For Blazor, we just need to refresh the token on the server side
-        // The client will get the fresh token on the next request
-        var refreshSuccess = await RefreshTokenInternalAsync(httpContext, forceRefresh: true, updateCookies: false);
-        
-        if (refreshSuccess)
-        {
-            _logger.LogInformation("Blazor token refresh successful - fresh tokens available for future requests");
-            return true;
-        }
-        
-        _logger.LogWarning("Blazor token refresh failed");
-        return false;
-    }
-
-    /// <summary>
     /// Internal method to handle token refresh with options for different scenarios
     /// </summary>
     private async Task<bool> RefreshTokenInternalAsync(HttpContext httpContext, bool forceRefresh = false, bool updateCookies = true)
@@ -103,7 +82,7 @@ public class TokenRefreshService : ITokenRefreshService
                 return true;
             }
 
-            var refreshToken = await httpContext.GetTokenAsync("refresh_token");
+            var refreshToken = await httpContext.GetTokenAsync(TokenConstants.TokenNames.RefreshToken);
             if (string.IsNullOrEmpty(refreshToken))
             {
                 _logger.LogWarning("No refresh token available for token refresh");
@@ -121,10 +100,10 @@ public class TokenRefreshService : ITokenRefreshService
             
             var tokenRequest = new Dictionary<string, string>
             {
-                ["grant_type"] = "refresh_token",
-                ["refresh_token"] = refreshToken,
-                ["client_id"] = clientId,
-                ["client_secret"] = clientSecret
+                [TokenConstants.ParameterNames.GrantType] = TokenConstants.GrantTypes.RefreshToken,
+                [TokenConstants.ParameterNames.RefreshToken] = refreshToken,
+                [TokenConstants.ParameterNames.ClientId] = clientId,
+                [TokenConstants.ParameterNames.ClientSecret] = clientSecret
             };
 
             var tokenEndpoint = $"{authority.TrimEnd('/')}/connect/token";
@@ -153,25 +132,25 @@ public class TokenRefreshService : ITokenRefreshService
                     var authenticateResult = await httpContext.AuthenticateAsync();
                     if (authenticateResult.Properties != null)
                     {
-                        authenticateResult.Properties.UpdateTokenValue("access_token", tokenResponse.AccessToken);
+                        authenticateResult.Properties.UpdateTokenValue(TokenConstants.TokenNames.AccessToken, tokenResponse.AccessToken);
                         
                         // CRITICAL: Update refresh token if a new one was provided (token rotation)
                         if (!string.IsNullOrEmpty(tokenResponse.RefreshToken))
                         {
-                            authenticateResult.Properties.UpdateTokenValue("refresh_token", tokenResponse.RefreshToken);
+                            authenticateResult.Properties.UpdateTokenValue(TokenConstants.TokenNames.RefreshToken, tokenResponse.RefreshToken);
                             _logger.LogDebug("Updated refresh token due to token rotation");
                         }
 
                         if (!string.IsNullOrEmpty(tokenResponse.IdToken))
                         {
-                            authenticateResult.Properties.UpdateTokenValue("id_token", tokenResponse.IdToken);
+                            authenticateResult.Properties.UpdateTokenValue(TokenConstants.TokenNames.IdToken, tokenResponse.IdToken);
                         }
 
                         // Calculate expiry time if provided
                         if (tokenResponse.ExpiresIn.HasValue)
                         {
                             var expiresAt = DateTimeOffset.UtcNow.AddSeconds(tokenResponse.ExpiresIn.Value);
-                            authenticateResult.Properties.UpdateTokenValue("expires_at", 
+                            authenticateResult.Properties.UpdateTokenValue(TokenConstants.TokenNames.ExpiresAt, 
                                 expiresAt.ToString("o"));
                         }
 
@@ -184,7 +163,6 @@ public class TokenRefreshService : ITokenRefreshService
                         catch (InvalidOperationException ex) when (ex.Message.Contains("Headers are read-only"))
                         {
                             _logger.LogWarning("Token refresh successful but cookies could not be updated (response already started): {Error}", ex.Message);
-                            // This is acceptable in Blazor scenarios - the token is refreshed, just not persisted in this request
                             return true;
                         }
                         
@@ -204,7 +182,7 @@ public class TokenRefreshService : ITokenRefreshService
                 
                 // If the refresh token is invalid/expired, the user needs to re-authenticate
                 if (response.StatusCode == System.Net.HttpStatusCode.BadRequest && 
-                    errorContent.Contains("invalid_grant"))
+                    errorContent.Contains(TokenConstants.ErrorCodes.InvalidGrant))
                 {
                     _logger.LogWarning("Refresh token is invalid or expired, user needs to re-authenticate");
                     // Could potentially trigger a re-authentication flow here
@@ -230,7 +208,7 @@ public class TokenRefreshService : ITokenRefreshService
     {
         try
         {
-            var accessToken = await httpContext.GetTokenAsync("access_token");
+            var accessToken = await httpContext.GetTokenAsync(TokenConstants.TokenNames.AccessToken);
             if (string.IsNullOrEmpty(accessToken))
             {
                 _logger.LogDebug("No access token found, considering it expired");
@@ -238,7 +216,7 @@ public class TokenRefreshService : ITokenRefreshService
             }
 
             // Try to get expiry from stored token properties first
-            var expiresAtString = await httpContext.GetTokenAsync("expires_at");
+            var expiresAtString = await httpContext.GetTokenAsync(TokenConstants.TokenNames.ExpiresAt);
             if (!string.IsNullOrEmpty(expiresAtString) && DateTimeOffset.TryParse(expiresAtString, out var expiresAt))
             {
                 var timeUntilExpiry = expiresAt - DateTimeOffset.UtcNow;
@@ -280,22 +258,22 @@ public class TokenRefreshService : ITokenRefreshService
     /// </summary>
     private class TokenResponse
     {
-        [JsonPropertyName("access_token")]
+        [JsonPropertyName(TokenConstants.JsonPropertyNames.AccessToken)]
         public string? AccessToken { get; set; }
         
-        [JsonPropertyName("refresh_token")]
+        [JsonPropertyName(TokenConstants.JsonPropertyNames.RefreshToken)]
         public string? RefreshToken { get; set; }
         
-        [JsonPropertyName("id_token")]
+        [JsonPropertyName(TokenConstants.JsonPropertyNames.IdToken)]
         public string? IdToken { get; set; }
         
-        [JsonPropertyName("token_type")]
+        [JsonPropertyName(TokenConstants.JsonPropertyNames.TokenType)]
         public string? TokenType { get; set; }
         
-        [JsonPropertyName("expires_in")]
+        [JsonPropertyName(TokenConstants.JsonPropertyNames.ExpiresIn)]
         public int? ExpiresIn { get; set; }
         
-        [JsonPropertyName("scope")]
+        [JsonPropertyName(TokenConstants.JsonPropertyNames.Scope)]
         public string? Scope { get; set; }
     }
 }
