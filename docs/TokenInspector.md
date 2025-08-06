@@ -26,13 +26,14 @@ The JWT Token Inspector is a comprehensive tool for debugging and inspecting JWT
 
 ### Web Interface
 - **Main UI**: `https://localhost:7113/identity/token-inspector`
+- **Alternative URL**: `https://localhost:7113/identity/tokeninspector`
 - **Admin Interface**: `https://localhost:7257/identity/token-inspector`
 
 ### API Endpoints
 
 #### Decode Token (No Authentication Required)
 ```http
-POST https://localhost:7113/identity/tokeninspector/decode
+POST https://localhost:7113/identity/token-inspector/decode
 Content-Type: application/json
 
 {
@@ -42,7 +43,7 @@ Content-Type: application/json
 
 #### Introspect Token (Authentication Required)
 ```http
-POST https://localhost:7113/identity/tokeninspector/introspect
+POST https://localhost:7113/identity/token-inspector/introspect
 Authorization: Bearer <your-access-token>
 Content-Type: application/json
 
@@ -53,7 +54,7 @@ Content-Type: application/json
 
 #### Current User Token Info (Authentication Required)
 ```http
-GET https://localhost:7113/identity/tokeninspector/current
+GET https://localhost:7113/identity/token-inspector/current
 Authorization: Bearer <your-access-token>
 ```
 
@@ -72,7 +73,7 @@ Authorization: Bearer <your-access-token>
 # Decode a token
 $token = "your-jwt-token-here"
 $body = @{ token = $token } | ConvertTo-Json
-$response = Invoke-RestMethod -Uri "https://localhost:7113/identity/tokeninspector/decode" -Method POST -Body $body -ContentType "application/json"
+$response = Invoke-RestMethod -Uri "https://localhost:7113/identity/token-inspector/decode" -Method POST -Body $body -ContentType "application/json"
 $response | ConvertTo-Json -Depth 10
 ```
 
@@ -80,12 +81,12 @@ $response | ConvertTo-Json -Depth 10
 
 ```bash
 # Decode a token
-curl -X POST https://localhost:7113/identity/tokeninspector/decode \
+curl -X POST https://localhost:7113/identity/token-inspector/decode \
   -H "Content-Type: application/json" \
   -d '{"token":"your-jwt-token-here"}'
 
 # Introspect a token (requires authentication)
-curl -X POST https://localhost:7113/identity/tokeninspector/introspect \
+curl -X POST https://localhost:7113/identity/token-inspector/introspect \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer your-access-token" \
   -d '{"token":"token-to-validate"}'

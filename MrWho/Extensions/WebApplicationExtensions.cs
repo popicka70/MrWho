@@ -42,6 +42,9 @@ public static class WebApplicationExtensions
             name: "default",
             pattern: "{controller=Home}/{action=Index}/{id?}");
 
+        // CRITICAL: Map API controllers for token inspector and other API endpoints
+        app.MapControllers();
+
         return app;
     }
 
@@ -70,9 +73,6 @@ public static class WebApplicationExtensions
 
     public static WebApplication AddMrWhoDebugEndpoints(this WebApplication app)
     {
-        // Token Inspector endpoint - redirect to controller
-        app.MapGet("/identity/token-inspector", () => Results.Redirect("/identity/tokeninspector"));
-
         // Debug endpoints discovery
         app.MapGet("/debug", () => Results.Ok(new
         {
@@ -80,6 +80,7 @@ public static class WebApplicationExtensions
             Endpoints = new
             {
                 TokenInspector = "/identity/token-inspector",
+                TokenInspectorAlt = "/identity/tokeninspector",
                 ClientInfo = "/debug/client-info", 
                 AdminClientInfo = "/debug/admin-client-info",
                 EssentialData = "/debug/essential-data",

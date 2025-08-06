@@ -10,6 +10,7 @@ namespace MrWho.Controllers;
 
 [ApiController]
 [Route("identity/[controller]")]
+[Route("identity/token-inspector")] // Add explicit route for the kebab-case URL
 public class TokenInspectorController : ControllerBase
 {
     private readonly ILogger<TokenInspectorController> _logger;
