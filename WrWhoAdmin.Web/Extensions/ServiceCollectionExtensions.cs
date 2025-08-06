@@ -211,10 +211,16 @@ public static class ServiceCollectionExtensions
         options.ClaimActions.DeleteClaim("oi_tbn_id");
 
         // Only map claims from UserInfo endpoint
+        options.ClaimActions.MapJsonKey("sub", "sub");
         options.ClaimActions.MapJsonKey("name", "name");
         options.ClaimActions.MapJsonKey("given_name", "given_name");
         options.ClaimActions.MapJsonKey("family_name", "family_name");
         options.ClaimActions.MapJsonKey("email", "email");
+        options.ClaimActions.MapJsonKey("email_verified", "email_verified");
+        options.ClaimActions.MapJsonKey("preferred_username", "preferred_username");
+        options.ClaimActions.MapJsonKey("phone_number", "phone_number");
+        options.ClaimActions.MapJsonKey("phone_number_verified", "phone_number_verified");
+        options.ClaimActions.MapJsonKey("role", "role");
     }
 
     /// <summary>
@@ -235,8 +241,33 @@ public static class ServiceCollectionExtensions
             OnTokenValidated = context =>
             {
                 var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-                logger.LogInformation("Token validated successfully for user: {UserName}", 
-                    context.Principal?.Identity?.Name ?? "Unknown");
+                logger.LogInformation("Token validated successfully for user: {UserName}. Claims count: {ClaimsCount}", 
+                    context.Principal?.Identity?.Name ?? "Unknown", context.Principal?.Claims?.Count() ?? 0);
+                
+                // Log the claims we have at this point
+                if (context.Principal?.Claims != null)
+                {
+                    foreach (var claim in context.Principal.Claims)
+                    {
+                        logger.LogDebug("Token claim: {ClaimType} = {ClaimValue}", claim.Type, claim.Value);
+                    }
+                }
+                
+                return Task.CompletedTask;
+            },
+
+            OnUserInformationReceived = context =>
+            {
+                var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+                logger.LogInformation("UserInfo received from endpoint. User document contains {PropertyCount} properties", 
+                    context.User.RootElement.EnumerateObject().Count());
+                
+                // Log what we received from UserInfo endpoint
+                foreach (var property in context.User.RootElement.EnumerateObject())
+                {
+                    logger.LogDebug("UserInfo property: {PropertyName} = {PropertyValue}", property.Name, property.Value.ToString());
+                }
+                
                 return Task.CompletedTask;
             },
             

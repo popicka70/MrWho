@@ -15,6 +15,11 @@ public interface IScopeSeederService
     /// Initializes standard scopes in the database
     /// </summary>
     Task InitializeStandardScopesAsync();
+
+    /// <summary>
+    /// Initializes standard identity resources in the database
+    /// </summary>
+    Task InitializeStandardIdentityResourcesAsync();
 }
 
 /// <summary>
@@ -103,6 +108,64 @@ public class ScopeSeederService : IScopeSeederService
         foreach (var standardScope in standardScopes)
         {
             await CreateOrUpdateDatabaseScopeAsync(standardScope);
+        }
+    }
+
+    /// <summary>
+    /// Initializes standard identity resources in the database
+    /// </summary>
+    public async Task InitializeStandardIdentityResourcesAsync()
+    {
+        var identityResources = new[]
+        {
+            new StandardIdentityResourceDefinition
+            {
+                Name = "openid",
+                DisplayName = "OpenID",
+                Description = "Access to OpenID Connect identity",
+                IsRequired = true,
+                Claims = new[] { "sub" }
+            },
+            new StandardIdentityResourceDefinition
+            {
+                Name = "profile",
+                DisplayName = "Profile",
+                Description = "Access to profile information",
+                Claims = new[] { "name", "family_name", "given_name", "middle_name", "nickname", "preferred_username", "profile", "picture", "website", "gender", "birthdate", "zoneinfo", "locale", "updated_at" }
+            },
+            new StandardIdentityResourceDefinition
+            {
+                Name = "email",
+                DisplayName = "Email",
+                Description = "Access to email address",
+                Claims = new[] { "email", "email_verified" }
+            },
+            new StandardIdentityResourceDefinition
+            {
+                Name = "roles",
+                DisplayName = "Roles",
+                Description = "Access to user roles",
+                Claims = new[] { "role" }
+            },
+            new StandardIdentityResourceDefinition
+            {
+                Name = "phone",
+                DisplayName = "Phone",
+                Description = "Access to phone number",
+                Claims = new[] { "phone_number", "phone_number_verified" }
+            },
+            new StandardIdentityResourceDefinition
+            {
+                Name = "address",
+                DisplayName = "Address",
+                Description = "Access to address information",
+                Claims = new[] { "address" }
+            }
+        };
+
+        foreach (var identityResource in identityResources)
+        {
+            await CreateOrUpdateIdentityResourceAsync(identityResource);
         }
     }
 
@@ -206,6 +269,99 @@ public class ScopeSeederService : IScopeSeederService
         }
     }
 
+    private async Task CreateOrUpdateIdentityResourceAsync(StandardIdentityResourceDefinition identityResource)
+    {
+        var existing = await _context.IdentityResources
+            .Include(ir => ir.UserClaims)
+            .FirstOrDefaultAsync(ir => ir.Name == identityResource.Name);
+
+        if (existing == null)
+        {
+            var resource = new IdentityResource
+            {
+                Name = identityResource.Name,
+                DisplayName = identityResource.DisplayName,
+                Description = identityResource.Description,
+                IsEnabled = true,
+                IsRequired = identityResource.IsRequired,
+                ShowInDiscoveryDocument = true,
+                IsStandard = true,
+                CreatedBy = "System"
+            };
+
+            _context.IdentityResources.Add(resource);
+            await _context.SaveChangesAsync();
+
+            // Add claims
+            foreach (var claimType in identityResource.Claims)
+            {
+                _context.IdentityResourceClaims.Add(new IdentityResourceClaim
+                {
+                    IdentityResourceId = resource.Id,
+                    ClaimType = claimType
+                });
+            }
+
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Created standard identity resource '{ResourceName}' in database", resource.Name);
+        }
+        else
+        {
+            // Update existing identity resource if needed
+            var updated = false;
+            
+            if (existing.DisplayName != identityResource.DisplayName)
+            {
+                existing.DisplayName = identityResource.DisplayName;
+                updated = true;
+            }
+            
+            if (existing.Description != identityResource.Description)
+            {
+                existing.Description = identityResource.Description;
+                updated = true;
+            }
+
+            if (existing.IsRequired != identityResource.IsRequired)
+            {
+                existing.IsRequired = identityResource.IsRequired;
+                updated = true;
+            }
+
+            if (!existing.IsStandard)
+            {
+                existing.IsStandard = true;
+                updated = true;
+            }
+
+            // Check if claims need updating
+            var existingClaims = existing.UserClaims.Select(c => c.ClaimType).ToHashSet();
+            var expectedClaims = identityResource.Claims.ToHashSet();
+
+            if (!existingClaims.SetEquals(expectedClaims))
+            {
+                _context.IdentityResourceClaims.RemoveRange(existing.UserClaims);
+                foreach (var claimType in identityResource.Claims)
+                {
+                    _context.IdentityResourceClaims.Add(new IdentityResourceClaim
+                    {
+                        IdentityResourceId = existing.Id,
+                        ClaimType = claimType
+                    });
+                }
+                updated = true;
+            }
+
+            if (updated)
+            {
+                existing.UpdatedAt = DateTime.UtcNow;
+                existing.UpdatedBy = "System";
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Updated standard identity resource '{ResourceName}' in database", existing.Name);
+            }
+        }
+    }
+
     private class StandardScopeDefinition
     {
         public string Name { get; set; } = string.Empty;
@@ -213,6 +369,15 @@ public class ScopeSeederService : IScopeSeederService
         public string Description { get; set; } = string.Empty;
         public bool IsRequired { get; set; } = false;
         public ScopeType Type { get; set; } = ScopeType.Identity;
+        public string[] Claims { get; set; } = Array.Empty<string>();
+    }
+
+    private class StandardIdentityResourceDefinition
+    {
+        public string Name { get; set; } = string.Empty;
+        public string DisplayName { get; set; } = string.Empty;
+        public string Description { get; set; } = string.Empty;
+        public bool IsRequired { get; set; } = false;
         public string[] Claims { get; set; } = Array.Empty<string>();
     }
 }

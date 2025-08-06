@@ -267,11 +267,50 @@ public class OidcClientService : IOidcClientService
             var result = await _userManager.CreateAsync(adminUser, "MrWhoAdmin2024!");
             if (result.Succeeded)
             {
-                _logger.LogInformation("Created admin user 'admin@mrwho.local'");
+                // Add name claims to admin user for proper display name
+                await _userManager.AddClaimAsync(adminUser, new System.Security.Claims.Claim("name", "MrWho Administrator"));
+                await _userManager.AddClaimAsync(adminUser, new System.Security.Claims.Claim("given_name", "MrWho"));
+                await _userManager.AddClaimAsync(adminUser, new System.Security.Claims.Claim("family_name", "Administrator"));
+                await _userManager.AddClaimAsync(adminUser, new System.Security.Claims.Claim("preferred_username", "admin"));
+                
+                _logger.LogInformation("Created admin user 'admin@mrwho.local' with name claims");
             }
             else
             {
                 _logger.LogError("Failed to create admin user: {Errors}", string.Join(", ", result.Errors.Select(e => e.Description)));
+            }
+        }
+        else
+        {
+            // Check if existing admin user has name claims, and add them if missing
+            var existingClaims = await _userManager.GetClaimsAsync(adminUser);
+            var hasNameClaim = existingClaims.Any(c => c.Type == "name");
+            var hasGivenNameClaim = existingClaims.Any(c => c.Type == "given_name");
+            var hasFamilyNameClaim = existingClaims.Any(c => c.Type == "family_name");
+            var hasPreferredUsernameClaim = existingClaims.Any(c => c.Type == "preferred_username");
+
+            if (!hasNameClaim)
+            {
+                await _userManager.AddClaimAsync(adminUser, new System.Security.Claims.Claim("name", "MrWho Administrator"));
+                _logger.LogInformation("Added 'name' claim to existing admin user");
+            }
+
+            if (!hasGivenNameClaim)
+            {
+                await _userManager.AddClaimAsync(adminUser, new System.Security.Claims.Claim("given_name", "MrWho"));
+                _logger.LogInformation("Added 'given_name' claim to existing admin user");
+            }
+
+            if (!hasFamilyNameClaim)
+            {
+                await _userManager.AddClaimAsync(adminUser, new System.Security.Claims.Claim("family_name", "Administrator"));
+                _logger.LogInformation("Added 'family_name' claim to existing admin user");
+            }
+
+            if (!hasPreferredUsernameClaim)
+            {
+                await _userManager.AddClaimAsync(adminUser, new System.Security.Claims.Claim("preferred_username", "admin"));
+                _logger.LogInformation("Added 'preferred_username' claim to existing admin user");
             }
         }
 
