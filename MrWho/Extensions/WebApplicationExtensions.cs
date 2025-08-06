@@ -421,7 +421,7 @@ public static class WebApplicationExtensions
         });
 
         // Debug endpoint to manually synchronize all scopes (DEVELOPMENT ONLY)
-        app.MapPost("/debug/sync-scopes", async (IScopeSeederService scopeSeederService, ILogger<Program> logger) =>
+        app.MapPost("/debug/sync-scopes", async (IOpenIddictScopeSyncService scopeSyncService, ILogger<Program> logger) =>
         {
             if (!app.Environment.IsDevelopment())
             {
@@ -430,7 +430,7 @@ public static class WebApplicationExtensions
             
             try
             {
-                await scopeSeederService.SynchronizeAllScopesWithOpenIddictAsync();
+                await scopeSyncService.SynchronizeAllScopesAsync();
                 return Results.Ok(new 
                 { 
                     message = "All scopes synchronized with OpenIddict successfully", 
@@ -523,7 +523,7 @@ public static class WebApplicationExtensions
         try
         {
             await scopeSeederService.InitializeStandardScopesAsync();
-            Console.WriteLine("Standard scopes initialized successfully");
+            Console.WriteLine("Standard scopes initialized successfully in database");
         }
         catch (Exception ex)
         {
@@ -534,7 +534,8 @@ public static class WebApplicationExtensions
         // CRITICAL: Synchronize all scopes from database with OpenIddict
         try
         {
-            await scopeSeederService.SynchronizeAllScopesWithOpenIddictAsync();
+            var scopeSyncService = scope.ServiceProvider.GetRequiredService<IOpenIddictScopeSyncService>();
+            await scopeSyncService.SynchronizeAllScopesAsync();
             Console.WriteLine("All database scopes synchronized with OpenIddict successfully");
         }
         catch (Exception ex)

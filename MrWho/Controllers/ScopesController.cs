@@ -14,16 +14,16 @@ namespace MrWho.Controllers;
 public class ScopesController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
-    private readonly IScopeSeederService _scopeSeederService;
+    private readonly IOpenIddictScopeSyncService _scopeSyncService;
     private readonly ILogger<ScopesController> _logger;
 
     public ScopesController(
         ApplicationDbContext context,
-        IScopeSeederService scopeSeederService,
+        IOpenIddictScopeSyncService scopeSyncService,
         ILogger<ScopesController> logger)
     {
         _context = context;
-        _scopeSeederService = scopeSeederService;
+        _scopeSyncService = scopeSyncService;
         _logger = logger;
     }
 
@@ -177,7 +177,7 @@ public class ScopesController : ControllerBase
                     .Include(s => s.Claims)
                     .FirstAsync(s => s.Id == scope.Id);
                 
-                await _scopeSeederService.RegisterDatabaseScopeWithOpenIddictAsync(scopeWithClaims);
+                await _scopeSyncService.RegisterScopeAsync(scopeWithClaims);
                 _logger.LogInformation("Successfully registered new scope '{ScopeName}' with OpenIddict", scope.Name);
             }
             catch (Exception ex)
@@ -266,13 +266,13 @@ public class ScopesController : ControllerBase
             if (scope.IsEnabled)
             {
                 // Update the scope in OpenIddict
-                await _scopeSeederService.RegisterDatabaseScopeWithOpenIddictAsync(scope);
+                await _scopeSyncService.RegisterScopeAsync(scope);
                 _logger.LogInformation("Successfully updated scope '{ScopeName}' in OpenIddict", scope.Name);
             }
             else
             {
                 // Remove disabled scope from OpenIddict
-                await _scopeSeederService.RemoveScopeFromOpenIddictAsync(scope.Name);
+                await _scopeSyncService.RemoveScopeAsync(scope.Name);
                 _logger.LogInformation("Successfully removed disabled scope '{ScopeName}' from OpenIddict", scope.Name);
             }
         }
@@ -338,7 +338,7 @@ public class ScopesController : ControllerBase
         // CRITICAL: Remove the deleted scope from OpenIddict
         try
         {
-            await _scopeSeederService.RemoveScopeFromOpenIddictAsync(scopeName);
+            await _scopeSyncService.RemoveScopeAsync(scopeName);
             _logger.LogInformation("Successfully removed deleted scope '{ScopeName}' from OpenIddict", scopeName);
         }
         catch (Exception ex)
@@ -377,13 +377,13 @@ public class ScopesController : ControllerBase
             if (scope.IsEnabled)
             {
                 // Register the enabled scope with OpenIddict
-                await _scopeSeederService.RegisterDatabaseScopeWithOpenIddictAsync(scope);
+                await _scopeSyncService.RegisterScopeAsync(scope);
                 _logger.LogInformation("Successfully registered enabled scope '{ScopeName}' with OpenIddict", scope.Name);
             }
             else
             {
                 // Remove the disabled scope from OpenIddict
-                await _scopeSeederService.RemoveScopeFromOpenIddictAsync(scope.Name);
+                await _scopeSyncService.RemoveScopeAsync(scope.Name);
                 _logger.LogInformation("Successfully removed disabled scope '{ScopeName}' from OpenIddict", scope.Name);
             }
         }

@@ -21,6 +21,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IOidcClientService, OidcClientService>();
         services.AddScoped<ISeedingService, SeedingService>();
         services.AddScoped<IScopeSeederService, ScopeSeederService>();
+        services.AddScoped<IOpenIddictScopeSyncService, OpenIddictScopeSyncService>();
         services.AddScoped<IApiResourceSeederService, ApiResourceSeederService>();
         services.AddScoped<IIdentityResourceSeederService, IdentityResourceSeederService>();
 
