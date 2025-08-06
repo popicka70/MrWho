@@ -373,6 +373,77 @@ public static class WebApplicationExtensions
             }
         });
 
+        // Debug endpoint to show OpenIddict scope information (DEVELOPMENT ONLY)
+        app.MapGet("/debug/openiddict-scopes", async (IOpenIddictScopeManager scopeManager, ApplicationDbContext context) =>
+        {
+            var openIddictScopes = new List<object>();
+            var databaseScopes = await context.Scopes
+                .Where(s => s.IsEnabled)
+                .OrderBy(s => s.Name)
+                .ToListAsync();
+
+            foreach (var dbScope in databaseScopes)
+            {
+                var openIddictScope = await scopeManager.FindByNameAsync(dbScope.Name);
+                openIddictScopes.Add(new
+                {
+                    ScopeName = dbScope.Name,
+                    DatabaseScope = new
+                    {
+                        dbScope.Id,
+                        dbScope.Name,
+                        dbScope.DisplayName,
+                        dbScope.Description,
+                        dbScope.IsEnabled,
+                        dbScope.IsStandard,
+                        dbScope.Type
+                    },
+                    OpenIddictScope = openIddictScope != null ? new
+                    {
+                        Id = await scopeManager.GetIdAsync(openIddictScope),
+                        Name = await scopeManager.GetNameAsync(openIddictScope),
+                        DisplayName = await scopeManager.GetDisplayNameAsync(openIddictScope),
+                        Description = await scopeManager.GetDescriptionAsync(openIddictScope),
+                        Resources = await scopeManager.GetResourcesAsync(openIddictScope)
+                    } : null,
+                    IsSynchronized = openIddictScope != null
+                });
+            }
+
+            return Results.Ok(new
+            {
+                TotalDatabaseScopes = databaseScopes.Count,
+                EnabledDatabaseScopes = databaseScopes.Count(s => s.IsEnabled),
+                SynchronizedScopes = openIddictScopes.Count(s => ((dynamic)s).IsSynchronized),
+                Scopes = openIddictScopes,
+                Timestamp = DateTime.UtcNow
+            });
+        });
+
+        // Debug endpoint to manually synchronize all scopes (DEVELOPMENT ONLY)
+        app.MapPost("/debug/sync-scopes", async (IScopeSeederService scopeSeederService, ILogger<Program> logger) =>
+        {
+            if (!app.Environment.IsDevelopment())
+            {
+                return Results.BadRequest("This endpoint is only available in development");
+            }
+            
+            try
+            {
+                await scopeSeederService.SynchronizeAllScopesWithOpenIddictAsync();
+                return Results.Ok(new 
+                { 
+                    message = "All scopes synchronized with OpenIddict successfully", 
+                    timestamp = DateTime.UtcNow 
+                });
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to synchronize scopes with OpenIddict");
+                return Results.Problem($"Failed to synchronize scopes: {ex.Message}");
+            }
+        });
+ 
         return app;
     }
 
@@ -457,6 +528,18 @@ public static class WebApplicationExtensions
         catch (Exception ex)
         {
             Console.WriteLine($"Error initializing standard scopes: {ex.Message}");
+            throw;
+        }
+        
+        // CRITICAL: Synchronize all scopes from database with OpenIddict
+        try
+        {
+            await scopeSeederService.SynchronizeAllScopesWithOpenIddictAsync();
+            Console.WriteLine("All database scopes synchronized with OpenIddict successfully");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error synchronizing scopes with OpenIddict: {ex.Message}");
             throw;
         }
         
