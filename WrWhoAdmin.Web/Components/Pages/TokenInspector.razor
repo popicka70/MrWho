@@ -1,0 +1,100 @@
+@page "/identity/token-inspector"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject NavigationManager Navigation
+@inject IConfiguration Configuration
+
+<PageTitle>Token Inspector - MrWho Admin</PageTitle>
+
+<RadzenText TextStyle="TextStyle.H3" class="rz-mb-4">?? JWT Token Inspector</RadzenText>
+
+<RadzenCard class="rz-mb-4">
+    <RadzenText TextStyle="TextStyle.Body1">
+        This tool allows you to inspect and decode JWT tokens issued by the MrWho Identity Server.
+        You can use it to debug authentication issues, validate token claims, and understand token structure.
+    </RadzenText>
+</RadzenCard>
+
+<RadzenCard>
+    <RadzenStack Gap="1rem">
+        <RadzenButton 
+            Text="?? Open Token Inspector" 
+            Icon="token"
+            ButtonStyle="ButtonStyle.Primary" 
+            Size="ButtonSize.Large"
+            Click="@OpenTokenInspector" />
+        
+        <RadzenButton 
+            Text="?? Debug Current Token" 
+            Icon="bug_report"
+            ButtonStyle="ButtonStyle.Secondary" 
+            Size="ButtonSize.Medium"
+            Click="@(() => Navigation.NavigateTo("/debug-tokens"))" />
+            
+        <RadzenButton 
+            Text="?? Token Refresh Debug" 
+            Icon="autorenew"
+            ButtonStyle="ButtonStyle.Info" 
+            Size="ButtonSize.Medium"
+            Click="@(() => Navigation.NavigateTo("/debug-token-refresh"))" />
+    </RadzenStack>
+</RadzenCard>
+
+<RadzenCard class="rz-mt-4">
+    <RadzenText TextStyle="TextStyle.H6" class="rz-mb-3">?? Quick Reference</RadzenText>
+    
+    <RadzenAccordion>
+        <Items>
+            <RadzenAccordionItem Text="?? How to Use Token Inspector" Icon="help">
+                <ol>
+                    <li><strong>Get a Token:</strong> Use the "Debug Current Token" button or copy a token from your application</li>
+                    <li><strong>Open Inspector:</strong> Click "Open Token Inspector" to access the JWT decoder</li>
+                    <li><strong>Paste Token:</strong> Enter your JWT token (with or without "Bearer " prefix)</li>
+                    <li><strong>Decode:</strong> Click "Decode Token" to see the token structure and claims</li>
+                    <li><strong>Introspect:</strong> Use "Introspect Token" for OAuth 2.0 compliant validation</li>
+                </ol>
+            </RadzenAccordionItem>
+            
+            <RadzenAccordionItem Text="?? Token Types" Icon="info">
+                <ul>
+                    <li><strong>Access Token:</strong> Used for API authorization (contains scopes)</li>
+                    <li><strong>ID Token:</strong> Contains user identity information (OpenID Connect)</li>
+                    <li><strong>Refresh Token:</strong> Used to obtain new access tokens</li>
+                </ul>
+            </RadzenAccordionItem>
+            
+            <RadzenAccordionItem Text="?? Security Notes" Icon="security">
+                <ul>
+                    <li>Never share tokens in production environments</li>
+                    <li>Tokens contain sensitive information - handle with care</li>
+                    <li>This tool is for debugging purposes only</li>
+                    <li>Expired tokens will be marked as invalid</li>
+                </ul>
+            </RadzenAccordionItem>
+            
+            <RadzenAccordionItem Text="??? Available Endpoints" Icon="api">
+                <ul>
+                    <li><strong>Token Inspector UI:</strong> @GetIdentityServerUrl()/identity/token-inspector</li>
+                    <li><strong>Decode API:</strong> POST @GetIdentityServerUrl()/identity/tokeninspector/decode</li>
+                    <li><strong>Introspect API:</strong> POST @GetIdentityServerUrl()/identity/tokeninspector/introspect</li>
+                    <li><strong>Current Token API:</strong> GET @GetIdentityServerUrl()/identity/tokeninspector/current</li>
+                </ul>
+            </RadzenAccordionItem>
+        </Items>
+    </RadzenAccordion>
+</RadzenCard>
+
+@code {
+    private void OpenTokenInspector()
+    {
+        var identityServerUrl = GetIdentityServerUrl();
+        var inspectorUrl = $"{identityServerUrl}/identity/token-inspector";
+        Navigation.NavigateTo(inspectorUrl, true); // Open in new tab/window
+    }
+    
+    private string GetIdentityServerUrl()
+    {
+        // Get the identity server URL from configuration
+        return Configuration.GetValue<string>("Authentication:Authority") ?? "https://localhost:7113";
+    }
+}

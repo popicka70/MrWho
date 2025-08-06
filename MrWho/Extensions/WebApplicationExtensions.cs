@@ -70,6 +70,25 @@ public static class WebApplicationExtensions
 
     public static WebApplication AddMrWhoDebugEndpoints(this WebApplication app)
     {
+        // Token Inspector endpoint - redirect to controller
+        app.MapGet("/identity/token-inspector", () => Results.Redirect("/identity/tokeninspector"));
+
+        // Debug endpoints discovery
+        app.MapGet("/debug", () => Results.Ok(new
+        {
+            Title = "MrWho Identity Server Debug Endpoints",
+            Endpoints = new
+            {
+                TokenInspector = "/identity/token-inspector",
+                ClientInfo = "/debug/client-info", 
+                AdminClientInfo = "/debug/admin-client-info",
+                EssentialData = "/debug/essential-data",
+                ClientPermissions = "/debug/client-permissions",
+                OpenIddictScopes = "/debug/openiddict-scopes"
+            },
+            Documentation = "Visit any endpoint above for debug information or tools"
+        }));
+
         app.MapGet("/debug/client-info", async (IOidcClientService oidcClientService) =>
         {
             var clients = await oidcClientService.GetEnabledClientsAsync();
