@@ -42,7 +42,7 @@
         <RadzenStack Gap="0.5rem">
             <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
                 <RadzenDropDown @bind-Value="@selectedClaimType" Data="@availableClaimTypes" 
-                               Placeholder="@(isLoadingClaimTypes ? "Loading claim types..." : "Select a claim type...")" 
+                               Placeholder="@ClaimTypePlaceholder" 
                                Style="width: 400px;" AllowClear="true" AllowFiltering="true" 
                                FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
                                Disabled="@isLoadingClaimTypes">
@@ -101,22 +101,25 @@
             }
 
             <!-- Custom claim input for advanced users -->
-            <RadzenCollapsible>
-                <HeaderTemplate>
-                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+            <RadzenStack Gap="0.5rem">
+                <RadzenButton Text="@(showCustomClaimInput ? "Hide Custom Claim Type" : "Add Custom Claim Type")" 
+                             Icon="@(showCustomClaimInput ? "expand_less" : "expand_more")" 
+                             ButtonStyle="ButtonStyle.Light" 
+                             Variant="Variant.Text" 
+                             Click="@(async () => await ToggleCustomClaimInput())" 
+                             Style="justify-content: flex-start; padding: 8px;" />
+                
+                @if (showCustomClaimInput)
+                {
+                    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center" class="rz-mt-2" Style="padding-left: 24px;">
                         <RadzenIcon Icon="code" />
-                        <RadzenText Text="Add Custom Claim Type" />
-                    </RadzenStack>
-                </HeaderTemplate>
-                <ChildContent>
-                    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center" class="rz-mt-2">
                         <RadzenTextBox @bind-Value="@customClaimType" Placeholder="Enter custom claim type" Style="width: 300px;" />
                         <RadzenButton Text="Add Custom" Icon="add" ButtonStyle="ButtonStyle.Light" 
                                     Click="@(async () => await AddCustomClaim())" 
                                     Disabled="@(string.IsNullOrWhiteSpace(customClaimType) || (request?.UserClaims?.Contains(customClaimType) == true))" />
                     </RadzenStack>
-                </ChildContent>
-            </RadzenCollapsible>
+                }
+            </RadzenStack>
 
             @if (request?.UserClaims?.Any() == true)
             {
@@ -197,6 +200,10 @@
     private string customClaimType = string.Empty;
     private List<ClaimTypeInfo> availableClaimTypes = new();
     private bool isLoadingClaimTypes = true;
+    private bool showCustomClaimInput = false;
+
+    // Computed properties
+    private string ClaimTypePlaceholder => isLoadingClaimTypes ? "Loading claim types..." : "Select a claim type...";
 
     protected override void OnInitialized()
     {
@@ -268,6 +275,13 @@
             customClaimType = string.Empty;
             StateHasChanged();
         }
+        await Task.CompletedTask;
+    }
+
+    private async Task ToggleCustomClaimInput()
+    {
+        showCustomClaimInput = !showCustomClaimInput;
+        StateHasChanged();
         await Task.CompletedTask;
     }
 

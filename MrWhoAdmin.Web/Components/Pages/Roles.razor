@@ -142,7 +142,6 @@
 
     // For role users functionality
     private List<UserDto> roleUsers = new();
-    private bool isLoadingUsers = false;
     private string userSearchTerm = "";
     private RoleDto? selectedRoleForUsers = null;
 
@@ -324,7 +323,6 @@
     {
         if (selectedRoleForUsers == null) return;
 
-        isLoadingUsers = true;
         try
         {
             var result = await RolesApi.GetRoleUsersAsync(selectedRoleForUsers.Id, page: 1, pageSize: 100, search: userSearchTerm);
@@ -347,7 +345,6 @@
         }
         finally
         {
-            isLoadingUsers = false;
         }
     }
 
