@@ -503,8 +503,8 @@ public static class WebApplicationExtensions
             { 
                 IsAuthenticated = true,
                 ClaimsCount = claims.Count,
-                IdentityName = context.User.Identity.Name,
-                AuthenticationType = context.User.Identity.AuthenticationType,
+                IdentityName = context.User.Identity?.Name,
+                AuthenticationType = context.User.Identity?.AuthenticationType ?? string.Empty,
                 Claims = claims
             });
         }).RequireAuthorization();
