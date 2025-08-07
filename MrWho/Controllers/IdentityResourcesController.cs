@@ -69,7 +69,7 @@ public class IdentityResourcesController : ControllerBase
                 UpdatedAt = ir.UpdatedAt,
                 CreatedBy = ir.CreatedBy,
                 UpdatedBy = ir.UpdatedBy,
-                UserClaims = ir.UserClaims.Select(c => c.ClaimType).ToList(),
+                UserClaims = ir.UserClaims.Select(c => IdentityResourceClaimDto.FromClaimType(c.ClaimType)).ToList(),
                 Properties = ir.Properties.ToDictionary(p => p.Key, p => p.Value)
             }).ToList();
 
@@ -123,7 +123,7 @@ public class IdentityResourcesController : ControllerBase
                 UpdatedAt = identityResource.UpdatedAt,
                 CreatedBy = identityResource.CreatedBy,
                 UpdatedBy = identityResource.UpdatedBy,
-                UserClaims = identityResource.UserClaims.Select(c => c.ClaimType).ToList(),
+                UserClaims = identityResource.UserClaims.Select(c => IdentityResourceClaimDto.FromClaimType(c.ClaimType)).ToList(),
                 Properties = identityResource.Properties.ToDictionary(p => p.Key, p => p.Value)
             };
 
@@ -216,7 +216,7 @@ public class IdentityResourcesController : ControllerBase
                 UpdatedAt = createdIdentityResource.UpdatedAt,
                 CreatedBy = createdIdentityResource.CreatedBy,
                 UpdatedBy = createdIdentityResource.UpdatedBy,
-                UserClaims = createdIdentityResource.UserClaims.Select(c => c.ClaimType).ToList(),
+                UserClaims = createdIdentityResource.UserClaims.Select(c => IdentityResourceClaimDto.FromClaimType(c.ClaimType)).ToList(),
                 Properties = createdIdentityResource.Properties.ToDictionary(p => p.Key, p => p.Value)
             };
 
@@ -325,7 +325,7 @@ public class IdentityResourcesController : ControllerBase
                 UpdatedAt = updatedIdentityResource.UpdatedAt,
                 CreatedBy = updatedIdentityResource.CreatedBy,
                 UpdatedBy = updatedIdentityResource.UpdatedBy,
-                UserClaims = updatedIdentityResource.UserClaims.Select(c => c.ClaimType).ToList(),
+                UserClaims = updatedIdentityResource.UserClaims.Select(c => IdentityResourceClaimDto.FromClaimType(c.ClaimType)).ToList(),
                 Properties = updatedIdentityResource.Properties.ToDictionary(p => p.Key, p => p.Value)
             };
 
@@ -414,7 +414,7 @@ public class IdentityResourcesController : ControllerBase
                 UpdatedAt = identityResource.UpdatedAt,
                 CreatedBy = identityResource.CreatedBy,
                 UpdatedBy = identityResource.UpdatedBy,
-                UserClaims = identityResource.UserClaims.Select(c => c.ClaimType).ToList(),
+                UserClaims = identityResource.UserClaims.Select(c => IdentityResourceClaimDto.FromClaimType(c.ClaimType)).ToList(),
                 Properties = identityResource.Properties.ToDictionary(p => p.Key, p => p.Value)
             };
 

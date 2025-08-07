@@ -1,64 +1,83 @@
+@inject IIdentityResourcesApiService IdentityResourcesApi
+@inject IUsersApiService UsersApi
+@inject NotificationService NotificationService
 @inject DialogService DialogService
 @inject ILogger<IdentityResourceDetailsDialog> Logger
+@using MrWho.Shared.Models
 
 <RadzenStack Gap="1rem">
-    <RadzenCard class="rz-p-4">
-        <RadzenText TextStyle="TextStyle.H4" class="rz-mb-3">Basic Information</RadzenText>
-        
-        <RadzenRow Gap="1rem">
-            <RadzenColumn Size="6">
-                <RadzenFormField Text="Name" Variant="Variant.Outlined">
-                    <RadzenTextBox Value="@IdentityResource.Name" ReadOnly="true" Style="width: 100%;" />
-                </RadzenFormField>
-            </RadzenColumn>
-            <RadzenColumn Size="6">
-                <RadzenFormField Text="Display Name" Variant="Variant.Outlined">
-                    <RadzenTextBox Value="@IdentityResource.DisplayName" ReadOnly="true" Style="width: 100%;" />
-                </RadzenFormField>
-            </RadzenColumn>
-        </RadzenRow>
+    <RadzenText TextStyle="TextStyle.H5" Text="@IdentityResource.Name" />
+    
+    @if (!string.IsNullOrEmpty(IdentityResource.DisplayName))
+    {
+        <RadzenText TextStyle="TextStyle.Subtitle1" Text="@IdentityResource.DisplayName" />
+    }
 
-        <RadzenFormField Text="Description" Variant="Variant.Outlined">
-            <RadzenTextArea Value="@IdentityResource.Description" ReadOnly="true" Rows="3" Style="width: 100%;" />
-        </RadzenFormField>
+    @if (!string.IsNullOrEmpty(IdentityResource.Description))
+    {
+        <RadzenText Text="@IdentityResource.Description" class="rz-text-secondary-color" />
+    }
 
-        <RadzenRow Gap="1rem">
-            <RadzenColumn Size="3">
-                <RadzenFormField Text="Status" Variant="Variant.Outlined">
-                    <RadzenBadge BadgeStyle="@(IdentityResource.IsEnabled ? BadgeStyle.Success : BadgeStyle.Danger)" 
-                               Text="@(IdentityResource.IsEnabled ? "Enabled" : "Disabled")" />
-                </RadzenFormField>
-            </RadzenColumn>
-            <RadzenColumn Size="3">
-                <RadzenFormField Text="Type" Variant="Variant.Outlined">
-                    <RadzenBadge BadgeStyle="@(IdentityResource.IsStandard ? BadgeStyle.Info : BadgeStyle.Light)" 
-                               Text="@(IdentityResource.IsStandard ? "Standard" : "Custom")" />
-                </RadzenFormField>
-            </RadzenColumn>
-            <RadzenColumn Size="3">
-                <RadzenFormField Text="Required" Variant="Variant.Outlined">
-                    <RadzenBadge BadgeStyle="@(IdentityResource.IsRequired ? BadgeStyle.Warning : BadgeStyle.Light)" 
-                               Text="@(IdentityResource.IsRequired ? "Yes" : "No")" />
-                </RadzenFormField>
-            </RadzenColumn>
-            <RadzenColumn Size="3">
-                <RadzenFormField Text="Show in Discovery" Variant="Variant.Outlined">
-                    <RadzenBadge BadgeStyle="@(IdentityResource.ShowInDiscoveryDocument ? BadgeStyle.Success : BadgeStyle.Light)" 
-                               Text="@(IdentityResource.ShowInDiscoveryDocument ? "Yes" : "No")" />
-                </RadzenFormField>
-            </RadzenColumn>
-        </RadzenRow>
-    </RadzenCard>
+    <RadzenRow Gap="1rem">
+        <RadzenColumn Size="3">
+            <RadzenStack Gap="0.25rem">
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-text-secondary-color">Status</RadzenText>
+                <RadzenBadge BadgeStyle="@(IdentityResource.IsEnabled ? BadgeStyle.Success : BadgeStyle.Danger)" 
+                           Text="@(IdentityResource.IsEnabled ? "Enabled" : "Disabled")" />
+            </RadzenStack>
+        </RadzenColumn>
+        <RadzenColumn Size="3">
+            <RadzenStack Gap="0.25rem">
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-text-secondary-color">Required</RadzenText>
+                <RadzenBadge BadgeStyle="@(IdentityResource.IsRequired ? BadgeStyle.Warning : BadgeStyle.Light)" 
+                           Text="@(IdentityResource.IsRequired ? "Yes" : "No")" />
+            </RadzenStack>
+        </RadzenColumn>
+        <RadzenColumn Size="3">
+            <RadzenStack Gap="0.25rem">
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-text-secondary-color">Standard</RadzenText>
+                <RadzenBadge BadgeStyle="@(IdentityResource.IsStandard ? BadgeStyle.Info : BadgeStyle.Light)" 
+                           Text="@(IdentityResource.IsStandard ? "Yes" : "No")" />
+            </RadzenStack>
+        </RadzenColumn>
+        <RadzenColumn Size="3">
+            <RadzenStack Gap="0.25rem">
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-text-secondary-color">Emphasize</RadzenText>
+                <RadzenBadge BadgeStyle="@(IdentityResource.Emphasize ? BadgeStyle.Warning : BadgeStyle.Light)" 
+                           Text="@(IdentityResource.Emphasize ? "Yes" : "No")" />
+            </RadzenStack>
+        </RadzenColumn>
+    </RadzenRow>
 
-    <RadzenCard class="rz-p-4">
-        <RadzenText TextStyle="TextStyle.H4" class="rz-mb-3">User Claims</RadzenText>
-        
-        @if (IdentityResource.UserClaims.Any())
+    <RadzenFieldset Text="User Claims">
+        @if (IdentityResource.UserClaims?.Any() == true)
         {
-            <RadzenDataList Data="@IdentityResource.UserClaims" TItem="string" WrapItems="true">
+            <RadzenDataList Data="@IdentityResource.UserClaims" TItem="IdentityResourceClaimDto" WrapItems="true">
                 <Template Context="claim">
-                    <RadzenCard class="rz-p-2" Style="margin: 4px; background: var(--rz-primary-light);">
-                        <RadzenText Text="@claim" Style="color: var(--rz-primary-darker);" />
+                    <RadzenCard class="rz-p-2" Style="margin: 4px;">
+                        <RadzenStack Gap="0.25rem">
+                            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
+                                <RadzenText Text="@claim.ClaimType" Style="font-weight: 500; font-family: monospace;" />
+                                @if (claim.IsStandard)
+                                {
+                                    <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="Standard" Size="BadgeSize.ExtraSmall" />
+                                }
+                                else
+                                {
+                                    <RadzenBadge BadgeStyle="BadgeStyle.Secondary" Text="Custom" Size="BadgeSize.ExtraSmall" />
+                                }
+                            </RadzenStack>
+                            @if (!string.IsNullOrEmpty(claim.DisplayName))
+                            {
+                                <RadzenText Text="@claim.DisplayName" TextStyle="TextStyle.Caption" 
+                                           class="rz-text-secondary-color" />
+                            }
+                            @if (!string.IsNullOrEmpty(claim.Description))
+                            {
+                                <RadzenText Text="@claim.Description" TextStyle="TextStyle.Caption" 
+                                           class="rz-text-secondary-color" />
+                            }
+                        </RadzenStack>
                     </RadzenCard>
                 </Template>
             </RadzenDataList>
@@ -66,56 +85,62 @@
         else
         {
             <RadzenAlert AlertStyle="AlertStyle.Info" ShowIcon="false">
-                <RadzenText>No user claims defined for this identity resource.</RadzenText>
+                <RadzenText>No claims defined for this identity resource.</RadzenText>
             </RadzenAlert>
         }
-    </RadzenCard>
+    </RadzenFieldset>
 
-    @if (IdentityResource.Properties.Any())
+    @if (IdentityResource.Properties?.Any() == true)
     {
-        <RadzenCard class="rz-p-4">
-            <RadzenText TextStyle="TextStyle.H4" class="rz-mb-3">Properties</RadzenText>
-            
-            <RadzenDataGrid Data="@IdentityResource.Properties" TItem="KeyValuePair<string, string>" AllowSorting="true">
-                <Columns>
-                    <RadzenDataGridColumn TItem="KeyValuePair<string, string>" Property="Key" Title="Key" Width="200px" />
-                    <RadzenDataGridColumn TItem="KeyValuePair<string, string>" Property="Value" Title="Value" />
-                </Columns>
-            </RadzenDataGrid>
-        </RadzenCard>
+        <RadzenFieldset Text="Properties">
+            <RadzenDataList Data="@IdentityResource.Properties" TItem="KeyValuePair<string, string>" WrapItems="true">
+                <Template Context="property">
+                    <RadzenCard class="rz-p-2" Style="margin: 4px;">
+                        <RadzenText Text="@($"{property.Key}: {property.Value}")" />
+                    </RadzenCard>
+                </Template>
+            </RadzenDataList>
+        </RadzenFieldset>
     }
 
-    <RadzenCard class="rz-p-4">
-        <RadzenText TextStyle="TextStyle.H4" class="rz-mb-3">Audit Information</RadzenText>
-        
+    <RadzenFieldset Text="Metadata">
         <RadzenRow Gap="1rem">
             <RadzenColumn Size="6">
-                <RadzenFormField Text="Created At" Variant="Variant.Outlined">
-                    <RadzenTextBox Value="@IdentityResource.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")" ReadOnly="true" Style="width: 100%;" />
-                </RadzenFormField>
+                <RadzenStack Gap="0.25rem">
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-text-secondary-color">Created</RadzenText>
+                    <RadzenText Text="@IdentityResource.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")" />
+                    @if (!string.IsNullOrEmpty(IdentityResource.CreatedBy))
+                    {
+                        <RadzenText Text="@($"by {IdentityResource.CreatedBy}")" TextStyle="TextStyle.Caption" 
+                                   class="rz-text-secondary-color" />
+                    }
+                </RadzenStack>
             </RadzenColumn>
             <RadzenColumn Size="6">
-                <RadzenFormField Text="Created By" Variant="Variant.Outlined">
-                    <RadzenTextBox Value="@IdentityResource.CreatedBy" ReadOnly="true" Style="width: 100%;" />
-                </RadzenFormField>
+                <RadzenStack Gap="0.25rem">
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-text-secondary-color">Updated</RadzenText>
+                    <RadzenText Text="@IdentityResource.UpdatedAt.ToString("yyyy-MM-dd HH:mm:ss")" />
+                    @if (!string.IsNullOrEmpty(IdentityResource.UpdatedBy))
+                    {
+                        <RadzenText Text="@($"by {IdentityResource.UpdatedBy}")" TextStyle="TextStyle.Caption" 
+                                   class="rz-text-secondary-color" />
+                    }
+                </RadzenStack>
             </RadzenColumn>
         </RadzenRow>
-
-        <RadzenRow Gap="1rem">
-            <RadzenColumn Size="6">
-                <RadzenFormField Text="Updated At" Variant="Variant.Outlined">
-                    <RadzenTextBox Value="@IdentityResource.UpdatedAt.ToString("yyyy-MM-dd HH:mm:ss")" ReadOnly="true" Style="width: 100%;" />
-                </RadzenFormField>
-            </RadzenColumn>
-            <RadzenColumn Size="6">
-                <RadzenFormField Text="Updated By" Variant="Variant.Outlined">
-                    <RadzenTextBox Value="@IdentityResource.UpdatedBy" ReadOnly="true" Style="width: 100%;" />
-                </RadzenFormField>
-            </RadzenColumn>
-        </RadzenRow>
-    </RadzenCard>
+    </RadzenFieldset>
 
     <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" class="rz-mt-4">
+        @if (!IdentityResource.IsStandard)
+        {
+            <RadzenButton Text="Edit" Icon="edit" ButtonStyle="ButtonStyle.Primary" 
+                        Click="@(async () => await EditIdentityResource())" />
+        }
+        else
+        {
+            <RadzenButton Text="Edit" Icon="edit" ButtonStyle="ButtonStyle.Light" 
+                        Disabled="true" Title="Standard identity resources cannot be edited" />
+        }
         <RadzenButton Text="Close" Icon="close" ButtonStyle="ButtonStyle.Secondary" 
                     Click="@(async () => await Close())" />
     </RadzenStack>
@@ -123,6 +148,42 @@
 
 @code {
     [Parameter] public IdentityResourceDto IdentityResource { get; set; } = new();
+    [Parameter] public EventCallback<IdentityResourceDto> OnEditRequested { get; set; }
+
+    private List<ClaimTypeInfo> availableClaimTypes = new();
+
+    protected override void OnInitialized()
+    {
+        // Initialize available claim types for descriptions
+        availableClaimTypes = CommonClaimTypes.StandardClaims.ToList();
+        
+        // Load additional claim types from database
+        _ = LoadClaimTypesAsync();
+    }
+
+    private async Task LoadClaimTypesAsync()
+    {
+        try
+        {
+            var claimTypes = await UsersApi.GetDistinctClaimTypesAsync();
+            if (claimTypes != null)
+            {
+                availableClaimTypes = claimTypes;
+                StateHasChanged();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError(ex, "Error loading claim types for descriptions");
+            // Continue with standard claims only
+        }
+    }
+
+    private async Task EditIdentityResource()
+    {
+        DialogService?.Close("edit"); // Pass "edit" as result to indicate edit was requested
+        await Task.CompletedTask;
+    }
 
     private async Task Close()
     {

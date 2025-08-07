@@ -155,9 +155,9 @@
                             Disabled="@(string.IsNullOrWhiteSpace(newPropertyKey) || string.IsNullOrWhiteSpace(newPropertyValue))" />
             </RadzenStack>
 
-            @if (request?.Properties?.Any() == true)
+            @if (properties?.Any() == true)
             {
-                <RadzenDataList Data="@request.Properties" TItem="KeyValuePair<string, string>" WrapItems="true">
+                <RadzenDataList Data="@properties" TItem="KeyValuePair<string, string>" WrapItems="true">
                     <Template Context="property">
                         <RadzenCard class="rz-p-2" Style="margin: 4px;">
                             <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
@@ -216,7 +216,8 @@
             Description = IdentityResource.Description
         };
 
-        userClaims = new List<string>(IdentityResource.UserClaims ?? new List<string>());
+        // Convert IdentityResourceClaimDto list to string list for editing
+        userClaims = IdentityResource.UserClaims?.Select(c => c.ClaimType).ToList() ?? new List<string>();
         properties = new Dictionary<string, string>(IdentityResource.Properties ?? new Dictionary<string, string>());
 
         isEnabled = IdentityResource.IsEnabled;
