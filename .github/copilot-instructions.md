@@ -93,6 +93,30 @@ services.AddIsolatedTestDatabase();   // Isolated database per test
 
 Without this component, Radzen UI components (dialogs, notifications, etc.) will not function correctly.
 
+### CRITICAL: RadzenFormField Usage
+**ALWAYS** wrap Radzen input controls in `RadzenFormField` unless there is a specific reason not to do so:
+
+**✅ CORRECT - Controls wrapped in RadzenFormField:**
+```razor
+<RadzenFormField Text="Status" Variant="Variant.Outlined">
+    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+        <RadzenCheckBox @bind-Value="@model.IsEnabled" />
+        <RadzenLabel Text="Client is enabled" />
+    </RadzenStack>
+</RadzenFormField>
+
+<RadzenFormField Text="Name" Variant="Variant.Outlined">
+    <RadzenTextBox @bind-Value="@model.Name" Style="width: 100%;" />
+</RadzenFormField>
+```
+
+**Key Rules:**
+1. **RadzenFormField provides consistent styling and layout**
+2. **Multiple controls can be placed in a single RadzenFormField when logically related**
+3. **Use RadzenStack inside RadzenFormField to properly organize multiple controls**
+4. **RadzenFormField handles proper spacing, borders, and visual hierarchy**
+5. **Only exclude RadzenFormField when you need special layout handling**
+
 ### CRITICAL: Async Methods in Event Handlers
 When using async methods in Blazor event handlers, especially in lambda expressions, **ALWAYS** use `async` and `await`:
 
