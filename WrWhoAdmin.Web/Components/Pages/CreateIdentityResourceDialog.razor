@@ -2,6 +2,7 @@
 @inject NotificationService NotificationService
 @inject DialogService DialogService
 @inject ILogger<CreateIdentityResourceDialog> Logger
+@using MrWho.Shared.Models
 
 <RadzenStack Gap="1rem">
     <RadzenFormField Text="Name" Variant="Variant.Outlined">
@@ -39,10 +40,52 @@
     <RadzenFieldset Text="User Claims">
         <RadzenStack Gap="0.5rem">
             <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
-                <RadzenTextBox @bind-Value="@newClaim" Placeholder="Enter claim type (e.g., email, name)" Style="width: 300px;" />
+                <RadzenDropDown @bind-Value="@selectedClaimType" Data="@availableClaimTypes" 
+                               Placeholder="Select a claim type..." Style="width: 400px;"
+                               AllowClear="true">
+                    <Template Context="item">
+                        <RadzenStack Gap="0.25rem">
+                            <RadzenText Text="@($"{item.Type}")" Style="font-weight: 500; font-family: monospace;" />
+                            <RadzenText Text="@item.DisplayName" TextStyle="TextStyle.Caption" class="rz-text-secondary-color" />
+                        </RadzenStack>
+                    </Template>
+                    <ValueTemplate Context="item">
+                        <RadzenText Text="@($"{item?.Type} - {item?.DisplayName}")" />
+                    </ValueTemplate>
+                </RadzenDropDown>
                 <RadzenButton Text="Add Claim" Icon="add" ButtonStyle="ButtonStyle.Light" 
-                            Click="@(async () => await AddClaim())" Disabled="@string.IsNullOrWhiteSpace(newClaim)" />
+                            Click="@(async () => await AddSelectedClaim())" 
+                            Disabled="@(selectedClaimType == null || (request?.UserClaims?.Contains(selectedClaimType.Type) == true))" />
             </RadzenStack>
+            
+            <RadzenText TextStyle="TextStyle.Caption" class="rz-text-secondary-color">
+                @if (selectedClaimType != null)
+                {
+                    @selectedClaimType.Description
+                }
+                else
+                {
+                    <text>Select a claim type to see its description</text>
+                }
+            </RadzenText>
+
+            <!-- Custom claim input for advanced users -->
+            <RadzenCollapsible>
+                <HeaderTemplate>
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                        <RadzenIcon Icon="code" />
+                        <RadzenText Text="Add Custom Claim Type" />
+                    </RadzenStack>
+                </HeaderTemplate>
+                <ChildContent>
+                    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center" class="rz-mt-2">
+                        <RadzenTextBox @bind-Value="@customClaimType" Placeholder="Enter custom claim type" Style="width: 300px;" />
+                        <RadzenButton Text="Add Custom" Icon="add" ButtonStyle="ButtonStyle.Light" 
+                                    Click="@(async () => await AddCustomClaim())" 
+                                    Disabled="@(string.IsNullOrWhiteSpace(customClaimType) || (request?.UserClaims?.Contains(customClaimType) == true))" />
+                    </RadzenStack>
+                </ChildContent>
+            </RadzenCollapsible>
 
             @if (request?.UserClaims?.Any() == true)
             {
@@ -50,7 +93,11 @@
                     <Template Context="claim">
                         <RadzenCard class="rz-p-2" Style="margin: 4px;">
                             <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
-                                <RadzenText Text="@claim" />
+                                <RadzenStack Gap="0.25rem">
+                                    <RadzenText Text="@claim" Style="font-weight: 500; font-family: monospace;" />
+                                    <RadzenText Text="@GetClaimDescription(claim)" TextStyle="TextStyle.Caption" 
+                                               class="rz-text-secondary-color" />
+                                </RadzenStack>
                                 <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.ExtraSmall" 
                                             Click="@(async () => await RemoveClaim(claim))" />
                             </RadzenStack>
@@ -110,10 +157,14 @@
 
 @code {
     private CreateIdentityResourceRequest request = new();
-    private string newClaim = string.Empty;
     private string newPropertyKey = string.Empty;
     private string newPropertyValue = string.Empty;
     private bool isCreating = false;
+
+    // Claim type selection
+    private ClaimTypeInfo? selectedClaimType;
+    private string customClaimType = string.Empty;
+    private List<ClaimTypeInfo> availableClaimTypes = new();
 
     protected override void OnInitialized()
     {
@@ -130,14 +181,28 @@
             UserClaims = new List<string>(),
             Properties = new Dictionary<string, string>()
         };
+
+        // Initialize available claim types
+        availableClaimTypes = CommonClaimTypes.StandardClaims.ToList();
     }
 
-    private async Task AddClaim()
+    private async Task AddSelectedClaim()
     {
-        if (!string.IsNullOrWhiteSpace(newClaim) && request?.UserClaims != null && !request.UserClaims.Contains(newClaim))
+        if (selectedClaimType != null && request?.UserClaims != null && !request.UserClaims.Contains(selectedClaimType.Type))
         {
-            request.UserClaims.Add(newClaim.Trim());
-            newClaim = string.Empty;
+            request.UserClaims.Add(selectedClaimType.Type);
+            selectedClaimType = null; // Clear selection
+            StateHasChanged();
+        }
+        await Task.CompletedTask;
+    }
+
+    private async Task AddCustomClaim()
+    {
+        if (!string.IsNullOrWhiteSpace(customClaimType) && request?.UserClaims != null && !request.UserClaims.Contains(customClaimType.Trim()))
+        {
+            request.UserClaims.Add(customClaimType.Trim());
+            customClaimType = string.Empty;
             StateHasChanged();
         }
         await Task.CompletedTask;
@@ -151,6 +216,12 @@
             StateHasChanged();
         }
         await Task.CompletedTask;
+    }
+
+    private string GetClaimDescription(string claimType)
+    {
+        var claimInfo = availableClaimTypes.FirstOrDefault(c => c.Type == claimType);
+        return claimInfo?.Description ?? "Custom claim type";
     }
 
     private async Task AddProperty()
