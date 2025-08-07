@@ -3,7 +3,6 @@
 @rendermode InteractiveServer
 @inherits AuthenticatedComponentBase
 @inject NavigationManager Navigation
-@inject ILogger<Realms> Logger
 @inject NotificationService NotificationService
 @inject IRealmsApiService RealmsApi
 
@@ -112,6 +111,9 @@ else
 }
 
 @code {
+    [Inject] 
+    protected new ILogger<Realms> Logger { get; set; } = default!;
+    
     private List<RealmDto> realms = new();
     private bool isLoading = false;
     private bool hasAuthError = false;

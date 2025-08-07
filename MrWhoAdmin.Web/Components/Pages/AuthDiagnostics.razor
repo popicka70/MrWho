@@ -151,13 +151,14 @@
     private string DiagnosticsResult = "";
     private bool _hasRendered = false;
 
-    protected override async Task OnInitializedAsync()
+    protected override Task OnInitializedAsync()
     {
         var authConfig = Configuration.GetSection("Authentication");
         Authority = authConfig.GetValue<string>("Authority") ?? "https://localhost:7113/";
         ClientId = authConfig.GetValue<string>("ClientId") ?? "mrwho_admin_web";
         CurrentUrl = Navigation.Uri;
         ExpectedCallback = Navigation.BaseUri + "signin-oidc";
+        return Task.CompletedTask;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -167,7 +168,7 @@
             _hasRendered = true;
             await CheckAuthorityStatus();
         }
-        
+
         await base.OnAfterRenderAsync(firstRender);
     }
 
@@ -177,7 +178,7 @@
         {
             using var httpClient = new HttpClient();
             httpClient.Timeout = TimeSpan.FromSeconds(5);
-            
+
             var response = await httpClient.GetAsync($"{Authority}.well-known/openid_configuration");
             if (response.IsSuccessStatusCode)
             {
@@ -195,7 +196,7 @@
             AuthorityStatus = "error";
             AuthorityStatusMessage = $"? Cannot reach OIDC server: {ex.Message}";
         }
-        
+
         StateHasChanged();
     }
 
@@ -221,8 +222,9 @@
         {
             DiagnosticsResult += $"Error checking token: {ex.Message}\n";
         }
-        
+
         StateHasChanged();
+        await Task.CompletedTask;
     }
 
     private async Task TestOidcDiscovery()
@@ -341,6 +343,7 @@
             DiagnosticsResult += $"Error: {ex.Message}\n";
             StateHasChanged();
         }
+        await Task.CompletedTask;
     }
 
     private async Task TestLogin()
@@ -364,6 +367,7 @@
             DiagnosticsResult += $"Error: {ex.Message}\n";
             StateHasChanged();
         }
+        await Task.CompletedTask;
     }
 
     private string GetStatusClass(string status)

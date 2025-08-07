@@ -6,6 +6,8 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using MrWho.Shared.Models;
 using System.Security.Claims;
+using System.Globalization;
+using MrWho.Data;
 
 namespace MrWho.Controllers;
 
@@ -21,6 +23,7 @@ public class UsersController : ControllerBase
     private readonly IDeleteUserHandler _deleteUserHandler;
     private readonly UserManager<IdentityUser> _userManager;
     private readonly RoleManager<IdentityRole> _roleManager;
+    private readonly ApplicationDbContext _context;
     private readonly ILogger<UsersController> _logger;
 
     public UsersController(
@@ -31,6 +34,7 @@ public class UsersController : ControllerBase
         IDeleteUserHandler deleteUserHandler,
         UserManager<IdentityUser> userManager,
         RoleManager<IdentityRole> roleManager,
+        ApplicationDbContext context,
         ILogger<UsersController> logger)
     {
         _getUsersHandler = getUsersHandler;
@@ -40,6 +44,7 @@ public class UsersController : ControllerBase
         _deleteUserHandler = deleteUserHandler;
         _userManager = userManager;
         _roleManager = roleManager;
+        _context = context;
         _logger = logger;
     }
 
@@ -358,7 +363,55 @@ public class UsersController : ControllerBase
 
     #endregion
 
-    #region User Roles Management
+    #region Claim Types Management
+
+    /// <summary>
+    /// Get distinct claim types used in the system
+    /// </summary>
+    [HttpGet("claim-types")]
+    public async Task<ActionResult<List<ClaimTypeInfo>>> GetDistinctClaimTypes()
+    {
+        try
+        {
+            // Get distinct claim types from AspNetUserClaims table directly
+            var distinctClaimTypes = await _context.UserClaims
+                .Select(c => c.ClaimType)
+                .Where(ct => ct != null)
+                .Distinct()
+                .ToListAsync();
+
+            // Combine standard claims with custom claims from database
+            var allClaimTypes = new List<ClaimTypeInfo>();
+            
+            // Add all standard claims
+            allClaimTypes.AddRange(CommonClaimTypes.StandardClaims);
+            
+            // Add custom claims that aren't already in the standard list
+            foreach (var claimType in distinctClaimTypes)
+            {
+                if (!string.IsNullOrEmpty(claimType) && !allClaimTypes.Any(c => c.Type == claimType))
+                {
+                    allClaimTypes.Add(new ClaimTypeInfo(
+                        claimType, 
+                        claimType.Replace("_", " ").ToTitleCase(), 
+                        "Custom claim type from database"
+                    ));
+                }
+            }
+
+            // Sort by display name for better UX
+            return Ok(allClaimTypes.OrderBy(c => c.DisplayName).ToList());
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting distinct claim types");
+            return StatusCode(500, "An error occurred while retrieving claim types.");
+        }
+    }
+
+    #endregion
+
+    #region Roles Management
 
     /// <summary>
     /// Get roles for a specific user
@@ -582,4 +635,18 @@ public class UpdateUserClaimRequest
     public string OldClaimValue { get; set; } = string.Empty;
     public string NewClaimType { get; set; } = string.Empty;
     public string NewClaimValue { get; set; } = string.Empty;
+}
+
+/// <summary>
+/// Extension methods for string manipulation
+/// </summary>
+public static class StringExtensions
+{
+    public static string ToTitleCase(this string input)
+    {
+        if (string.IsNullOrEmpty(input))
+            return input;
+
+        return CultureInfo.CurrentCulture.TextInfo.ToTitleCase(input.ToLower());
+    }
 }

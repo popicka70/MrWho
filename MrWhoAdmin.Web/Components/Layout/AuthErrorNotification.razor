@@ -29,7 +29,7 @@
         await base.OnAfterRenderAsync(firstRender);
     }
 
-    private async Task CheckForAuthenticationErrors()
+    private Task CheckForAuthenticationErrors()
     {
         try
         {
@@ -50,6 +50,7 @@
         {
             Logger.LogError(ex, "Error checking for authentication errors");
         }
+        return Task.CompletedTask;
     }
 
     private void DismissError()

@@ -59,8 +59,14 @@
                     </RadzenDataGridColumn>
                     <RadzenDataGridColumn TItem="IdentityResourceDto" Title="Claims" Width="200px">
                         <Template Context="identityResource">
-                            <RadzenText class="rz-text-truncate" Title="@string.Join(", ", identityResource.UserClaims)">
-                                @(string.Join(", ", identityResource.UserClaims.Take(3)))@(identityResource.UserClaims.Count > 3 ? "..." : "")
+                            @{
+                                var claimNames = identityResource.UserClaims.Select(c => c.ClaimType).ToList();
+                                var displayText = string.Join(", ", claimNames.Take(3));
+                                if (claimNames.Count > 3) displayText += "...";
+                                var fullText = string.Join(", ", claimNames);
+                            }
+                            <RadzenText class="rz-text-truncate" Title="@fullText">
+                                @displayText
                             </RadzenText>
                         </Template>
                     </RadzenDataGridColumn>
@@ -242,9 +248,15 @@
     {
         try
         {
-            await DialogService.OpenAsync<IdentityResourceDetailsDialog>("Identity Resource Details",
+            var result = await DialogService.OpenAsync<IdentityResourceDetailsDialog>("Identity Resource Details",
                 new Dictionary<string, object> { { "IdentityResource", identityResource } },
                 new DialogOptions() { Width = "800px", Height = "600px", Resizable = true, Draggable = true });
+
+            // If user clicked Edit in the details dialog, open the edit dialog
+            if (result is string action && action == "edit")
+            {
+                await ShowEditIdentityResourceDialog(identityResource);
+            }
         }
         catch (Exception ex)
         {

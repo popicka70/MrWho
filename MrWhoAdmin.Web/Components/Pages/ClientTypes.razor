@@ -1,0 +1,236 @@
+@page "/clients/types"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using MrWho.Shared
+@using MrWho.Shared.Models
+@using MrWhoAdmin.Web.Services
+@inject IClientTypesApiService ClientTypesApi
+@inject NotificationService NotificationService
+@inject ILogger<ClientTypes> Logger
+
+<PageTitle>Client Types - MrWho Admin</PageTitle>
+
+<RadzenText TextStyle="TextStyle.H3" TagName="TagName.H1" class="rz-pt-8">
+    <RadzenIcon Icon="category" class="rz-me-1" />
+    Client Types
+</RadzenText>
+
+<RadzenText TextStyle="TextStyle.Body1" class="rz-mb-4">
+    Learn about the different OAuth2/OIDC client types and their use cases. Client types are predefined categories that determine how clients authenticate and what flows they can use.
+</RadzenText>
+
+@if (isLoading)
+{
+    <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+}
+else if (clientTypes.Any())
+{
+    <RadzenStack Gap="2rem">
+        @foreach (var clientType in clientTypes)
+        {
+            <RadzenCard class="rz-shadow-3">
+                <RadzenStack>
+                    <!-- Header -->
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem" class="rz-mb-3">
+                        <RadzenIcon Icon="@GetClientTypeIcon(clientType.Type)" 
+                                   Style="@($"font-size: 2rem; color: {GetClientTypeColor(clientType.Type)}")" />
+                        <RadzenStack Gap="0.5rem">
+                            <RadzenText TextStyle="TextStyle.H5" Text="@clientType.Name" />
+                            <RadzenBadge BadgeStyle="@GetClientTypeBadgeStyle(clientType.Type)" 
+                                        Text="@clientType.Type.ToString()" />
+                        </RadzenStack>
+                    </RadzenStack>
+
+                    <!-- Description -->
+                    <RadzenText TextStyle="TextStyle.Body1" Text="@clientType.Description" class="rz-mb-3" />
+
+                    <!-- Content sections -->
+                    <RadzenRow Gap="1rem">
+                        <!-- Characteristics -->
+                        <RadzenColumn Size="12" SizeMD="6">
+                            <RadzenCard class="rz-background-color-base-100 h-100">
+                                <RadzenStack>
+                                    <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">
+                                        <RadzenIcon Icon="checklist" class="rz-me-1" />
+                                        Key Characteristics
+                                    </RadzenText>
+                                    @foreach (var characteristic in clientType.Characteristics)
+                                    {
+                                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Start" Gap="0.5rem" class="rz-mb-1">
+                                            <RadzenIcon Icon="check_circle" Style="color: var(--rz-success); font-size: 1rem; margin-top: 2px;" />
+                                            <RadzenText TextStyle="TextStyle.Body2" Text="@characteristic" />
+                                        </RadzenStack>
+                                    }
+                                </RadzenStack>
+                            </RadzenCard>
+                        </RadzenColumn>
+
+                        <!-- Use Cases -->
+                        <RadzenColumn Size="12" SizeMD="6">
+                            <RadzenCard class="rz-background-color-base-100 h-100">
+                                <RadzenStack>
+                                    <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">
+                                        <RadzenIcon Icon="lightbulb" class="rz-me-1" />
+                                        Common Use Cases
+                                    </RadzenText>
+                                    @foreach (var useCase in clientType.UseCases)
+                                    {
+                                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Start" Gap="0.5rem" class="rz-mb-1">
+                                            <RadzenIcon Icon="arrow_right" Style="color: var(--rz-primary); font-size: 1rem; margin-top: 2px;" />
+                                            <RadzenText TextStyle="TextStyle.Body2" Text="@useCase" />
+                                        </RadzenStack>
+                                    }
+                                </RadzenStack>
+                            </RadzenCard>
+                        </RadzenColumn>
+
+                        <!-- Recommended Flows -->
+                        <RadzenColumn Size="12" SizeMD="6">
+                            <RadzenCard class="rz-background-color-base-100 h-100">
+                                <RadzenStack>
+                                    <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">
+                                        <RadzenIcon Icon="alt_route" class="rz-me-1" />
+                                        Recommended OAuth2 Flows
+                                    </RadzenText>
+                                    @foreach (var flow in clientType.RecommendedFlows)
+                                    {
+                                        <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="@flow" class="rz-me-1 rz-mb-1" />
+                                    }
+                                </RadzenStack>
+                            </RadzenCard>
+                        </RadzenColumn>
+
+                        <!-- Security Considerations -->
+                        <RadzenColumn Size="12" SizeMD="6">
+                            <RadzenCard class="rz-background-color-base-100 h-100">
+                                <RadzenStack>
+                                    <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">
+                                        <RadzenIcon Icon="security" class="rz-me-1" />
+                                        Security Considerations
+                                    </RadzenText>
+                                    @foreach (var consideration in clientType.SecurityConsiderations)
+                                    {
+                                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Start" Gap="0.5rem" class="rz-mb-1">
+                                            <RadzenIcon Icon="warning" Style="color: var(--rz-warning); font-size: 1rem; margin-top: 2px;" />
+                                            <RadzenText TextStyle="TextStyle.Body2" Text="@consideration" />
+                                        </RadzenStack>
+                                    }
+                                </RadzenStack>
+                            </RadzenCard>
+                        </RadzenColumn>
+                    </RadzenRow>
+                </RadzenStack>
+            </RadzenCard>
+        }
+    </RadzenStack>
+}
+else
+{
+    <RadzenAlert AlertStyle="AlertStyle.Warning">
+        <RadzenText>No client type information available.</RadzenText>
+    </RadzenAlert>
+}
+
+<!-- Quick Reference Card -->
+<RadzenCard class="rz-mt-4 rz-background-color-primary-lighter">
+    <RadzenStack>
+        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">
+            <RadzenIcon Icon="info" class="rz-me-1" />
+            Quick Reference
+        </RadzenText>
+        <RadzenRow>
+            <RadzenColumn Size="12" SizeMD="4">
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                    <RadzenIcon Icon="security" Style="color: var(--rz-success)" />
+                    <RadzenText TextStyle="TextStyle.Body2"><strong>Confidential:</strong> Server-side apps</RadzenText>
+                </RadzenStack>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="4">
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                    <RadzenIcon Icon="public" Style="color: var(--rz-info)" />
+                    <RadzenText TextStyle="TextStyle.Body2"><strong>Public:</strong> SPAs, mobile apps</RadzenText>
+                </RadzenStack>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="4">
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                    <RadzenIcon Icon="precision_manufacturing" Style="color: var(--rz-warning)" />
+                    <RadzenText TextStyle="TextStyle.Body2"><strong>Machine:</strong> API-to-API communication</RadzenText>
+                </RadzenStack>
+            </RadzenColumn>
+        </RadzenRow>
+    </RadzenStack>
+</RadzenCard>
+
+@code {
+    private List<ClientTypeInfoDto> clientTypes = new();
+    private bool isLoading = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadClientTypes();
+    }
+
+    private async Task LoadClientTypes()
+    {
+        isLoading = true;
+        try
+        {
+            var result = await ClientTypesApi.GetClientTypesAsync();
+            
+            if (result != null)
+            {
+                clientTypes = result.ToList();
+                Logger.LogInformation("Loaded {Count} client types", clientTypes.Count);
+            }
+            else
+            {
+                clientTypes = new List<ClientTypeInfoDto>();
+                NotificationService.Notify(NotificationSeverity.Warning, "Warning", "Failed to load client types");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading client types");
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to load client types");
+            clientTypes = new List<ClientTypeInfoDto>();
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private string GetClientTypeIcon(ClientType clientType)
+    {
+        return clientType switch
+        {
+            ClientType.Confidential => "security",
+            ClientType.Public => "public",
+            ClientType.Machine => "precision_manufacturing",
+            _ => "category"
+        };
+    }
+
+    private string GetClientTypeColor(ClientType clientType)
+    {
+        return clientType switch
+        {
+            ClientType.Confidential => "var(--rz-success)",
+            ClientType.Public => "var(--rz-info)",
+            ClientType.Machine => "var(--rz-warning)",
+            _ => "var(--rz-text-color)"
+        };
+    }
+
+    private BadgeStyle GetClientTypeBadgeStyle(ClientType clientType)
+    {
+        return clientType switch
+        {
+            ClientType.Confidential => BadgeStyle.Success,
+            ClientType.Public => BadgeStyle.Info,
+            ClientType.Machine => BadgeStyle.Warning,
+            _ => BadgeStyle.Secondary
+        };
+    }
+}

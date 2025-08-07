@@ -302,6 +302,23 @@ public class UsersApiService : IUsersApiService
         }
     }
 
+    public async Task<List<ClaimTypeInfo>?> GetDistinctClaimTypesAsync()
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync("api/users/claim-types");
+            response.EnsureSuccessStatusCode();
+
+            var json = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<List<ClaimTypeInfo>>(json, _jsonOptions);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting distinct claim types");
+            return null;
+        }
+    }
+
     // Role management methods  
     public async Task<List<RoleDto>?> GetUserRolesAsync(string userId)
     {

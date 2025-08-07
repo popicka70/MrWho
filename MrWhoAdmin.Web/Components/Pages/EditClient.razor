@@ -89,8 +89,10 @@
                         </RadzenRow>
 
                         <RadzenFormField Text="Status" Variant="Variant.Outlined">
-                            <RadzenCheckBox @bind-Value="@model.IsEnabled" />
-                            <RadzenLabel Text="Client is enabled" class="rz-ml-2" />
+                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                <RadzenCheckBox @bind-Value="@model.IsEnabled" />
+                                <RadzenLabel Text="Client is enabled" />
+                            </RadzenStack>
                         </RadzenFormField>
                     </RadzenStack>
                 </RadzenFieldset>
@@ -186,18 +188,23 @@
                                         
                                         <RadzenDataGridColumn TItem="ScopeDto" Property="Name" Title="Scope Name" Width="200px">
                                             <Template Context="scope">
-                                                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
-                                                    <RadzenIcon Icon="@GetScopeTypeIcon(scope.Type)" 
-                                                               Style="@($"color: {GetScopeTypeColor(scope.Type)}")" />
-                                                    <RadzenText Text="@scope.Name" />
+                                                <RadzenText Text="@scope.Name" />
+                                            </Template>
+                                        </RadzenDataGridColumn>
+
+                                        <RadzenDataGridColumn TItem="ScopeDto" Title="Kind" Width="100px" Sortable="false">
+                                            <Template Context="scope">
+                                                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.25rem" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.Center">
+                                                    <RadzenIcon Icon="@GetScopeTypeIcon(scope.Type)"
+                                                                Style="@($"color: {GetScopeTypeColor(scope.Type)}")" />
                                                     @if (scope.IsStandard)
                                                     {
-                                                        <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="Standard" Size="BadgeSize.ExtraSmall" />
+                                                        <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="STD" />
                                                     }
                                                 </RadzenStack>
                                             </Template>
                                         </RadzenDataGridColumn>
-                                        
+
                                         <RadzenDataGridColumn TItem="ScopeDto" Property="DisplayName" Title="Display Name" Width="150px" />
                                         
                                         <RadzenDataGridColumn TItem="ScopeDto" Property="Description" Title="Description">
@@ -206,7 +213,7 @@
                                             </Template>
                                         </RadzenDataGridColumn>
                                         
-                                        <RadzenDataGridColumn TItem="ScopeDto" Property="Type" Title="Type" Width="100px">
+                                        <RadzenDataGridColumn TItem="ScopeDto" Property="Type" Title="Type Badge" Width="100px">
                                             <Template Context="scope">
                                                 <RadzenBadge BadgeStyle="@GetScopeTypeBadgeStyle(scope.Type)" 
                                                             Text="@GetScopeTypeText(scope.Type)" />
@@ -225,12 +232,14 @@
                             <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-mt-3 rz-mb-2">Selected Scopes (@model.Scopes.Count)</RadzenText>
                             @if (model.Scopes.Any())
                             {
-                                <RadzenStack Wrap="FlexWrap.Wrap" Gap="0.5rem">
-                                    @foreach (var scope in model.Scopes)
-                                    {
-                                        <RadzenBadge BadgeStyle="BadgeStyle.Primary" Text="@scope" />
-                                    }
-                                </RadzenStack>
+                                <RadzenCard Style="max-width: 800px;">
+                                    <RadzenStack Wrap="FlexWrap.Wrap" Gap="0.5rem">
+                                        @foreach (var scope in model.Scopes)
+                                        {
+                                            <RadzenBadge BadgeStyle="BadgeStyle.Primary" Text="@scope" />
+                                        }
+                                    </RadzenStack>
+                                </RadzenCard>
                             }
                             else
                             {

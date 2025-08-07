@@ -86,11 +86,11 @@
     private bool hasRefreshToken = false;
     private DateTimeOffset? tokenExpiryTime = null;
     private string timeUntilExpiry = "";
-    
+
     private bool isChecking = false;
     private bool isRefreshing = false;
     private bool isTestingApi = false;
-    
+
     private string lastOperationResult = "";
     private bool lastOperationSuccess = false;
     private bool showRefreshError = false;
@@ -98,7 +98,7 @@
     protected override async Task OnInitializedAsync()
     {
         await CheckTokenStatus();
-        
+
         // Check if we returned from a redirect with an error
         var uri = new Uri(Navigation.Uri);
         var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
@@ -109,7 +109,7 @@
     {
         isChecking = true;
         lastOperationResult = "";
-        
+
         try
         {
             var httpContext = HttpContextAccessor.HttpContext;
@@ -117,14 +117,14 @@
             {
                 // Check if token is expiring
                 isTokenExpiring = await TokenRefreshService.IsTokenExpiredOrExpiringSoonAsync(httpContext);
-                
+
                 // Check for tokens
                 var accessToken = await httpContext.GetTokenAsync(TokenConstants.TokenNames.AccessToken);
                 hasAccessToken = !string.IsNullOrEmpty(accessToken);
-                
+
                 var refreshToken = await httpContext.GetTokenAsync(TokenConstants.TokenNames.RefreshToken);
                 hasRefreshToken = !string.IsNullOrEmpty(refreshToken);
-                
+
                 // Try to get token expiry
                 var expiresAtString = await httpContext.GetTokenAsync(TokenConstants.TokenNames.ExpiresAt);
                 if (!string.IsNullOrEmpty(expiresAtString) && DateTimeOffset.TryParse(expiresAtString, out var expiresAt))
@@ -138,7 +138,7 @@
                     tokenExpiryTime = null;
                     timeUntilExpiry = "Unknown";
                 }
-                
+
                 lastOperationResult = "Token status checked successfully";
                 lastOperationSuccess = true;
             }
@@ -159,13 +159,13 @@
     private async Task ForceRefreshTokenRedirect()
     {
         isRefreshing = true;
-        
+
         try
         {
             // Build the return URL for after refresh
             var currentUrl = Navigation.Uri;
             var refreshUrl = $"/token/refresh?returnUrl={Uri.EscapeDataString(currentUrl)}";
-            
+
             // Use NavigationManager for safer navigation
             Navigation.NavigateTo(refreshUrl, forceLoad: true);
         }
@@ -177,6 +177,7 @@
             isRefreshing = false;
             StateHasChanged();
         }
+        await Task.CompletedTask;
     }
 
     private async Task TestApiCall()

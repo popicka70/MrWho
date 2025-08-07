@@ -6,7 +6,6 @@
 @inject IRealmsApiService RealmsApi
 @inject IClientsApiService ClientsApi
 @inject IUsersApiService UsersApi
-@inject ILogger<Home> Logger
 
 <PageTitle>Dashboard - MrWho Administration</PageTitle>
 
@@ -163,6 +162,9 @@ else
 }
 
 @code {
+    [Inject] 
+    protected new ILogger<Home> Logger { get; set; } = default!;
+    
     private int totalRealms = 0;
     private int totalClients = 0;
     private int totalUsers = 0;

@@ -20,7 +20,7 @@ public class IdentityResourceDto
     public DateTime UpdatedAt { get; set; }
     public string? CreatedBy { get; set; }
     public string? UpdatedBy { get; set; }
-    public List<string> UserClaims { get; set; } = new();
+    public List<IdentityResourceClaimDto> UserClaims { get; set; } = new();
     public Dictionary<string, string> Properties { get; set; } = new();
 }
 
