@@ -7,6 +7,13 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+	  <Compile Remove="Components\Dialogs\**" />
+	  <Content Remove="Components\Dialogs\**" />
+	  <EmbeddedResource Remove="Components\Dialogs\**" />
+	  <None Remove="Components\Dialogs\**" />
+	</ItemGroup>
+
+	<ItemGroup>
 		<PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="9.0.7" />
 		<PackageReference Include="Radzen.Blazor" Version="7.1.6" />
 		<PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.13.0" />
@@ -15,10 +22,6 @@
 	<ItemGroup>
 	  <ProjectReference Include="..\MrWho.Shared\MrWho.Shared.csproj" />
 	  <ProjectReference Include="..\MrWhoAdmin.ServiceDefaults\MrWhoAdmin.ServiceDefaults.csproj" />
-	</ItemGroup>
-
-	<ItemGroup>
-	  <Folder Include="Components\Dialogs\" />
 	</ItemGroup>
 
 </Project>

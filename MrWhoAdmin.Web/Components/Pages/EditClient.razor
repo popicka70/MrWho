@@ -186,18 +186,23 @@
                                         
                                         <RadzenDataGridColumn TItem="ScopeDto" Property="Name" Title="Scope Name" Width="200px">
                                             <Template Context="scope">
-                                                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
-                                                    <RadzenIcon Icon="@GetScopeTypeIcon(scope.Type)" 
-                                                               Style="@($"color: {GetScopeTypeColor(scope.Type)}")" />
-                                                    <RadzenText Text="@scope.Name" />
+                                                <RadzenText Text="@scope.Name" />
+                                            </Template>
+                                        </RadzenDataGridColumn>
+
+                                        <RadzenDataGridColumn TItem="ScopeDto" Title="Kind" Width="100px" Sortable="false">
+                                            <Template Context="scope">
+                                                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.25rem" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.Center">
+                                                    <RadzenIcon Icon="@GetScopeTypeIcon(scope.Type)"
+                                                                Style="@($"color: {GetScopeTypeColor(scope.Type)}")" />
                                                     @if (scope.IsStandard)
                                                     {
-                                                        <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="Standard" Size="BadgeSize.ExtraSmall" />
+                                                        <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="STD" />
                                                     }
                                                 </RadzenStack>
                                             </Template>
                                         </RadzenDataGridColumn>
-                                        
+
                                         <RadzenDataGridColumn TItem="ScopeDto" Property="DisplayName" Title="Display Name" Width="150px" />
                                         
                                         <RadzenDataGridColumn TItem="ScopeDto" Property="Description" Title="Description">
@@ -206,7 +211,7 @@
                                             </Template>
                                         </RadzenDataGridColumn>
                                         
-                                        <RadzenDataGridColumn TItem="ScopeDto" Property="Type" Title="Type" Width="100px">
+                                        <RadzenDataGridColumn TItem="ScopeDto" Property="Type" Title="Type Badge" Width="100px">
                                             <Template Context="scope">
                                                 <RadzenBadge BadgeStyle="@GetScopeTypeBadgeStyle(scope.Type)" 
                                                             Text="@GetScopeTypeText(scope.Type)" />
