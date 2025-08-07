@@ -16,4 +16,6 @@ var adminWeb = builder.AddProject<Projects.MrWhoAdmin_Web>("webfrontend")
     .WithReference(mrWho)
     .WaitFor(mrWho);
 
+builder.AddProject<Projects.MrWhoDemo1>("mrwhodemo1");
+
 builder.Build().Run();
