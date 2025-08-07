@@ -1,4 +1,5 @@
 @inject IIdentityResourcesApiService IdentityResourcesApi
+@inject IUsersApiService UsersApi
 @inject NotificationService NotificationService
 @inject DialogService DialogService
 @inject ILogger<EditIdentityResourceDialog> Logger
@@ -41,33 +42,63 @@
         <RadzenStack Gap="0.5rem">
             <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
                 <RadzenDropDown @bind-Value="@selectedClaimType" Data="@availableClaimTypes" 
-                               Placeholder="Select a claim type..." Style="width: 400px;"
-                               AllowClear="true">
+                               Placeholder="@(isLoadingClaimTypes ? "Loading claim types..." : "Select a claim type...")" 
+                               Style="width: 400px;" AllowClear="true" AllowFiltering="true" 
+                               FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                               Disabled="@isLoadingClaimTypes">
                     <Template Context="item">
                         <RadzenStack Gap="0.25rem">
-                            <RadzenText Text="@($"{item.Type}")" Style="font-weight: 500; font-family: monospace;" />
+                            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
+                                <RadzenText Text="@($"{item.Type}")" Style="font-weight: 500; font-family: monospace;" />
+                                @if (IsCustomClaimType(item))
+                                {
+                                    <RadzenBadge BadgeStyle="BadgeStyle.Secondary" Text="Custom" />
+                                }
+                                else
+                                {
+                                    <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="Standard" />
+                                }
+                            </RadzenStack>
                             <RadzenText Text="@item.DisplayName" TextStyle="TextStyle.Caption" class="rz-text-secondary-color" />
                         </RadzenStack>
                     </Template>
                     <ValueTemplate Context="item">
-                        <RadzenText Text="@($"{item?.Type} - {item?.DisplayName}")" />
+                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
+                            <RadzenText Text="@($"{item?.Type}")" Style="font-family: monospace;" />
+                            @if (item != null && IsCustomClaimType(item))
+                            {
+                                <RadzenBadge BadgeStyle="BadgeStyle.Secondary" Text="Custom" Size="BadgeSize.ExtraSmall" />
+                            }
+                        </RadzenStack>
                     </ValueTemplate>
                 </RadzenDropDown>
                 <RadzenButton Text="Add Claim" Icon="add" ButtonStyle="ButtonStyle.Light" 
                             Click="@(async () => await AddSelectedClaim())" 
-                            Disabled="@(selectedClaimType == null || userClaims.Contains(selectedClaimType.Type))" />
+                            Disabled="@(isLoadingClaimTypes || selectedClaimType == null || userClaims.Contains(selectedClaimType?.Type ?? ""))" />
             </RadzenStack>
             
-            <RadzenText TextStyle="TextStyle.Caption" class="rz-text-secondary-color">
-                @if (selectedClaimType != null)
-                {
-                    @selectedClaimType.Description
-                }
-                else
-                {
-                    <text>Select a claim type to see its description</text>
-                }
-            </RadzenText>
+            @if (isLoadingClaimTypes)
+            {
+                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
+                    <RadzenProgressBarCircular Value="100" ShowValue="false" Size="ProgressBarCircularSize.Small" />
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-text-secondary-color">
+                        Loading claim types from database...
+                    </RadzenText>
+                </RadzenStack>
+            }
+            else
+            {
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-text-secondary-color">
+                    @if (selectedClaimType != null)
+                    {
+                        @selectedClaimType.Description
+                    }
+                    else
+                    {
+                        <text>Select a claim type to see its description. Showing @availableClaimTypes.Count available claim types.</text>
+                    }
+                </RadzenText>
+            }
 
             <!-- Custom claim input for advanced users -->
             <RadzenCollapsible>
@@ -169,6 +200,7 @@
     private ClaimTypeInfo? selectedClaimType;
     private string customClaimType = string.Empty;
     private List<ClaimTypeInfo> availableClaimTypes = new();
+    private bool isLoadingClaimTypes = true;
 
     // Individual properties for checkboxes
     private bool isEnabled;
@@ -192,8 +224,39 @@
         showInDiscoveryDocument = IdentityResource.ShowInDiscoveryDocument;
         emphasize = IdentityResource.Emphasize;
 
-        // Initialize available claim types
-        availableClaimTypes = CommonClaimTypes.StandardClaims.ToList();
+        // Load available claim types from database
+        _ = LoadClaimTypesAsync();
+    }
+
+    private async Task LoadClaimTypesAsync()
+    {
+        try
+        {
+            isLoadingClaimTypes = true;
+            StateHasChanged();
+
+            var claimTypes = await UsersApi.GetDistinctClaimTypesAsync();
+            if (claimTypes != null)
+            {
+                availableClaimTypes = claimTypes;
+            }
+            else
+            {
+                // Fallback to standard claims if API call fails
+                availableClaimTypes = CommonClaimTypes.StandardClaims.ToList();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError(ex, "Error loading claim types");
+            // Fallback to standard claims if error occurs
+            availableClaimTypes = CommonClaimTypes.StandardClaims.ToList();
+        }
+        finally
+        {
+            isLoadingClaimTypes = false;
+            StateHasChanged();
+        }
     }
 
     private async Task AddSelectedClaim()
@@ -229,6 +292,11 @@
     {
         var claimInfo = availableClaimTypes.FirstOrDefault(c => c.Type == claimType);
         return claimInfo?.Description ?? "Custom claim type";
+    }
+
+    private bool IsCustomClaimType(ClaimTypeInfo claimType)
+    {
+        return !CommonClaimTypes.StandardClaims.Any(s => s.Type == claimType.Type);
     }
 
     private async Task AddProperty()

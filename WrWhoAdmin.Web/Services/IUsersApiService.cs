@@ -24,6 +24,7 @@ public interface IUsersApiService
     Task<bool> AddUserClaimAsync(string userId, AddUserClaimRequest request);
     Task<bool> RemoveUserClaimAsync(string userId, RemoveUserClaimRequest request);
     Task<bool> UpdateUserClaimAsync(string userId, string oldClaimType, string oldClaimValue, AddUserClaimRequest newClaim);
+    Task<List<ClaimTypeInfo>?> GetDistinctClaimTypesAsync();
 
     // Role management
     Task<List<RoleDto>?> GetUserRolesAsync(string userId);
