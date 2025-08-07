@@ -12,7 +12,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\MrWho\MrWho.csproj" />
-    <ProjectReference Include="..\WrWhoAdmin.Web\MrWhoAdmin.Web.csproj" />
+    <ProjectReference Include="..\MrWhoAdmin.Web\MrWhoAdmin.Web.csproj" />
   </ItemGroup>
 
   <ItemGroup>

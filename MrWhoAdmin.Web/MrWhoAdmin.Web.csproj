@@ -14,7 +14,7 @@
 
 	<ItemGroup>
 	  <ProjectReference Include="..\MrWho.Shared\MrWho.Shared.csproj" />
-	  <ProjectReference Include="..\WrWhoAdmin.ServiceDefaults\MrWhoAdmin.ServiceDefaults.csproj" />
+	  <ProjectReference Include="..\MrWhoAdmin.ServiceDefaults\MrWhoAdmin.ServiceDefaults.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>

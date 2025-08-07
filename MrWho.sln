@@ -5,13 +5,13 @@ VisualStudioVersion = 17.14.36327.8
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MrWho", "MrWho\MrWho.csproj", "{9B158CF4-86D0-4200-BB7E-23C65E491304}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MrWhoAdmin.AppHost", "WrWhoAdmin.AppHost\MrWhoAdmin.AppHost.csproj", "{ABBC3523-7A4E-45CE-B5BD-1D7C7636B32A}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MrWhoAdmin.AppHost", "MrWhoAdmin.AppHost\MrWhoAdmin.AppHost.csproj", "{ABBC3523-7A4E-45CE-B5BD-1D7C7636B32A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MrWhoAdmin.ServiceDefaults", "WrWhoAdmin.ServiceDefaults\MrWhoAdmin.ServiceDefaults.csproj", "{B58C1D3E-BAF0-2028-F629-1E699BE12DD1}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MrWhoAdmin.ServiceDefaults", "MrWhoAdmin.ServiceDefaults\MrWhoAdmin.ServiceDefaults.csproj", "{B58C1D3E-BAF0-2028-F629-1E699BE12DD1}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MrWhoAdmin.Web", "WrWhoAdmin.Web\MrWhoAdmin.Web.csproj", "{BFA34AF9-E963-A6FF-C22C-8B41FBCFA2E9}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MrWhoAdmin.Web", "MrWhoAdmin.Web\MrWhoAdmin.Web.csproj", "{BFA34AF9-E963-A6FF-C22C-8B41FBCFA2E9}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MrWhoAdmin.Tests", "WrWhoAdmin.Tests\MrWhoAdmin.Tests.csproj", "{71BF738B-9DE2-A251-932F-1886D6C6AF44}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MrWhoAdmin.Tests", "MrWhoAdmin.Tests\MrWhoAdmin.Tests.csproj", "{71BF738B-9DE2-A251-932F-1886D6C6AF44}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Položky řešení", "Položky řešení", "{73E6DEBC-5D85-E032-7380-14D1E53616C6}"
 	ProjectSection(SolutionItems) = preProject

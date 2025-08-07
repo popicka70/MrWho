@@ -25,9 +25,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\WrWhoAdmin.AppHost\MrWhoAdmin.AppHost.csproj" />
+    <ProjectReference Include="..\MrWhoAdmin.AppHost\MrWhoAdmin.AppHost.csproj" />
+    <ProjectReference Include="..\MrWhoAdmin.Web\MrWhoAdmin.Web.csproj" />
+    <ProjectReference Include="..\MrWhoAdmin.AppHost\MrWhoAdmin.AppHost.csproj" />
     <ProjectReference Include="..\MrWho\MrWho.csproj" />
-    <ProjectReference Include="..\WrWhoAdmin.Web\MrWhoAdmin.Web.csproj" />
   </ItemGroup>
 
   <ItemGroup>
