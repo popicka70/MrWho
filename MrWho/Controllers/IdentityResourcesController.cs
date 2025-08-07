@@ -22,6 +22,35 @@ public class IdentityResourcesController : ControllerBase
     }
 
     /// <summary>
+    /// Creates an IdentityResourceClaimDto from an IdentityResourceClaim entity
+    /// </summary>
+    private static IdentityResourceClaimDto CreateClaimDto(IdentityResourceClaim entity)
+    {
+        var standardClaim = CommonClaimTypes.StandardClaims.FirstOrDefault(s => s.Type == entity.ClaimType);
+        
+        return new IdentityResourceClaimDto
+        {
+            Id = entity.Id,
+            IdentityResourceId = entity.IdentityResourceId,
+            ClaimType = entity.ClaimType,
+            DisplayName = standardClaim?.DisplayName ?? ToTitleCase(entity.ClaimType.Replace("_", " ")),
+            Description = standardClaim?.Description ?? "Custom claim type",
+            IsStandard = standardClaim != null
+        };
+    }
+
+    /// <summary>
+    /// Helper method for title case conversion
+    /// </summary>
+    private static string ToTitleCase(string input)
+    {
+        if (string.IsNullOrEmpty(input))
+            return input;
+
+        return System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(input.ToLower());
+    }
+
+    /// <summary>
     /// Get paginated list of identity resources
     /// </summary>
     [HttpGet]
@@ -69,7 +98,7 @@ public class IdentityResourcesController : ControllerBase
                 UpdatedAt = ir.UpdatedAt,
                 CreatedBy = ir.CreatedBy,
                 UpdatedBy = ir.UpdatedBy,
-                UserClaims = ir.UserClaims.Select(c => IdentityResourceClaimDto.FromClaimType(c.ClaimType)).ToList(),
+                UserClaims = ir.UserClaims.Select(c => CreateClaimDto(c)).ToList(),
                 Properties = ir.Properties.ToDictionary(p => p.Key, p => p.Value)
             }).ToList();
 
@@ -123,7 +152,7 @@ public class IdentityResourcesController : ControllerBase
                 UpdatedAt = identityResource.UpdatedAt,
                 CreatedBy = identityResource.CreatedBy,
                 UpdatedBy = identityResource.UpdatedBy,
-                UserClaims = identityResource.UserClaims.Select(c => IdentityResourceClaimDto.FromClaimType(c.ClaimType)).ToList(),
+                UserClaims = identityResource.UserClaims.Select(c => CreateClaimDto(c)).ToList(),
                 Properties = identityResource.Properties.ToDictionary(p => p.Key, p => p.Value)
             };
 
@@ -216,7 +245,7 @@ public class IdentityResourcesController : ControllerBase
                 UpdatedAt = createdIdentityResource.UpdatedAt,
                 CreatedBy = createdIdentityResource.CreatedBy,
                 UpdatedBy = createdIdentityResource.UpdatedBy,
-                UserClaims = createdIdentityResource.UserClaims.Select(c => IdentityResourceClaimDto.FromClaimType(c.ClaimType)).ToList(),
+                UserClaims = createdIdentityResource.UserClaims.Select(c => CreateClaimDto(c)).ToList(),
                 Properties = createdIdentityResource.Properties.ToDictionary(p => p.Key, p => p.Value)
             };
 
@@ -325,7 +354,7 @@ public class IdentityResourcesController : ControllerBase
                 UpdatedAt = updatedIdentityResource.UpdatedAt,
                 CreatedBy = updatedIdentityResource.CreatedBy,
                 UpdatedBy = updatedIdentityResource.UpdatedBy,
-                UserClaims = updatedIdentityResource.UserClaims.Select(c => IdentityResourceClaimDto.FromClaimType(c.ClaimType)).ToList(),
+                UserClaims = updatedIdentityResource.UserClaims.Select(c => CreateClaimDto(c)).ToList(),
                 Properties = updatedIdentityResource.Properties.ToDictionary(p => p.Key, p => p.Value)
             };
 
@@ -414,7 +443,7 @@ public class IdentityResourcesController : ControllerBase
                 UpdatedAt = identityResource.UpdatedAt,
                 CreatedBy = identityResource.CreatedBy,
                 UpdatedBy = identityResource.UpdatedBy,
-                UserClaims = identityResource.UserClaims.Select(c => IdentityResourceClaimDto.FromClaimType(c.ClaimType)).ToList(),
+                UserClaims = identityResource.UserClaims.Select(c => CreateClaimDto(c)).ToList(),
                 Properties = identityResource.Properties.ToDictionary(p => p.Key, p => p.Value)
             };
 
