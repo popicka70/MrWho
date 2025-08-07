@@ -11,6 +11,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\MrWhoDemo1\MrWhoDemo1.csproj" />
     <ProjectReference Include="..\MrWho\MrWho.csproj" />
     <ProjectReference Include="..\MrWhoAdmin.Web\MrWhoAdmin.Web.csproj" />
   </ItemGroup>

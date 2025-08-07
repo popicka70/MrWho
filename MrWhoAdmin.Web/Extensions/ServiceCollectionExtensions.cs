@@ -171,7 +171,7 @@ public static class ServiceCollectionExtensions
         options.RemoteSignOutPath = "/signout-oidc";
 
         // Additional configuration for OpenIddict compatibility
-        options.MetadataAddress = $"{options.Authority}.well-known/openid_configuration";
+        options.MetadataAddress = $"{options.Authority}.well-known/openid-configuration";
 
         // Configure token refresh settings
         options.RefreshInterval = TimeSpan.FromMinutes(30); // Check for refresh every 30 minutes

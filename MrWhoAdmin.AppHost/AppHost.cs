@@ -16,4 +16,10 @@ var adminWeb = builder.AddProject<Projects.MrWhoAdmin_Web>("webfrontend")
     .WithReference(mrWho)
     .WaitFor(mrWho);
 
+var demo1 = builder.AddProject<Projects.MrWhoDemo1>("mrwhodemo1")
+    .WithExternalHttpEndpoints()
+    .WithHttpHealthCheck("/health")
+    .WithReference(mrWho)
+    .WaitFor(mrWho);
+
 builder.Build().Run();

@@ -127,7 +127,7 @@ public static class ServiceCollectionExtensions
                 options.SetAuthorizationEndpointUris("/connect/authorize")
                        .SetTokenEndpointUris("/connect/token")
                        .SetEndSessionEndpointUris("/connect/logout")
-                       .SetConfigurationEndpointUris("/.well-known/openid_configuration")
+                       .SetConfigurationEndpointUris("/.well-known/openid-configuration")
                        .SetUserInfoEndpointUris("/connect/userinfo")
 
                        // Enable grant types

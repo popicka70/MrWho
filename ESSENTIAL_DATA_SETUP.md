@@ -58,7 +58,7 @@ The MrWho API runs on `https://localhost:7113` and provides:
 - Token Endpoint: `https://localhost:7113/connect/token`
 - UserInfo Endpoint: `https://localhost:7113/connect/userinfo`
 - End Session Endpoint: `https://localhost:7113/connect/logout`
-- Discovery Document: `https://localhost:7113/.well-known/openid_configuration`
+- Discovery Document: `https://localhost:7113/.well-known/openid-configuration`
 
 ### MrWhoAdmin.Web Application (Port 7257)  
 The admin web application runs on `https://localhost:7257` and is configured to:
