@@ -1,10 +1,183 @@
 ﻿@page
 @model IndexModel
+@using Microsoft.AspNetCore.Authentication
 @{
     ViewData["Title"] = "Home page";
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="display-4 mb-4">Welcome to MrWho Demo Application 1</h1>
+            
+            @if (User.Identity?.IsAuthenticated == true)
+            {
+                <div class="alert alert-success">
+                    <h4><i class="bi bi-check-circle"></i> Authentication Successful!</h4>
+                    <p>Welcome <strong>@(User.Identity.Name ?? "Unknown User")</strong>!</p>
+                </div>
+
+                <div class="row">
+                    <div class="col-lg-6 mb-4">
+                        <div class="card">
+                            <div class="card-header bg-primary text-white">
+                                <h5 class="mb-0"><i class="bi bi-person-circle"></i> User Information</h5>
+                            </div>
+                            <div class="card-body">
+                                <table class="table table-borderless">
+                                    <tr>
+                                        <td><strong>Name:</strong></td>
+                                        <td>@(User.Identity.Name ?? "Not available")</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Email:</strong></td>
+                                        <td>@(User.FindFirst("email")?.Value ?? "Not available")</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Subject ID:</strong></td>
+                                        <td><code>@(User.FindFirst("sub")?.Value ?? "Not available")</code></td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Authentication Type:</strong></td>
+                                        <td>@(User.Identity.AuthenticationType ?? "Not available")</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>Is Authenticated:</strong></td>
+                                        <td><span class="badge bg-success">@User.Identity.IsAuthenticated</span></td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-6 mb-4">
+                        <div class="card">
+                            <div class="card-header bg-info text-white">
+                                <h5 class="mb-0"><i class="bi bi-key"></i> Tokens</h5>
+                            </div>
+                            <div class="card-body">
+                                @{
+                                    var accessToken = await HttpContext.GetTokenAsync("access_token");
+                                    var refreshToken = await HttpContext.GetTokenAsync("refresh_token");
+                                    var idToken = await HttpContext.GetTokenAsync("id_token");
+                                }
+                                
+                                <div class="mb-3">
+                                    <label class="form-label"><strong>Access Token:</strong></label>
+                                    @if (!string.IsNullOrEmpty(accessToken))
+                                    {
+                                        <textarea class="form-control font-monospace" rows="3" readonly>@accessToken</textarea>
+                                        <small class="text-muted">Length: @accessToken.Length characters</small>
+                                    }
+                                    else
+                                    {
+                                        <p class="text-muted">Not available</p>
+                                    }
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label"><strong>Refresh Token:</strong></label>
+                                    @if (!string.IsNullOrEmpty(refreshToken))
+                                    {
+                                        <textarea class="form-control font-monospace" rows="2" readonly>@refreshToken</textarea>
+                                        <small class="text-muted">Length: @refreshToken.Length characters</small>
+                                    }
+                                    else
+                                    {
+                                        <p class="text-muted">Not available</p>
+                                    }
+                                </div>
+
+                                <div class="mb-3">
+                                    <label class="form-label"><strong>ID Token:</strong></label>
+                                    @if (!string.IsNullOrEmpty(idToken))
+                                    {
+                                        <textarea class="form-control font-monospace" rows="4" readonly>@idToken</textarea>
+                                        <small class="text-muted">Length: @idToken.Length characters</small>
+                                    }
+                                    else
+                                    {
+                                        <p class="text-muted">Not available</p>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-warning text-dark">
+                                <h5 class="mb-0"><i class="bi bi-list-ul"></i> All Claims</h5>
+                            </div>
+                            <div class="card-body">
+                                @if (User.Claims.Any())
+                                {
+                                    <div class="table-responsive">
+                                        <table class="table table-striped table-sm">
+                                            <thead>
+                                                <tr>
+                                                    <th>Claim Type</th>
+                                                    <th>Value</th>
+                                                    <th>Issuer</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @foreach (var claim in User.Claims.OrderBy(c => c.Type))
+                                                {
+                                                    <tr>
+                                                        <td><code>@claim.Type</code></td>
+                                                        <td>@claim.Value</td>
+                                                        <td><small class="text-muted">@claim.Issuer</small></td>
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <p class="text-muted">No claims available</p>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="d-flex gap-2">
+                            <a href="/Account/Logout" class="btn btn-outline-danger">
+                                <i class="bi bi-box-arrow-right"></i> Logout
+                            </a>
+                            <a href="https://localhost:7113/.well-known/openid_configuration" target="_blank" class="btn btn-outline-info">
+                                <i class="bi bi-gear"></i> View OpenID Configuration
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="alert alert-warning">
+                    <h4><i class="bi bi-exclamation-triangle"></i> Not Authenticated</h4>
+                    <p>You need to log in to access this application.</p>
+                    <a href="/Account/Login" class="btn btn-primary">
+                        <i class="bi bi-box-arrow-in-right"></i> Login
+                    </a>
+                </div>
+                
+                <div class="mt-4">
+                    <h5>Demo Credentials:</h5>
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <p><strong>Username:</strong> demo1@example.com</p>
+                            <p><strong>Password:</strong> Demo123</p>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
 </div>

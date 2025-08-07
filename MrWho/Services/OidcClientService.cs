@@ -51,6 +51,26 @@ public class OidcClientService : IOidcClientService
             _logger.LogInformation("Created admin realm");
         }
 
+        // 1.5. Create demo realm if it doesn't exist
+        var demoRealm = await _context.Realms.FirstOrDefaultAsync(r => r.Name == "demo");
+        if (demoRealm == null)
+        {
+            demoRealm = new Realm
+            {
+                Name = "demo",
+                DisplayName = "Demo Applications",
+                Description = "Realm for demo applications showcasing MrWho OIDC integration",
+                IsEnabled = true,
+                AccessTokenLifetime = TimeSpan.FromMinutes(60),
+                RefreshTokenLifetime = TimeSpan.FromDays(7),
+                AuthorizationCodeLifetime = TimeSpan.FromMinutes(10),
+                CreatedBy = "System"
+            };
+            _context.Realms.Add(demoRealm);
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Created demo realm");
+        }
+
         // 2. Create admin client for MrWhoAdmin.Web if it doesn't exist
         var adminClient = await _context.Clients
             .Include(c => c.RedirectUris)
@@ -253,6 +273,109 @@ public class OidcClientService : IOidcClientService
             }
         }
 
+        // 2.5. Create demo1 client for MrWhoDemo1 if it doesn't exist
+        var demo1Client = await _context.Clients
+            .Include(c => c.RedirectUris)
+            .Include(c => c.PostLogoutUris)
+            .Include(c => c.Scopes)
+            .Include(c => c.Permissions)
+            .FirstOrDefaultAsync(c => c.ClientId == "mrwho_demo1");
+
+        if (demo1Client == null)
+        {
+            demo1Client = new Client
+            {
+                ClientId = "mrwho_demo1",
+                ClientSecret = "Demo1Secret2024!",
+                Name = "MrWho Demo Application 1",
+                Description = "Demo application showcasing MrWho OIDC integration",
+                RealmId = demoRealm.Id,
+                IsEnabled = true,
+                ClientType = ClientType.Confidential,
+                AllowAuthorizationCodeFlow = true,
+                AllowClientCredentialsFlow = false,
+                AllowPasswordFlow = false,
+                AllowRefreshTokenFlow = true,
+                RequirePkce = true,
+                RequireClientSecret = true,
+                CreatedBy = "System"
+            };
+
+            _context.Clients.Add(demo1Client);
+            await _context.SaveChangesAsync();
+
+            // Add redirect URIs for MrWhoDemo1 (port 7037)
+            var redirectUris = new[]
+            {
+                "https://localhost:7037/signin-oidc",
+                "https://localhost:7037/callback"
+            };
+
+            foreach (var uri in redirectUris)
+            {
+                _context.ClientRedirectUris.Add(new ClientRedirectUri
+                {
+                    ClientId = demo1Client.Id,
+                    Uri = uri
+                });
+            }
+
+            // Add post-logout URIs
+            var postLogoutUris = new[]
+            {
+                "https://localhost:7037/",
+                "https://localhost:7037/signout-callback-oidc"
+            };
+
+            foreach (var uri in postLogoutUris)
+            {
+                _context.ClientPostLogoutUris.Add(new ClientPostLogoutUri
+                {
+                    ClientId = demo1Client.Id,
+                    Uri = uri
+                });
+            }
+
+            // Add scopes for demo1
+            var scopes = new[] { "openid", "email", "profile", "roles", "offline_access" };
+            foreach (var scope in scopes)
+            {
+                _context.ClientScopes.Add(new ClientScope
+                {
+                    ClientId = demo1Client.Id,
+                    Scope = scope
+                });
+            }
+
+            // Add permissions for demo1
+            var permissions = new[]
+            {
+                OpenIddictConstants.Permissions.Endpoints.Authorization,
+                OpenIddictConstants.Permissions.Endpoints.Token,
+                OpenIddictConstants.Permissions.Endpoints.EndSession,
+                OpenIddictConstants.Permissions.GrantTypes.AuthorizationCode,
+                OpenIddictConstants.Permissions.GrantTypes.RefreshToken,
+                "scp:openid",
+                OpenIddictConstants.Permissions.Scopes.Email,
+                OpenIddictConstants.Permissions.Scopes.Profile,
+                OpenIddictConstants.Permissions.Scopes.Roles,
+                OpenIddictConstants.Permissions.ResponseTypes.Code,
+                "scp:offline_access"
+            };
+
+            foreach (var permission in permissions)
+            {
+                _context.ClientPermissions.Add(new ClientPermission
+                {
+                    ClientId = demo1Client.Id,
+                    Permission = permission
+                });
+            }
+
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Created demo1 client 'mrwho_demo1'");
+        }
+
         // 3. Create admin user if it doesn't exist
         var adminUser = await _userManager.FindByNameAsync("admin@mrwho.local");
         if (adminUser == null)
@@ -314,8 +437,39 @@ public class OidcClientService : IOidcClientService
             }
         }
 
+        // 3.5. Create demo1 user if it doesn't exist
+        var demo1User = await _userManager.FindByNameAsync("demo1@example.com");
+        if (demo1User == null)
+        {
+            demo1User = new IdentityUser
+            {
+                UserName = "demo1@example.com",
+                Email = "demo1@example.com",
+                EmailConfirmed = true
+            };
+
+            var result = await _userManager.CreateAsync(demo1User, "Demo123");
+            if (result.Succeeded)
+            {
+                // Add name claims to demo1 user for proper display name
+                await _userManager.AddClaimAsync(demo1User, new System.Security.Claims.Claim("name", "Demo User One"));
+                await _userManager.AddClaimAsync(demo1User, new System.Security.Claims.Claim("given_name", "Demo"));
+                await _userManager.AddClaimAsync(demo1User, new System.Security.Claims.Claim("family_name", "User One"));
+                await _userManager.AddClaimAsync(demo1User, new System.Security.Claims.Claim("preferred_username", "demo1"));
+                
+                _logger.LogInformation("Created demo1 user 'demo1@example.com' with name claims");
+            }
+            else
+            {
+                _logger.LogError("Failed to create demo1 user: {Errors}", string.Join(", ", result.Errors.Select(e => e.Description)));
+            }
+        }
+
         // Sync the admin client with OpenIddict
         await SyncClientWithOpenIddictAsync(adminClient!);
+
+        // Sync the demo1 client with OpenIddict
+        await SyncClientWithOpenIddictAsync(demo1Client!);
         
         // CRITICAL FIX: Clean up any existing incorrect API permissions and ensure correct ones are present
         await FixExistingApiPermissionsAsync(adminClient!);

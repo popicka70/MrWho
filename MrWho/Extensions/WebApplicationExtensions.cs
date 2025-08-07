@@ -83,6 +83,7 @@ public static class WebApplicationExtensions
                 TokenInspectorAlt = "/identity/tokeninspector",
                 ClientInfo = "/debug/client-info", 
                 AdminClientInfo = "/debug/admin-client-info",
+                Demo1ClientInfo = "/debug/demo1-client-info",
                 EssentialData = "/debug/essential-data",
                 ClientPermissions = "/debug/client-permissions",
                 OpenIddictScopes = "/debug/openiddict-scopes"
@@ -178,6 +179,39 @@ public static class WebApplicationExtensions
                 {
                     Username = "admin@mrwho.local",
                     Password = "MrWhoAdmin2024!"
+                }
+            });
+        });
+
+        app.MapGet("/debug/demo1-client-info", async (IOidcClientService oidcClientService) =>
+        {
+            var clients = await oidcClientService.GetEnabledClientsAsync();
+            var demo1Client = clients.FirstOrDefault(c => c.ClientId == "mrwho_demo1");
+            
+            if (demo1Client == null)
+            {
+                return Results.NotFound("Demo1 client not found");
+            }
+            
+            return Results.Ok(new
+            {
+                ClientId = demo1Client.ClientId,
+                ClientSecret = demo1Client.ClientSecret,
+                Name = demo1Client.Name,
+                RealmName = demo1Client.Realm.Name,
+                IsEnabled = demo1Client.IsEnabled,
+                AuthorizeUrl = "https://localhost:7113/connect/authorize",
+                TokenUrl = "https://localhost:7113/connect/token",
+                LogoutUrl = "https://localhost:7113/connect/logout",
+                RedirectUris = demo1Client.RedirectUris.Select(ru => ru.Uri).ToArray(),
+                PostLogoutRedirectUris = demo1Client.PostLogoutUris.Select(plu => plu.Uri).ToArray(),
+                Scopes = demo1Client.Scopes.Select(s => s.Scope).ToArray(),
+                SampleAuthUrl = $"https://localhost:7113/connect/authorize?client_id={demo1Client.ClientId}&response_type=code&redirect_uri=https://localhost:7037/signin-oidc&scope=openid%20email%20profile%20roles&state=demo1_test",
+                SampleLogoutUrl = "https://localhost:7113/connect/logout?post_logout_redirect_uri=https://localhost:7037/signout-callback-oidc",
+                Demo1Credentials = new
+                {
+                    Username = "demo1@example.com",
+                    Password = "Demo123"
                 }
             });
         });
