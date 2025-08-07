@@ -179,7 +179,7 @@
             using var httpClient = new HttpClient();
             httpClient.Timeout = TimeSpan.FromSeconds(5);
 
-            var response = await httpClient.GetAsync($"{Authority}.well-known/openid_configuration");
+            var response = await httpClient.GetAsync($"{Authority}.well-known/openid-configuration");
             if (response.IsSuccessStatusCode)
             {
                 AuthorityStatus = "success";
@@ -242,7 +242,7 @@
         try
         {
             using var httpClient = new HttpClient();
-            var response = await httpClient.GetAsync($"{Authority}.well-known/openid_configuration");
+            var response = await httpClient.GetAsync($"{Authority}.well-known/openid-configuration");
             var content = await response.Content.ReadAsStringAsync();
             
             DiagnosticsResult += $"Status: {response.StatusCode}\n";
