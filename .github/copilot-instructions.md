@@ -166,3 +166,31 @@ If a method is not being called:
 2. Verify `<RadzenComponents @rendermode="InteractiveServer" />` is in MainLayout
 3. Check browser console for JavaScript errors
 4. Verify proper rendermode is set on the page
+
+## ⚠️ CRITICAL: OpenID Connect Discovery Endpoint URL Format
+
+**ALWAYS use the correct OpenID Connect discovery endpoint URL format:**
+
+✅ **CORRECT (Standard OIDC Spec):**
+- `https://example.com/.well-known/openid-configuration`
+
+❌ **INCORRECT (Common mistake):**
+- `https://example.com/_well-known/openid-configuration`
+
+This is the code block that represents the suggested code change:
+
+### Key Points:
+1. **The URL uses HYPHEN (-), not underscore (_)**
+2. **This is defined by the OpenID Connect Discovery specification**
+3. **Most OIDC clients automatically append this path to the Authority URL**
+4. **Using underscore will cause discovery failures**
+
+### When Configuring:
+- **OpenIddict Server**: Use hyphen in endpoint configuration
+- **Client Applications**: Authority URL should be base URL only (e.g., `https://localhost:7113`)
+- **Manual Discovery**: Always test `/.well-known/openid-configuration` (with hyphen)
+
+### Debugging Discovery Issues:
+1. First check: Is the endpoint using hyphen or underscore?
+2. Test manually: Browse to `{authority}/.well-known/openid-configuration`
+3. Verify JSON response contains all required OIDC endpoints
