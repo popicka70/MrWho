@@ -12,30 +12,112 @@
                     <h4 class="mb-0"><i class="bi bi-box-arrow-in-right"></i> Login to MrWho Demo 1</h4>
                 </div>
                 <div class="card-body">
-                    <p class="text-muted">You will be redirected to the MrWho Identity Server to authenticate.</p>
-                    
-                    <div class="alert alert-info">
-                        <h6><i class="bi bi-info-circle"></i> Demo Credentials:</h6>
-                        <p class="mb-1"><strong>Username:</strong> demo1@example.com</p>
-                        <p class="mb-0"><strong>Password:</strong> Demo123</p>
+                    <div class="alert alert-info mb-4">
+                        <h6><i class="bi bi-info-circle"></i> About This Login Form:</h6>
+                        <p class="mb-1">This form shows the traditional username/password experience, but authentication is still handled by the <strong>MrWho Identity Server</strong> using OpenID Connect.</p>
+                        <p class="mb-0">Fill in your credentials below, then click "Login" to be redirected to the identity server.</p>
                     </div>
-                    
-                    <form method="post">
-                        <button type="submit" class="btn btn-primary btn-lg w-100">
-                            <i class="bi bi-shield-lock"></i> Login with MrWho
-                        </button>
+
+                    <form method="post" id="loginForm">
+                        <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+                        <div asp-validation-summary="All" class="text-danger mb-3"></div>
+
+                        <div class="mb-3">
+                            <label asp-for="Input.Email" class="form-label">Email Address</label>
+                            <input asp-for="Input.Email" class="form-control" type="email" placeholder="Enter your email address" autocomplete="username" />
+                            <span asp-validation-for="Input.Email" class="text-danger"></span>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="Input.Password" class="form-label">Password</label>
+                            <input asp-for="Input.Password" class="form-control" type="password" placeholder="Enter your password" autocomplete="current-password" />
+                            <span asp-validation-for="Input.Password" class="text-danger"></span>
+                        </div>
+
+                        <div class="mb-3 form-check">
+                            <input asp-for="Input.RememberMe" class="form-check-input" type="checkbox" />
+                            <label asp-for="Input.RememberMe" class="form-check-label">Remember me on this device</label>
+                        </div>
+
+                        <div class="d-grid gap-2 mb-3">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="bi bi-shield-lock"></i> Login with MrWho
+                            </button>
+                        </div>
                     </form>
-                    
+
                     <hr>
-                    
+
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <h6 class="card-title"><i class="bi bi-lightning"></i> Quick Demo Login</h6>
+                            <p class="card-text small text-muted">Use the demo credentials to quickly test the application:</p>
+                            
+                            <div class="d-grid gap-2">
+                                <form method="post" asp-page-handler="AutoFill" style="display: inline;">
+                                    <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+                                    <button type="submit" class="btn btn-outline-primary btn-sm w-100">
+                                        <i class="bi bi-magic"></i> Auto-Fill Demo Credentials
+                                    </button>
+                                </form>
+                                
+                                <button type="button" class="btn btn-success btn-sm" onclick="autoFillAndSubmit()">
+                                    <i class="bi bi-rocket"></i> Auto-Fill & Login Immediately
+                                </button>
+                            </div>
+                            
+                            <div class="mt-2">
+                                <small class="text-muted">
+                                    <strong>Demo Credentials:</strong><br>
+                                    Username: <code>demo1@example.com</code><br>
+                                    Password: <code>Demo123</code>
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+
                     <div class="text-center">
                         <small class="text-muted">
                             Powered by <strong>MrWho Identity Server</strong><br>
-                            Using OpenID Connect
+                            Using OpenID Connect with PKCE
                         </small>
                     </div>
                 </div>
             </div>
+
+            @if (!string.IsNullOrEmpty(Model.Input.Email))
+            {
+                <div class="alert alert-success mt-3">
+                    <i class="bi bi-check-circle"></i> <strong>Credentials Auto-Filled!</strong><br>
+                    You can now click "Login with MrWho" to proceed to authentication.
+                </div>
+            }
         </div>
     </div>
 </div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    
+    <script>
+        function autoFillAndSubmit() {
+            // Fill the form fields
+            document.getElementById('Input_Email').value = 'demo1@example.com';
+            document.getElementById('Input_Password').value = 'Demo123';
+            document.getElementById('Input_RememberMe').checked = true;
+            
+            // Add a small delay to show the user what happened, then submit
+            setTimeout(function() {
+                document.getElementById('loginForm').submit();
+            }, 500);
+            
+            // Show immediate feedback
+            const btn = event.target;
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="bi bi-check"></i> Credentials Filled, Logging In...';
+            btn.disabled = true;
+        }
+    </script>
+}
