@@ -7,6 +7,7 @@ using OpenIddict.Abstractions;
 using OpenIddict.Server.AspNetCore;
 using MrWho.Services;
 using System.Security.Claims;
+using System.Web;
 using static OpenIddict.Abstractions.OpenIddictConstants;
 
 namespace MrWho.Controllers;
@@ -58,36 +59,46 @@ public class AuthController : Controller
             
             if (result.Succeeded)
             {
+                var user = await _userManager.FindByNameAsync(model.Email);
+                if (user == null)
+                {
+                    _logger.LogError("User not found after successful login: {Email}", model.Email);
+                    ModelState.AddModelError(string.Empty, "Authentication error occurred.");
+                    return View(model);
+                }
+
                 // If we have a client ID, also sign in with the client-specific scheme
                 if (!string.IsNullOrEmpty(clientId))
                 {
                     try
                     {
-                        var user = await _userManager.FindByNameAsync(model.Email);
-                        if (user != null)
+                        var cookieScheme = _cookieService.GetCookieSchemeForClient(clientId);
+                        
+                        // Create claims identity for client-specific cookie
+                        var identity = new ClaimsIdentity(cookieScheme);
+                        identity.AddClaim(Claims.Subject, user.Id);
+                        identity.AddClaim(Claims.Email, user.Email!);
+                        
+                        // Get user's name claim or use friendly fallback
+                        var userName = await GetUserDisplayNameAsync(user);
+                        identity.AddClaim(Claims.Name, userName);
+                        identity.AddClaim(Claims.PreferredUsername, user.UserName!);
+
+                        // Add profile claims if available
+                        await AddUserClaimsToIdentity(identity, user);
+
+                        // Add roles
+                        var roles = await _userManager.GetRolesAsync(user);
+                        foreach (var role in roles)
                         {
-                            var cookieScheme = _cookieService.GetCookieSchemeForClient(clientId);
-                            
-                            // Create claims identity for client-specific cookie
-                            var identity = new ClaimsIdentity(cookieScheme);
-                            identity.AddClaim(Claims.Subject, user.Id);
-                            identity.AddClaim(Claims.Email, user.Email!);
-                            identity.AddClaim(Claims.Name, user.UserName!);
-                            identity.AddClaim(Claims.PreferredUsername, user.UserName!);
-
-                            // Add roles
-                            var roles = await _userManager.GetRolesAsync(user);
-                            foreach (var role in roles)
-                            {
-                                identity.AddClaim(Claims.Role, role);
-                            }
-
-                            var principal = new ClaimsPrincipal(identity);
-                            await HttpContext.SignInAsync(cookieScheme, principal);
-                            
-                            _logger.LogDebug("Signed in user {UserName} with client-specific scheme {Scheme}", 
-                                user.UserName, cookieScheme);
+                            identity.AddClaim(Claims.Role, role);
                         }
+
+                        var principal = new ClaimsPrincipal(identity);
+                        await HttpContext.SignInAsync(cookieScheme, principal);
+                        
+                        _logger.LogDebug("Signed in user {UserName} with client-specific scheme {Scheme}", 
+                            user.UserName, cookieScheme);
                     }
                     catch (Exception ex)
                     {
@@ -96,11 +107,23 @@ public class AuthController : Controller
                     }
                 }
 
-                if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
+                // CRITICAL FIX: For OIDC flows, redirect back to the authorization endpoint
+                // to complete the authorization flow properly
+                if (!string.IsNullOrEmpty(returnUrl))
                 {
-                    _logger.LogDebug("Login successful, redirecting to: {ReturnUrl}", returnUrl);
-                    return Redirect(returnUrl);
+                    // Check if this is an OIDC authorization request
+                    if (returnUrl.Contains("/connect/authorize"))
+                    {
+                        _logger.LogDebug("Login successful, redirecting to OIDC authorization endpoint: {ReturnUrl}", returnUrl);
+                        return Redirect(returnUrl);
+                    }
+                    else if (Url.IsLocalUrl(returnUrl))
+                    {
+                        _logger.LogDebug("Login successful, redirecting to local URL: {ReturnUrl}", returnUrl);
+                        return Redirect(returnUrl);
+                    }
                 }
+                
                 _logger.LogDebug("Login successful, redirecting to Home");
                 return RedirectToAction("Index", "Home");
             }
@@ -123,33 +146,27 @@ public class AuthController : Controller
     {
         var request = HttpContext.GetOpenIddictServerRequest();
         
-        // If we have a client ID, sign out from the client-specific scheme
-        if (!string.IsNullOrEmpty(clientId))
-        {
-            try
-            {
-                var cookieScheme = _cookieService.GetCookieSchemeForClient(clientId);
-                await HttpContext.SignOutAsync(cookieScheme);
-                _logger.LogDebug("Signed out from client-specific scheme {Scheme} for client {ClientId}", 
-                    cookieScheme, clientId);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to sign out from client-specific scheme for client {ClientId}", clientId);
-            }
-        }
+        // Try to get clientId from multiple sources
+        string? detectedClientId = clientId ?? await TryGetClientIdFromRequest();
+        
+        _logger.LogDebug("Logout requested. ClientId parameter: {ClientId}, Detected ClientId: {DetectedClientId}", 
+            clientId, detectedClientId);
+
+        // CRITICAL FIX: Sign out from all possible authentication schemes
+        await SignOutFromAllSchemesAsync(detectedClientId);
         
         if (request != null)
         {
             // This is an OIDC logout request
-            await _signInManager.SignOutAsync();
+            _logger.LogDebug("Processing OIDC logout request with post_logout_redirect_uri: {PostLogoutRedirectUri}", 
+                request.PostLogoutRedirectUri);
             
             // Return a SignOut result to complete the OIDC logout flow
             return SignOut(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
         }
 
         // Regular logout
-        await _signInManager.SignOutAsync();
+        _logger.LogDebug("Processing regular logout, redirecting to Home");
         return RedirectToAction("Index", "Home");
     }
 
@@ -157,24 +174,222 @@ public class AuthController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> LogoutPost(string? clientId = null)
     {
-        // If we have a client ID, sign out from the client-specific scheme
-        if (!string.IsNullOrEmpty(clientId))
+        // Try to get clientId from multiple sources
+        string? detectedClientId = clientId ?? await TryGetClientIdFromRequest();
+        
+        _logger.LogDebug("Logout POST requested. ClientId parameter: {ClientId}, Detected ClientId: {DetectedClientId}", 
+            clientId, detectedClientId);
+
+        // CRITICAL FIX: Sign out from all possible authentication schemes
+        await SignOutFromAllSchemesAsync(detectedClientId);
+
+        return RedirectToAction("Index", "Home");
+    }
+
+    /// <summary>
+    /// Attempts to detect the client ID from the current request
+    /// </summary>
+    private async Task<string?> TryGetClientIdFromRequest()
+    {
+        try
         {
-            try
+            // First try to get it from the OIDC request context
+            var request = HttpContext.GetOpenIddictServerRequest();
+            if (!string.IsNullOrEmpty(request?.ClientId))
             {
-                var cookieScheme = _cookieService.GetCookieSchemeForClient(clientId);
-                await HttpContext.SignOutAsync(cookieScheme);
-                _logger.LogDebug("Signed out from client-specific scheme {Scheme} for client {ClientId}", 
-                    cookieScheme, clientId);
+                _logger.LogDebug("Found ClientId in OpenIddict request: {ClientId}", request.ClientId);
+                return request.ClientId;
             }
-            catch (Exception ex)
+
+            // Try to get it from query parameters
+            if (HttpContext.Request.Query.TryGetValue("client_id", out var clientIdFromQuery))
             {
-                _logger.LogWarning(ex, "Failed to sign out from client-specific scheme for client {ClientId}", clientId);
+                _logger.LogDebug("Found ClientId in query parameters: {ClientId}", clientIdFromQuery.ToString());
+                return clientIdFromQuery.ToString();
+            }
+
+            // Try to use the client cookie service
+            var clientIdFromCookies = await _cookieService.GetClientIdFromRequestAsync(HttpContext);
+            if (!string.IsNullOrEmpty(clientIdFromCookies))
+            {
+                _logger.LogDebug("Found ClientId from cookie analysis: {ClientId}", clientIdFromCookies);
+                return clientIdFromCookies;
+            }
+
+            // Try to get it from the referring URL (if coming from authorization flow)
+            var referer = HttpContext.Request.Headers.Referer.ToString();
+            if (!string.IsNullOrEmpty(referer) && referer.Contains("client_id="))
+            {
+                var uri = new Uri(referer);
+                var query = HttpUtility.ParseQueryString(uri.Query);
+                var clientIdFromReferer = query["client_id"];
+                if (!string.IsNullOrEmpty(clientIdFromReferer))
+                {
+                    _logger.LogDebug("Found ClientId in referer URL: {ClientId}", clientIdFromReferer);
+                    return clientIdFromReferer;
+                }
+            }
+
+            _logger.LogDebug("Could not detect ClientId from request");
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error attempting to detect ClientId from request");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Signs out from all relevant authentication schemes
+    /// </summary>
+    private async Task SignOutFromAllSchemesAsync(string? clientId)
+    {
+        try
+        {
+            // Always sign out from the default Identity scheme
+            await _signInManager.SignOutAsync();
+            _logger.LogDebug("Signed out from default Identity scheme");
+
+            // If we have a client ID, also sign out from the client-specific scheme
+            if (!string.IsNullOrEmpty(clientId))
+            {
+                try
+                {
+                    var cookieScheme = _cookieService.GetCookieSchemeForClient(clientId);
+                    await HttpContext.SignOutAsync(cookieScheme);
+                    _logger.LogDebug("Signed out from client-specific scheme {Scheme} for client {ClientId}", 
+                        cookieScheme, clientId);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to sign out from client-specific scheme for client {ClientId}", clientId);
+                }
+            }
+            else
+            {
+                // If we don't know the specific client, try to sign out from all configured client schemes
+                _logger.LogDebug("No specific client ID available, attempting to sign out from all client schemes");
+                var allConfigurations = _cookieService.GetAllClientConfigurations();
+                
+                foreach (var config in allConfigurations)
+                {
+                    try
+                    {
+                        await HttpContext.SignOutAsync(config.Value.SchemeName);
+                        _logger.LogDebug("Signed out from client scheme {Scheme} for client {ClientId}", 
+                            config.Value.SchemeName, config.Key);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogDebug(ex, "Failed to sign out from client scheme {Scheme} for client {ClientId} (may not be signed in)", 
+                            config.Value.SchemeName, config.Key);
+                    }
+                }
             }
         }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during logout process");
+        }
+    }
 
-        await _signInManager.SignOutAsync();
-        return RedirectToAction("Index", "Home");
+    /// <summary>
+    /// Get user's display name with fallback logic
+    /// </summary>
+    private async Task<string> GetUserDisplayNameAsync(IdentityUser user)
+    {
+        try
+        {
+            var claims = await _userManager.GetClaimsAsync(user);
+            var nameClaim = claims.FirstOrDefault(c => c.Type == "name")?.Value;
+            
+            if (!string.IsNullOrEmpty(nameClaim))
+            {
+                return nameClaim;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving name claim for user {UserId}", user.Id);
+        }
+
+        // Fallback to converting username to friendly display name
+        return ConvertToFriendlyName(user.UserName ?? "Unknown User");
+    }
+
+    /// <summary>
+    /// Add user claims to the identity
+    /// </summary>
+    private async Task AddUserClaimsToIdentity(ClaimsIdentity identity, IdentityUser user)
+    {
+        try
+        {
+            var claims = await _userManager.GetClaimsAsync(user);
+            
+            // Add profile claims
+            var givenName = claims.FirstOrDefault(c => c.Type == "given_name")?.Value;
+            if (!string.IsNullOrEmpty(givenName))
+            {
+                identity.AddClaim(Claims.GivenName, givenName);
+            }
+
+            var familyName = claims.FirstOrDefault(c => c.Type == "family_name")?.Value;
+            if (!string.IsNullOrEmpty(familyName))
+            {
+                identity.AddClaim(Claims.FamilyName, familyName);
+            }
+
+            var preferredUsername = claims.FirstOrDefault(c => c.Type == "preferred_username")?.Value;
+            if (!string.IsNullOrEmpty(preferredUsername))
+            {
+                identity.AddClaim(Claims.PreferredUsername, preferredUsername);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error adding user claims to identity for user {UserId}", user.Id);
+        }
+    }
+
+    /// <summary>
+    /// Convert a username to a friendly display name
+    /// </summary>
+    private string ConvertToFriendlyName(string input)
+    {
+        if (string.IsNullOrEmpty(input))
+            return "Unknown User";
+
+        // If username is an email, extract the local part and convert to friendly name
+        if (input.Contains('@'))
+        {
+            var localPart = input.Split('@')[0];
+            return ConvertToDisplayName(localPart);
+        }
+
+        // Otherwise just convert the username to friendly name
+        return ConvertToDisplayName(input);
+    }
+
+    /// <summary>
+    /// Convert a username or email local part to a friendly display name
+    /// </summary>
+    private string ConvertToDisplayName(string input)
+    {
+        if (string.IsNullOrEmpty(input))
+            return "Unknown User";
+
+        // Replace common separators with spaces
+        var friendlyName = input.Replace('.', ' ')
+                               .Replace('_', ' ')
+                               .Replace('-', ' ');
+
+        // Split into words and capitalize each word
+        var words = friendlyName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var capitalizedWords = words.Select(word => 
+            word.Length > 0 ? char.ToUpper(word[0]) + word.Substring(1).ToLower() : word);
+
+        return string.Join(" ", capitalizedWords);
     }
 }
 
