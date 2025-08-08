@@ -18,17 +18,20 @@ public class TokenHandler : ITokenHandler
     private readonly UserManager<IdentityUser> _userManager;
     private readonly SignInManager<IdentityUser> _signInManager;
     private readonly IClientCookieConfigurationService _cookieService;
+    private readonly IUserRealmValidationService _realmValidationService;
     private readonly ILogger<TokenHandler> _logger;
 
     public TokenHandler(
         UserManager<IdentityUser> userManager,
         SignInManager<IdentityUser> signInManager,
         IClientCookieConfigurationService cookieService,
+        IUserRealmValidationService realmValidationService,
         ILogger<TokenHandler> logger)
     {
         _userManager = userManager;
         _signInManager = signInManager;
         _cookieService = cookieService;
+        _realmValidationService = realmValidationService;
         _logger = logger;
     }
 
@@ -70,8 +73,28 @@ public class TokenHandler : ITokenHandler
 
         if (user != null && await _userManager.CheckPasswordAsync(user, request.Password!))
         {
-            // Get client-specific authentication scheme if available
             var clientId = request.ClientId!;
+            
+            // CRITICAL: Validate user can access this client based on realm restrictions
+            var realmValidation = await _realmValidationService.ValidateUserRealmAccessAsync(user, clientId);
+            if (!realmValidation.IsValid)
+            {
+                _logger.LogWarning("User {UserName} denied access to client {ClientId} via password grant: {Reason}", 
+                    user.UserName, clientId, realmValidation.Reason);
+                
+                var forbidProperties = new AuthenticationProperties(new Dictionary<string, string?>
+                {
+                    [OpenIddictServerAspNetCoreConstants.Properties.Error] = "access_denied",
+                    [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = realmValidation.Reason ?? "User does not have access to this client"
+                });
+
+                return Results.Forbid(forbidProperties, new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
+            }
+
+            _logger.LogInformation("User {UserName} validated for password grant access to client {ClientId} in realm {Realm}", 
+                user.UserName, clientId, realmValidation.ClientRealm);
+
+            // Get client-specific authentication scheme if available
             var cookieScheme = _cookieService.GetCookieSchemeForClient(clientId);
             var scopes = request.GetScopes();
 

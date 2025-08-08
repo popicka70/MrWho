@@ -782,6 +782,56 @@ public static class WebApplicationExtensions
 
             return Results.Json(result);
         });
+
+        // Debug endpoint to check user realm assignments
+        app.MapGet("/debug/user-realms", async (UserManager<IdentityUser> userManager, IUserRealmValidationService realmValidationService, ILogger<Program> logger) =>
+        {
+            logger.LogInformation("Checking user realm assignments");
+            
+            var users = userManager.Users.ToList();
+            var userRealms = new List<object>();
+
+            foreach (var user in users)
+            {
+                var claims = await userManager.GetClaimsAsync(user);
+                var realmClaim = claims.FirstOrDefault(c => c.Type == "realm")?.Value;
+                
+                // Test realm validation for different clients
+                var adminValidation = await realmValidationService.ValidateUserRealmAccessAsync(user, "mrwho_admin_web");
+                var demo1Validation = await realmValidationService.ValidateUserRealmAccessAsync(user, "mrwho_demo1");
+                
+                userRealms.Add(new
+                {
+                    UserId = user.Id,
+                    UserName = user.UserName,
+                    Email = user.Email,
+                    RealmClaim = realmClaim,
+                    DeterminedRealm = adminValidation.UserRealm ?? demo1Validation.UserRealm,
+                    ClientAccess = new
+                    {
+                        AdminClient = new
+                        {
+                            CanAccess = adminValidation.IsValid,
+                            Reason = adminValidation.Reason
+                        },
+                        Demo1Client = new
+                        {
+                            CanAccess = demo1Validation.IsValid,
+                            Reason = demo1Validation.Reason
+                        }
+                    }
+                });
+            }
+
+            var result = new
+            {
+                TotalUsers = users.Count,
+                UserRealms = userRealms,
+                Timestamp = DateTime.UtcNow
+            };
+
+            return Results.Json(result);
+        });
         
         return app;
     }

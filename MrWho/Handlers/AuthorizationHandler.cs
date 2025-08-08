@@ -19,17 +19,20 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
     private readonly UserManager<IdentityUser> _userManager;
     private readonly SignInManager<IdentityUser> _signInManager;
     private readonly IClientCookieConfigurationService _cookieService;
+    private readonly IUserRealmValidationService _realmValidationService;
     private readonly ILogger<OidcAuthorizationHandler> _logger;
 
     public OidcAuthorizationHandler(
         UserManager<IdentityUser> userManager,
         SignInManager<IdentityUser> signInManager,
         IClientCookieConfigurationService cookieService,
+        IUserRealmValidationService realmValidationService,
         ILogger<OidcAuthorizationHandler> logger)
     {
         _userManager = userManager;
         _signInManager = signInManager;
         _cookieService = cookieService;
+        _realmValidationService = realmValidationService;
         _logger = logger;
     }
 
@@ -111,30 +114,53 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
             return Results.Forbid();
         }
 
+        // CRITICAL: Validate user can access this client based on realm restrictions
+        var realmValidation = await _realmValidationService.ValidateUserRealmAccessAsync(user, clientId);
+        if (!realmValidation.IsValid)
+        {
+            _logger.LogWarning("User {UserName} denied access to client {ClientId}: {Reason}", 
+                user.UserName, clientId, realmValidation.Reason);
+            
+            // Return a 403 Forbidden with appropriate error information
+            var forbidProperties = new AuthenticationProperties(new Dictionary<string, string?>
+            {
+                [OpenIddictServerAspNetCoreConstants.Properties.Error] = "access_denied",
+                [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = realmValidation.Reason ?? "User does not have access to this client"
+            });
+
+            return Results.Forbid(forbidProperties, new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
+        }
+
+        _logger.LogInformation("User {UserName} validated for access to client {ClientId} in realm {Realm}", 
+            user.UserName, clientId, realmValidation.ClientRealm);
+
+        // User is authenticated and authorized for this client, create authorization code
+        var claimsIdentity = new ClaimsIdentity(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+
         // Get requested scopes to determine claim destinations
         var scopes = request.GetScopes();
 
         // Create claims for the authorization code with proper destinations
         var subClaim = new Claim(OpenIddictConstants.Claims.Subject, user.Id);
         subClaim.SetDestinations(OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken);
-        identity.AddClaim(subClaim);
+        claimsIdentity.AddClaim(subClaim);
 
         var emailClaim = new Claim(OpenIddictConstants.Claims.Email, user.Email!);
         emailClaim.SetDestinations(OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken);
-        identity.AddClaim(emailClaim);
+        claimsIdentity.AddClaim(emailClaim);
         
         // Get the user's name claim, fallback to friendly name from username
         var userName = await GetUserNameClaimAsync(user);
         var nameClaim = new Claim(OpenIddictConstants.Claims.Name, userName);
         nameClaim.SetDestinations(OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken);
-        identity.AddClaim(nameClaim);
+        claimsIdentity.AddClaim(nameClaim);
 
         var preferredUsernameClaim = new Claim(OpenIddictConstants.Claims.PreferredUsername, user.UserName!);
         preferredUsernameClaim.SetDestinations(OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken);
-        identity.AddClaim(preferredUsernameClaim);
+        claimsIdentity.AddClaim(preferredUsernameClaim);
 
         // Add other profile claims with proper destinations if available
-        await AddProfileClaimsAsync(identity, user, scopes);
+        await AddProfileClaimsAsync(claimsIdentity, user, scopes);
 
         // Add roles with proper destinations
         var roles = await _userManager.GetRolesAsync(user);
@@ -142,10 +168,10 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         {
             var roleClaim = new Claim(OpenIddictConstants.Claims.Role, role);
             roleClaim.SetDestinations(OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken);
-            identity.AddClaim(roleClaim);
+            claimsIdentity.AddClaim(roleClaim);
         }
 
-        var authPrincipal = new ClaimsPrincipal(identity);
+        var authPrincipal = new ClaimsPrincipal(claimsIdentity);
         authPrincipal.SetScopes(request.GetScopes());
 
         // Sign in the user with the client-specific scheme if not already done
@@ -196,7 +222,7 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
     /// <summary>
     /// Add additional profile claims with proper destinations if available
     /// </summary>
-    private async Task AddProfileClaimsAsync(ClaimsIdentity identity, IdentityUser user, IEnumerable<string> scopes)
+    private async Task AddProfileClaimsAsync(ClaimsIdentity claimsIdentity, IdentityUser user, IEnumerable<string> scopes)
     {
         try
         {
@@ -211,7 +237,7 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
                 {
                     var givenNameClaim = new Claim(OpenIddictConstants.Claims.GivenName, givenName);
                     givenNameClaim.SetDestinations(OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken);
-                    identity.AddClaim(givenNameClaim);
+                    claimsIdentity.AddClaim(givenNameClaim);
                 }
 
                 // Add family_name if available
@@ -220,7 +246,7 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
                 {
                     var familyNameClaim = new Claim(OpenIddictConstants.Claims.FamilyName, familyName);
                     familyNameClaim.SetDestinations(OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken);
-                    identity.AddClaim(familyNameClaim);
+                    claimsIdentity.AddClaim(familyNameClaim);
                 }
 
                 // Add other profile claims as needed
@@ -229,7 +255,7 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
                 {
                     var pictureClaim = new Claim(OpenIddictConstants.Claims.Picture, picture);
                     pictureClaim.SetDestinations(OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken);
-                    identity.AddClaim(pictureClaim);
+                    claimsIdentity.AddClaim(pictureClaim);
                 }
             }
         }

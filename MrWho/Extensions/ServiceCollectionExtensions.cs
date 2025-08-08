@@ -48,6 +48,9 @@ public static class ServiceCollectionExtensions
         // Register client cookie configuration service
         services.AddScoped<IClientCookieConfigurationService, ClientCookieConfigurationService>();
 
+        // Register user realm validation service
+        services.AddScoped<IUserRealmValidationService, UserRealmValidationService>();
+
         return services;
     }
 
