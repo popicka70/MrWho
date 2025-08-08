@@ -175,7 +175,7 @@ If a method is not being called:
 - `https://example.com/.well-known/openid-configuration`
 
 ❌ **INCORRECT (Common mistake):**
-- `https://example.com/_well-known/openid-configuration`
+- `https://example.com/_well-known/openid_configuration`
 
 This is the code block that represents the suggested code change:
 
