@@ -124,17 +124,38 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
             return Results.Forbid();
         }
 
-        // Create claims for the authorization code
-        identity.AddClaim(OpenIddictConstants.Claims.Subject, user.Id);
-        identity.AddClaim(OpenIddictConstants.Claims.Email, user.Email!);
-        identity.AddClaim(OpenIddictConstants.Claims.Name, user.UserName!);
-        identity.AddClaim(OpenIddictConstants.Claims.PreferredUsername, user.UserName!);
+        // Get requested scopes to determine claim destinations
+        var scopes = request.GetScopes();
 
-        // Add roles
+        // Create claims for the authorization code with proper destinations
+        var subClaim = new Claim(OpenIddictConstants.Claims.Subject, user.Id);
+        subClaim.SetDestinations(OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken);
+        identity.AddClaim(subClaim);
+
+        var emailClaim = new Claim(OpenIddictConstants.Claims.Email, user.Email!);
+        emailClaim.SetDestinations(OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken);
+        identity.AddClaim(emailClaim);
+        
+        // Get the user's name claim, fallback to friendly name from username
+        var userName = await GetUserNameClaimAsync(user);
+        var nameClaim = new Claim(OpenIddictConstants.Claims.Name, userName);
+        nameClaim.SetDestinations(OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken);
+        identity.AddClaim(nameClaim);
+
+        var preferredUsernameClaim = new Claim(OpenIddictConstants.Claims.PreferredUsername, user.UserName!);
+        preferredUsernameClaim.SetDestinations(OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken);
+        identity.AddClaim(preferredUsernameClaim);
+
+        // Add other profile claims with proper destinations if available
+        await AddProfileClaimsAsync(identity, user, scopes);
+
+        // Add roles with proper destinations
         var roles = await _userManager.GetRolesAsync(user);
         foreach (var role in roles)
         {
-            identity.AddClaim(OpenIddictConstants.Claims.Role, role);
+            var roleClaim = new Claim(OpenIddictConstants.Claims.Role, role);
+            roleClaim.SetDestinations(OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken);
+            identity.AddClaim(roleClaim);
         }
 
         var authPrincipal = new ClaimsPrincipal(identity);
@@ -159,6 +180,116 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
             user.UserName, clientId);
 
         return Results.SignIn(authPrincipal, authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+    }
+
+    /// <summary>
+    /// Get the user's name claim, with intelligent fallback to username conversion
+    /// </summary>
+    private async Task<string> GetUserNameClaimAsync(IdentityUser user)
+    {
+        try
+        {
+            var claims = await _userManager.GetClaimsAsync(user);
+            var nameClaim = claims.FirstOrDefault(c => c.Type == "name")?.Value;
+            
+            if (!string.IsNullOrEmpty(nameClaim))
+            {
+                return nameClaim;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving name claim for user {UserId}", user.Id);
+        }
+
+        // Fallback to converting username to friendly display name
+        return ConvertToFriendlyName(user.UserName ?? "Unknown User");
+    }
+
+    /// <summary>
+    /// Add additional profile claims with proper destinations if available
+    /// </summary>
+    private async Task AddProfileClaimsAsync(ClaimsIdentity identity, IdentityUser user, IEnumerable<string> scopes)
+    {
+        try
+        {
+            var claims = await _userManager.GetClaimsAsync(user);
+            
+            // Only include profile claims if profile scope is requested
+            if (scopes.Contains(OpenIddictConstants.Scopes.Profile))
+            {
+                // Add given_name if available
+                var givenName = claims.FirstOrDefault(c => c.Type == "given_name")?.Value;
+                if (!string.IsNullOrEmpty(givenName))
+                {
+                    var givenNameClaim = new Claim(OpenIddictConstants.Claims.GivenName, givenName);
+                    givenNameClaim.SetDestinations(OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken);
+                    identity.AddClaim(givenNameClaim);
+                }
+
+                // Add family_name if available
+                var familyName = claims.FirstOrDefault(c => c.Type == "family_name")?.Value;
+                if (!string.IsNullOrEmpty(familyName))
+                {
+                    var familyNameClaim = new Claim(OpenIddictConstants.Claims.FamilyName, familyName);
+                    familyNameClaim.SetDestinations(OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken);
+                    identity.AddClaim(familyNameClaim);
+                }
+
+                // Add other profile claims as needed
+                var picture = claims.FirstOrDefault(c => c.Type == "picture")?.Value;
+                if (!string.IsNullOrEmpty(picture))
+                {
+                    var pictureClaim = new Claim(OpenIddictConstants.Claims.Picture, picture);
+                    pictureClaim.SetDestinations(OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken);
+                    identity.AddClaim(pictureClaim);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving profile claims for user {UserId}", user.Id);
+        }
+    }
+
+    /// <summary>
+    /// Convert a username to a friendly display name
+    /// </summary>
+    private string ConvertToFriendlyName(string input)
+    {
+        if (string.IsNullOrEmpty(input))
+            return "Unknown User";
+
+        // If username is an email, extract the local part and convert to friendly name
+        if (input.Contains('@'))
+        {
+            var localPart = input.Split('@')[0];
+            return ConvertToDisplayName(localPart);
+        }
+
+        // Otherwise just convert the username to friendly name
+        return ConvertToDisplayName(input);
+    }
+
+    /// <summary>
+    /// Convert a username or email local part to a friendly display name
+    /// </summary>
+    private string ConvertToDisplayName(string input)
+    {
+        if (string.IsNullOrEmpty(input))
+            return "Unknown User";
+
+        // Replace common separators with spaces
+        var friendlyName = input.Replace('.', ' ')
+                               .Replace('_', ' ')
+                               .Replace('-', ' ');
+
+        // Split into words and capitalize each word
+        var words = friendlyName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var capitalizedWords = words.Select(word => 
+            word.Length > 0 ? char.ToUpper(word[0]) + word.Substring(1).ToLower() : word);
+
+        return string.Join(" ", capitalizedWords);
     }
 
     private async Task<bool> IsUserSignedInWithScheme(HttpContext context, string scheme, string userId)

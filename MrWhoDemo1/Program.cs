@@ -1,5 +1,7 @@
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -7,6 +9,9 @@ builder.AddServiceDefaults();
 
 // Add services to the container.
 builder.Services.AddRazorPages();
+
+// CRITICAL: Clear default claim mappings to preserve JWT claim names
+Microsoft.IdentityModel.JsonWebTokens.JsonWebTokenHandler.DefaultInboundClaimTypeMap.Clear();
 
 // Add authentication services
 builder.Services.AddAuthentication(options =>
@@ -20,7 +25,7 @@ builder.Services.AddAuthentication(options =>
     options.Authority = "https://localhost:7113"; // MrWho OIDC Server
     options.ClientId = "mrwho_demo1";
     options.ClientSecret = "Demo1Secret2024!";
-    options.ResponseType = "code";
+    options.ResponseType = OpenIdConnectResponseType.Code;
     
     // Scopes
     options.Scope.Clear();
@@ -39,9 +44,38 @@ builder.Services.AddAuthentication(options =>
     // SSL configuration for development
     options.RequireHttpsMetadata = false; // Only for development
     
-    // Map claims
+    // Disable the default inbound claim type mappings to preserve JWT claim names
+    options.MapInboundClaims = false;
+    
+    // Map claims to preserve JWT claim names
     options.TokenValidationParameters.NameClaimType = "name";
     options.TokenValidationParameters.RoleClaimType = "role";
+    
+    // Clear default claim type mappings to ensure we get the raw JWT claims
+    options.ClaimActions.Clear();
+    
+    // Map the claims we want to preserve from the ID token
+    options.ClaimActions.MapUniqueJsonKey("sub", "sub");
+    options.ClaimActions.MapUniqueJsonKey("name", "name");
+    options.ClaimActions.MapUniqueJsonKey("given_name", "given_name");
+    options.ClaimActions.MapUniqueJsonKey("family_name", "family_name");
+    options.ClaimActions.MapUniqueJsonKey("email", "email");
+    options.ClaimActions.MapUniqueJsonKey("email_verified", "email_verified");
+    options.ClaimActions.MapUniqueJsonKey("preferred_username", "preferred_username");
+    options.ClaimActions.MapUniqueJsonKey("role", "role");
+    
+    // Optional: Add event handlers for debugging
+    options.Events = new OpenIdConnectEvents
+    {
+        OnTokenValidated = context =>
+        {
+            // Log the claims for debugging
+            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+            logger.LogDebug("Claims in ID token: {Claims}", 
+                string.Join(", ", context.Principal?.Claims.Select(c => $"{c.Type}={c.Value}") ?? Array.Empty<string>()));
+            return Task.CompletedTask;
+        }
+    };
 });
 
 var app = builder.Build();

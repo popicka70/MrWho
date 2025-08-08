@@ -711,6 +711,77 @@ public static class WebApplicationExtensions
 
             return Results.Json(result);
         });
+
+        // Debug endpoint to list all users in the system
+        app.MapGet("/debug/all-users", async (UserManager<IdentityUser> userManager, ILogger<Program> logger) =>
+        {
+            logger.LogInformation("Listing all users in the system");
+            
+            var users = userManager.Users.ToList();
+            var userDetails = new List<object>();
+
+            foreach (var user in users)
+            {
+                var claims = await userManager.GetClaimsAsync(user);
+                var roles = await userManager.GetRolesAsync(user);
+                var nameClaim = claims.FirstOrDefault(c => c.Type == "name")?.Value;
+
+                userDetails.Add(new
+                {
+                    UserId = user.Id,
+                    UserName = user.UserName,
+                    Email = user.Email,
+                    EmailConfirmed = user.EmailConfirmed,
+                    NameClaim = nameClaim,
+                    ClaimsCount = claims.Count,
+                    Claims = claims.Select(c => new { Type = c.Type, Value = c.Value }).ToArray(),
+                    RolesCount = roles.Count,
+                    Roles = roles.ToArray()
+                });
+            }
+
+            var result = new
+            {
+                TotalUsers = users.Count,
+                Users = userDetails
+            };
+
+            return Results.Json(result);
+        });
+
+        // Debug endpoint to check which user ID corresponds to the JWT subject
+        app.MapGet("/debug/find-user-by-subject/{subject}", async (string subject, UserManager<IdentityUser> userManager, ILogger<Program> logger) =>
+        {
+            logger.LogInformation("Looking for user with subject/ID {Subject}", subject);
+            
+            var user = await userManager.FindByIdAsync(subject);
+            if (user == null)
+            {
+                // Also try to find by username in case it's a username instead of ID
+                user = await userManager.FindByNameAsync(subject);
+            }
+
+            if (user == null)
+            {
+                return Results.NotFound($"No user found with subject/ID or username '{subject}'");
+            }
+
+            var claims = await userManager.GetClaimsAsync(user);
+            var nameClaim = claims.FirstOrDefault(c => c.Type == "name")?.Value;
+
+            var result = new
+            {
+                UserId = user.Id,
+                UserName = user.UserName,
+                Email = user.Email,
+                EmailConfirmed = user.EmailConfirmed,
+                NameClaim = nameClaim,
+                ClaimsCount = claims.Count,
+                Claims = claims.Select(c => new { Type = c.Type, Value = c.Value }).ToArray()
+            };
+
+            return Results.Json(result);
+        });
         
         return app;
     }
