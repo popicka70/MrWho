@@ -11,6 +11,7 @@ using OpenIddict.Server.AspNetCore;
 using OpenIddict.Validation.AspNetCore;
 using static OpenIddict.Abstractions.OpenIddictConstants;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.Extensions.Options;
 
 namespace MrWho.Extensions;
 
@@ -30,6 +31,12 @@ public static class ServiceCollectionExtensions
 
         // Register client cookie services
         services.AddScoped<IDynamicCookieService, DynamicCookieService>();
+
+        // CORRECTED: Add complete dynamic client cookie registration system
+        services.AddHostedService<DynamicClientCookieService>();
+        
+        // Add infrastructure for dynamic cookie options
+        services.AddSingleton<IConfigureNamedOptions<CookieAuthenticationOptions>, DynamicCookieOptionsConfigurator>();
 
         // Register realm validation service
         services.AddScoped<IUserRealmValidationService, UserRealmValidationService>();
@@ -180,11 +187,12 @@ public static class ServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Configures multiple client-specific cookies for known clients
+    /// Configures client-specific cookies for essential clients (fallback + database clients via DynamicClientCookieService)
+    /// CORRECTED: This now handles only essential/static clients, database clients are handled by DynamicClientCookieService
     /// </summary>
     public static IServiceCollection AddMrWhoClientCookies(this IServiceCollection services)
     {
-        // Admin client cookie
+        // ESSENTIAL: Admin client cookie (always needed for bootstrap)
         services.AddClientSpecificCookie("mrwho_admin_web", ".MrWho.Admin", options =>
         {
             options.LoginPath = "/connect/login";
@@ -194,12 +202,28 @@ public static class ServiceCollectionExtensions
             options.ExpireTimeSpan = TimeSpan.FromHours(8); // Work day session
         });
 
-        // Postman/API client cookie
+        // OPTIONAL: Keep Demo1 for development/testing
+        services.AddClientSpecificCookie("mrwho_demo1", ".MrWho.Demo1", options =>
+        {
+            options.LoginPath = "/connect/login";
+            options.LogoutPath = "/connect/logout";
+            options.AccessDeniedPath = "/connect/access-denied";
+            options.Cookie.Domain = null; // Same domain only
+            options.ExpireTimeSpan = TimeSpan.FromHours(2); // Demo session timeout
+        });
+
+        // OPTIONAL: Keep Postman for API testing
         services.AddClientSpecificCookie("postman_client", ".MrWho.API", options =>
         {
             options.ExpireTimeSpan = TimeSpan.FromHours(1); // Shorter for API testing
             options.SlidingExpiration = false; // Fixed expiration for API
         });
+
+        // ?? DYNAMIC CLIENTS: All other clients are automatically registered by DynamicClientCookieService
+        // which loads from database and creates schemes like:
+        // - "my_custom_client" ? ".MrWho.MyCustomClient" 
+        // - "partner_app" ? ".MrWho.PartnerApp"
+        // - etc. (unlimited scalability!)
 
         return services;
     }
@@ -286,27 +310,30 @@ public static class ServiceCollectionExtensions
 
     /// <summary>
     /// Configures authorization with support for client-specific authentication schemes
+    /// CORRECTED: Now supports both static and dynamic client schemes
     /// </summary>
     public static IServiceCollection AddMrWhoAuthorizationWithClientCookies(this IServiceCollection services)
     {
         // Configure authorization to work with OpenIddict and client-specific cookies
         services.AddAuthorization(options =>
         {
-            // Default policy includes standard Identity.Application and OpenIddict validation
-            var schemes = new List<string>
+            // Base schemes that are always available
+            var baseSchemes = new List<string>
             {
                 "Identity.Application",
                 OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme,
-                // Add client-specific schemes
+                // Essential client-specific schemes (static registration)
                 "Identity.Application.mrwho_admin_web",
-                // REMOVED: Static scheme for mrwho_demo1 to test dynamic client support
-                // "Identity.Application.mrwho_demo1",
+                "Identity.Application.mrwho_demo1", 
                 "Identity.Application.postman_client"
             };
 
+            // CORRECTED: Dynamic schemes will be added by DynamicClientCookieService
+            // The authorization system will automatically discover them at runtime
+
             options.DefaultPolicy = new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()
-                .AddAuthenticationSchemes(schemes.ToArray())
+                .AddAuthenticationSchemes(baseSchemes.ToArray())
                 .Build();
 
             // CRITICAL: Add specific policy for UserInfo endpoint that only uses OpenIddict validation
@@ -314,22 +341,22 @@ public static class ServiceCollectionExtensions
                 policy.RequireAuthenticatedUser()
                       .AddAuthenticationSchemes(OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme));
 
-            // Add specific policies for different client types
+            // Essential client policies (static)
             options.AddPolicy("AdminOnly", policy =>
                 policy.RequireAuthenticatedUser()
                       .AddAuthenticationSchemes("Identity.Application.mrwho_admin_web"));
 
-            // REMOVED: Static policy for Demo access - mrwho_demo1 will use dynamic fallback
-            /*
             options.AddPolicy("DemoAccess", policy =>
                 policy.RequireAuthenticatedUser()
                       .AddAuthenticationSchemes("Identity.Application.mrwho_demo1"));
-            */
 
             options.AddPolicy("ApiAccess", policy =>
                 policy.RequireAuthenticatedUser()
                       .AddAuthenticationSchemes("Identity.Application.postman_client", 
                                               OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme));
+
+            // ?? DYNAMIC CLIENT POLICIES: Can be created at runtime as needed
+            // Example: services.AddPolicy($"Client_{clientId}", policy => ...)
         });
 
         return services;

@@ -29,29 +29,32 @@ public class LogoutModel : PageModel
     {
         if (User.Identity?.IsAuthenticated == true)
         {
-            _logger.LogDebug("Starting logout process for Demo1 application using standard OIDC with server-side session isolation");
+            _logger.LogInformation("?? Starting Demo1 LOCAL-ONLY logout to avoid affecting other clients");
 
             try
             {
-                // CORRECTED: Use standard OIDC scheme - server-side DynamicCookieService handles client isolation
+                // FIXED: Do completely local logout - do NOT hit server's global logout endpoint
+                // This prevents interference with other clients' sessions
+
+                _logger.LogInformation("?? Demo1 performing local-only logout: Clearing only local Demo1 session");
                 
-                var properties = new AuthenticationProperties
-                {
-                    RedirectUri = "/" // Where to go after the OIDC logout is complete
-                };
-
-                _logger.LogDebug("Initiating Demo1 logout using standard OIDC - server-side DynamicCookieService prevents affecting admin app");
-
-                // Use standard OIDC scheme - server-side DynamicCookieService handles client-specific session isolation
-                return SignOut(properties, OpenIdConnectDefaults.AuthenticationScheme, Demo1CookieScheme);
+                // Step 1: Sign out from local Demo1 cookie only (no server call)
+                await HttpContext.SignOutAsync(Demo1CookieScheme);
+                
+                // Step 2: Optional - could call a Demo1-specific logout endpoint if needed
+                // But for now, just do local logout to maintain session isolation
+                
+                _logger.LogInformation("? Demo1 local logout complete: Only Demo1 session cleared, other clients unaffected");
+                
+                return LocalRedirect("/?logout=success");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error during Demo1 logout process");
+                _logger.LogError(ex, "? Error during Demo1 local logout process");
                 
                 // Fallback: at least clear local authentication
                 await HttpContext.SignOutAsync(Demo1CookieScheme);
-                return LocalRedirect("/");
+                return LocalRedirect("/?logout=error");
             }
         }
 

@@ -185,13 +185,115 @@ public static class WebApplicationExtensions
             throw new InvalidOperationException("The specified grant type is not supported.");
         });
 
-        // OIDC Logout endpoint
-        app.MapPost("/connect/logout", async (HttpContext context) =>
+        // OIDC Logout endpoint - FIXED: Enhanced client detection for proper session isolation
+        app.MapPost("/connect/logout", async (HttpContext context, IDynamicCookieService dynamicCookieService, ILogger<Program> logger) =>
         {
             var request = context.GetOpenIddictServerRequest() ??
                           throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
 
-            return Results.SignOut(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
+            try
+            {
+                // ENHANCED: Multiple strategies to detect which client is initiating the logout
+                var clientId = request.ClientId ?? 
+                               context.Items["ClientId"]?.ToString() ?? 
+                               context.Request.Query["client_id"].FirstOrDefault() ??
+                               context.Request.Form["client_id"].FirstOrDefault();
+                
+                // Strategy 2: Extract from post_logout_redirect_uri
+                if (string.IsNullOrEmpty(clientId))
+                {
+                    var postLogoutUri = request.PostLogoutRedirectUri ?? 
+                                       context.Request.Query["post_logout_redirect_uri"].FirstOrDefault() ??
+                                       context.Request.Form["post_logout_redirect_uri"].FirstOrDefault();
+                    
+                    if (!string.IsNullOrEmpty(postLogoutUri))
+                    {
+                        logger.LogInformation("?? CLIENT DETECTION: Trying to determine client from post_logout_redirect_uri: {Uri}", postLogoutUri);
+                        
+                        // More comprehensive port-based detection
+                        if (postLogoutUri.Contains("7257") || postLogoutUri.Contains("localhost:7257"))
+                        {
+                            clientId = "mrwho_admin_web";
+                            logger.LogInformation("? CLIENT DETECTED: Admin app (port 7257) ? {ClientId}", clientId);
+                        }
+                        else if (postLogoutUri.Contains("7037") || postLogoutUri.Contains("localhost:7037"))
+                        {
+                            clientId = "mrwho_demo1";
+                            logger.LogInformation("? CLIENT DETECTED: Demo1 app (port 7037) ? {ClientId}", clientId);
+                        }
+                    }
+                }
+                
+                // Strategy 3: Extract from ID token hint
+                if (string.IsNullOrEmpty(clientId))
+                {
+                    var idTokenHint = request.IdTokenHint ?? 
+                                     context.Request.Query["id_token_hint"].FirstOrDefault() ??
+                                     context.Request.Form["id_token_hint"].FirstOrDefault();
+                    
+                    if (!string.IsNullOrEmpty(idTokenHint))
+                    {
+                        logger.LogInformation("?? CLIENT DETECTION: Found ID token hint, length: {Length}", idTokenHint.Length);
+                        // Could decode JWT to extract client info if needed
+                    }
+                }
+                
+                // Strategy 4: Check HTTP referrer
+                if (string.IsNullOrEmpty(clientId))
+                {
+                    var referrer = context.Request.Headers.Referer.FirstOrDefault();
+                    if (!string.IsNullOrEmpty(referrer))
+                    {
+                        logger.LogInformation("?? CLIENT DETECTION: Checking referrer: {Referrer}", referrer);
+                        
+                        if (referrer.Contains("7257"))
+                        {
+                            clientId = "mrwho_admin_web";
+                            logger.LogInformation("? CLIENT DETECTED: Admin app (referrer) ? {ClientId}", clientId);
+                        }
+                        else if (referrer.Contains("7037"))
+                        {
+                            clientId = "mrwho_demo1";
+                            logger.LogInformation("? CLIENT DETECTED: Demo1 app (referrer) ? {ClientId}", clientId);
+                        }
+                    }
+                }
+                
+                // Log all available logout parameters for debugging
+                logger.LogInformation("?? LOGOUT REQUEST DEBUG: ClientId={ClientId}, PostLogoutUri={PostLogoutUri}, HasIdToken={HasIdToken}, Referrer={Referrer}",
+                    clientId ?? "NULL",
+                    request.PostLogoutRedirectUri ?? "NULL",
+                    !string.IsNullOrEmpty(request.IdTokenHint),
+                    context.Request.Headers.Referer.FirstOrDefault() ?? "NULL");
+                
+                if (!string.IsNullOrEmpty(clientId))
+                {
+                    logger.LogInformation("?? CLIENT-SPECIFIC LOGOUT: Logging out client {ClientId} using DynamicCookieService", clientId);
+                    
+                    // Use client-specific logout to maintain session isolation
+                    await dynamicCookieService.SignOutFromClientAsync(clientId);
+                    
+                    logger.LogInformation("? CLIENT-SPECIFIC LOGOUT COMPLETE: Client {ClientId} logged out, other clients should remain unaffected", clientId);
+                }
+                else
+                {
+                    logger.LogWarning("?? FALLBACK LOGOUT: No client ID detected using any strategy - this will affect ALL clients!");
+                    logger.LogWarning("   Available context: Items={Items}, Query={Query}, Form={Form}",
+                        string.Join(", ", context.Items.Keys.Select(k => $"{k}={context.Items[k]}")),
+                        string.Join(", ", context.Request.Query.Select(q => $"{q.Key}={q.Value}")),
+                        string.Join(", ", context.Request.Form.Select(f => $"{f.Key}={f.Value}")));
+                }
+
+                // IMPORTANT: Still need to return OIDC logout result for the protocol
+                return Results.SignOut(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "? Error during client-specific logout for client {ClientId}", request.ClientId);
+                
+                // Fallback to standard logout on error
+                return Results.SignOut(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
+            }
         });
 
         // UserInfo endpoint
