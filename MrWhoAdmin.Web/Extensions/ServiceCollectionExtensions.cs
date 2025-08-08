@@ -47,6 +47,26 @@ public static class ServiceCollectionExtensions
         // This should be automatic with Blazor Server, but we'll add it explicitly to fix the error
         services.AddAntiforgery();
         
+        // Configure HttpClient defaults for better connection management
+        services.ConfigureHttpClientDefaults(builder =>
+        {
+            builder.ConfigureHttpClient(client =>
+            {
+                client.Timeout = TimeSpan.FromSeconds(30); // Default timeout
+            });
+            
+            // Configure connection lifetime to prevent stale connections
+            builder.ConfigurePrimaryHttpMessageHandler(() =>
+            {
+                return new SocketsHttpHandler()
+                {
+                    PooledConnectionLifetime = TimeSpan.FromMinutes(15), // Refresh connections every 15 minutes
+                    PooledConnectionIdleTimeout = TimeSpan.FromMinutes(5), // Close idle connections after 5 minutes
+                    MaxConnectionsPerServer = 10 // Limit concurrent connections per server
+                };
+            });
+        });
+        
         return services;
     }
 
@@ -57,12 +77,15 @@ public static class ServiceCollectionExtensions
     {
         var mrWhoApiBaseUrl = configuration.GetValue<string>("MrWhoApi:BaseUrl") ?? "https://localhost:7113/";
 
-        // Register MrWho API clients with authentication
+        // Configure default timeout for all HTTP clients
+        var defaultTimeout = TimeSpan.FromSeconds(30);
+
+        // Register MrWho API clients with authentication and improved timeout handling
         services.AddHttpClient<IRealmsApiService, RealmsApiService>(client =>
         {
             client.BaseAddress = new Uri(mrWhoApiBaseUrl);
             client.DefaultRequestHeaders.Add("Accept", "application/json");
-            client.Timeout = TimeSpan.FromSeconds(30);
+            client.Timeout = defaultTimeout; // Set explicit timeout
         })
         .AddHttpMessageHandler<AuthenticationDelegatingHandler>();
 
@@ -70,7 +93,7 @@ public static class ServiceCollectionExtensions
         {
             client.BaseAddress = new Uri(mrWhoApiBaseUrl);
             client.DefaultRequestHeaders.Add("Accept", "application/json");
-            client.Timeout = TimeSpan.FromSeconds(30);
+            client.Timeout = defaultTimeout; // Set explicit timeout
         })
         .AddHttpMessageHandler<AuthenticationDelegatingHandler>();
 
@@ -78,7 +101,7 @@ public static class ServiceCollectionExtensions
         {
             client.BaseAddress = new Uri(mrWhoApiBaseUrl);
             client.DefaultRequestHeaders.Add("Accept", "application/json");
-            client.Timeout = TimeSpan.FromSeconds(30);
+            client.Timeout = defaultTimeout; // Set explicit timeout
         })
         .AddHttpMessageHandler<AuthenticationDelegatingHandler>();
 
@@ -86,7 +109,7 @@ public static class ServiceCollectionExtensions
         {
             client.BaseAddress = new Uri(mrWhoApiBaseUrl);
             client.DefaultRequestHeaders.Add("Accept", "application/json");
-            client.Timeout = TimeSpan.FromSeconds(30);
+            client.Timeout = defaultTimeout; // Set explicit timeout
         })
         .AddHttpMessageHandler<AuthenticationDelegatingHandler>();
 
@@ -94,7 +117,7 @@ public static class ServiceCollectionExtensions
         {
             client.BaseAddress = new Uri(mrWhoApiBaseUrl);
             client.DefaultRequestHeaders.Add("Accept", "application/json");
-            client.Timeout = TimeSpan.FromSeconds(30);
+            client.Timeout = defaultTimeout; // Set explicit timeout
         })
         .AddHttpMessageHandler<AuthenticationDelegatingHandler>();
 
@@ -102,7 +125,7 @@ public static class ServiceCollectionExtensions
         {
             client.BaseAddress = new Uri(mrWhoApiBaseUrl);
             client.DefaultRequestHeaders.Add("Accept", "application/json");
-            client.Timeout = TimeSpan.FromSeconds(30);
+            client.Timeout = defaultTimeout; // Set explicit timeout
         })
         .AddHttpMessageHandler<AuthenticationDelegatingHandler>();
 
@@ -110,7 +133,7 @@ public static class ServiceCollectionExtensions
         {
             client.BaseAddress = new Uri(mrWhoApiBaseUrl);
             client.DefaultRequestHeaders.Add("Accept", "application/json");
-            client.Timeout = TimeSpan.FromSeconds(30);
+            client.Timeout = defaultTimeout; // Set explicit timeout
         })
         .AddHttpMessageHandler<AuthenticationDelegatingHandler>();
 
@@ -118,7 +141,7 @@ public static class ServiceCollectionExtensions
         {
             client.BaseAddress = new Uri(mrWhoApiBaseUrl);
             client.DefaultRequestHeaders.Add("Accept", "application/json");
-            client.Timeout = TimeSpan.FromSeconds(30);
+            client.Timeout = defaultTimeout; // Set explicit timeout
         })
         .AddHttpMessageHandler<AuthenticationDelegatingHandler>();
 
@@ -127,7 +150,7 @@ public static class ServiceCollectionExtensions
         {
             client.BaseAddress = new Uri(mrWhoApiBaseUrl);
             client.DefaultRequestHeaders.Add("Accept", "application/json");
-            client.Timeout = TimeSpan.FromSeconds(30);
+            client.Timeout = defaultTimeout; // Set explicit timeout
         })
         .AddHttpMessageHandler<AuthenticationDelegatingHandler>();
 
