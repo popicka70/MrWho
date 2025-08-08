@@ -38,6 +38,9 @@ public static class ServiceCollectionExtensions
         // Add infrastructure for dynamic cookie options
         services.AddSingleton<IConfigureNamedOptions<CookieAuthenticationOptions>, DynamicCookieOptionsConfigurator>();
 
+        // CORRECTED: Add dynamic authorization policy provider that loads schemes from database
+        services.AddSingleton<IAuthorizationPolicyProvider, DynamicAuthorizationPolicyProvider>();
+
         // Register realm validation service
         services.AddScoped<IUserRealmValidationService, UserRealmValidationService>();
 
@@ -309,39 +312,22 @@ public static class ServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Configures authorization with support for client-specific authentication schemes
-    /// CORRECTED: Now supports both static and dynamic client schemes
+    /// Configures authorization with dynamic client-specific authentication schemes loaded from database
+    /// CORRECTED: Now uses DynamicAuthorizationPolicyProvider for true database-driven scheme loading
     /// </summary>
     public static IServiceCollection AddMrWhoAuthorizationWithClientCookies(this IServiceCollection services)
     {
-        // Configure authorization to work with OpenIddict and client-specific cookies
+        // Configure authorization with dynamic policy provider
         services.AddAuthorization(options =>
         {
-            // Base schemes that are always available
-            var baseSchemes = new List<string>
-            {
-                "Identity.Application",
-                OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme,
-                // Essential client-specific schemes (static registration)
-                "Identity.Application.mrwho_admin_web",
-                "Identity.Application.mrwho_demo1", 
-                "Identity.Application.postman_client"
-            };
-
-            // CORRECTED: Dynamic schemes will be added by DynamicClientCookieService
-            // The authorization system will automatically discover them at runtime
-
-            options.DefaultPolicy = new AuthorizationPolicyBuilder()
-                .RequireAuthenticatedUser()
-                .AddAuthenticationSchemes(baseSchemes.ToArray())
-                .Build();
-
-            // CRITICAL: Add specific policy for UserInfo endpoint that only uses OpenIddict validation
+            // Configure minimal static options - DynamicAuthorizationPolicyProvider handles the rest
+            
+            // CRITICAL: UserInfo endpoint policy (always static for security)
             options.AddPolicy("UserInfoPolicy", policy =>
                 policy.RequireAuthenticatedUser()
                       .AddAuthenticationSchemes(OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme));
 
-            // Essential client policies (static)
+            // Essential static client policies (optional - DynamicAuthorizationPolicyProvider can handle these too)
             options.AddPolicy("AdminOnly", policy =>
                 policy.RequireAuthenticatedUser()
                       .AddAuthenticationSchemes("Identity.Application.mrwho_admin_web"));
@@ -355,8 +341,15 @@ public static class ServiceCollectionExtensions
                       .AddAuthenticationSchemes("Identity.Application.postman_client", 
                                               OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme));
 
-            // ?? DYNAMIC CLIENT POLICIES: Can be created at runtime as needed
-            // Example: services.AddPolicy($"Client_{clientId}", policy => ...)
+            // ?? DEFAULT POLICY: Now handled by DynamicAuthorizationPolicyProvider
+            // - Loads ALL client schemes from database at runtime
+            // - Automatically includes new clients without code changes
+            // - Falls back to essential schemes if database is unavailable
+            
+            // ?? DYNAMIC CLIENT POLICIES: Also handled by DynamicAuthorizationPolicyProvider
+            // - Use policy name format: "Client_{clientId}"
+            // - Example: services.RequireAuthorization("Client_my_custom_client")
+            // - Automatically creates policies for any client in database
         });
 
         return services;
