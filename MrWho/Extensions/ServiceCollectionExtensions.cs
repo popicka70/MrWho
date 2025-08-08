@@ -18,44 +18,36 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddMrWhoServices(this IServiceCollection services)
     {
-        // Register custom services
-        services.AddScoped<IOidcClientService, OidcClientService>();
+        // Register database access layer
         services.AddScoped<ISeedingService, SeedingService>();
         services.AddScoped<IScopeSeederService, ScopeSeederService>();
-        services.AddScoped<IOpenIddictScopeSyncService, OpenIddictScopeSyncService>();
         services.AddScoped<IApiResourceSeederService, ApiResourceSeederService>();
         services.AddScoped<IIdentityResourceSeederService, IdentityResourceSeederService>();
 
-        // Register token handler
-        services.AddScoped<ITokenHandler, TokenHandler>();
+        // Register client services
+        services.AddScoped<IOidcClientService, OidcClientService>();
+        services.AddScoped<IOpenIddictScopeSyncService, OpenIddictScopeSyncService>();
 
-        // Register authorization handler
-        services.AddScoped<IOidcAuthorizationHandler, OidcAuthorizationHandler>();
+        // Register client cookie services
+        services.AddScoped<IDynamicCookieService, DynamicCookieService>();
 
-        // Register userinfo handler
-        services.AddScoped<IUserInfoHandler, UserInfoHandler>();
+        // Register realm validation service
+        services.AddScoped<IUserRealmValidationService, UserRealmValidationService>();
 
-        // Register User management handlers
+        // Register user handlers
         services.AddScoped<IGetUsersHandler, GetUsersHandler>();
         services.AddScoped<IGetUserHandler, GetUserHandler>();
         services.AddScoped<ICreateUserHandler, CreateUserHandler>();
         services.AddScoped<IUpdateUserHandler, UpdateUserHandler>();
         services.AddScoped<IDeleteUserHandler, DeleteUserHandler>();
-        //services.AddScoped<IChangePasswordHandler, ChangePasswordHandler>();
-        //services.AddScoped<IResetPasswordHandler, ResetPasswordHandler>();
-        //services.AddScoped<ISetLockoutHandler, SetLockoutHandler>();
 
-        // Register client cookie configuration service
-        services.AddScoped<IClientCookieConfigurationService, ClientCookieConfigurationService>();
+        // Register authorization and token handlers
+        services.AddScoped<IOidcAuthorizationHandler, OidcAuthorizationHandler>();
+        services.AddScoped<IUserInfoHandler, UserInfoHandler>();
 
-        // Register dynamic cookie service for client-specific cookies
-        services.AddScoped<IDynamicCookieService, DynamicCookieService>();
-
-        // Register HttpContextAccessor for dynamic cookie service
-        services.AddHttpContextAccessor();
-
-        // Register user realm validation service
-        services.AddScoped<IUserRealmValidationService, UserRealmValidationService>();
+        // Register back-channel logout service
+        services.AddScoped<IBackChannelLogoutService, BackChannelLogoutService>();
+        services.AddHttpClient(); // Required for back-channel logout HTTP calls
 
         return services;
     }
@@ -282,6 +274,11 @@ public static class ServiceCollectionExtensions
                 .RequireAuthenticatedUser()
                 .AddAuthenticationSchemes("Identity.Application", OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme)
                 .Build();
+
+            // CRITICAL: Add specific policy for UserInfo endpoint that only uses OpenIddict validation
+            options.AddPolicy("UserInfoPolicy", policy =>
+                policy.RequireAuthenticatedUser()
+                      .AddAuthenticationSchemes(OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme));
         });
 
         return services;
@@ -311,6 +308,11 @@ public static class ServiceCollectionExtensions
                 .RequireAuthenticatedUser()
                 .AddAuthenticationSchemes(schemes.ToArray())
                 .Build();
+
+            // CRITICAL: Add specific policy for UserInfo endpoint that only uses OpenIddict validation
+            options.AddPolicy("UserInfoPolicy", policy =>
+                policy.RequireAuthenticatedUser()
+                      .AddAuthenticationSchemes(OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme));
 
             // Add specific policies for different client types
             options.AddPolicy("AdminOnly", policy =>

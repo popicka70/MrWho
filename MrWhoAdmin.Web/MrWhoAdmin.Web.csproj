@@ -24,4 +24,8 @@
 	  <ProjectReference Include="..\MrWhoAdmin.ServiceDefaults\MrWhoAdmin.ServiceDefaults.csproj" />
 	</ItemGroup>
 
+	<ItemGroup>
+	  <Folder Include="Models\" />
+	</ItemGroup>
+
 </Project>

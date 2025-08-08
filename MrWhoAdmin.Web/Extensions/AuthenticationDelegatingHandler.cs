@@ -86,11 +86,24 @@ public class AuthenticationDelegatingHandler : DelegatingHandler
 
         var response = await base.SendAsync(request, cancellationToken);
         
-        // If we get a 401 response, it might indicate token issues
-        if (response.StatusCode == HttpStatusCode.Unauthorized && httpContext?.User.Identity?.IsAuthenticated == true)
+        // Handle authentication failures
+        if (httpContext?.User.Identity?.IsAuthenticated == true)
         {
-            _logger.LogWarning("Received 401 Unauthorized response from {RequestUri} despite being authenticated. Token might be invalid.", 
-                request.RequestUri);
+            if (response.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                _logger.LogWarning("Received 401 Unauthorized response from {RequestUri} despite being authenticated. Token might be invalid.", 
+                    request.RequestUri);
+            }
+            else if (response.StatusCode == HttpStatusCode.Forbidden)
+            {
+                _logger.LogWarning("Received 403 Forbidden response from {RequestUri}. Session might be revoked or user lacks permissions.", 
+                    request.RequestUri);
+                
+                // For API calls that result in 403, we should indicate this to the client
+                // The client can then handle the redirect to logout/error page
+                response.Headers.Add("X-Auth-Error", "session_revoked");
+                response.Headers.Add("X-Auth-Error-Description", "Access forbidden - session may have been revoked");
+            }
         }
 
         return response;

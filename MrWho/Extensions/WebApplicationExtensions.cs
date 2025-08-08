@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using MrWho.Data;
@@ -7,8 +8,12 @@ using MrWho.Handlers;
 using MrWho.Services;
 using MrWho.Middleware;
 using OpenIddict.Abstractions;
+using OpenIddict.Server.AspNetCore;
+using Microsoft.AspNetCore;
 using System.Linq;
 using System.Reflection;
+using System.Security.Claims;
+using static OpenIddict.Abstractions.OpenIddictConstants;
 
 namespace MrWho.Extensions;
 
@@ -109,23 +114,96 @@ public static class WebApplicationExtensions
             return await authorizationHandler.HandleAuthorizationRequestAsync(context);
         });
 
-        // OIDC Token endpoint - now uses injected TokenHandler
-        app.MapPost("/connect/token", async (HttpContext context, ITokenHandler tokenHandler) =>
+        // CRITICAL: Add missing token endpoint
+        app.MapPost("/connect/token", async (HttpContext context) =>
         {
-            return await tokenHandler.HandleTokenRequestAsync(context);
+            var request = context.GetOpenIddictServerRequest() ??
+                          throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
+
+            if (request.IsAuthorizationCodeGrantType())
+            {
+                // Handle authorization code flow (used by Demo1 app)
+                var authResult = await context.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+                
+                if (!authResult.Succeeded)
+                {
+                    return Results.Forbid(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
+                }
+
+                // Return the tokens
+                return Results.SignIn(authResult.Principal, authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+            }
+
+            if (request.IsClientCredentialsGrantType())
+            {
+                // Handle client credentials flow
+                var identity = new ClaimsIdentity(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+                identity.AddClaim(OpenIddictConstants.Claims.Subject, request.ClientId!);
+
+                var principal = new ClaimsPrincipal(identity);
+                principal.SetScopes(request.GetScopes());
+
+                return Results.SignIn(principal, authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+            }
+
+            if (request.IsPasswordGrantType())
+            {
+                // Handle password grant flow
+                var userManager = context.RequestServices.GetRequiredService<UserManager<IdentityUser>>();
+                var user = await userManager.FindByNameAsync(request.Username!);
+
+                if (user != null && await userManager.CheckPasswordAsync(user, request.Password!))
+                {
+                    var identity = new ClaimsIdentity(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+                    identity.AddClaim(OpenIddictConstants.Claims.Subject, user.Id);
+                    identity.AddClaim(OpenIddictConstants.Claims.Email, user.Email!);
+                    identity.AddClaim(OpenIddictConstants.Claims.Name, user.UserName!);
+
+                    var principal = new ClaimsPrincipal(identity);
+                    principal.SetScopes(request.GetScopes());
+
+                    return Results.SignIn(principal, authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+                }
+
+                return Results.Forbid(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
+            }
+
+            if (request.IsRefreshTokenGrantType())
+            {
+                // Handle refresh token flow
+                var authResult = await context.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+                
+                if (!authResult.Succeeded)
+                {
+                    return Results.Forbid(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
+                }
+
+                // Return refreshed tokens
+                return Results.SignIn(authResult.Principal, authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+            }
+
+            throw new InvalidOperationException("The specified grant type is not supported.");
         });
 
-        // UserInfo endpoint (optional but recommended) - Updated to use OpenIddict validation
+        // OIDC Logout endpoint
+        app.MapPost("/connect/logout", async (HttpContext context) =>
+        {
+            var request = context.GetOpenIddictServerRequest() ??
+                          throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
+
+            return Results.SignOut(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
+        });
+
+        // UserInfo endpoint
         app.MapGet("/connect/userinfo", async (HttpContext context, IUserInfoHandler userInfoHandler) =>
         {
             return await userInfoHandler.HandleUserInfoRequestAsync(context);
-        }).RequireAuthorization();
+        }).RequireAuthorization("UserInfoPolicy"); // Use specific policy for UserInfo endpoint
 
-        // API Test endpoint (for debugging) - This will now work with OpenIddict validation
-        app.MapGet("/api/test", [Authorize] () =>
+        app.MapPost("/connect/userinfo", async (HttpContext context, IUserInfoHandler userInfoHandler) =>
         {
-            return Results.Ok(new { Message = "API is working!", Timestamp = DateTime.UtcNow });
-        });
+            return await userInfoHandler.HandleUserInfoRequestAsync(context);
+        }).RequireAuthorization("UserInfoPolicy"); // Use specific policy for UserInfo endpoint
 
         return app;
     }

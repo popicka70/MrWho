@@ -153,6 +153,10 @@ public class TokenRefreshMiddleware
     private static bool IsApiRequest(HttpContext context)
     {
         var path = context.Request.Path.Value?.ToLowerInvariant();
-        return path != null && path.StartsWith("/api/");
+        return path != null && (
+            path.StartsWith("/api/") ||
+            path.StartsWith("/connect/") || // CRITICAL: Don't interfere with OIDC endpoints
+            path.StartsWith("/.well-known/") // Don't interfere with discovery
+        );
     }
 }

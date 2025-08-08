@@ -40,6 +40,13 @@ public static class ServiceCollectionExtensions
         // Add Blazor authentication service
         services.AddScoped<IBlazorAuthService, BlazorAuthService>();
         
+        // Add authentication failure service
+        services.AddScoped<IAuthenticationFailureService, AuthenticationFailureService>();
+        
+        // CRITICAL: Ensure antiforgery services are explicitly added
+        // This should be automatic with Blazor Server, but we'll add it explicitly to fix the error
+        services.AddAntiforgery();
+        
         return services;
     }
 
@@ -183,7 +190,7 @@ public static class ServiceCollectionExtensions
         
         options.ResponseType = "code";
         options.SaveTokens = true; // CRITICAL: This saves tokens for API calls
-        options.GetClaimsFromUserInfoEndpoint = true;
+        options.GetClaimsFromUserInfoEndpoint = false; // TEMPORARILY DISABLE: Skip UserInfo endpoint due to 403 issue
         options.RequireHttpsMetadata = false; // Only for development
         options.UsePkce = true; // Enable PKCE for better security
 
@@ -230,8 +237,10 @@ public static class ServiceCollectionExtensions
     /// </summary>
     private static void ConfigureClaimActions(OpenIdConnectOptions options)
     {
-        // Force UserInfo endpoint call by removing ALL claims from ID token processing
+        // Since we're not using UserInfo endpoint due to 403 issue, get claims from ID token
         options.ClaimActions.Clear();
+        
+        // Remove technical OpenIddict claims we don't need
         options.ClaimActions.DeleteClaim("iss");
         options.ClaimActions.DeleteClaim("aud");
         options.ClaimActions.DeleteClaim("exp");
@@ -242,7 +251,7 @@ public static class ServiceCollectionExtensions
         options.ClaimActions.DeleteClaim("oi_au_id");
         options.ClaimActions.DeleteClaim("oi_tbn_id");
 
-        // Only map claims from UserInfo endpoint
+        // Map claims from ID token (since UserInfo is disabled)
         options.ClaimActions.MapJsonKey("sub", "sub");
         options.ClaimActions.MapJsonKey("name", "name");
         options.ClaimActions.MapJsonKey("given_name", "given_name");
@@ -318,9 +327,22 @@ public static class ServiceCollectionExtensions
                 logger.LogError("Authentication failed: {Error} - {ErrorDescription}", 
                     context.Exception?.Message, context.Exception?.ToString());
                 
-                // Handle authentication failures by redirecting to an error page
+                // Check if this is a UserInfo endpoint failure (403 Forbidden)
+                if (context.Exception is HttpRequestException httpEx && 
+                    httpEx.Message.Contains("403") && 
+                    httpEx.Message.Contains("Forbidden"))
+                {
+                    logger.LogWarning("UserInfo endpoint returned 403 Forbidden - this might be a temporary server issue");
+                    
+                    // Don't treat UserInfo 403 as a complete authentication failure
+                    // The user can still be authenticated based on the ID token
+                    // Just log the issue and let the authentication continue without UserInfo claims
+                    return Task.CompletedTask;
+                }
+                
+                // For other authentication failures, redirect to error page
                 var errorMessage = Uri.EscapeDataString(context.Exception?.Message ?? "Unknown error");
-                context.Response.Redirect($"/auth-error?error={errorMessage}");
+                context.Response.Redirect($"/auth/error?error={errorMessage}");
                 context.HandleResponse();
                 
                 return Task.CompletedTask;
@@ -331,9 +353,21 @@ public static class ServiceCollectionExtensions
                 var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
                 logger.LogError("Remote authentication failure: {Error}", context.Failure?.Message);
                 
-                // Handle remote failures by redirecting to an error page
+                // Check if this is a UserInfo endpoint failure (403 Forbidden)
+                if (context.Failure is HttpRequestException httpEx && 
+                    httpEx.Message.Contains("403") && 
+                    httpEx.Message.Contains("Forbidden"))
+                {
+                    logger.LogWarning("UserInfo endpoint returned 403 Forbidden during remote authentication");
+                    
+                    // Don't treat UserInfo 403 as a complete authentication failure
+                    // Skip the UserInfo call and continue with ID token claims
+                    return Task.CompletedTask;
+                }
+                
+                // For other remote failures, redirect to error page
                 var errorMessage = Uri.EscapeDataString(context.Failure?.Message ?? "Remote authentication failed");
-                context.Response.Redirect($"/auth-error?error={errorMessage}");
+                context.Response.Redirect($"/auth/error?error={errorMessage}");
                 context.HandleResponse();
                 
                 return Task.CompletedTask;

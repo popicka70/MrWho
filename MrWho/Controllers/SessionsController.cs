@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using OpenIddict.Abstractions;
 using MrWho.Data;
 using MrWho.Shared;
+using MrWho.Services;
 using Microsoft.AspNetCore.Identity;
 using System.Collections.Immutable;
 
@@ -161,6 +162,9 @@ public class SessionsController : ControllerBase
                 return NotFound($"Session '{authorizationId}' not found");
             }
 
+            var subject = await _authorizationManager.GetSubjectAsync(authorization);
+            var sessionId = authorizationId; // Use authorization ID as session ID
+
             // Revoke all tokens associated with this authorization
             await foreach (var token in _tokenManager.FindByAuthorizationIdAsync(authorizationId))
             {
@@ -170,7 +174,14 @@ public class SessionsController : ControllerBase
             // Mark the authorization as revoked
             await _authorizationManager.TryRevokeAsync(authorization);
 
-            _logger.LogInformation("Session {AuthorizationId} revoked successfully", authorizationId);
+            // CRITICAL: Send back-channel logout notifications to clients
+            var backChannelService = HttpContext.RequestServices.GetRequiredService<IBackChannelLogoutService>();
+            if (!string.IsNullOrEmpty(subject))
+            {
+                await backChannelService.NotifyClientLogoutAsync(authorizationId, subject, sessionId);
+            }
+
+            _logger.LogInformation("Session {AuthorizationId} revoked successfully with back-channel logout notifications", authorizationId);
             return Ok();
         }
         catch (Exception ex)
@@ -189,6 +200,7 @@ public class SessionsController : ControllerBase
         try
         {
             var revokedCount = 0;
+            var backChannelService = HttpContext.RequestServices.GetRequiredService<IBackChannelLogoutService>();
 
             await foreach (var authorization in _authorizationManager.FindBySubjectAsync(userId))
             {
@@ -207,9 +219,12 @@ public class SessionsController : ControllerBase
                 // Mark the authorization as revoked
                 await _authorizationManager.TryRevokeAsync(authorization);
                 revokedCount++;
+
+                // Send back-channel logout notification for this specific session
+                await backChannelService.NotifyClientLogoutAsync(authorizationId, userId, authorizationId);
             }
 
-            _logger.LogInformation("Revoked {Count} sessions for user {UserId}", revokedCount, userId);
+            _logger.LogInformation("Revoked {Count} sessions for user {UserId} with back-channel logout notifications", revokedCount, userId);
             return Ok(new { RevokedSessions = revokedCount });
         }
         catch (Exception ex)

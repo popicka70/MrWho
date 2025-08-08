@@ -9,6 +9,16 @@ builder.AddServiceDefaults();
 
 // Add services to the container.
 builder.Services.AddRazorPages();
+builder.Services.AddControllers(); // Add controllers for back-channel logout
+
+// Add session support for logout notifications
+builder.Services.AddSession(options =>
+{
+    options.IdleTimeout = TimeSpan.FromMinutes(30);
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+    options.Cookie.Name = ".MrWho.Demo1.Session";
+});
 
 // CRITICAL: Clear default claim mappings to preserve JWT claim names
 Microsoft.IdentityModel.JsonWebTokens.JsonWebTokenHandler.DefaultInboundClaimTypeMap.Clear();
@@ -159,9 +169,15 @@ app.UseHttpsRedirection();
 
 app.UseRouting();
 
+// Add session middleware for logout notifications
+app.UseSession();
+
 // Add authentication middleware
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Map controllers for back-channel logout
+app.MapControllers();
 
 app.MapStaticAssets();
 app.MapRazorPages()
