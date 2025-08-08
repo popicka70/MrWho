@@ -121,11 +121,34 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
             _logger.LogWarning("User {UserName} denied access to client {ClientId}: {Reason}", 
                 user.UserName, clientId, realmValidation.Reason);
             
-            // Return a 403 Forbidden with appropriate error information
+            // SECURITY: Don't reveal user existence or realm structure via 403
+            // Instead, sign out user and redirect to login with neutral error
+            // This prevents information disclosure attacks and user enumeration
+            // by making realm validation failures indistinguishable from authentication failures
+            
+            // Sign out from the client-specific scheme to clear authentication
+            try
+            {
+                await context.SignOutAsync(cookieScheme);
+                _logger.LogDebug("Signed out user from client-specific scheme {Scheme} due to realm validation failure", cookieScheme);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to sign out from client-specific scheme {Scheme}", cookieScheme);
+            }
+            
+            // For web applications, redirect to login with neutral error message
+            if (request.ResponseType == "code") // Authorization Code Flow (web apps)
+            {
+                var loginUrl = $"/connect/login?returnUrl={Uri.EscapeDataString(context.Request.GetEncodedUrl())}&clientId={Uri.EscapeDataString(clientId)}&error=access_denied";
+                return Results.Redirect(loginUrl);
+            }
+
+            // For other flows, return generic access_denied error without revealing details
             var forbidProperties = new AuthenticationProperties(new Dictionary<string, string?>
             {
                 [OpenIddictServerAspNetCoreConstants.Properties.Error] = "access_denied",
-                [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = realmValidation.Reason ?? "User does not have access to this client"
+                [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = "Access denied"
             });
 
             return Results.Forbid(forbidProperties, new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });

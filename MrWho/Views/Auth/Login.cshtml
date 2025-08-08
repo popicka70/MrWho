@@ -10,6 +10,24 @@
                 <h4 class="text-center">Sign In</h4>
             </div>
             <div class="card-body">
+                @* Display error messages based on query parameters *@
+                @if (!string.IsNullOrEmpty(Context.Request.Query["error"]))
+                {
+                    var error = Context.Request.Query["error"].ToString();
+                    <div class="alert alert-warning mb-3" role="alert">
+                        @if (error == "access_denied")
+                        {
+                            <strong>Access Denied</strong><br/>
+                            <span>You do not have permission to access this application. Please contact your administrator or try a different account.</span>
+                        }
+                        else
+                        {
+                            <strong>Authentication Required</strong><br/>
+                            <span>Please sign in to continue.</span>
+                        }
+                    </div>
+                }
+                
                 <form method="post">
                     @Html.AntiForgeryToken()
                     <div asp-validation-summary="All" class="text-danger"></div>

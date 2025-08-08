@@ -12,8 +12,8 @@ using MrWho.Data;
 namespace MrWho.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250804212152_Scopes")]
-    partial class Scopes
+    [Migration("20250808104311_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -223,6 +223,122 @@ namespace MrWho.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
+            modelBuilder.Entity("MrWho.Models.ApiResource", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("DisplayName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsStandard")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("ApiResources");
+                });
+
+            modelBuilder.Entity("MrWho.Models.ApiResourceClaim", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("ApiResourceId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("ClaimType")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApiResourceId", "ClaimType")
+                        .IsUnique();
+
+                    b.ToTable("ApiResourceClaims");
+                });
+
+            modelBuilder.Entity("MrWho.Models.ApiResourceScope", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("ApiResourceId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("Scope")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApiResourceId", "Scope")
+                        .IsUnique();
+
+                    b.ToTable("ApiResourceScopes");
+                });
+
+            modelBuilder.Entity("MrWho.Models.ApiResourceSecret", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("ApiResourceId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("Expiration")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApiResourceId");
+
+                    b.ToTable("ApiResourceSecrets");
+                });
+
             modelBuilder.Entity("MrWho.Models.Client", b =>
                 {
                     b.Property<string>("Id")
@@ -391,6 +507,108 @@ namespace MrWho.Migrations
                         .IsUnique();
 
                     b.ToTable("ClientScopes");
+                });
+
+            modelBuilder.Entity("MrWho.Models.IdentityResource", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("DisplayName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<bool>("Emphasize")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsEnabled")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsRequired")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsStandard")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<bool>("ShowInDiscoveryDocument")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("IdentityResources");
+                });
+
+            modelBuilder.Entity("MrWho.Models.IdentityResourceClaim", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("ClaimType")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("IdentityResourceId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IdentityResourceId", "ClaimType")
+                        .IsUnique();
+
+                    b.ToTable("IdentityResourceClaims");
+                });
+
+            modelBuilder.Entity("MrWho.Models.IdentityResourceProperty", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("IdentityResourceId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(250)
+                        .HasColumnType("nvarchar(250)");
+
+                    b.Property<string>("Value")
+                        .IsRequired()
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IdentityResourceId", "Key")
+                        .IsUnique();
+
+                    b.ToTable("IdentityResourceProperties");
                 });
 
             modelBuilder.Entity("MrWho.Models.Realm", b =>
@@ -780,6 +998,39 @@ namespace MrWho.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("MrWho.Models.ApiResourceClaim", b =>
+                {
+                    b.HasOne("MrWho.Models.ApiResource", "ApiResource")
+                        .WithMany("UserClaims")
+                        .HasForeignKey("ApiResourceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ApiResource");
+                });
+
+            modelBuilder.Entity("MrWho.Models.ApiResourceScope", b =>
+                {
+                    b.HasOne("MrWho.Models.ApiResource", "ApiResource")
+                        .WithMany("Scopes")
+                        .HasForeignKey("ApiResourceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ApiResource");
+                });
+
+            modelBuilder.Entity("MrWho.Models.ApiResourceSecret", b =>
+                {
+                    b.HasOne("MrWho.Models.ApiResource", "ApiResource")
+                        .WithMany("Secrets")
+                        .HasForeignKey("ApiResourceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ApiResource");
+                });
+
             modelBuilder.Entity("MrWho.Models.Client", b =>
                 {
                     b.HasOne("MrWho.Models.Realm", "Realm")
@@ -835,6 +1086,28 @@ namespace MrWho.Migrations
                     b.Navigation("Client");
                 });
 
+            modelBuilder.Entity("MrWho.Models.IdentityResourceClaim", b =>
+                {
+                    b.HasOne("MrWho.Models.IdentityResource", "IdentityResource")
+                        .WithMany("UserClaims")
+                        .HasForeignKey("IdentityResourceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("IdentityResource");
+                });
+
+            modelBuilder.Entity("MrWho.Models.IdentityResourceProperty", b =>
+                {
+                    b.HasOne("MrWho.Models.IdentityResource", "IdentityResource")
+                        .WithMany("Properties")
+                        .HasForeignKey("IdentityResourceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("IdentityResource");
+                });
+
             modelBuilder.Entity("MrWho.Models.ScopeClaim", b =>
                 {
                     b.HasOne("MrWho.Models.Scope", "Scope")
@@ -870,6 +1143,15 @@ namespace MrWho.Migrations
                     b.Navigation("Authorization");
                 });
 
+            modelBuilder.Entity("MrWho.Models.ApiResource", b =>
+                {
+                    b.Navigation("Scopes");
+
+                    b.Navigation("Secrets");
+
+                    b.Navigation("UserClaims");
+                });
+
             modelBuilder.Entity("MrWho.Models.Client", b =>
                 {
                     b.Navigation("Permissions");
@@ -879,6 +1161,13 @@ namespace MrWho.Migrations
                     b.Navigation("RedirectUris");
 
                     b.Navigation("Scopes");
+                });
+
+            modelBuilder.Entity("MrWho.Models.IdentityResource", b =>
+                {
+                    b.Navigation("Properties");
+
+                    b.Navigation("UserClaims");
                 });
 
             modelBuilder.Entity("MrWho.Models.Realm", b =>
