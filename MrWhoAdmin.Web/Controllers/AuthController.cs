@@ -13,6 +13,7 @@ public class AuthController : Controller
 {
     private readonly ITokenRefreshService _tokenRefreshService;
     private readonly ILogger<AuthController> _logger;
+    private const string AdminCookieScheme = "AdminCookies"; // Match the scheme from ServiceCollectionExtensions
 
     public AuthController(ITokenRefreshService tokenRefreshService, ILogger<AuthController> logger)
     {
@@ -45,7 +46,8 @@ public class AuthController : Controller
     [Authorize]
     public async Task<IActionResult> Logout(string? returnUrl = null)
     {
-        await HttpContext.SignOutAsync();
+        // Sign out from client-specific cookie scheme
+        await HttpContext.SignOutAsync(AdminCookieScheme);
         
         var redirectUrl = !string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl) ? returnUrl : "/";
         return Redirect(redirectUrl);

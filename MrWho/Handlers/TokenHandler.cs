@@ -119,10 +119,9 @@ public class TokenHandler : ITokenHandler
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to sign in with client-specific scheme {Scheme}, using default", 
-                    cookieScheme);
-                // Fallback to default identity scheme
-                await _signInManager.SignInAsync(user, isPersistent: false);
+                _logger.LogError(ex, "Failed to sign in with client-specific scheme {Scheme}", cookieScheme);
+                // DO NOT fallback to default scheme - this would cause cross-client contamination
+                // Just log the error and continue - the OIDC token will still be issued
             }
 
             return Results.SignIn(principal, authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);

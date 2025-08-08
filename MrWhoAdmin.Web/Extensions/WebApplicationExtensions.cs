@@ -42,6 +42,8 @@ public static class WebApplicationExtensions
     /// </summary>
     public static WebApplication ConfigureAuthenticationEndpoints(this WebApplication app)
     {
+        const string adminCookieScheme = "AdminCookies"; // Match the scheme from AddAuthenticationServices
+        
         // Login endpoint - trigger OIDC challenge
         app.MapGet("/login", async (HttpContext context, string? returnUrl = null) =>
         {
@@ -56,7 +58,7 @@ public static class WebApplicationExtensions
             };
 
             // Clear any existing authentication state before challenging
-            await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            await context.SignOutAsync(adminCookieScheme);
             
             // Trigger OpenIdConnect challenge
             await context.ChallengeAsync(OpenIdConnectDefaults.AuthenticationScheme, properties);
@@ -75,7 +77,7 @@ public static class WebApplicationExtensions
             };
 
             // Sign out from both cookie and OIDC schemes
-            await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            await context.SignOutAsync(adminCookieScheme);
             await context.SignOutAsync(OpenIdConnectDefaults.AuthenticationScheme, properties);
         });
 
@@ -88,7 +90,7 @@ public static class WebApplicationExtensions
         {
             app.MapGet("/debug/clear-auth", async (HttpContext context) =>
             {
-                await context.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+                await context.SignOutAsync(adminCookieScheme);
                 await context.SignOutAsync(OpenIdConnectDefaults.AuthenticationScheme);
                 
                 // Clear all cookies

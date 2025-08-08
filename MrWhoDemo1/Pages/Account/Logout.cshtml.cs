@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -9,6 +8,7 @@ namespace MrWhoDemo1.Pages.Account;
 public class LogoutModel : PageModel
 {
     private readonly ILogger<LogoutModel> _logger;
+    private const string Demo1CookieScheme = "Demo1Cookies"; // Match the scheme from Program.cs
 
     public LogoutModel(ILogger<LogoutModel> logger)
     {
@@ -31,9 +31,9 @@ public class LogoutModel : PageModel
         {
             _logger.LogDebug("Starting logout process for Demo1 application");
 
-            // Sign out from the local application first
-            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-            _logger.LogDebug("Signed out from local cookie scheme");
+            // Sign out from the local application first using client-specific scheme
+            await HttpContext.SignOutAsync(Demo1CookieScheme);
+            _logger.LogDebug("Signed out from Demo1 cookie scheme");
 
             // Complete the OIDC logout flow with the provider
             // The MrWho server will now automatically detect the client and clean up all schemes

@@ -13,15 +13,30 @@ builder.Services.AddRazorPages();
 // CRITICAL: Clear default claim mappings to preserve JWT claim names
 Microsoft.IdentityModel.JsonWebTokens.JsonWebTokenHandler.DefaultInboundClaimTypeMap.Clear();
 
+// CRITICAL: Use client-specific cookie scheme to prevent session sharing
+const string demo1CookieScheme = "Demo1Cookies";
+
 // Add authentication services
 builder.Services.AddAuthentication(options =>
 {
-    options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+    options.DefaultScheme = demo1CookieScheme; // Use client-specific scheme
     options.DefaultChallengeScheme = OpenIdConnectDefaults.AuthenticationScheme;
 })
-.AddCookie(CookieAuthenticationDefaults.AuthenticationScheme)
+.AddCookie(demo1CookieScheme, options => // Use client-specific scheme name
+{
+    options.Cookie.Name = ".MrWho.Demo1"; // Client-specific cookie name
+    options.Cookie.Path = "/";
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+    options.Cookie.SameSite = SameSiteMode.Lax;
+    options.ExpireTimeSpan = TimeSpan.FromHours(2); // Demo session timeout
+    options.SlidingExpiration = true;
+    options.LoginPath = "/Account/Login";
+    options.LogoutPath = "/Account/Logout";
+})
 .AddOpenIdConnect(OpenIdConnectDefaults.AuthenticationScheme, options =>
 {
+    options.SignInScheme = demo1CookieScheme; // CRITICAL: Use client-specific scheme
     options.Authority = "https://localhost:7113"; // MrWho OIDC Server
     options.ClientId = "mrwho_demo1";
     options.ClientSecret = "Demo1Secret2024!";

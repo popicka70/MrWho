@@ -44,7 +44,7 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         // Get client-specific authentication scheme
         var cookieScheme = _cookieService.GetCookieSchemeForClient(clientId);
 
-        // Check if user is already authenticated with this client's scheme
+        // CRITICAL: Only check authentication with the client-specific scheme, NO FALLBACK
         ClaimsPrincipal? principal = null;
         try
         {
@@ -54,34 +54,21 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
                 principal = authResult.Principal;
                 _logger.LogDebug("User already authenticated with client-specific scheme {Scheme}", cookieScheme);
             }
+            else
+            {
+                _logger.LogDebug("User not authenticated with client-specific scheme {Scheme}", cookieScheme);
+            }
         }
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "Failed to authenticate with client-specific scheme {Scheme}", cookieScheme);
         }
 
-        // Fallback to default Identity authentication if not authenticated with client scheme
+        // If user is not authenticated with THIS client's scheme, trigger login
         if (principal == null)
         {
-            try
-            {
-                var defaultAuthResult = await context.AuthenticateAsync("Identity.Application");
-                if (defaultAuthResult.Succeeded && defaultAuthResult.Principal?.Identity?.IsAuthenticated == true)
-                {
-                    principal = defaultAuthResult.Principal;
-                    _logger.LogDebug("User authenticated with default Identity scheme");
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogDebug(ex, "Failed to authenticate with default Identity scheme");
-            }
-        }
-
-        // If user is not authenticated, trigger login with client-specific scheme
-        if (principal == null)
-        {
-            _logger.LogDebug("User not authenticated, triggering login challenge with scheme {Scheme}", cookieScheme);
+            _logger.LogDebug("User not authenticated for client {ClientId}, triggering login challenge with scheme {Scheme}", 
+                clientId, cookieScheme);
             
             // Store the authorization request parameters for later use
             var properties = new AuthenticationProperties
@@ -104,7 +91,7 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
             return Results.Challenge(properties, new[] { cookieScheme });
         }
 
-        // User is authenticated, create authorization code
+        // User is authenticated with the correct client scheme, create authorization code
         var identity = new ClaimsIdentity(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
 
         // Get user from database to ensure we have the latest information
