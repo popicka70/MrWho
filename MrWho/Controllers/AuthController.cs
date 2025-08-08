@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using OpenIddict.Abstractions;
 using OpenIddict.Server.AspNetCore;
+using MrWho.Services;
 using System.Security.Claims;
 using static OpenIddict.Abstractions.OpenIddictConstants;
 
@@ -15,88 +16,128 @@ public class AuthController : Controller
 {
     private readonly SignInManager<IdentityUser> _signInManager;
     private readonly UserManager<IdentityUser> _userManager;
+    private readonly IClientCookieConfigurationService _cookieService;
+    private readonly ILogger<AuthController> _logger;
 
-    public AuthController(SignInManager<IdentityUser> signInManager, UserManager<IdentityUser> userManager)
+    public AuthController(
+        SignInManager<IdentityUser> signInManager, 
+        UserManager<IdentityUser> userManager,
+        IClientCookieConfigurationService cookieService,
+        ILogger<AuthController> logger)
     {
         _signInManager = signInManager;
         _userManager = userManager;
+        _cookieService = cookieService;
+        _logger = logger;
     }
 
-    [HttpGet("authorize")]
-    public async Task<IActionResult> Authorize()
-    {
-        var request = HttpContext.GetOpenIddictServerRequest() ??
-                      throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
-
-        // Log the request for debugging
-        Console.WriteLine($"Authorization request received: ClientId={request.ClientId}, ResponseType={request.ResponseType}, RedirectUri={request.RedirectUri}");
-        Console.WriteLine($"User authenticated: {User.Identity?.IsAuthenticated == true}");
-
-        // If the user is already authenticated, process the authorization request
-        if (User.Identity?.IsAuthenticated == true)
-        {
-            Console.WriteLine($"User is authenticated, processing authorization");
-            return await ProcessAuthorizationAsync(request);
-        }
-
-        Console.WriteLine($"User not authenticated, redirecting to login");
-
-        // Store the authorization request in TempData to preserve it across redirects
-        TempData["AuthorizationRequest"] = request.ToString();
-
-        // Preserve query parameters when redirecting to login
-        var returnUrl = Url.Action(nameof(Authorize)) + HttpContext.Request.QueryString;
-        return RedirectToAction(nameof(Login), new { returnUrl });
-    }
+    // REMOVED: [HttpGet("authorize")] - Now handled by minimal API with client-specific cookies
 
     [HttpGet("login")]
-    public IActionResult Login(string? returnUrl = null)
+    public IActionResult Login(string? returnUrl = null, string? clientId = null)
     {
-        Console.WriteLine($"Login page requested, returnUrl = {returnUrl}");
+        _logger.LogDebug("Login page requested, returnUrl = {ReturnUrl}, clientId = {ClientId}", returnUrl, clientId);
         ViewData["ReturnUrl"] = returnUrl;
+        ViewData["ClientId"] = clientId;
         return View(new LoginViewModel());
     }
 
     [HttpPost("login")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Login(LoginViewModel model, string? returnUrl = null)
+    public async Task<IActionResult> Login(LoginViewModel model, string? returnUrl = null, string? clientId = null)
     {
         ViewData["ReturnUrl"] = returnUrl;
-        Console.WriteLine($"Login POST: Email={model.Email}, ReturnUrl={returnUrl}");
+        ViewData["ClientId"] = clientId;
+        _logger.LogDebug("Login POST: Email={Email}, ReturnUrl={ReturnUrl}, ClientId={ClientId}", 
+            model.Email, returnUrl, clientId);
 
         if (ModelState.IsValid)
         {
             var result = await _signInManager.PasswordSignInAsync(model.Email, model.Password, model.RememberMe, lockoutOnFailure: false);
-            Console.WriteLine($"Login attempt result: Success={result.Succeeded}");
+            _logger.LogDebug("Login attempt result: Success={Success}", result.Succeeded);
             
             if (result.Succeeded)
             {
+                // If we have a client ID, also sign in with the client-specific scheme
+                if (!string.IsNullOrEmpty(clientId))
+                {
+                    try
+                    {
+                        var user = await _userManager.FindByNameAsync(model.Email);
+                        if (user != null)
+                        {
+                            var cookieScheme = _cookieService.GetCookieSchemeForClient(clientId);
+                            
+                            // Create claims identity for client-specific cookie
+                            var identity = new ClaimsIdentity(cookieScheme);
+                            identity.AddClaim(Claims.Subject, user.Id);
+                            identity.AddClaim(Claims.Email, user.Email!);
+                            identity.AddClaim(Claims.Name, user.UserName!);
+                            identity.AddClaim(Claims.PreferredUsername, user.UserName!);
+
+                            // Add roles
+                            var roles = await _userManager.GetRolesAsync(user);
+                            foreach (var role in roles)
+                            {
+                                identity.AddClaim(Claims.Role, role);
+                            }
+
+                            var principal = new ClaimsPrincipal(identity);
+                            await HttpContext.SignInAsync(cookieScheme, principal);
+                            
+                            _logger.LogDebug("Signed in user {UserName} with client-specific scheme {Scheme}", 
+                                user.UserName, cookieScheme);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to sign in with client-specific scheme for client {ClientId}", clientId);
+                        // Continue anyway - the default SignInManager login above should still work
+                    }
+                }
+
                 if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
                 {
-                    Console.WriteLine($"Login successful, redirecting to: {returnUrl}");
+                    _logger.LogDebug("Login successful, redirecting to: {ReturnUrl}", returnUrl);
                     return Redirect(returnUrl);
                 }
-                Console.WriteLine($"Login successful, redirecting to Home");
+                _logger.LogDebug("Login successful, redirecting to Home");
                 return RedirectToAction("Index", "Home");
             }
             else
             {
-                Console.WriteLine($"Login failed: {result}");
+                _logger.LogDebug("Login failed: {Result}", result);
                 ModelState.AddModelError(string.Empty, "Invalid login attempt.");
             }
         }
         else
         {
-            Console.WriteLine($"Login ModelState invalid");
+            _logger.LogDebug("Login ModelState invalid");
         }
 
         return View(model);
     }
 
     [HttpGet("logout")]
-    public async Task<IActionResult> Logout()
+    public async Task<IActionResult> Logout(string? clientId = null)
     {
         var request = HttpContext.GetOpenIddictServerRequest();
+        
+        // If we have a client ID, sign out from the client-specific scheme
+        if (!string.IsNullOrEmpty(clientId))
+        {
+            try
+            {
+                var cookieScheme = _cookieService.GetCookieSchemeForClient(clientId);
+                await HttpContext.SignOutAsync(cookieScheme);
+                _logger.LogDebug("Signed out from client-specific scheme {Scheme} for client {ClientId}", 
+                    cookieScheme, clientId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to sign out from client-specific scheme for client {ClientId}", clientId);
+            }
+        }
         
         if (request != null)
         {
@@ -114,53 +155,26 @@ public class AuthController : Controller
 
     [HttpPost("logout")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> LogoutPost()
+    public async Task<IActionResult> LogoutPost(string? clientId = null)
     {
+        // If we have a client ID, sign out from the client-specific scheme
+        if (!string.IsNullOrEmpty(clientId))
+        {
+            try
+            {
+                var cookieScheme = _cookieService.GetCookieSchemeForClient(clientId);
+                await HttpContext.SignOutAsync(cookieScheme);
+                _logger.LogDebug("Signed out from client-specific scheme {Scheme} for client {ClientId}", 
+                    cookieScheme, clientId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to sign out from client-specific scheme for client {ClientId}", clientId);
+            }
+        }
+
         await _signInManager.SignOutAsync();
         return RedirectToAction("Index", "Home");
-    }
-
-    private async Task<IActionResult> ProcessAuthorizationAsync(OpenIddictRequest request)
-    {
-        Console.WriteLine($"ProcessAuthorizationAsync called");
-        
-        var user = await _userManager.GetUserAsync(User);
-        Console.WriteLine($"User lookup result: Found={user != null}, Id={user?.Id}, UserName={user?.UserName}");
-        
-        if (user == null)
-        {
-            Console.WriteLine($"No user found via GetUserAsync - Identity claim configuration may be incorrect");
-            Console.WriteLine($"Available claims: {string.Join(", ", User.Claims.Select(c => $"{c.Type}={c.Value}"))}");
-            return Forbid(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
-        }
-
-        try
-        {
-            // Create a new ClaimsIdentity containing the claims that
-            // will be used to create an id_token, a token or a code.
-            var identity = new ClaimsIdentity(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
-            identity.AddClaim(Claims.Subject, user.Id);
-            identity.AddClaim(Claims.Email, user.Email!);
-            identity.AddClaim(Claims.Name, user.UserName!);
-            identity.AddClaim(Claims.PreferredUsername, user.UserName!);
-
-            Console.WriteLine($"Created identity with claims: Subject={user.Id}, Email={user.Email}, Name={user.UserName}");
-
-            // Set the list of scopes granted to the client application.
-            var principal = new ClaimsPrincipal(identity);
-            principal.SetScopes(request.GetScopes());
-
-            Console.WriteLine($"Set scopes: {string.Join(", ", request.GetScopes())}");
-            Console.WriteLine($"Returning SignIn result");
-
-            // Automatically consent to the authorization request
-            return SignIn(principal, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error in ProcessAuthorizationAsync: {ex}");
-            return Forbid(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
-        }
     }
 }
 

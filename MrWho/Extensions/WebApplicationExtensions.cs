@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using MrWho.Data;
 using MrWho.Handlers;
 using MrWho.Services;
+using MrWho.Middleware;
 using OpenIddict.Abstractions;
 using System.Linq;
 using System.Reflection;
@@ -28,6 +29,53 @@ public static class WebApplicationExtensions
         app.UseStaticFiles();
         app.UseRouting();
 
+        // Add client cookie middleware before authentication
+        app.UseMiddleware<ClientCookieMiddleware>();
+
+        // Add antiforgery middleware
+        app.UseAntiforgery();
+
+        app.UseAuthentication();
+        app.UseAuthorization();
+
+        // Initialize database and seed essential data
+        await app.InitializeDatabaseAsync();
+
+        // Configure routing for controllers
+        app.MapControllerRoute(
+            name: "default",
+            pattern: "{controller=Home}/{action=Index}/{id?}");
+
+        // CRITICAL: Map API controllers for token inspector and other API endpoints
+        app.MapControllers();
+
+        return app;
+    }
+
+    /// <summary>
+    /// Configures the MrWho pipeline with client-specific cookie support
+    /// </summary>
+    public static async Task<WebApplication> ConfigureMrWhoPipelineWithClientCookiesAsync(this WebApplication app)
+    {
+        app.MapDefaultEndpoints();
+
+        // Configure the HTTP request pipeline
+        if (!app.Environment.IsDevelopment())
+        {
+            app.UseExceptionHandler("/Error");
+            app.UseHsts();
+        }
+
+        app.UseHttpsRedirection();
+        app.UseStaticFiles();
+        app.UseRouting();
+
+        // Enable session support for client tracking
+        app.UseSession();
+
+        // Add client cookie middleware before authentication - CRITICAL for client-specific cookies
+        app.UseMiddleware<ClientCookieMiddleware>();
+
         // Add antiforgery middleware
         app.UseAntiforgery();
 
@@ -50,6 +98,17 @@ public static class WebApplicationExtensions
 
     public static WebApplication AddMrWhoEndpoints(this WebApplication app)
     {
+        // OIDC Authorization endpoint
+        app.MapGet("/connect/authorize", async (HttpContext context, IOidcAuthorizationHandler authorizationHandler) =>
+        {
+            return await authorizationHandler.HandleAuthorizationRequestAsync(context);
+        });
+
+        app.MapPost("/connect/authorize", async (HttpContext context, IOidcAuthorizationHandler authorizationHandler) =>
+        {
+            return await authorizationHandler.HandleAuthorizationRequestAsync(context);
+        });
+
         // OIDC Token endpoint - now uses injected TokenHandler
         app.MapPost("/connect/token", async (HttpContext context, ITokenHandler tokenHandler) =>
         {
@@ -86,10 +145,58 @@ public static class WebApplicationExtensions
                 Demo1ClientInfo = "/debug/demo1-client-info",
                 EssentialData = "/debug/essential-data",
                 ClientPermissions = "/debug/client-permissions",
-                OpenIddictScopes = "/debug/openiddict-scopes"
+                OpenIddictScopes = "/debug/openiddict-scopes",
+                ClientCookieStatus = "/debug/client-cookies"
             },
             Documentation = "Visit any endpoint above for debug information or tools"
         }));
+
+        // Debug endpoint for client cookie configurations
+        app.MapGet("/debug/client-cookies", (HttpContext context, IClientCookieConfigurationService cookieService) =>
+        {
+            var configurations = cookieService.GetAllClientConfigurations();
+            var currentClientId = context.Items["ClientId"]?.ToString();
+            var currentScheme = context.Items["ClientCookieScheme"]?.ToString();
+            var currentCookieName = context.Items["ClientCookieName"]?.ToString();
+
+            var activeCookies = new List<object>();
+            foreach (var config in configurations)
+            {
+                var cookieValue = context.Request.Cookies[config.Value.CookieName];
+                activeCookies.Add(new
+                {
+                    ClientId = config.Key,
+                    CookieName = config.Value.CookieName,
+                    SchemeName = config.Value.SchemeName,
+                    HasCookie = !string.IsNullOrEmpty(cookieValue),
+                    CookieLength = cookieValue?.Length ?? 0
+                });
+            }
+
+            return Results.Ok(new
+            {
+                CurrentRequest = new
+                {
+                    Path = context.Request.Path.ToString(),
+                    ClientId = currentClientId,
+                    CookieScheme = currentScheme,
+                    CookieName = currentCookieName
+                },
+                ConfiguredClients = configurations.Select(kvp => new
+                {
+                    ClientId = kvp.Key,
+                    SchemeName = kvp.Value.SchemeName,
+                    CookieName = kvp.Value.CookieName
+                }),
+                ActiveCookies = activeCookies,
+                AllRequestCookies = context.Request.Cookies.Select(c => new
+                {
+                    Name = c.Key,
+                    Length = c.Value.Length
+                }),
+                Timestamp = DateTime.UtcNow
+            });
+        });
 
         app.MapGet("/debug/client-info", async (IOidcClientService oidcClientService) =>
         {
