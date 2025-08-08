@@ -366,6 +366,14 @@ public class AuthController : Controller
 
         return string.Join(" ", capitalizedWords);
     }
+
+    [HttpGet("access-denied")]
+    public IActionResult AccessDenied(string? returnUrl = null)
+    {
+        _logger.LogDebug("Access denied page requested, returnUrl = {ReturnUrl}", returnUrl);
+        ViewData["ReturnUrl"] = returnUrl;
+        return View();
+    }
 }
 
 public class LoginViewModel

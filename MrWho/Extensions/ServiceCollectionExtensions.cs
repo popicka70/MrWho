@@ -195,9 +195,9 @@ public static class ServiceCollectionExtensions
         // Admin client cookie
         services.AddClientSpecificCookie("mrwho_admin_web", ".MrWho.Admin", options =>
         {
-            options.LoginPath = "/login";
-            options.LogoutPath = "/logout";
-            options.AccessDeniedPath = "/access-denied";
+            options.LoginPath = "/connect/login";
+            options.LogoutPath = "/connect/logout";
+            options.AccessDeniedPath = "/connect/access-denied";
             options.Cookie.Domain = null; // Same domain only
             options.ExpireTimeSpan = TimeSpan.FromHours(8); // Work day session
         });
