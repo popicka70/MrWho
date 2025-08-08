@@ -1,0 +1,117 @@
+@page "/secure"
+@model MrWhoDemo1.Pages.SecureModel
+@using Microsoft.AspNetCore.Authentication
+@{
+    ViewData["Title"] = "Secure Page";
+}
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="display-4 mb-4">?? Secure Page</h1>
+            
+            <div class="alert alert-success">
+                <h4><i class="bi bi-shield-check"></i> Access Granted!</h4>
+                <p>Welcome <strong>@(User.Identity.Name ?? "Unknown User")</strong>! You have successfully accessed this protected page.</p>
+            </div>
+
+            <div class="row">
+                <div class="col-lg-6 mb-4">
+                    <div class="card">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="mb-0"><i class="bi bi-person-badge"></i> Authentication Details</h5>
+                        </div>
+                        <div class="card-body">
+                            <table class="table table-borderless">
+                                <tr>
+                                    <td><strong>Name:</strong></td>
+                                    <td>@(User.Identity.Name ?? "Not available")</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Email:</strong></td>
+                                    <td>@(User.FindFirst("email")?.Value ?? "Not available")</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Subject ID:</strong></td>
+                                    <td><code>@(User.FindFirst("sub")?.Value ?? "Not available")</code></td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Authentication Type:</strong></td>
+                                    <td>@(User.Identity.AuthenticationType ?? "Not available")</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Claims Count:</strong></td>
+                                    <td><span class="badge bg-info">@User.Claims.Count()</span></td>
+                                </tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-6 mb-4">
+                    <div class="card">
+                        <div class="card-header bg-info text-white">
+                            <h5 class="mb-0"><i class="bi bi-key"></i> Token Status</h5>
+                        </div>
+                        <div class="card-body">
+                            @{
+                                var accessToken = await HttpContext.GetTokenAsync("access_token");
+                                var refreshToken = await HttpContext.GetTokenAsync("refresh_token");
+                                var idToken = await HttpContext.GetTokenAsync("id_token");
+                            }
+                            
+                            <div class="mb-2">
+                                <strong>Access Token:</strong>
+                                <span class="badge @(!string.IsNullOrEmpty(accessToken) ? "bg-success" : "bg-danger")">
+                                    @(!string.IsNullOrEmpty(accessToken) ? "Available" : "Not Available")
+                                </span>
+                                @if (!string.IsNullOrEmpty(accessToken))
+                                {
+                                    <small class="text-muted d-block">Length: @accessToken.Length characters</small>
+                                }
+                            </div>
+
+                            <div class="mb-2">
+                                <strong>Refresh Token:</strong>
+                                <span class="badge @(!string.IsNullOrEmpty(refreshToken) ? "bg-success" : "bg-danger")">
+                                    @(!string.IsNullOrEmpty(refreshToken) ? "Available" : "Not Available")
+                                </span>
+                                @if (!string.IsNullOrEmpty(refreshToken))
+                                {
+                                    <small class="text-muted d-block">Length: @refreshToken.Length characters</small>
+                                }
+                            </div>
+
+                            <div class="mb-2">
+                                <strong>ID Token:</strong>
+                                <span class="badge @(!string.IsNullOrEmpty(idToken) ? "bg-success" : "bg-danger")">
+                                    @(!string.IsNullOrEmpty(idToken) ? "Available" : "Not Available")
+                                </span>
+                                @if (!string.IsNullOrEmpty(idToken))
+                                {
+                                    <small class="text-muted d-block">Length: @idToken.Length characters</small>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="d-flex gap-2 flex-wrap">
+                        <a href="/" class="btn btn-primary">
+                            <i class="bi bi-house"></i> Home
+                        </a>
+                        <a href="/Account/Logout" class="btn btn-outline-danger">
+                            <i class="bi bi-box-arrow-right"></i> Logout
+                        </a>
+                        <a href="/debug/logout" class="btn btn-outline-warning">
+                            <i class="bi bi-bug"></i> Debug Logout
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

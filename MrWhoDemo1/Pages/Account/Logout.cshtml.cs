@@ -31,16 +31,32 @@ public class LogoutModel : PageModel
         {
             _logger.LogDebug("Starting logout process for Demo1 application");
 
-            // Sign out from the local application first using client-specific scheme
-            await HttpContext.SignOutAsync(Demo1CookieScheme);
-            _logger.LogDebug("Signed out from Demo1 cookie scheme");
-
-            // Complete the OIDC logout flow with the provider
-            // The MrWho server will now automatically detect the client and clean up all schemes
-            return SignOut(new AuthenticationProperties
+            try
             {
-                RedirectUri = "/"
-            }, OpenIdConnectDefaults.AuthenticationScheme);
+                // CRITICAL FIX: Use the proper SignOut approach for OpenID Connect
+                // This will:
+                // 1. Sign out from local cookies
+                // 2. Redirect to the OIDC provider's end session endpoint
+                // 3. Have the provider redirect back to our post-logout redirect URI
+                
+                var properties = new AuthenticationProperties
+                {
+                    RedirectUri = "/" // Where to go after the OIDC logout is complete
+                };
+
+                _logger.LogDebug("Initiating complete OIDC logout flow");
+
+                // This single call will handle both local and remote logout
+                return SignOut(properties, OpenIdConnectDefaults.AuthenticationScheme, Demo1CookieScheme);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during logout process");
+                
+                // Fallback: at least clear local authentication
+                await HttpContext.SignOutAsync(Demo1CookieScheme);
+                return LocalRedirect("/");
+            }
         }
 
         return LocalRedirect("/");
