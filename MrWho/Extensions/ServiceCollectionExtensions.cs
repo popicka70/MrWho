@@ -202,18 +202,6 @@ public static class ServiceCollectionExtensions
             options.ExpireTimeSpan = TimeSpan.FromHours(8); // Work day session
         });
 
-        // REMOVED: Demo1 client static cookie configuration to test dynamic client support
-        // The mrwho_demo1 client will now use dynamic cookie configuration
-        /*
-        services.AddClientSpecificCookie("mrwho_demo1", ".MrWho.Demo1", options =>
-        {
-            options.LoginPath = "/Account/Login";
-            options.LogoutPath = "/Account/Logout";
-            options.AccessDeniedPath = "/Account/AccessDenied";
-            options.ExpireTimeSpan = TimeSpan.FromHours(2); // Demo session
-        });
-        */
-
         // Postman/API client cookie
         services.AddClientSpecificCookie("postman_client", ".MrWho.API", options =>
         {
