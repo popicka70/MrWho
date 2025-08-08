@@ -159,32 +159,33 @@ public static class ServiceCollectionExtensions
 
     /// <summary>
     /// Configures authentication services including OpenID Connect
+    /// CORRECTED: Use standard OIDC with server-side session isolation
     /// </summary>
     public static IServiceCollection AddAuthenticationServices(this IServiceCollection services, IConfiguration configuration)
     {
-        // CRITICAL: Use client-specific cookie scheme to prevent session sharing
+        // CORRECTED: Use standard OIDC schemes - session isolation handled server-side
         const string adminCookieScheme = "AdminCookies";
         
         services.AddAuthentication(options =>
         {
-            options.DefaultScheme = adminCookieScheme; // Use client-specific scheme
-            options.DefaultChallengeScheme = OpenIdConnectDefaults.AuthenticationScheme;
+            options.DefaultScheme = adminCookieScheme;
+            options.DefaultChallengeScheme = OpenIdConnectDefaults.AuthenticationScheme; // Use standard OIDC
         })
-        .AddCookie(adminCookieScheme, options => // Use client-specific scheme name
+        .AddCookie(adminCookieScheme, options =>
         {
-            options.Cookie.Name = ".MrWho.Admin"; // Client-specific cookie name
+            options.Cookie.Name = ".MrWho.Admin"; // Client-specific cookie name for local session
             options.Cookie.Path = "/";
             options.Cookie.HttpOnly = true;
             options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
             options.Cookie.SameSite = SameSiteMode.Lax;
-            options.ExpireTimeSpan = TimeSpan.FromHours(8); // Admin session timeout
+            options.ExpireTimeSpan = TimeSpan.FromHours(8);
             options.SlidingExpiration = true;
             options.LoginPath = "/login";
             options.LogoutPath = "/logout";
         })
-        .AddOpenIdConnect(OpenIdConnectDefaults.AuthenticationScheme, options =>
+        .AddOpenIdConnect(OpenIdConnectDefaults.AuthenticationScheme, options => // Use standard scheme
         {
-            options.SignInScheme = adminCookieScheme; // CRITICAL: Use client-specific scheme
+            options.SignInScheme = adminCookieScheme;
             ConfigureOpenIdConnect(options, configuration);
         });
 
@@ -297,23 +298,23 @@ public static class ServiceCollectionExtensions
             OnRedirectToIdentityProvider = context =>
             {
                 var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-                logger.LogInformation("Redirecting to identity provider: {Authority} with return URL: {ReturnUrl}", 
-                    options.Authority, context.Properties.RedirectUri);
+                logger.LogInformation("?? ADMIN: Redirecting to identity provider with client_id: {ClientId}", 
+                    context.ProtocolMessage.ClientId);
                 return Task.CompletedTask;
             },
             
             OnTokenValidated = context =>
             {
                 var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-                logger.LogInformation("Token validated successfully for user: {UserName}. Claims count: {ClaimsCount}", 
+                logger.LogInformation("? ADMIN: Token validated successfully for user: {UserName}. Claims count: {ClaimsCount}", 
                     context.Principal?.Identity?.Name ?? "Unknown", context.Principal?.Claims?.Count() ?? 0);
                 
-                // Log the claims we have at this point
+                // Log the claims we have at this context
                 if (context.Principal?.Claims != null)
                 {
                     foreach (var claim in context.Principal.Claims)
                     {
-                        logger.LogDebug("Token claim: {ClaimType} = {ClaimValue}", claim.Type, claim.Value);
+                        logger.LogDebug("ADMIN Token claim: {ClaimType} = {ClaimValue}", claim.Type, claim.Value);
                     }
                 }
                 
@@ -323,13 +324,13 @@ public static class ServiceCollectionExtensions
             OnUserInformationReceived = context =>
             {
                 var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-                logger.LogInformation("UserInfo received from endpoint. User document contains {PropertyCount} properties", 
+                logger.LogInformation("?? ADMIN: UserInfo received from endpoint. User document contains {PropertyCount} properties", 
                     context.User.RootElement.EnumerateObject().Count());
                 
                 // Log what we received from UserInfo endpoint
                 foreach (var property in context.User.RootElement.EnumerateObject())
                 {
-                    logger.LogDebug("UserInfo property: {PropertyName} = {PropertyValue}", property.Name, property.Value.ToString());
+                    logger.LogDebug("ADMIN UserInfo property: {PropertyName} = {PropertyValue}", property.Name, property.Value.ToString());
                 }
                 
                 return Task.CompletedTask;
@@ -338,7 +339,7 @@ public static class ServiceCollectionExtensions
             OnTokenResponseReceived = context =>
             {
                 var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-                logger.LogInformation("Token response received - Access Token: {HasAccessToken}, Refresh Token: {HasRefreshToken}", 
+                logger.LogInformation("?? ADMIN: Token response received - Access Token: {HasAccessToken}, Refresh Token: {HasRefreshToken}", 
                     !string.IsNullOrEmpty(context.TokenEndpointResponse.AccessToken),
                     !string.IsNullOrEmpty(context.TokenEndpointResponse.RefreshToken));
                 return Task.CompletedTask;
@@ -347,7 +348,7 @@ public static class ServiceCollectionExtensions
             OnAuthenticationFailed = context =>
             {
                 var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-                logger.LogError("Authentication failed: {Error} - {ErrorDescription}", 
+                logger.LogError("? ADMIN: Authentication failed: {Error} - {ErrorDescription}", 
                     context.Exception?.Message, context.Exception?.ToString());
                 
                 // Check if this is a UserInfo endpoint failure (403 Forbidden)
@@ -355,7 +356,7 @@ public static class ServiceCollectionExtensions
                     httpEx.Message.Contains("403") && 
                     httpEx.Message.Contains("Forbidden"))
                 {
-                    logger.LogWarning("UserInfo endpoint returned 403 Forbidden - this might be a temporary server issue");
+                    logger.LogWarning("?? ADMIN: UserInfo endpoint returned 403 Forbidden - this might be a temporary server issue");
                     
                     // Don't treat UserInfo 403 as a complete authentication failure
                     // The user can still be authenticated based on the ID token
@@ -374,14 +375,14 @@ public static class ServiceCollectionExtensions
             OnRemoteFailure = context =>
             {
                 var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-                logger.LogError("Remote authentication failure: {Error}", context.Failure?.Message);
+                logger.LogError("?? ADMIN: Remote authentication failure: {Error}", context.Failure?.Message);
                 
                 // Check if this is a UserInfo endpoint failure (403 Forbidden)
                 if (context.Failure is HttpRequestException httpEx && 
                     httpEx.Message.Contains("403") && 
                     httpEx.Message.Contains("Forbidden"))
                 {
-                    logger.LogWarning("UserInfo endpoint returned 403 Forbidden during remote authentication");
+                    logger.LogWarning("?? ADMIN: UserInfo endpoint returned 403 Forbidden during remote authentication");
                     
                     // Don't treat UserInfo 403 as a complete authentication failure
                     // Skip the UserInfo call and continue with ID token claims
@@ -399,21 +400,21 @@ public static class ServiceCollectionExtensions
             OnAuthorizationCodeReceived = context =>
             {
                 var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-                logger.LogInformation("Authorization code received, exchanging for tokens");
+                logger.LogInformation("?? ADMIN: Authorization code received, exchanging for tokens");
                 return Task.CompletedTask;
             },
             
             OnRedirectToIdentityProviderForSignOut = context =>
             {
                 var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-                logger.LogInformation("Redirecting to identity provider for sign out");
+                logger.LogInformation("?? ADMIN: Redirecting to identity provider for sign out (server-side isolation via DynamicCookieService)");
                 return Task.CompletedTask;
             },
             
             OnSignedOutCallbackRedirect = context =>
             {
                 var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-                logger.LogInformation("Processing signed out callback redirect to: {RedirectUri}", 
+                logger.LogInformation("? ADMIN: Processing signed out callback redirect to: {RedirectUri}", 
                     context.Options.SignedOutRedirectUri);
                 return Task.CompletedTask;
             }

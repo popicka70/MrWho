@@ -29,29 +29,25 @@ public class LogoutModel : PageModel
     {
         if (User.Identity?.IsAuthenticated == true)
         {
-            _logger.LogDebug("Starting logout process for Demo1 application");
+            _logger.LogDebug("Starting logout process for Demo1 application using standard OIDC with server-side session isolation");
 
             try
             {
-                // CRITICAL FIX: Use the proper SignOut approach for OpenID Connect
-                // This will:
-                // 1. Sign out from local cookies
-                // 2. Redirect to the OIDC provider's end session endpoint
-                // 3. Have the provider redirect back to our post-logout redirect URI
+                // CORRECTED: Use standard OIDC scheme - server-side DynamicCookieService handles client isolation
                 
                 var properties = new AuthenticationProperties
                 {
                     RedirectUri = "/" // Where to go after the OIDC logout is complete
                 };
 
-                _logger.LogDebug("Initiating complete OIDC logout flow");
+                _logger.LogDebug("Initiating Demo1 logout using standard OIDC - server-side DynamicCookieService prevents affecting admin app");
 
-                // This single call will handle both local and remote logout
+                // Use standard OIDC scheme - server-side DynamicCookieService handles client-specific session isolation
                 return SignOut(properties, OpenIdConnectDefaults.AuthenticationScheme, Demo1CookieScheme);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error during logout process");
+                _logger.LogError(ex, "Error during Demo1 logout process");
                 
                 // Fallback: at least clear local authentication
                 await HttpContext.SignOutAsync(Demo1CookieScheme);

@@ -30,27 +30,33 @@ public class BackChannelLogoutService : IBackChannelLogoutService
 {
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<BackChannelLogoutService> _logger;
-    private readonly ApplicationDbContext _context;
+    private readonly IServiceProvider _serviceProvider; // Changed from direct DbContext injection
 
     public BackChannelLogoutService(
         IHttpClientFactory httpClientFactory,
         ILogger<BackChannelLogoutService> logger,
-        ApplicationDbContext context)
+        IServiceProvider serviceProvider) // Use service provider to create scoped contexts
     {
         _httpClientFactory = httpClientFactory;
         _logger = logger;
-        _context = context;
+        _serviceProvider = serviceProvider;
     }
 
     public async Task NotifyClientLogoutAsync(string authorizationId, string subject, string sessionId)
     {
         try
         {
-            // Find all clients that might have sessions for this user
-            var clientsToNotify = await GetClientsForLogoutNotificationAsync(subject);
+            // Get clients once using a dedicated scope
+            List<Models.Client> clientsToNotify;
+            using (var scope = _serviceProvider.CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                clientsToNotify = await GetClientsForLogoutNotificationAsync(context, subject);
+            }
 
+            // Process notifications concurrently but with separate scopes for each
             var tasks = clientsToNotify.Select(client => 
-                NotifyClientLogoutAsync(client.ClientId, subject, sessionId));
+                NotifyClientLogoutInternalAsync(client.ClientId, subject, sessionId));
 
             await Task.WhenAll(tasks);
         }
@@ -62,10 +68,25 @@ public class BackChannelLogoutService : IBackChannelLogoutService
 
     public async Task NotifyClientLogoutAsync(string clientId, string subject, string sessionId, string? logoutToken = null)
     {
+        await NotifyClientLogoutInternalAsync(clientId, subject, sessionId, logoutToken);
+    }
+
+    /// <summary>
+    /// Internal method that creates its own DbContext scope for thread safety
+    /// </summary>
+    private async Task NotifyClientLogoutInternalAsync(string clientId, string subject, string sessionId, string? logoutToken = null)
+    {
         try
         {
-            var client = await _context.Clients
-                .FirstOrDefaultAsync(c => c.ClientId == clientId);
+            Models.Client? client;
+            
+            // Create a new scope and context for this operation
+            using (var scope = _serviceProvider.CreateScope())
+            {
+                var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                client = await context.Clients
+                    .FirstOrDefaultAsync(c => c.ClientId == clientId);
+            }
 
             if (client == null)
             {
@@ -135,10 +156,13 @@ public class BackChannelLogoutService : IBackChannelLogoutService
         return JsonSerializer.Serialize(logoutToken);
     }
 
-    private async Task<List<Models.Client>> GetClientsForLogoutNotificationAsync(string subject)
+    /// <summary>
+    /// Gets clients for logout notification using the provided context
+    /// </summary>
+    private async Task<List<Models.Client>> GetClientsForLogoutNotificationAsync(ApplicationDbContext context, string subject)
     {
         // Get all clients that support back-channel logout
-        return await _context.Clients
+        return await context.Clients
             .Where(c => c.IsEnabled)
             .ToListAsync();
     }

@@ -34,7 +34,7 @@ public class AuthController : Controller
             RedirectUri = !string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl) ? returnUrl : "/"
         };
 
-        return Challenge(properties, OpenIdConnectDefaults.AuthenticationScheme);
+        return Challenge(properties, OpenIdConnectDefaults.AuthenticationScheme); // Use standard OIDC scheme
     }
 
     /// <summary>
@@ -48,7 +48,7 @@ public class AuthController : Controller
     {
         try
         {
-            _logger.LogInformation("Logout requested. ReturnUrl: {ReturnUrl}, ClearAll: {ClearAll}", returnUrl, clearAll);
+            _logger.LogInformation("Admin app logout requested. ReturnUrl: {ReturnUrl}, ClearAll: {ClearAll} (Server-side session isolation active)", returnUrl, clearAll);
 
             if (clearAll)
             {
@@ -65,26 +65,26 @@ public class AuthController : Controller
                     }
                 }
                 
-                _logger.LogInformation("Complete authentication clear performed");
+                _logger.LogInformation("Complete authentication clear performed for admin app");
                 
                 var clearAllRedirectUrl = !string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl) ? returnUrl : "/";
                 return Redirect(clearAllRedirectUrl);
             }
             else
             {
-                // Standard logout - sign out from client-specific cookie scheme first
+                // Standard logout - use standard OIDC scheme (server handles client-specific session isolation)
                 if (HttpContext.User.Identity?.IsAuthenticated == true)
                 {
-                    await HttpContext.SignOutAsync(AdminCookieScheme);
-                    
-                    // Then sign out from OIDC if needed
                     var properties = new AuthenticationProperties();
                     if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
                     {
                         properties.RedirectUri = returnUrl;
                     }
                     
-                    return SignOut(properties, OpenIdConnectDefaults.AuthenticationScheme);
+                    _logger.LogInformation("Signing out admin app using standard OIDC (DynamicCookieService handles client isolation)");
+                    
+                    // Use standard OIDC scheme - server-side DynamicCookieService handles client isolation
+                    return SignOut(properties, OpenIdConnectDefaults.AuthenticationScheme, AdminCookieScheme);
                 }
                 
                 var redirectUrl = !string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl) ? returnUrl : "/";
@@ -93,7 +93,7 @@ public class AuthController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during logout");
+            _logger.LogError(ex, "Error during admin app logout");
             var fallbackUrl = !string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl) ? returnUrl : "/";
             return Redirect(fallbackUrl);
         }
