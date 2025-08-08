@@ -27,15 +27,6 @@ public class ClientCookieConfigurationService : IClientCookieConfigurationServic
             }
         },
         { 
-            "mrwho_demo1", 
-            new ClientCookieConfiguration
-            {
-                ClientId = "mrwho_demo1",
-                SchemeName = "Identity.Application.mrwho_demo1",
-                CookieName = ".MrWho.Demo1"
-            }
-        },
-        { 
             "postman_client", 
             new ClientCookieConfiguration
             {
@@ -61,10 +52,10 @@ public class ClientCookieConfigurationService : IClientCookieConfigurationServic
             return config.SchemeName;
         }
 
-        // Fallback - dynamically generated scheme
-        var fallbackScheme = $"Identity.Application.{clientId}";
-        _logger.LogDebug("Using fallback cookie scheme {Scheme} for client {ClientId}", fallbackScheme, clientId);
-        return fallbackScheme;
+        // For true dynamic configuration, all clients without static config use the default scheme
+        // The cookie differentiation happens at the cookie NAME level, not the scheme level
+        _logger.LogDebug("Client {ClientId} using default authentication scheme with dynamic cookie management", clientId);
+        return "Identity.Application";
     }
 
     public string GetCookieNameForClient(string clientId)
@@ -74,10 +65,27 @@ public class ClientCookieConfigurationService : IClientCookieConfigurationServic
             return config.CookieName;
         }
 
-        // Fallback - dynamically generated cookie name
-        var fallbackName = $".AspNetCore.Identity.{clientId}";
-        _logger.LogDebug("Using fallback cookie name {CookieName} for client {ClientId}", fallbackName, clientId);
-        return fallbackName;
+        // Dynamic cookie naming - each client gets its own cookie name
+        // This allows session isolation without requiring separate authentication schemes
+        var dynamicCookieName = $".MrWho.{clientId}";
+        _logger.LogDebug("Client {ClientId} using dynamic cookie name: {CookieName}", clientId, dynamicCookieName);
+        return dynamicCookieName;
+    }
+
+    /// <summary>
+    /// Checks if a client has static cookie configuration
+    /// </summary>
+    public bool HasStaticConfiguration(string clientId)
+    {
+        return ClientCookieConfigurations.ContainsKey(clientId);
+    }
+
+    /// <summary>
+    /// Checks if a client should use dynamic cookie management
+    /// </summary>
+    public bool UsesDynamicCookies(string clientId)
+    {
+        return !HasStaticConfiguration(clientId);
     }
 
     public async Task<string?> GetClientIdFromRequestAsync(HttpContext context)

@@ -48,6 +48,12 @@ public static class ServiceCollectionExtensions
         // Register client cookie configuration service
         services.AddScoped<IClientCookieConfigurationService, ClientCookieConfigurationService>();
 
+        // Register dynamic cookie service for client-specific cookies
+        services.AddScoped<IDynamicCookieService, DynamicCookieService>();
+
+        // Register HttpContextAccessor for dynamic cookie service
+        services.AddHttpContextAccessor();
+
         // Register user realm validation service
         services.AddScoped<IUserRealmValidationService, UserRealmValidationService>();
 
@@ -196,7 +202,9 @@ public static class ServiceCollectionExtensions
             options.ExpireTimeSpan = TimeSpan.FromHours(8); // Work day session
         });
 
-        // Demo1 client cookie
+        // REMOVED: Demo1 client static cookie configuration to test dynamic client support
+        // The mrwho_demo1 client will now use dynamic cookie configuration
+        /*
         services.AddClientSpecificCookie("mrwho_demo1", ".MrWho.Demo1", options =>
         {
             options.LoginPath = "/Account/Login";
@@ -204,6 +212,7 @@ public static class ServiceCollectionExtensions
             options.AccessDeniedPath = "/Account/AccessDenied";
             options.ExpireTimeSpan = TimeSpan.FromHours(2); // Demo session
         });
+        */
 
         // Postman/API client cookie
         services.AddClientSpecificCookie("postman_client", ".MrWho.API", options =>
@@ -305,7 +314,8 @@ public static class ServiceCollectionExtensions
                 OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme,
                 // Add client-specific schemes
                 "Identity.Application.mrwho_admin_web",
-                "Identity.Application.mrwho_demo1",
+                // REMOVED: Static scheme for mrwho_demo1 to test dynamic client support
+                // "Identity.Application.mrwho_demo1",
                 "Identity.Application.postman_client"
             };
 
@@ -319,9 +329,12 @@ public static class ServiceCollectionExtensions
                 policy.RequireAuthenticatedUser()
                       .AddAuthenticationSchemes("Identity.Application.mrwho_admin_web"));
 
+            // REMOVED: Static policy for Demo access - mrwho_demo1 will use dynamic fallback
+            /*
             options.AddPolicy("DemoAccess", policy =>
                 policy.RequireAuthenticatedUser()
                       .AddAuthenticationSchemes("Identity.Application.mrwho_demo1"));
+            */
 
             options.AddPolicy("ApiAccess", policy =>
                 policy.RequireAuthenticatedUser()

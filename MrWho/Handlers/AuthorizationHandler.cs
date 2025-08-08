@@ -19,6 +19,7 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
     private readonly UserManager<IdentityUser> _userManager;
     private readonly SignInManager<IdentityUser> _signInManager;
     private readonly IClientCookieConfigurationService _cookieService;
+    private readonly IDynamicCookieService _dynamicCookieService;
     private readonly IUserRealmValidationService _realmValidationService;
     private readonly ILogger<OidcAuthorizationHandler> _logger;
 
@@ -26,12 +27,14 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         UserManager<IdentityUser> userManager,
         SignInManager<IdentityUser> signInManager,
         IClientCookieConfigurationService cookieService,
+        IDynamicCookieService dynamicCookieService,
         IUserRealmValidationService realmValidationService,
         ILogger<OidcAuthorizationHandler> logger)
     {
         _userManager = userManager;
         _signInManager = signInManager;
         _cookieService = cookieService;
+        _dynamicCookieService = dynamicCookieService;
         _realmValidationService = realmValidationService;
         _logger = logger;
     }
@@ -44,54 +47,59 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         var clientId = request.ClientId!;
         _logger.LogDebug("Authorization request received for client {ClientId}", clientId);
 
-        // Get client-specific authentication scheme
-        var cookieScheme = _cookieService.GetCookieSchemeForClient(clientId);
-
-        // CRITICAL: Only check authentication with the client-specific scheme, NO FALLBACK
+        // Check if user is authenticated for this specific client using the dynamic cookie service
         ClaimsPrincipal? principal = null;
         try
         {
-            var authResult = await context.AuthenticateAsync(cookieScheme);
-            if (authResult.Succeeded && authResult.Principal?.Identity?.IsAuthenticated == true)
+            if (await _dynamicCookieService.IsAuthenticatedForClientAsync(clientId))
             {
-                principal = authResult.Principal;
-                _logger.LogDebug("User already authenticated with client-specific scheme {Scheme}", cookieScheme);
+                principal = await _dynamicCookieService.GetClientPrincipalAsync(clientId);
+                if (principal?.Identity?.IsAuthenticated == true)
+                {
+                    _logger.LogDebug("User already authenticated for client {ClientId}", clientId);
+                }
+                else
+                {
+                    principal = null;
+                    _logger.LogDebug("User cookie exists but principal is invalid for client {ClientId}", clientId);
+                }
             }
             else
             {
-                _logger.LogDebug("User not authenticated with client-specific scheme {Scheme}", cookieScheme);
+                _logger.LogDebug("User not authenticated for client {ClientId}", clientId);
             }
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "Failed to authenticate with client-specific scheme {Scheme}", cookieScheme);
+            _logger.LogDebug(ex, "Failed to check authentication for client {ClientId}", clientId);
         }
 
-        // If user is not authenticated with THIS client's scheme, trigger login
+        // If user is not authenticated with THIS client, trigger login
         if (principal == null)
         {
-            _logger.LogDebug("User not authenticated for client {ClientId}, triggering login challenge with scheme {Scheme}", 
-                clientId, cookieScheme);
+            _logger.LogDebug("User not authenticated for client {ClientId}, triggering login challenge", 
+                clientId);
             
             // Store the authorization request parameters for later use
             var properties = new AuthenticationProperties
             {
-                RedirectUri = context.Request.GetEncodedUrl(),
-                Items = 
+                RedirectUri = context.Request.GetDisplayUrl(),
+                Items =
                 {
-                    ["client_id"] = clientId
+                    ["client_id"] = clientId,
+                    ["return_url"] = context.Request.GetDisplayUrl()
                 }
             };
 
-            // For web applications, redirect to the login page with client information
-            if (request.ResponseType == "code") // Authorization Code Flow (web apps)
+            // Store client ID in session for callback handling
+            if (context.Session.IsAvailable)
             {
-                var loginUrl = $"/connect/login?returnUrl={Uri.EscapeDataString(context.Request.GetEncodedUrl())}&clientId={Uri.EscapeDataString(clientId)}";
-                return Results.Redirect(loginUrl);
+                context.Session.Set("oidc_client_id", System.Text.Encoding.UTF8.GetBytes(clientId));
             }
 
-            // For other flows, challenge with client-specific cookie scheme
-            return Results.Challenge(properties, new[] { cookieScheme });
+            // Redirect to login with client ID parameter
+            var loginUrl = $"/connect/login?clientId={Uri.EscapeDataString(clientId)}&returnUrl={Uri.EscapeDataString(context.Request.GetDisplayUrl())}";
+            return Results.Redirect(loginUrl);
         }
 
         // User is authenticated with the correct client scheme, create authorization code
@@ -120,38 +128,20 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         {
             _logger.LogWarning("User {UserName} denied access to client {ClientId}: {Reason}", 
                 user.UserName, clientId, realmValidation.Reason);
-            
-            // SECURITY: Don't reveal user existence or realm structure via 403
-            // Instead, sign out user and redirect to login with neutral error
-            // This prevents information disclosure attacks and user enumeration
-            // by making realm validation failures indistinguishable from authentication failures
-            
-            // Sign out from the client-specific scheme to clear authentication
+
+            // Sign out the user from client-specific authentication since they don't have access
             try
             {
-                await context.SignOutAsync(cookieScheme);
-                _logger.LogDebug("Signed out user from client-specific scheme {Scheme} due to realm validation failure", cookieScheme);
+                await _dynamicCookieService.SignOutFromClientAsync(clientId);
+                _logger.LogDebug("Signed out user from client-specific authentication due to realm validation failure");
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to sign out from client-specific scheme {Scheme}", cookieScheme);
-            }
-            
-            // For web applications, redirect to login with neutral error message
-            if (request.ResponseType == "code") // Authorization Code Flow (web apps)
-            {
-                var loginUrl = $"/connect/login?returnUrl={Uri.EscapeDataString(context.Request.GetEncodedUrl())}&clientId={Uri.EscapeDataString(clientId)}&error=access_denied";
-                return Results.Redirect(loginUrl);
+                _logger.LogWarning(ex, "Failed to sign out from client-specific authentication");
             }
 
-            // For other flows, return generic access_denied error without revealing details
-            var forbidProperties = new AuthenticationProperties(new Dictionary<string, string?>
-            {
-                [OpenIddictServerAspNetCoreConstants.Properties.Error] = "access_denied",
-                [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = "Access denied"
-            });
-
-            return Results.Forbid(forbidProperties, new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
+            // Return access denied error
+            return Results.Forbid();
         }
 
         _logger.LogInformation("User {UserName} validated for access to client {ClientId} in realm {Realm}", 
@@ -198,17 +188,19 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         authPrincipal.SetScopes(request.GetScopes());
 
         // Sign in the user with the client-specific scheme if not already done
-        if (!await IsUserSignedInWithScheme(context, cookieScheme, user.Id))
+        // CRITICAL: Ensure user is signed in with the client-specific scheme for proper session isolation
+        if (!await _dynamicCookieService.IsAuthenticatedForClientAsync(clientId))
         {
+            _logger.LogDebug("User not signed in with client-specific authentication, signing them in for client {ClientId}", clientId);
             try
             {
-                await context.SignInAsync(cookieScheme, authPrincipal);
-                _logger.LogDebug("Signed in user {UserName} with client-specific scheme {Scheme}", 
-                    user.UserName, cookieScheme);
+                await _dynamicCookieService.SignInWithClientCookieAsync(clientId, user, false);
+                _logger.LogDebug("Successfully signed in user {UserName} with client-specific authentication", 
+                    user.UserName);
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to sign in with client-specific scheme {Scheme}", cookieScheme);
+                _logger.LogWarning(ex, "Failed to sign in with client-specific authentication");
             }
         }
 
@@ -326,24 +318,5 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
             word.Length > 0 ? char.ToUpper(word[0]) + word.Substring(1).ToLower() : word);
 
         return string.Join(" ", capitalizedWords);
-    }
-
-    private async Task<bool> IsUserSignedInWithScheme(HttpContext context, string scheme, string userId)
-    {
-        try
-        {
-            var authResult = await context.AuthenticateAsync(scheme);
-            if (authResult.Succeeded && authResult.Principal?.Identity?.IsAuthenticated == true)
-            {
-                var subjectClaim = authResult.Principal.FindFirst(ClaimTypes.NameIdentifier) ??
-                                  authResult.Principal.FindFirst(OpenIddictConstants.Claims.Subject);
-                return subjectClaim?.Value == userId;
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogDebug(ex, "Error checking authentication status for scheme {Scheme}", scheme);
-        }
-        return false;
     }
 }

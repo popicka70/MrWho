@@ -18,17 +18,20 @@ public class AuthController : Controller
     private readonly SignInManager<IdentityUser> _signInManager;
     private readonly UserManager<IdentityUser> _userManager;
     private readonly IClientCookieConfigurationService _cookieService;
+    private readonly IDynamicCookieService _dynamicCookieService;
     private readonly ILogger<AuthController> _logger;
 
     public AuthController(
         SignInManager<IdentityUser> signInManager, 
         UserManager<IdentityUser> userManager,
         IClientCookieConfigurationService cookieService,
+        IDynamicCookieService dynamicCookieService,
         ILogger<AuthController> logger)
     {
         _signInManager = signInManager;
         _userManager = userManager;
         _cookieService = cookieService;
+        _dynamicCookieService = dynamicCookieService;
         _logger = logger;
     }
 
@@ -67,42 +70,18 @@ public class AuthController : Controller
                     return View(model);
                 }
 
-                // If we have a client ID, also sign in with the client-specific scheme
+                // If we have a client ID, sign in with client-specific cookie using the dynamic service
                 if (!string.IsNullOrEmpty(clientId))
                 {
                     try
                     {
-                        var cookieScheme = _cookieService.GetCookieSchemeForClient(clientId);
-                        
-                        // Create claims identity for client-specific cookie
-                        var identity = new ClaimsIdentity(cookieScheme);
-                        identity.AddClaim(Claims.Subject, user.Id);
-                        identity.AddClaim(Claims.Email, user.Email!);
-                        
-                        // Get user's name claim or use friendly fallback
-                        var userName = await GetUserDisplayNameAsync(user);
-                        identity.AddClaim(Claims.Name, userName);
-                        identity.AddClaim(Claims.PreferredUsername, user.UserName!);
-
-                        // Add profile claims if available
-                        await AddUserClaimsToIdentity(identity, user);
-
-                        // Add roles
-                        var roles = await _userManager.GetRolesAsync(user);
-                        foreach (var role in roles)
-                        {
-                            identity.AddClaim(Claims.Role, role);
-                        }
-
-                        var principal = new ClaimsPrincipal(identity);
-                        await HttpContext.SignInAsync(cookieScheme, principal);
-                        
-                        _logger.LogDebug("Signed in user {UserName} with client-specific scheme {Scheme}", 
-                            user.UserName, cookieScheme);
+                        await _dynamicCookieService.SignInWithClientCookieAsync(clientId, user, model.RememberMe);
+                        _logger.LogDebug("Signed in user {UserName} with client-specific cookie for client {ClientId}", 
+                            user.UserName, clientId);
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogWarning(ex, "Failed to sign in with client-specific scheme for client {ClientId}", clientId);
+                        _logger.LogWarning(ex, "Failed to sign in with client-specific cookie for client {ClientId}", clientId);
                         // Continue anyway - the default SignInManager login above should still work
                     }
                 }
@@ -251,39 +230,35 @@ public class AuthController : Controller
             await _signInManager.SignOutAsync();
             _logger.LogDebug("Signed out from default Identity scheme");
 
-            // If we have a client ID, also sign out from the client-specific scheme
+            // If we have a client ID, also sign out from the client-specific cookie
             if (!string.IsNullOrEmpty(clientId))
             {
                 try
                 {
-                    var cookieScheme = _cookieService.GetCookieSchemeForClient(clientId);
-                    await HttpContext.SignOutAsync(cookieScheme);
-                    _logger.LogDebug("Signed out from client-specific scheme {Scheme} for client {ClientId}", 
-                        cookieScheme, clientId);
+                    await _dynamicCookieService.SignOutFromClientAsync(clientId);
+                    _logger.LogDebug("Signed out from client-specific cookie for client {ClientId}", clientId);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed to sign out from client-specific scheme for client {ClientId}", clientId);
+                    _logger.LogWarning(ex, "Failed to sign out from client-specific cookie for client {ClientId}", clientId);
                 }
             }
             else
             {
                 // If we don't know the specific client, try to sign out from all configured client schemes
-                _logger.LogDebug("No specific client ID available, attempting to sign out from all client schemes");
+                _logger.LogDebug("No specific client ID available, attempting to sign out from all client configurations");
                 var allConfigurations = _cookieService.GetAllClientConfigurations();
                 
                 foreach (var config in allConfigurations)
                 {
                     try
                     {
-                        await HttpContext.SignOutAsync(config.Value.SchemeName);
-                        _logger.LogDebug("Signed out from client scheme {Scheme} for client {ClientId}", 
-                            config.Value.SchemeName, config.Key);
+                        await _dynamicCookieService.SignOutFromClientAsync(config.Key);
+                        _logger.LogDebug("Signed out from client configuration for client {ClientId}", config.Key);
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogDebug(ex, "Failed to sign out from client scheme {Scheme} for client {ClientId} (may not be signed in)", 
-                            config.Value.SchemeName, config.Key);
+                        _logger.LogDebug(ex, "Failed to sign out from client configuration for client {ClientId} (may not be signed in)", config.Key);
                     }
                 }
             }

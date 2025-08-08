@@ -26,6 +26,16 @@ public interface IClientCookieConfigurationService
     /// Gets all configured client cookie schemes
     /// </summary>
     IDictionary<string, ClientCookieConfiguration> GetAllClientConfigurations();
+    
+    /// <summary>
+    /// Checks if a client has static cookie configuration
+    /// </summary>
+    bool HasStaticConfiguration(string clientId);
+    
+    /// <summary>
+    /// Checks if a client should use dynamic cookie management
+    /// </summary>
+    bool UsesDynamicCookies(string clientId);
 }
 
 /// <summary>
