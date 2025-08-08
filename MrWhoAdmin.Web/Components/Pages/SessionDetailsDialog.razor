@@ -1,0 +1,354 @@
+@using MrWho.Shared
+
+<RadzenStack Gap="1.5rem">
+    <!-- Header -->
+    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem">
+        <RadzenIcon Icon="info" Style="font-size: 2rem; color: var(--rz-primary);" />
+        <RadzenStack Gap="0.25rem">
+            <RadzenText TextStyle="TextStyle.H6" Text="Session Details" />
+            <RadzenText TextStyle="TextStyle.Caption" Text="@Session.Id" class="rz-color-secondary" />
+        </RadzenStack>
+    </RadzenStack>
+
+    <!-- User Information -->
+    <RadzenFieldset Text="User Information">
+        <RadzenRow Gap="1rem">
+            <RadzenColumn Size="12" SizeMD="6">
+                <RadzenFormField Text="User Name" Variant="Variant.Outlined">
+                    <RadzenTextBox Value="@Session.UserName" ReadOnly="true" Style="width: 100%;" />
+                </RadzenFormField>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="6">
+                <RadzenFormField Text="Email" Variant="Variant.Outlined">
+                    <RadzenTextBox Value="@Session.UserEmail" ReadOnly="true" Style="width: 100%;" />
+                </RadzenFormField>
+            </RadzenColumn>
+        </RadzenRow>
+        
+        <RadzenFormField Text="Subject (User ID)" Variant="Variant.Outlined">
+            <RadzenTextBox Value="@Session.Subject" ReadOnly="true" Style="width: 100%; font-family: monospace;" />
+        </RadzenFormField>
+    </RadzenFieldset>
+
+    <!-- Client Information -->
+    <RadzenFieldset Text="Client Information">
+        <RadzenRow Gap="1rem">
+            <RadzenColumn Size="12" SizeMD="6">
+                <RadzenFormField Text="Client ID" Variant="Variant.Outlined">
+                    <RadzenTextBox Value="@Session.ClientId" ReadOnly="true" Style="width: 100%; font-family: monospace;" />
+                </RadzenFormField>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="6">
+                <RadzenFormField Text="Client Name" Variant="Variant.Outlined">
+                    <RadzenTextBox Value="@Session.ClientName" ReadOnly="true" Style="width: 100%;" />
+                </RadzenFormField>
+            </RadzenColumn>
+        </RadzenRow>
+        
+        <RadzenFormField Text="Session Type" Variant="Variant.Outlined">
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                <RadzenBadge Text="@Session.SessionType" BadgeStyle="@GetSessionTypeBadgeStyle(Session.SessionType)" />
+                <RadzenText Text="@Session.SessionType" />
+            </RadzenStack>
+        </RadzenFormField>
+    </RadzenFieldset>
+
+    <!-- Session Timeline -->
+    <RadzenFieldset Text="Session Timeline">
+        <RadzenRow Gap="1rem">
+            <RadzenColumn Size="12" SizeMD="4">
+                <RadzenFormField Text="Started" Variant="Variant.Outlined">
+                    <RadzenStack Gap="0.25rem">
+                        <RadzenTextBox Value="@Session.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")" ReadOnly="true" Style="width: 100%; font-family: monospace;" />
+                        <RadzenText TextStyle="TextStyle.Caption" Text="@GetTimeAgo(Session.CreatedAt)" class="rz-color-secondary" />
+                    </RadzenStack>
+                </RadzenFormField>
+            </RadzenColumn>
+            
+            <RadzenColumn Size="12" SizeMD="4">
+                <RadzenFormField Text="Last Activity" Variant="Variant.Outlined">
+                    @if (Session.LastActivity.HasValue)
+                    {
+                        <RadzenStack Gap="0.25rem">
+                            <RadzenTextBox Value="@Session.LastActivity.Value.ToString("yyyy-MM-dd HH:mm:ss")" ReadOnly="true" Style="width: 100%; font-family: monospace;" />
+                            <RadzenText TextStyle="TextStyle.Caption" Text="@GetTimeAgo(Session.LastActivity.Value)" class="rz-color-secondary" />
+                        </RadzenStack>
+                    }
+                    else
+                    {
+                        <RadzenText Text="No activity recorded" class="rz-color-secondary" Style="padding: 0.75rem;" />
+                    }
+                </RadzenFormField>
+            </RadzenColumn>
+            
+            <RadzenColumn Size="12" SizeMD="4">
+                <RadzenFormField Text="Expires" Variant="Variant.Outlined">
+                    @if (Session.ExpiresAt.HasValue)
+                    {
+                        var timeUntilExpiry = Session.ExpiresAt.Value - DateTime.UtcNow;
+                        var isExpiringSoon = timeUntilExpiry.TotalHours <= 1;
+                        
+                        <RadzenStack Gap="0.25rem">
+                            <RadzenTextBox Value="@Session.ExpiresAt.Value.ToString("yyyy-MM-dd HH:mm:ss")" 
+                                          ReadOnly="true" 
+                                          Style="@($"width: 100%; font-family: monospace; {(isExpiringSoon ? "color: var(--rz-danger);" : "")}")" />
+                            <RadzenText TextStyle="TextStyle.Caption" 
+                                       Text="@GetTimeUntil(Session.ExpiresAt.Value)" 
+                                       class="@(isExpiringSoon ? "rz-color-danger" : "rz-color-secondary")" />
+                        </RadzenStack>
+                    }
+                    else
+                    {
+                        <RadzenText Text="No expiration set" class="rz-color-secondary" Style="padding: 0.75rem;" />
+                    }
+                </RadzenFormField>
+            </RadzenColumn>
+        </RadzenRow>
+    </RadzenFieldset>
+
+    <!-- Tokens & Permissions -->
+    <RadzenFieldset Text="Tokens & Permissions">
+        <RadzenRow Gap="1rem">
+            <RadzenColumn Size="12" SizeMD="6">
+                <RadzenFormField Text="Token Information" Variant="Variant.Outlined">
+                    <RadzenStack Gap="0.5rem">
+                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                            <RadzenIcon Icon="key" />
+                            <RadzenText Text="@($"Total Tokens: {Session.TokenCount}")" />
+                        </RadzenStack>
+                        
+                        @if (Session.HasRefreshToken)
+                        {
+                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                <RadzenIcon Icon="autorenew" Style="color: var(--rz-success);" />
+                                <RadzenText Text="Has Refresh Token" Style="color: var(--rz-success);" />
+                            </RadzenStack>
+                        }
+                        else
+                        {
+                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                <RadzenIcon Icon="close" Style="color: var(--rz-danger);" />
+                                <RadzenText Text="No Refresh Token" Style="color: var(--rz-danger);" />
+                            </RadzenStack>
+                        }
+                    </RadzenStack>
+                </RadzenFormField>
+            </RadzenColumn>
+            
+            <RadzenColumn Size="12" SizeMD="6">
+                <RadzenFormField Text="Session Status" Variant="Variant.Outlined">
+                    <RadzenStack Gap="0.5rem">
+                        <RadzenBadge Text="@Session.Status" BadgeStyle="BadgeStyle.Success" Style="font-size: 1rem; padding: 0.5rem 1rem;" />
+                        
+                        @if (Session.ExpiresAt.HasValue)
+                        {
+                            var timeUntilExpiry = Session.ExpiresAt.Value - DateTime.UtcNow;
+                            if (timeUntilExpiry.TotalHours <= 1)
+                            {
+                                <RadzenBadge Text="Expiring Soon" BadgeStyle="BadgeStyle.Warning" Style="font-size: 0.875rem;" />
+                            }
+                        }
+                    </RadzenStack>
+                </RadzenFormField>
+            </RadzenColumn>
+        </RadzenRow>
+    </RadzenFieldset>
+
+    <!-- Granted Scopes -->
+    <RadzenFieldset Text="Granted Scopes">
+        @if (Session.Scopes?.Any() == true)
+        {
+            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" Wrap="FlexWrap.Wrap">
+                @foreach (var scope in Session.Scopes)
+                {
+                    <RadzenBadge Text="@scope" 
+                                BadgeStyle="@GetScopeBadgeStyle(scope)" 
+                                Style="font-size: 0.875rem; padding: 0.5rem 0.75rem;" />
+                }
+            </RadzenStack>
+        }
+        else
+        {
+            <RadzenText Text="No scopes granted" class="rz-color-secondary" />
+        }
+    </RadzenFieldset>
+
+    <!-- Technical Information -->
+    <RadzenFieldset Text="Technical Information">
+        <RadzenRow Gap="1rem">
+            <RadzenColumn Size="12" SizeMD="6">
+                <RadzenFormField Text="Session ID" Variant="Variant.Outlined">
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                        <RadzenTextBox Value="@Session.Id" ReadOnly="true" Style="width: 100%; font-family: monospace; font-size: 0.875rem;" />
+                        <RadzenButton Icon="content_copy" 
+                                     Size="ButtonSize.Small" 
+                                     ButtonStyle="ButtonStyle.Light" 
+                                     Click="@(async () => await CopyToClipboard(Session.Id))"
+                                     title="Copy Session ID" />
+                    </RadzenStack>
+                </RadzenFormField>
+            </RadzenColumn>
+            
+            <RadzenColumn Size="12" SizeMD="6">
+                <RadzenFormField Text="User ID" Variant="Variant.Outlined">
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                        <RadzenTextBox Value="@Session.UserId" ReadOnly="true" Style="width: 100%; font-family: monospace; font-size: 0.875rem;" />
+                        <RadzenButton Icon="content_copy" 
+                                     Size="ButtonSize.Small" 
+                                     ButtonStyle="ButtonStyle.Light" 
+                                     Click="@(async () => await CopyToClipboard(Session.UserId))"
+                                     title="Copy User ID" />
+                    </RadzenStack>
+                </RadzenFormField>
+            </RadzenColumn>
+        </RadzenRow>
+        
+        <RadzenRow Gap="1rem">
+            <RadzenColumn Size="12" SizeMD="6">
+                <RadzenFormField Text="IP Address" Variant="Variant.Outlined">
+                    <RadzenTextBox Value="@Session.IpAddress" ReadOnly="true" Style="width: 100%; font-family: monospace;" />
+                </RadzenFormField>
+            </RadzenColumn>
+            
+            <RadzenColumn Size="12" SizeMD="6">
+                <RadzenFormField Text="User Agent" Variant="Variant.Outlined">
+                    <RadzenTextBox Value="@Session.UserAgent" ReadOnly="true" Style="width: 100%;" />
+                </RadzenFormField>
+            </RadzenColumn>
+        </RadzenRow>
+    </RadzenFieldset>
+
+    <!-- Actions -->
+    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
+        <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem">
+            <RadzenButton Text="Close" 
+                         Click="@(() => DialogService.Close())" 
+                         ButtonStyle="ButtonStyle.Secondary" />
+        </RadzenStack>
+        
+        <RadzenButton Text="Revoke Session" 
+                     Icon="logout" 
+                     Click="@(async () => await RevokeSessionAndClose())" 
+                     ButtonStyle="ButtonStyle.Danger"
+                     IsBusy="@isRevoking" />
+    </RadzenStack>
+</RadzenStack>
+
+@code {
+    [Parameter] public ActiveSessionDto Session { get; set; } = default!;
+    
+    private bool isRevoking = false;
+
+    private async Task CopyToClipboard(string text)
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", text);
+            NotificationService.Notify(NotificationSeverity.Success, "Copied", "Text copied to clipboard");
+        }
+        catch
+        {
+            NotificationService.Notify(NotificationSeverity.Warning, "Copy Failed", "Could not copy to clipboard");
+        }
+    }
+
+    private async Task RevokeSessionAndClose()
+    {
+        var confirmed = await DialogService.Confirm(
+            $"Are you sure you want to revoke this session for {Session.UserName}?",
+            "Revoke Session",
+            new ConfirmOptions 
+            { 
+                OkButtonText = "Revoke", 
+                CancelButtonText = "Cancel" 
+            });
+
+        if (confirmed == true)
+        {
+            try
+            {
+                isRevoking = true;
+                StateHasChanged();
+
+                var success = await SessionsService.RevokeSessionAsync(Session.Id);
+                
+                if (success)
+                {
+                    NotificationService.Notify(NotificationSeverity.Success, "Success", 
+                        $"Session for {Session.UserName} has been revoked");
+                    DialogService.Close(true); // Return true to indicate session was revoked
+                }
+                else
+                {
+                    NotificationService.Notify(NotificationSeverity.Error, "Error", 
+                        "Failed to revoke session");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error revoking session {SessionId}", Session.Id);
+                NotificationService.Notify(NotificationSeverity.Error, "Error", 
+                    "An error occurred while revoking the session");
+            }
+            finally
+            {
+                isRevoking = false;
+                StateHasChanged();
+            }
+        }
+    }
+
+    private BadgeStyle GetSessionTypeBadgeStyle(string sessionType)
+    {
+        return sessionType switch
+        {
+            "Web" => BadgeStyle.Primary,
+            "Mobile" => BadgeStyle.Success,
+            "API" => BadgeStyle.Warning,
+            "SPA" => BadgeStyle.Info,
+            "Test" => BadgeStyle.Secondary,
+            _ => BadgeStyle.Light
+        };
+    }
+
+    private BadgeStyle GetScopeBadgeStyle(string scope)
+    {
+        return scope switch
+        {
+            "openid" => BadgeStyle.Primary,
+            "profile" => BadgeStyle.Info,
+            "email" => BadgeStyle.Success,
+            "roles" => BadgeStyle.Warning,
+            "offline_access" => BadgeStyle.Secondary,
+            var s when s.StartsWith("api.") => BadgeStyle.Danger,
+            _ => BadgeStyle.Light
+        };
+    }
+
+    private string GetTimeAgo(DateTime dateTime)
+    {
+        var timeSpan = DateTime.UtcNow - dateTime;
+        
+        return timeSpan.TotalDays >= 1 ? $"{(int)timeSpan.TotalDays} days ago" :
+               timeSpan.TotalHours >= 1 ? $"{(int)timeSpan.TotalHours} hours ago" :
+               timeSpan.TotalMinutes >= 1 ? $"{(int)timeSpan.TotalMinutes} minutes ago" : "Just now";
+    }
+
+    private string GetTimeUntil(DateTime dateTime)
+    {
+        var timeSpan = dateTime - DateTime.UtcNow;
+        
+        if (timeSpan.TotalSeconds <= 0)
+            return "Expired";
+            
+        return timeSpan.TotalDays >= 1 ? $"in {(int)timeSpan.TotalDays} days" :
+               timeSpan.TotalHours >= 1 ? $"in {(int)timeSpan.TotalHours} hours" :
+               timeSpan.TotalMinutes >= 1 ? $"in {(int)timeSpan.TotalMinutes} minutes" : "Very soon";
+    }
+
+    [Inject] private ISessionsApiService SessionsService { get; set; } = default!;
+    [Inject] private DialogService DialogService { get; set; } = default!;
+    [Inject] private NotificationService NotificationService { get; set; } = default!;
+    [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
+    [Inject] private ILogger<SessionDetailsDialog> Logger { get; set; } = default!;
+}
