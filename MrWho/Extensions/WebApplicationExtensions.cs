@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using MrWho.Data;
 using MrWho.Handlers;
 using MrWho.Services;
+using MrWho.Middleware;
 using OpenIddict.Abstractions;
 using System.Linq;
 using System.Reflection;
@@ -28,6 +29,53 @@ public static class WebApplicationExtensions
         app.UseStaticFiles();
         app.UseRouting();
 
+        // Add client cookie middleware before authentication
+        app.UseMiddleware<ClientCookieMiddleware>();
+
+        // Add antiforgery middleware
+        app.UseAntiforgery();
+
+        app.UseAuthentication();
+        app.UseAuthorization();
+
+        // Initialize database and seed essential data
+        await app.InitializeDatabaseAsync();
+
+        // Configure routing for controllers
+        app.MapControllerRoute(
+            name: "default",
+            pattern: "{controller=Home}/{action=Index}/{id?}");
+
+        // CRITICAL: Map API controllers for token inspector and other API endpoints
+        app.MapControllers();
+
+        return app;
+    }
+
+    /// <summary>
+    /// Configures the MrWho pipeline with client-specific cookie support
+    /// </summary>
+    public static async Task<WebApplication> ConfigureMrWhoPipelineWithClientCookiesAsync(this WebApplication app)
+    {
+        app.MapDefaultEndpoints();
+
+        // Configure the HTTP request pipeline
+        if (!app.Environment.IsDevelopment())
+        {
+            app.UseExceptionHandler("/Error");
+            app.UseHsts();
+        }
+
+        app.UseHttpsRedirection();
+        app.UseStaticFiles();
+        app.UseRouting();
+
+        // Enable session support for client tracking
+        app.UseSession();
+
+        // Add client cookie middleware before authentication - CRITICAL for client-specific cookies
+        app.UseMiddleware<ClientCookieMiddleware>();
+
         // Add antiforgery middleware
         app.UseAntiforgery();
 
@@ -50,6 +98,17 @@ public static class WebApplicationExtensions
 
     public static WebApplication AddMrWhoEndpoints(this WebApplication app)
     {
+        // OIDC Authorization endpoint
+        app.MapGet("/connect/authorize", async (HttpContext context, IOidcAuthorizationHandler authorizationHandler) =>
+        {
+            return await authorizationHandler.HandleAuthorizationRequestAsync(context);
+        });
+
+        app.MapPost("/connect/authorize", async (HttpContext context, IOidcAuthorizationHandler authorizationHandler) =>
+        {
+            return await authorizationHandler.HandleAuthorizationRequestAsync(context);
+        });
+
         // OIDC Token endpoint - now uses injected TokenHandler
         app.MapPost("/connect/token", async (HttpContext context, ITokenHandler tokenHandler) =>
         {
@@ -86,10 +145,58 @@ public static class WebApplicationExtensions
                 Demo1ClientInfo = "/debug/demo1-client-info",
                 EssentialData = "/debug/essential-data",
                 ClientPermissions = "/debug/client-permissions",
-                OpenIddictScopes = "/debug/openiddict-scopes"
+                OpenIddictScopes = "/debug/openiddict-scopes",
+                ClientCookieStatus = "/debug/client-cookies"
             },
             Documentation = "Visit any endpoint above for debug information or tools"
         }));
+
+        // Debug endpoint for client cookie configurations
+        app.MapGet("/debug/client-cookies", (HttpContext context, IClientCookieConfigurationService cookieService) =>
+        {
+            var configurations = cookieService.GetAllClientConfigurations();
+            var currentClientId = context.Items["ClientId"]?.ToString();
+            var currentScheme = context.Items["ClientCookieScheme"]?.ToString();
+            var currentCookieName = context.Items["ClientCookieName"]?.ToString();
+
+            var activeCookies = new List<object>();
+            foreach (var config in configurations)
+            {
+                var cookieValue = context.Request.Cookies[config.Value.CookieName];
+                activeCookies.Add(new
+                {
+                    ClientId = config.Key,
+                    CookieName = config.Value.CookieName,
+                    SchemeName = config.Value.SchemeName,
+                    HasCookie = !string.IsNullOrEmpty(cookieValue),
+                    CookieLength = cookieValue?.Length ?? 0
+                });
+            }
+
+            return Results.Ok(new
+            {
+                CurrentRequest = new
+                {
+                    Path = context.Request.Path.ToString(),
+                    ClientId = currentClientId,
+                    CookieScheme = currentScheme,
+                    CookieName = currentCookieName
+                },
+                ConfiguredClients = configurations.Select(kvp => new
+                {
+                    ClientId = kvp.Key,
+                    SchemeName = kvp.Value.SchemeName,
+                    CookieName = kvp.Value.CookieName
+                }),
+                ActiveCookies = activeCookies,
+                AllRequestCookies = context.Request.Cookies.Select(c => new
+                {
+                    Name = c.Key,
+                    Length = c.Value.Length
+                }),
+                Timestamp = DateTime.UtcNow
+            });
+        });
 
         app.MapGet("/debug/client-info", async (IOidcClientService oidcClientService) =>
         {
@@ -600,6 +707,127 @@ public static class WebApplicationExtensions
                 Claims = claims.Select(c => new { Type = c.Type, Value = c.Value }).ToArray(),
                 RolesCount = roles.Count,
                 Roles = roles.ToArray()
+            };
+
+            return Results.Json(result);
+        });
+
+        // Debug endpoint to list all users in the system
+        app.MapGet("/debug/all-users", async (UserManager<IdentityUser> userManager, ILogger<Program> logger) =>
+        {
+            logger.LogInformation("Listing all users in the system");
+            
+            var users = userManager.Users.ToList();
+            var userDetails = new List<object>();
+
+            foreach (var user in users)
+            {
+                var claims = await userManager.GetClaimsAsync(user);
+                var roles = await userManager.GetRolesAsync(user);
+                var nameClaim = claims.FirstOrDefault(c => c.Type == "name")?.Value;
+
+                userDetails.Add(new
+                {
+                    UserId = user.Id,
+                    UserName = user.UserName,
+                    Email = user.Email,
+                    EmailConfirmed = user.EmailConfirmed,
+                    NameClaim = nameClaim,
+                    ClaimsCount = claims.Count,
+                    Claims = claims.Select(c => new { Type = c.Type, Value = c.Value }).ToArray(),
+                    RolesCount = roles.Count,
+                    Roles = roles.ToArray()
+                });
+            }
+
+            var result = new
+            {
+                TotalUsers = users.Count,
+                Users = userDetails
+            };
+
+            return Results.Json(result);
+        });
+
+        // Debug endpoint to check which user ID corresponds to the JWT subject
+        app.MapGet("/debug/find-user-by-subject/{subject}", async (string subject, UserManager<IdentityUser> userManager, ILogger<Program> logger) =>
+        {
+            logger.LogInformation("Looking for user with subject/ID {Subject}", subject);
+            
+            var user = await userManager.FindByIdAsync(subject);
+            if (user == null)
+            {
+                // Also try to find by username in case it's a username instead of ID
+                user = await userManager.FindByNameAsync(subject);
+            }
+
+            if (user == null)
+            {
+                return Results.NotFound($"No user found with subject/ID or username '{subject}'");
+            }
+
+            var claims = await userManager.GetClaimsAsync(user);
+            var nameClaim = claims.FirstOrDefault(c => c.Type == "name")?.Value;
+
+            var result = new
+            {
+                UserId = user.Id,
+                UserName = user.UserName,
+                Email = user.Email,
+                EmailConfirmed = user.EmailConfirmed,
+                NameClaim = nameClaim,
+                ClaimsCount = claims.Count,
+                Claims = claims.Select(c => new { Type = c.Type, Value = c.Value }).ToArray()
+            };
+
+            return Results.Json(result);
+        });
+
+        // Debug endpoint to check user realm assignments
+        app.MapGet("/debug/user-realms", async (UserManager<IdentityUser> userManager, IUserRealmValidationService realmValidationService, ILogger<Program> logger) =>
+        {
+            logger.LogInformation("Checking user realm assignments");
+            
+            var users = userManager.Users.ToList();
+            var userRealms = new List<object>();
+
+            foreach (var user in users)
+            {
+                var claims = await userManager.GetClaimsAsync(user);
+                var realmClaim = claims.FirstOrDefault(c => c.Type == "realm")?.Value;
+                
+                // Test realm validation for different clients
+                var adminValidation = await realmValidationService.ValidateUserRealmAccessAsync(user, "mrwho_admin_web");
+                var demo1Validation = await realmValidationService.ValidateUserRealmAccessAsync(user, "mrwho_demo1");
+                
+                userRealms.Add(new
+                {
+                    UserId = user.Id,
+                    UserName = user.UserName,
+                    Email = user.Email,
+                    RealmClaim = realmClaim,
+                    DeterminedRealm = adminValidation.UserRealm ?? demo1Validation.UserRealm,
+                    ClientAccess = new
+                    {
+                        AdminClient = new
+                        {
+                            CanAccess = adminValidation.IsValid,
+                            Reason = adminValidation.Reason
+                        },
+                        Demo1Client = new
+                        {
+                            CanAccess = demo1Validation.IsValid,
+                            Reason = demo1Validation.Reason
+                        }
+                    }
+                });
+            }
+
+            var result = new
+            {
+                TotalUsers = users.Count,
+                UserRealms = userRealms,
+                Timestamp = DateTime.UtcNow
             };
 
             return Results.Json(result);

@@ -10,11 +10,22 @@
         <div class="col-12">
             <h1 class="display-4 mb-4">Welcome to MrWho Demo Application 1</h1>
             
+            @if (Model.ShowLogoutSuccess)
+            {
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    <h4><i class="bi bi-check-circle"></i> Logout Successful!</h4>
+                    <p>You have been successfully logged out from both the demo application and the MrWho identity server.</p>
+                    <p class="mb-0">You can now log in again or explore the application as an anonymous user.</p>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            }
+            
             @if (User.Identity?.IsAuthenticated == true)
             {
                 <div class="alert alert-success">
                     <h4><i class="bi bi-check-circle"></i> Authentication Successful!</h4>
                     <p>Welcome <strong>@(User.Identity.Name ?? "Unknown User")</strong>!</p>
+                    <p class="mb-0">You are currently logged in and can access protected resources.</p>
                 </div>
 
                 <div class="row">
@@ -109,7 +120,7 @@
                     <div class="col-12">
                         <div class="card">
                             <div class="card-header bg-warning text-dark">
-                                <h5 class="mb-0"><i class="bi bi-list-ul"></i> All Claims</h5>
+                                <h5 class="mb-0"><i class="bi bi-list-ul"></i> User Claims</h5>
                             </div>
                             <div class="card-body">
                                 @if (User.Claims.Any())
@@ -147,9 +158,15 @@
 
                 <div class="row mt-4">
                     <div class="col-12">
-                        <div class="d-flex gap-2">
+                        <div class="d-flex gap-2 flex-wrap">
+                            <a href="/secure" class="btn btn-success">
+                                <i class="bi bi-shield-check"></i> Access Secure Page
+                            </a>
                             <a href="/Account/Logout" class="btn btn-outline-danger">
                                 <i class="bi bi-box-arrow-right"></i> Logout
+                            </a>
+                            <a href="/debug/logout" class="btn btn-outline-warning">
+                                <i class="bi bi-bug"></i> Debug Logout
                             </a>
                             <a href="https://localhost:7113/.well-known/openid-configuration" target="_blank" class="btn btn-outline-info">
                                 <i class="bi bi-gear"></i> View OpenID Configuration
@@ -160,20 +177,65 @@
             }
             else
             {
-                <div class="alert alert-warning">
-                    <h4><i class="bi bi-exclamation-triangle"></i> Not Authenticated</h4>
-                    <p>You need to log in to access this application.</p>
-                    <a href="/Account/Login" class="btn btn-primary">
-                        <i class="bi bi-box-arrow-in-right"></i> Login
-                    </a>
+                <div class="alert alert-info">
+                    <h4><i class="bi bi-info-circle"></i> Welcome to MrWho Demo!</h4>
+                    <p>This application demonstrates OpenID Connect authentication with the MrWho OIDC Server.</p>
+                    <p class="mb-0">Please log in to explore the authentication features and view your tokens and claims.</p>
                 </div>
                 
-                <div class="mt-4">
-                    <h5>Demo Credentials:</h5>
-                    <div class="card bg-light">
-                        <div class="card-body">
-                            <p><strong>Username:</strong> demo1@example.com</p>
-                            <p><strong>Password:</strong> Demo123</p>
+                <div class="row mt-4">
+                    <div class="col-md-8">
+                        <h5>Features Available After Login:</h5>
+                        <ul class="list-group list-group-flush">
+                            <li class="list-group-item"><i class="bi bi-check-circle text-success"></i> View your authentication tokens (Access, Refresh, ID)</li>
+                            <li class="list-group-item"><i class="bi bi-check-circle text-success"></i> Inspect all user claims from the identity provider</li>
+                            <li class="list-group-item"><i class="bi bi-check-circle text-success"></i> Access protected resources</li>
+                            <li class="list-group-item"><i class="bi bi-check-circle text-success"></i> Test logout functionality</li>
+                            <li class="list-group-item"><i class="bi bi-check-circle text-success"></i> Debug authentication flows</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="card">
+                            <div class="card-header bg-primary text-white">
+                                <h6 class="mb-0">Get Started</h6>
+                            </div>
+                            <div class="card-body">
+                                <p class="small mb-3">Choose your login experience:</p>
+                                
+                                <div class="d-grid gap-2">
+                                    <a href="/Account/Login" class="btn btn-primary">
+                                        <i class="bi bi-box-arrow-in-right"></i> Login with Form
+                                    </a>
+                                    <small class="text-muted text-center">Traditional login form with demo credentials auto-fill</small>
+                                </div>
+                                
+                                <hr class="my-3">
+                                
+                                <div class="card bg-light">
+                                    <div class="card-body p-2">
+                                        <h6 class="card-title small mb-1">Demo Credentials:</h6>
+                                        <p class="small mb-1"><strong>Username:</strong><br><code>demo1@example.com</code></p>
+                                        <p class="small mb-0"><strong>Password:</strong><br><code>Demo123</code></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="d-flex gap-2 flex-wrap">
+                            <a href="/secure" class="btn btn-outline-secondary">
+                                <i class="bi bi-shield-lock"></i> Try Accessing Secure Page
+                            </a>
+                            <a href="/debug/logout" class="btn btn-outline-warning">
+                                <i class="bi bi-bug"></i> Debug Tools
+                            </a>
+                            <a href="https://localhost:7113/.well-known/openid-configuration" target="_blank" class="btn btn-outline-info">
+                                <i class="bi bi-gear"></i> View OpenID Configuration
+                            </a>
                         </div>
                     </div>
                 </div>

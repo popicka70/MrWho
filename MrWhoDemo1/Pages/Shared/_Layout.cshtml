@@ -29,19 +29,48 @@
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link text-white" asp-area="" asp-page="/Privacy">
-                                <i class="bi bi-shield-lock"></i> Privacy
+                            <a class="nav-link text-white" asp-area="" asp-page="/Secure">
+                                <i class="bi bi-shield-lock"></i> Secure Page
                             </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link text-white" asp-area="" asp-page="/Privacy">
+                                <i class="bi bi-file-text"></i> Privacy
+                            </a>
+                        </li>
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle text-white" href="#" id="debugDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="bi bi-bug"></i> Debug
+                            </a>
+                            <ul class="dropdown-menu" aria-labelledby="debugDropdown">
+                                <li><a class="dropdown-item" href="/debug/logout">
+                                    <i class="bi bi-box-arrow-right"></i> Logout Debug
+                                </a></li>
+                                <li><a class="dropdown-item" href="/debug/auth" target="_blank">
+                                    <i class="bi bi-code"></i> Auth Status API
+                                </a></li>
+                                <li><a class="dropdown-item" href="/debug/tokens" target="_blank">
+                                    <i class="bi bi-key"></i> Tokens API
+                                </a></li>
+                                <li><a class="dropdown-item" href="/debug/logout-flow" target="_blank">
+                                    <i class="bi bi-diagram-3"></i> Logout Flow API
+                                </a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="https://localhost:7113/.well-known/openid-configuration" target="_blank">
+                                    <i class="bi bi-gear"></i> OIDC Configuration
+                                </a></li>
+                            </ul>
                         </li>
                     </ul>
                     <ul class="navbar-nav">
                         @if (User.Identity?.IsAuthenticated == true)
                         {
                             <li class="nav-item dropdown">
-                                <a class="nav-link dropdown-toggle text-white" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <a class="nav-link dropdown-toggle text-white" href="#" id="userDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                     <i class="bi bi-person-circle"></i> @(User.Identity.Name ?? "User")
                                 </a>
-                                <ul class="dropdown-menu" aria-labelledby="navbarDropdown">
+                                <ul class="dropdown-menu" aria-labelledby="userDropdown">
+                                    <li><h6 class="dropdown-header">Account</h6></li>
                                     <li><a class="dropdown-item" href="/Account/Logout">
                                         <i class="bi bi-box-arrow-right"></i> Logout
                                     </a></li>

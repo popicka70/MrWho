@@ -12,26 +12,73 @@
                     <h4 class="mb-0"><i class="bi bi-box-arrow-in-right"></i> Login to MrWho Demo 1</h4>
                 </div>
                 <div class="card-body">
-                    <p class="text-muted">You will be redirected to the MrWho Identity Server to authenticate.</p>
-                    
-                    <div class="alert alert-info">
-                        <h6><i class="bi bi-info-circle"></i> Demo Credentials:</h6>
-                        <p class="mb-1"><strong>Username:</strong> demo1@example.com</p>
-                        <p class="mb-0"><strong>Password:</strong> Demo123</p>
+                    <div class="alert alert-info mb-4">
+                        <h6><i class="bi bi-info-circle"></i> About This Login Form:</h6>
+                        <p class="mb-1">This form shows the traditional username/password experience, but authentication is still handled by the <strong>MrWho Identity Server</strong> using OpenID Connect.</p>
+                        <p class="mb-0">Fill in your credentials below, then click "Login" to be redirected to the identity server.</p>
                     </div>
-                    
-                    <form method="post">
-                        <button type="submit" class="btn btn-primary btn-lg w-100">
-                            <i class="bi bi-shield-lock"></i> Login with MrWho
-                        </button>
+
+                    <div class="card bg-light mb-4">
+                        <div class="card-body">
+                            <h6 class="card-title"><i class="bi bi-person"></i> Demo User Account</h6>
+                            <p class="mb-1"><strong>Email/Username:</strong> <code>demo1@example.com</code></p>
+                            <p class="mb-0"><strong>Password:</strong> <code>Demo123</code></p>
+                        </div>
+                    </div>
+
+                    <form method="post" id="loginForm">
+                        <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
+                        <div asp-validation-summary="All" class="text-danger mb-3"></div>
+
+                        <div class="mb-3">
+                            <label asp-for="Input.Username" class="form-label">Username</label>
+                            <input asp-for="Input.Username" class="form-control" type="text" placeholder="Enter your username or email" autocomplete="username" />
+                            <span asp-validation-for="Input.Username" class="text-danger"></span>
+                        </div>
+
+                        <div class="mb-3">
+                            <label asp-for="Input.Password" class="form-label">Password</label>
+                            <input asp-for="Input.Password" class="form-control" type="password" placeholder="Enter your password" autocomplete="current-password" />
+                            <span asp-validation-for="Input.Password" class="text-danger"></span>
+                        </div>
+
+                        <div class="mb-3 form-check">
+                            <input asp-for="Input.RememberMe" class="form-check-input" type="checkbox" />
+                            <label asp-for="Input.RememberMe" class="form-check-label">Remember me on this device</label>
+                        </div>
+
+                        <div class="d-grid gap-2 mb-3">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="bi bi-shield-lock"></i> Login with MrWho
+                            </button>
+                        </div>
                     </form>
-                    
+
                     <hr>
-                    
+
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <h6 class="card-title"><i class="bi bi-lightning"></i> Quick Demo Actions</h6>
+                            <p class="card-text small text-muted">Quickly test the application with demo credentials:</p>
+                            
+                            <div class="d-grid gap-2">
+                                <button type="button" class="btn btn-outline-primary btn-sm w-100" onclick="autoFillCredentials()">
+                                    <i class="bi bi-magic"></i> Auto-Fill Demo Credentials
+                                </button>
+                                
+                                <button type="button" class="btn btn-success btn-sm" onclick="autoFillAndSubmit()">
+                                    <i class="bi bi-rocket"></i> Auto-Fill & Login Immediately
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr>
+
                     <div class="text-center">
                         <small class="text-muted">
                             Powered by <strong>MrWho Identity Server</strong><br>
-                            Using OpenID Connect
+                            Using OpenID Connect with PKCE
                         </small>
                     </div>
                 </div>
@@ -39,3 +86,80 @@
         </div>
     </div>
 </div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    
+    <script>
+        function autoFillCredentials() {
+            // Fill both username and password fields
+            document.getElementById('Input_Username').value = 'demo1@example.com';
+            document.getElementById('Input_Password').value = 'Demo123';
+            document.getElementById('Input_RememberMe').checked = true;
+            
+            // Clear any existing validation errors
+            clearValidationErrors();
+            
+            // Show success feedback
+            showAutoFillSuccess();
+        }
+        
+        function autoFillAndSubmit() {
+            // Fill the form fields first
+            autoFillCredentials();
+            
+            // Add a small delay to show the user what happened, then submit
+            setTimeout(function() {
+                document.getElementById('loginForm').submit();
+            }, 500);
+            
+            // Show immediate feedback
+            const btn = event.target;
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="bi bi-check"></i> Credentials Filled, Logging In...';
+            btn.disabled = true;
+        }
+        
+        function clearValidationErrors() {
+            // Clear validation summary
+            const validationSummary = document.querySelector('[data-valmsg-summary="true"]');
+            if (validationSummary) {
+                validationSummary.style.display = 'none';
+            }
+            
+            // Clear individual field validation messages
+            const validationMessages = document.querySelectorAll('[data-valmsg-for]');
+            validationMessages.forEach(function(msg) {
+                msg.textContent = '';
+                msg.style.display = 'none';
+            });
+            
+            // Remove validation error classes
+            const inputs = document.querySelectorAll('input.input-validation-error');
+            inputs.forEach(function(input) {
+                input.classList.remove('input-validation-error');
+            });
+        }
+        
+        function showAutoFillSuccess() {
+            // Remove any existing success message
+            const existingAlert = document.querySelector('.auto-fill-success');
+            if (existingAlert) {
+                existingAlert.remove();
+            }
+            
+            // Create and show success message
+            const successAlert = document.createElement('div');
+            successAlert.className = 'alert alert-success mt-3 auto-fill-success';
+            successAlert.innerHTML = `
+                <i class="bi bi-check-circle"></i> <strong>Credentials Auto-Filled!</strong><br>
+                You can now click "Login with MrWho" to proceed to authentication.
+                <button type="button" class="btn-close ms-2" onclick="this.parentElement.remove()"></button>
+            `;
+            
+            // Insert after the card
+            const card = document.querySelector('.card');
+            card.parentNode.insertBefore(successAlert, card.nextSibling);
+        }
+    </script>
+}

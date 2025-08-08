@@ -6,11 +6,31 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace MrWho.Migrations
 {
     /// <inheritdoc />
-    public partial class Scopes : Migration
+    public partial class InitialCreate : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.CreateTable(
+                name: "ApiResources",
+                columns: table => new
+                {
+                    Id = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    Name = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    DisplayName = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    Description = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    IsEnabled = table.Column<bool>(type: "bit", nullable: false),
+                    IsStandard = table.Column<bool>(type: "bit", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    CreatedBy = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    UpdatedBy = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ApiResources", x => x.Id);
+                });
+
             migrationBuilder.CreateTable(
                 name: "AspNetRoles",
                 columns: table => new
@@ -48,6 +68,29 @@ namespace MrWho.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_AspNetUsers", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "IdentityResources",
+                columns: table => new
+                {
+                    Id = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    Name = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
+                    DisplayName = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: true),
+                    Description = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: true),
+                    IsEnabled = table.Column<bool>(type: "bit", nullable: false),
+                    IsRequired = table.Column<bool>(type: "bit", nullable: false),
+                    IsStandard = table.Column<bool>(type: "bit", nullable: false),
+                    ShowInDiscoveryDocument = table.Column<bool>(type: "bit", nullable: false),
+                    Emphasize = table.Column<bool>(type: "bit", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    CreatedBy = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    UpdatedBy = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_IdentityResources", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -138,6 +181,67 @@ namespace MrWho.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Scopes", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "ApiResourceClaims",
+                columns: table => new
+                {
+                    Id = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    ApiResourceId = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    ClaimType = table.Column<string>(type: "nvarchar(450)", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ApiResourceClaims", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_ApiResourceClaims_ApiResources_ApiResourceId",
+                        column: x => x.ApiResourceId,
+                        principalTable: "ApiResources",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "ApiResourceScopes",
+                columns: table => new
+                {
+                    Id = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    ApiResourceId = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    Scope = table.Column<string>(type: "nvarchar(450)", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ApiResourceScopes", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_ApiResourceScopes_ApiResources_ApiResourceId",
+                        column: x => x.ApiResourceId,
+                        principalTable: "ApiResources",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "ApiResourceSecrets",
+                columns: table => new
+                {
+                    Id = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    ApiResourceId = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    Description = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    Value = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Expiration = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    Type = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ApiResourceSecrets", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_ApiResourceSecrets_ApiResources_ApiResourceId",
+                        column: x => x.ApiResourceId,
+                        principalTable: "ApiResources",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
                 });
 
             migrationBuilder.CreateTable(
@@ -242,6 +346,45 @@ namespace MrWho.Migrations
                         name: "FK_AspNetUserTokens_AspNetUsers_UserId",
                         column: x => x.UserId,
                         principalTable: "AspNetUsers",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "IdentityResourceClaims",
+                columns: table => new
+                {
+                    Id = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    IdentityResourceId = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    ClaimType = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_IdentityResourceClaims", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_IdentityResourceClaims_IdentityResources_IdentityResourceId",
+                        column: x => x.IdentityResourceId,
+                        principalTable: "IdentityResources",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "IdentityResourceProperties",
+                columns: table => new
+                {
+                    Id = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    IdentityResourceId = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    Key = table.Column<string>(type: "nvarchar(250)", maxLength: 250, nullable: false),
+                    Value = table.Column<string>(type: "nvarchar(2000)", maxLength: 2000, nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_IdentityResourceProperties", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_IdentityResourceProperties_IdentityResources_IdentityResourceId",
+                        column: x => x.IdentityResourceId,
+                        principalTable: "IdentityResources",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
@@ -436,6 +579,29 @@ namespace MrWho.Migrations
                 });
 
             migrationBuilder.CreateIndex(
+                name: "IX_ApiResourceClaims_ApiResourceId_ClaimType",
+                table: "ApiResourceClaims",
+                columns: new[] { "ApiResourceId", "ClaimType" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ApiResources_Name",
+                table: "ApiResources",
+                column: "Name",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ApiResourceScopes_ApiResourceId_Scope",
+                table: "ApiResourceScopes",
+                columns: new[] { "ApiResourceId", "Scope" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ApiResourceSecrets_ApiResourceId",
+                table: "ApiResourceSecrets",
+                column: "ApiResourceId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_AspNetRoleClaims_RoleId",
                 table: "AspNetRoleClaims",
                 column: "RoleId");
@@ -510,6 +676,24 @@ namespace MrWho.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_IdentityResourceClaims_IdentityResourceId_ClaimType",
+                table: "IdentityResourceClaims",
+                columns: new[] { "IdentityResourceId", "ClaimType" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_IdentityResourceProperties_IdentityResourceId_Key",
+                table: "IdentityResourceProperties",
+                columns: new[] { "IdentityResourceId", "Key" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_IdentityResources_Name",
+                table: "IdentityResources",
+                column: "Name",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_OpenIddictApplications_ClientId",
                 table: "OpenIddictApplications",
                 column: "ClientId",
@@ -568,6 +752,15 @@ namespace MrWho.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
+                name: "ApiResourceClaims");
+
+            migrationBuilder.DropTable(
+                name: "ApiResourceScopes");
+
+            migrationBuilder.DropTable(
+                name: "ApiResourceSecrets");
+
+            migrationBuilder.DropTable(
                 name: "AspNetRoleClaims");
 
             migrationBuilder.DropTable(
@@ -595,6 +788,12 @@ namespace MrWho.Migrations
                 name: "ClientScopes");
 
             migrationBuilder.DropTable(
+                name: "IdentityResourceClaims");
+
+            migrationBuilder.DropTable(
+                name: "IdentityResourceProperties");
+
+            migrationBuilder.DropTable(
                 name: "OpenIddictScopes");
 
             migrationBuilder.DropTable(
@@ -604,6 +803,9 @@ namespace MrWho.Migrations
                 name: "ScopeClaims");
 
             migrationBuilder.DropTable(
+                name: "ApiResources");
+
+            migrationBuilder.DropTable(
                 name: "AspNetRoles");
 
             migrationBuilder.DropTable(
@@ -611,6 +813,9 @@ namespace MrWho.Migrations
 
             migrationBuilder.DropTable(
                 name: "Clients");
+
+            migrationBuilder.DropTable(
+                name: "IdentityResources");
 
             migrationBuilder.DropTable(
                 name: "OpenIddictAuthorizations");

@@ -216,8 +216,8 @@ public class UserInfoHandler : IUserInfoHandler
             "phone_number" => user.PhoneNumber,
             "phone_number_verified" => user.PhoneNumberConfirmed,
 
-            // For name claim, check user claims first, then fallback to username
-            "name" => await GetUserClaimValueAsync(user, "name") ?? user.UserName,
+            // For name claim, check user claims first, then fallback to smart username conversion
+            "name" => await GetUserClaimValueAsync(user, "name") ?? GetUserDisplayName(user),
 
             // Handle roles specially - return as array
             "role" => await GetUserRolesAsync(user),
@@ -225,6 +225,51 @@ public class UserInfoHandler : IUserInfoHandler
             // For other claims, check user claims table
             _ => await GetUserClaimValueAsync(user, claimType)
         };
+    }
+
+    /// <summary>
+    /// Get a friendly display name for the user by converting their username/email to a readable format
+    /// </summary>
+    private string GetUserDisplayName(IdentityUser user)
+    {
+        if (string.IsNullOrEmpty(user.UserName))
+            return "Unknown User";
+
+        // If username is an email, extract the local part and convert to friendly name
+        if (user.UserName.Contains('@'))
+        {
+            var localPart = user.UserName.Split('@')[0];
+            return ConvertToFriendlyName(localPart);
+        }
+
+        // Otherwise just convert the username to friendly name
+        return ConvertToFriendlyName(user.UserName);
+    }
+
+    /// <summary>
+    /// Convert a username or email local part to a friendly display name
+    /// Examples:
+    /// - "demo1" -> "Demo1"
+    /// - "john.doe" -> "John Doe"
+    /// - "jane_smith" -> "Jane Smith"
+    /// - "mrwho_demo1" -> "Mrwho Demo1"
+    /// </summary>
+    private string ConvertToFriendlyName(string input)
+    {
+        if (string.IsNullOrEmpty(input))
+            return "Unknown User";
+
+        // Replace common separators with spaces
+        var friendlyName = input.Replace('.', ' ')
+                               .Replace('_', ' ')
+                               .Replace('-', ' ');
+
+        // Split into words and capitalize each word
+        var words = friendlyName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var capitalizedWords = words.Select(word => 
+            word.Length > 0 ? char.ToUpper(word[0]) + word.Substring(1).ToLower() : word);
+
+        return string.Join(" ", capitalizedWords);
     }
 
     private async Task<string?> GetUserClaimValueAsync(IdentityUser user, string claimType)

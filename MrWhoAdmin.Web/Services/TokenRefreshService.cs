@@ -92,10 +92,12 @@ public class TokenRefreshService : ITokenRefreshService
     /// </summary>
     public async Task<IActionResult> TriggerReauthenticationAsync(HttpContext httpContext, string? returnUrl = null)
     {
+        const string adminCookieScheme = "AdminCookies"; // Match the scheme from ServiceCollectionExtensions
+        
         _logger.LogInformation("Triggering re-authentication for user");
 
-        // Clear the current authentication cookies
-        await httpContext.SignOutAsync();
+        // Clear the current authentication cookies using the correct scheme
+        await httpContext.SignOutAsync(adminCookieScheme);
 
         // Determine return URL
         var redirectUrl = !string.IsNullOrEmpty(returnUrl) && IsLocalUrl(httpContext, returnUrl) 
@@ -180,7 +182,7 @@ public class TokenRefreshService : ITokenRefreshService
                     }
 
                     // Update the authentication properties with new tokens
-                    var authenticateResult = await httpContext.AuthenticateAsync();
+                    var authenticateResult = await httpContext.AuthenticateAsync("AdminCookies"); // Use client-specific scheme
                     if (authenticateResult.Properties != null)
                     {
                         authenticateResult.Properties.UpdateTokenValue(TokenConstants.TokenNames.AccessToken, tokenResponse.AccessToken);
@@ -208,7 +210,7 @@ public class TokenRefreshService : ITokenRefreshService
                         // Only sign in if response hasn't started (to avoid header modification errors)
                         try
                         {
-                            await httpContext.SignInAsync(authenticateResult.Principal!, authenticateResult.Properties);
+                            await httpContext.SignInAsync("AdminCookies", authenticateResult.Principal!, authenticateResult.Properties);
                             _logger.LogInformation("Token refresh successful - cookies updated");
                         }
                         catch (InvalidOperationException ex) when (ex.Message.Contains("Headers are read-only"))

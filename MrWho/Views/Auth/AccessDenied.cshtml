@@ -1,0 +1,56 @@
+@{
+    ViewData["Title"] = "Access Denied";
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="card border-warning">
+            <div class="card-header bg-warning text-dark">
+                <h4 class="mb-0"><i class="bi bi-exclamation-triangle-fill"></i> Access Denied</h4>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-warning" role="alert">
+                    <strong>Sorry, you don't have permission to access this application.</strong>
+                </div>
+                
+                <p>This could happen for several reasons:</p>
+                <ul>
+                    <li><strong>Realm Restriction:</strong> Your user account may belong to a different realm than the one required for this application.</li>
+                    <li><strong>Client Access:</strong> The application you're trying to access may not be configured for your user type.</li>
+                    <li><strong>Account Status:</strong> Your account may be disabled or require additional setup.</li>
+                </ul>
+
+                <h6 class="mt-4">What you can do:</h6>
+                <ul>
+                    <li>Contact your administrator for access to this application</li>
+                    <li>Try logging in with a different account</li>
+                    <li>Ensure you're using the correct application URL</li>
+                </ul>
+
+                @if (!string.IsNullOrEmpty(Context.Request.Query["ReturnUrl"]))
+                {
+                    <div class="mt-4">
+                        <small class="text-muted">
+                            <strong>Application:</strong> @Context.Request.Query["ReturnUrl"]
+                        </small>
+                    </div>
+                }
+
+                <div class="d-flex gap-2 mt-4">
+                    <a href="/connect/login" class="btn btn-primary">
+                        <i class="bi bi-arrow-left"></i> Try Different Account
+                    </a>
+                    <a href="/" class="btn btn-outline-secondary">
+                        <i class="bi bi-house"></i> Go to Home
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .card-header .bi {
+        margin-right: 8px;
+    }
+</style>

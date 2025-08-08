@@ -10,6 +10,7 @@ using OpenIddict.Abstractions;
 using OpenIddict.Server.AspNetCore;
 using OpenIddict.Validation.AspNetCore;
 using static OpenIddict.Abstractions.OpenIddictConstants;
+using Microsoft.AspNetCore.Authentication.Cookies;
 
 namespace MrWho.Extensions;
 
@@ -28,6 +29,9 @@ public static class ServiceCollectionExtensions
         // Register token handler
         services.AddScoped<ITokenHandler, TokenHandler>();
 
+        // Register authorization handler
+        services.AddScoped<IOidcAuthorizationHandler, OidcAuthorizationHandler>();
+
         // Register userinfo handler
         services.AddScoped<IUserInfoHandler, UserInfoHandler>();
 
@@ -40,6 +44,18 @@ public static class ServiceCollectionExtensions
         //services.AddScoped<IChangePasswordHandler, ChangePasswordHandler>();
         //services.AddScoped<IResetPasswordHandler, ResetPasswordHandler>();
         //services.AddScoped<ISetLockoutHandler, SetLockoutHandler>();
+
+        // Register client cookie configuration service
+        services.AddScoped<IClientCookieConfigurationService, ClientCookieConfigurationService>();
+
+        // Register dynamic cookie service for client-specific cookies
+        services.AddScoped<IDynamicCookieService, DynamicCookieService>();
+
+        // Register HttpContextAccessor for dynamic cookie service
+        services.AddHttpContextAccessor();
+
+        // Register user realm validation service
+        services.AddScoped<IUserRealmValidationService, UserRealmValidationService>();
 
         return services;
     }
@@ -107,6 +123,90 @@ public static class ServiceCollectionExtensions
             options.ClaimsIdentity.UserIdClaimType = OpenIddictConstants.Claims.Subject;
             options.ClaimsIdentity.UserNameClaimType = OpenIddictConstants.Claims.Name;
             options.ClaimsIdentity.EmailClaimType = OpenIddictConstants.Claims.Email;
+        });
+
+        return services;
+    }
+
+    /// <summary>
+    /// Configures Identity with client-specific cookie support
+    /// </summary>
+    public static IServiceCollection AddMrWhoIdentityWithClientCookies(this IServiceCollection services)
+    {
+        // Configure Identity
+        services.AddIdentity<IdentityUser, IdentityRole>()
+            .AddEntityFrameworkStores<ApplicationDbContext>()
+            .AddDefaultTokenProviders();
+
+        // Configure Identity options
+        services.Configure<IdentityOptions>(options =>
+        {
+            options.Password.RequireDigit = true;
+            options.Password.RequiredLength = 6;
+            options.Password.RequireNonAlphanumeric = false;
+            options.Password.RequireUppercase = false;
+            options.Password.RequireLowercase = false;
+            
+            // Configure Claims Identity to work with OpenIddict claims
+            options.ClaimsIdentity.UserIdClaimType = OpenIddictConstants.Claims.Subject;
+            options.ClaimsIdentity.UserNameClaimType = OpenIddictConstants.Claims.Name;
+            options.ClaimsIdentity.EmailClaimType = OpenIddictConstants.Claims.Email;
+        });
+
+        // Add support for multiple cookie configurations
+        services.AddScoped<IClientCookieConfigurationService, ClientCookieConfigurationService>();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Adds cookie configuration for a specific OIDC client
+    /// </summary>
+    public static IServiceCollection AddClientSpecificCookie(this IServiceCollection services, 
+        string clientId, 
+        string? cookieName = null,
+        Action<CookieAuthenticationOptions>? configureOptions = null)
+    {
+        var actualCookieName = cookieName ?? $".AspNetCore.Identity.{clientId}";
+        var schemeName = $"Identity.Application.{clientId}";
+
+        services.AddAuthentication()
+            .AddCookie(schemeName, options =>
+            {
+                options.Cookie.Name = actualCookieName;
+                options.Cookie.HttpOnly = true;
+                options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+                options.Cookie.SameSite = SameSiteMode.Lax;
+                options.ExpireTimeSpan = TimeSpan.FromHours(24);
+                options.SlidingExpiration = true;
+                
+                // Custom configuration
+                configureOptions?.Invoke(options);
+            });
+
+        return services;
+    }
+
+    /// <summary>
+    /// Configures multiple client-specific cookies for known clients
+    /// </summary>
+    public static IServiceCollection AddMrWhoClientCookies(this IServiceCollection services)
+    {
+        // Admin client cookie
+        services.AddClientSpecificCookie("mrwho_admin_web", ".MrWho.Admin", options =>
+        {
+            options.LoginPath = "/connect/login";
+            options.LogoutPath = "/connect/logout";
+            options.AccessDeniedPath = "/connect/access-denied";
+            options.Cookie.Domain = null; // Same domain only
+            options.ExpireTimeSpan = TimeSpan.FromHours(8); // Work day session
+        });
+
+        // Postman/API client cookie
+        services.AddClientSpecificCookie("postman_client", ".MrWho.API", options =>
+        {
+            options.ExpireTimeSpan = TimeSpan.FromHours(1); // Shorter for API testing
+            options.SlidingExpiration = false; // Fixed expiration for API
         });
 
         return services;
@@ -182,6 +282,52 @@ public static class ServiceCollectionExtensions
                 .RequireAuthenticatedUser()
                 .AddAuthenticationSchemes("Identity.Application", OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme)
                 .Build();
+        });
+
+        return services;
+    }
+
+    /// <summary>
+    /// Configures authorization with support for client-specific authentication schemes
+    /// </summary>
+    public static IServiceCollection AddMrWhoAuthorizationWithClientCookies(this IServiceCollection services)
+    {
+        // Configure authorization to work with OpenIddict and client-specific cookies
+        services.AddAuthorization(options =>
+        {
+            // Default policy includes standard Identity.Application and OpenIddict validation
+            var schemes = new List<string>
+            {
+                "Identity.Application",
+                OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme,
+                // Add client-specific schemes
+                "Identity.Application.mrwho_admin_web",
+                // REMOVED: Static scheme for mrwho_demo1 to test dynamic client support
+                // "Identity.Application.mrwho_demo1",
+                "Identity.Application.postman_client"
+            };
+
+            options.DefaultPolicy = new AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .AddAuthenticationSchemes(schemes.ToArray())
+                .Build();
+
+            // Add specific policies for different client types
+            options.AddPolicy("AdminOnly", policy =>
+                policy.RequireAuthenticatedUser()
+                      .AddAuthenticationSchemes("Identity.Application.mrwho_admin_web"));
+
+            // REMOVED: Static policy for Demo access - mrwho_demo1 will use dynamic fallback
+            /*
+            options.AddPolicy("DemoAccess", policy =>
+                policy.RequireAuthenticatedUser()
+                      .AddAuthenticationSchemes("Identity.Application.mrwho_demo1"));
+            */
+
+            options.AddPolicy("ApiAccess", policy =>
+                policy.RequireAuthenticatedUser()
+                      .AddAuthenticationSchemes("Identity.Application.postman_client", 
+                                              OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme));
         });
 
         return services;

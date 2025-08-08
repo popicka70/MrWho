@@ -123,14 +123,29 @@ public static class ServiceCollectionExtensions
     /// </summary>
     public static IServiceCollection AddAuthenticationServices(this IServiceCollection services, IConfiguration configuration)
     {
+        // CRITICAL: Use client-specific cookie scheme to prevent session sharing
+        const string adminCookieScheme = "AdminCookies";
+        
         services.AddAuthentication(options =>
         {
-            options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+            options.DefaultScheme = adminCookieScheme; // Use client-specific scheme
             options.DefaultChallengeScheme = OpenIdConnectDefaults.AuthenticationScheme;
         })
-        .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme)
+        .AddCookie(adminCookieScheme, options => // Use client-specific scheme name
+        {
+            options.Cookie.Name = ".MrWho.Admin"; // Client-specific cookie name
+            options.Cookie.Path = "/";
+            options.Cookie.HttpOnly = true;
+            options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+            options.Cookie.SameSite = SameSiteMode.Lax;
+            options.ExpireTimeSpan = TimeSpan.FromHours(8); // Admin session timeout
+            options.SlidingExpiration = true;
+            options.LoginPath = "/login";
+            options.LogoutPath = "/logout";
+        })
         .AddOpenIdConnect(OpenIdConnectDefaults.AuthenticationScheme, options =>
         {
+            options.SignInScheme = adminCookieScheme; // CRITICAL: Use client-specific scheme
             ConfigureOpenIdConnect(options, configuration);
         });
 

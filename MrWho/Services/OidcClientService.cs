@@ -396,7 +396,10 @@ public class OidcClientService : IOidcClientService
                 await _userManager.AddClaimAsync(adminUser, new System.Security.Claims.Claim("family_name", "Administrator"));
                 await _userManager.AddClaimAsync(adminUser, new System.Security.Claims.Claim("preferred_username", "admin"));
                 
-                _logger.LogInformation("Created admin user 'admin@mrwho.local' with name claims");
+                // CRITICAL: Add explicit realm claim to ensure admin user belongs to admin realm
+                await _userManager.AddClaimAsync(adminUser, new System.Security.Claims.Claim("realm", "admin"));
+                
+                _logger.LogInformation("Created admin user 'admin@mrwho.local' with name claims and admin realm");
             }
             else
             {
@@ -411,6 +414,7 @@ public class OidcClientService : IOidcClientService
             var hasGivenNameClaim = existingClaims.Any(c => c.Type == "given_name");
             var hasFamilyNameClaim = existingClaims.Any(c => c.Type == "family_name");
             var hasPreferredUsernameClaim = existingClaims.Any(c => c.Type == "preferred_username");
+            var hasRealmClaim = existingClaims.Any(c => c.Type == "realm");
 
             if (!hasNameClaim)
             {
@@ -435,6 +439,13 @@ public class OidcClientService : IOidcClientService
                 await _userManager.AddClaimAsync(adminUser, new System.Security.Claims.Claim("preferred_username", "admin"));
                 _logger.LogInformation("Added 'preferred_username' claim to existing admin user");
             }
+
+            // CRITICAL: Ensure admin user has realm claim
+            if (!hasRealmClaim)
+            {
+                await _userManager.AddClaimAsync(adminUser, new System.Security.Claims.Claim("realm", "admin"));
+                _logger.LogInformation("Added 'realm' claim to existing admin user");
+            }
         }
 
         // 3.5. Create demo1 user if it doesn't exist
@@ -457,11 +468,27 @@ public class OidcClientService : IOidcClientService
                 await _userManager.AddClaimAsync(demo1User, new System.Security.Claims.Claim("family_name", "User One"));
                 await _userManager.AddClaimAsync(demo1User, new System.Security.Claims.Claim("preferred_username", "demo1"));
                 
-                _logger.LogInformation("Created demo1 user 'demo1@example.com' with name claims");
+                // CRITICAL: Add explicit realm claim to ensure demo1 user belongs to demo realm
+                await _userManager.AddClaimAsync(demo1User, new System.Security.Claims.Claim("realm", "demo"));
+                
+                _logger.LogInformation("Created demo1 user 'demo1@example.com' with name claims and demo realm");
             }
             else
             {
                 _logger.LogError("Failed to create demo1 user: {Errors}", string.Join(", ", result.Errors.Select(e => e.Description)));
+            }
+        }
+        else
+        {
+            // Check if existing demo1 user has realm claim, and add it if missing
+            var existingClaims = await _userManager.GetClaimsAsync(demo1User);
+            var hasRealmClaim = existingClaims.Any(c => c.Type == "realm");
+
+            // CRITICAL: Ensure demo1 user has realm claim
+            if (!hasRealmClaim)
+            {
+                await _userManager.AddClaimAsync(demo1User, new System.Security.Claims.Claim("realm", "demo"));
+                _logger.LogInformation("Added 'realm' claim to existing demo1 user");
             }
         }
 
