@@ -35,38 +35,23 @@ public class LoginModel : PageModel
     {
         ReturnUrl = returnUrl;
 
-        // For demo purposes, we'll still redirect to the OIDC server
-        // but the form shows what credentials will be used
+        // For demo purposes, we'll redirect to the OIDC server regardless of form input
+        // The actual authentication will happen at the identity server
         var authenticationProperties = new AuthenticationProperties
         {
             RedirectUri = returnUrl ?? "/"
         };
 
-        _logger.LogInformation("Login form submitted with email: {Email}", Input.Email);
+        _logger.LogInformation("Login form submitted with username: {Username}", Input.Username);
         return Challenge(authenticationProperties, OpenIdConnectDefaults.AuthenticationScheme);
-    }
-
-    public IActionResult OnPostAutoFill()
-    {
-        // Auto-fill the demo credentials
-        Input.Email = "demo1@example.com";
-        Input.Password = "Demo123";
-        Input.RememberMe = true;
-
-        _logger.LogDebug("Auto-filled demo credentials");
-        
-        // Return the page with filled credentials
-        ReturnUrl = Request.Form["returnUrl"];
-        return Page();
     }
 }
 
 public class LoginInputModel
 {
     [Required]
-    [EmailAddress]
-    [Display(Name = "Email")]
-    public string Email { get; set; } = string.Empty;
+    [Display(Name = "Username")]
+    public string Username { get; set; } = string.Empty;
 
     [Required]
     [DataType(DataType.Password)]

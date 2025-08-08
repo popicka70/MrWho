@@ -18,14 +18,22 @@
                         <p class="mb-0">Fill in your credentials below, then click "Login" to be redirected to the identity server.</p>
                     </div>
 
+                    <div class="card bg-light mb-4">
+                        <div class="card-body">
+                            <h6 class="card-title"><i class="bi bi-person"></i> Demo User Account</h6>
+                            <p class="mb-1"><strong>Email/Username:</strong> <code>demo1@example.com</code></p>
+                            <p class="mb-0"><strong>Password:</strong> <code>Demo123</code></p>
+                        </div>
+                    </div>
+
                     <form method="post" id="loginForm">
                         <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
                         <div asp-validation-summary="All" class="text-danger mb-3"></div>
 
                         <div class="mb-3">
-                            <label asp-for="Input.Email" class="form-label">Email Address</label>
-                            <input asp-for="Input.Email" class="form-control" type="email" placeholder="Enter your email address" autocomplete="username" />
-                            <span asp-validation-for="Input.Email" class="text-danger"></span>
+                            <label asp-for="Input.Username" class="form-label">Username</label>
+                            <input asp-for="Input.Username" class="form-control" type="text" placeholder="Enter your username or email" autocomplete="username" />
+                            <span asp-validation-for="Input.Username" class="text-danger"></span>
                         </div>
 
                         <div class="mb-3">
@@ -50,28 +58,17 @@
 
                     <div class="card bg-light">
                         <div class="card-body">
-                            <h6 class="card-title"><i class="bi bi-lightning"></i> Quick Demo Login</h6>
-                            <p class="card-text small text-muted">Use the demo credentials to quickly test the application:</p>
+                            <h6 class="card-title"><i class="bi bi-lightning"></i> Quick Demo Actions</h6>
+                            <p class="card-text small text-muted">Quickly test the application with demo credentials:</p>
                             
                             <div class="d-grid gap-2">
-                                <form method="post" asp-page-handler="AutoFill" style="display: inline;">
-                                    <input type="hidden" name="returnUrl" value="@Model.ReturnUrl" />
-                                    <button type="submit" class="btn btn-outline-primary btn-sm w-100">
-                                        <i class="bi bi-magic"></i> Auto-Fill Demo Credentials
-                                    </button>
-                                </form>
+                                <button type="button" class="btn btn-outline-primary btn-sm w-100" onclick="autoFillCredentials()">
+                                    <i class="bi bi-magic"></i> Auto-Fill Demo Credentials
+                                </button>
                                 
                                 <button type="button" class="btn btn-success btn-sm" onclick="autoFillAndSubmit()">
                                     <i class="bi bi-rocket"></i> Auto-Fill & Login Immediately
                                 </button>
-                            </div>
-                            
-                            <div class="mt-2">
-                                <small class="text-muted">
-                                    <strong>Demo Credentials:</strong><br>
-                                    Username: <code>demo1@example.com</code><br>
-                                    Password: <code>Demo123</code>
-                                </small>
                             </div>
                         </div>
                     </div>
@@ -86,14 +83,6 @@
                     </div>
                 </div>
             </div>
-
-            @if (!string.IsNullOrEmpty(Model.Input.Email))
-            {
-                <div class="alert alert-success mt-3">
-                    <i class="bi bi-check-circle"></i> <strong>Credentials Auto-Filled!</strong><br>
-                    You can now click "Login with MrWho" to proceed to authentication.
-                </div>
-            }
         </div>
     </div>
 </div>
@@ -102,11 +91,22 @@
     <partial name="_ValidationScriptsPartial" />
     
     <script>
-        function autoFillAndSubmit() {
-            // Fill the form fields
-            document.getElementById('Input_Email').value = 'demo1@example.com';
+        function autoFillCredentials() {
+            // Fill both username and password fields
+            document.getElementById('Input_Username').value = 'demo1@example.com';
             document.getElementById('Input_Password').value = 'Demo123';
             document.getElementById('Input_RememberMe').checked = true;
+            
+            // Clear any existing validation errors
+            clearValidationErrors();
+            
+            // Show success feedback
+            showAutoFillSuccess();
+        }
+        
+        function autoFillAndSubmit() {
+            // Fill the form fields first
+            autoFillCredentials();
             
             // Add a small delay to show the user what happened, then submit
             setTimeout(function() {
@@ -118,6 +118,48 @@
             const originalText = btn.innerHTML;
             btn.innerHTML = '<i class="bi bi-check"></i> Credentials Filled, Logging In...';
             btn.disabled = true;
+        }
+        
+        function clearValidationErrors() {
+            // Clear validation summary
+            const validationSummary = document.querySelector('[data-valmsg-summary="true"]');
+            if (validationSummary) {
+                validationSummary.style.display = 'none';
+            }
+            
+            // Clear individual field validation messages
+            const validationMessages = document.querySelectorAll('[data-valmsg-for]');
+            validationMessages.forEach(function(msg) {
+                msg.textContent = '';
+                msg.style.display = 'none';
+            });
+            
+            // Remove validation error classes
+            const inputs = document.querySelectorAll('input.input-validation-error');
+            inputs.forEach(function(input) {
+                input.classList.remove('input-validation-error');
+            });
+        }
+        
+        function showAutoFillSuccess() {
+            // Remove any existing success message
+            const existingAlert = document.querySelector('.auto-fill-success');
+            if (existingAlert) {
+                existingAlert.remove();
+            }
+            
+            // Create and show success message
+            const successAlert = document.createElement('div');
+            successAlert.className = 'alert alert-success mt-3 auto-fill-success';
+            successAlert.innerHTML = `
+                <i class="bi bi-check-circle"></i> <strong>Credentials Auto-Filled!</strong><br>
+                You can now click "Login with MrWho" to proceed to authentication.
+                <button type="button" class="btn-close ms-2" onclick="this.parentElement.remove()"></button>
+            `;
+            
+            // Insert after the card
+            const card = document.querySelector('.card');
+            card.parentNode.insertBefore(successAlert, card.nextSibling);
         }
     </script>
 }
