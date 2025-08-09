@@ -15,7 +15,9 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MrWhoAdmin.Tests", "MrWhoAd
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Položky řešení", "Položky řešení", "{73E6DEBC-5D85-E032-7380-14D1E53616C6}"
 	ProjectSection(SolutionItems) = preProject
+		.env = .env
 		.github\copilot-instructions.md = .github\copilot-instructions.md
+		docker-compose.yml = docker-compose.yml
 		ESSENTIAL_DATA_SETUP.md = ESSENTIAL_DATA_SETUP.md
 		README.md = README.md
 	EndProjectSection
