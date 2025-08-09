@@ -1183,6 +1183,73 @@ public static class WebApplicationExtensions
                 }
             });
         });
+
+        // SPECIAL DEBUG: Test dynamic vs static cookie approach
+        app.MapGet("/debug/test-dynamic-cookies", async (
+            IDynamicCookieService dynamicCookieService,
+            IClientCookieConfigurationService cookieConfigService,
+            ILogger<Program> logger,
+            HttpContext context) =>
+        {
+            logger.LogInformation("?? Testing dynamic vs static cookie approaches");
+
+            var testClients = new[] { "mrwho_admin_web", "mrwho_demo1", "postman_client" };
+            var results = new List<object>();
+
+            foreach (var clientId in testClients)
+            {
+                try
+                {
+                    var hasStatic = cookieConfigService.HasStaticConfiguration(clientId);
+                    var isAuthenticated = await dynamicCookieService.IsAuthenticatedForClientAsync(clientId);
+                    var principal = await dynamicCookieService.GetClientPrincipalAsync(clientId);
+                    
+                    var subjectClaim = principal?.FindFirst(ClaimTypes.NameIdentifier) ?? 
+                                      principal?.FindFirst(OpenIddictConstants.Claims.Subject);
+
+                    results.Add(new
+                    {
+                        ClientId = clientId,
+                        HasStaticConfig = hasStatic,
+                        IsAuthenticated = isAuthenticated,
+                        HasPrincipal = principal != null,
+                        SubjectClaim = subjectClaim != null ? new
+                        {
+                            Type = subjectClaim.Type,
+                            Value = subjectClaim.Value
+                        } : null,
+                        AllClaims = principal?.Claims.Select(c => new { c.Type, c.Value }).ToArray() ?? new object[0],
+                        CookieName = cookieConfigService.GetCookieNameForClient(clientId),
+                        SchemeName = cookieConfigService.GetCookieSchemeForClient(clientId),
+                        Status = hasStatic ? "?? STATIC" : "?? DYNAMIC"
+                    });
+                }
+                catch (Exception ex)
+                {
+                    results.Add(new
+                    {
+                        ClientId = clientId,
+                        Error = ex.Message,
+                        Status = "? ERROR"
+                    });
+                }
+            }
+
+            return Results.Json(new
+            {
+                Title = "Dynamic vs Static Cookie Test",
+                TestResults = results,
+                Notes = new
+                {
+                    Demo1Status = "Demo1 should now use DYNAMIC approach",
+                    SubjectClaimTypes = new
+                    {
+                        NameIdentifier = ClaimTypes.NameIdentifier,
+                        Subject = OpenIddictConstants.Claims.Subject
+                    }
+                }
+            });
+        });
         return app;
     }
 

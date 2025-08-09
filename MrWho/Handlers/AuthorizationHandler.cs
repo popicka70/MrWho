@@ -111,16 +111,27 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         
         if (subjectClaim == null)
         {
-            _logger.LogWarning("No subject claim found in authenticated principal");
+            _logger.LogWarning("? No subject claim found in authenticated principal for client {ClientId}", clientId);
+            _logger.LogWarning("   ?? Available claims: {Claims}", 
+                string.Join(", ", principal.Claims.Select(c => $"{c.Type}={c.Value}")));
+            _logger.LogWarning("   ?? Looking for: {NameId} OR {Subject}", 
+                ClaimTypes.NameIdentifier, OpenIddictConstants.Claims.Subject);
             return Results.Forbid();
         }
+
+        _logger.LogDebug("? Subject claim found: Type='{ClaimType}', Value='{ClaimValue}'", 
+            subjectClaim.Type, subjectClaim.Value);
 
         var user = await _userManager.FindByIdAsync(subjectClaim.Value);
         if (user == null)
         {
-            _logger.LogWarning("User not found for subject {Subject}", subjectClaim.Value);
+            _logger.LogWarning("? User not found for subject {Subject} (client: {ClientId})", subjectClaim.Value, clientId);
+            _logger.LogWarning("   ?? Subject claim type: {ClaimType}", subjectClaim.Type);
             return Results.Forbid();
         }
+
+        _logger.LogDebug("? User found: {UserName} (ID: {UserId}) for client {ClientId}", 
+            user.UserName, user.Id, clientId);
 
         // CRITICAL: Validate user can access this client based on realm restrictions
         var realmValidation = await _realmValidationService.ValidateUserRealmAccessAsync(user, clientId);

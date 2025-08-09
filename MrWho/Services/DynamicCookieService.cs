@@ -1,14 +1,15 @@
-using Microsoft.AspNetCore.Authentication;
+﻿using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
 using System.Security.Claims;
 using static OpenIddict.Abstractions.OpenIddictConstants;
+using static OpenIddict.Abstractions.OpenIddictConstants.Claims;
 
 namespace MrWho.Services;
 
 /// <summary>
 /// Implementation of dynamic client-specific cookie management
-/// Uses cookie name differentiation rather than separate authentication schemes
+/// Uses consistent authentication scheme approach for both static and dynamic clients
 /// </summary>
 public class DynamicCookieService : IDynamicCookieService
 {
@@ -36,20 +37,39 @@ public class DynamicCookieService : IDynamicCookieService
 
         try
         {
-            // For clients with static configuration, use their registered scheme
-            if (_cookieConfigService.HasStaticConfiguration(clientId))
+            // CONSISTENT APPROACH: All clients use proper authentication schemes
+            var scheme = _cookieConfigService.GetCookieSchemeForClient(clientId);
+            
+            // Create claims identity for the authentication scheme
+            var identity = new ClaimsIdentity(scheme);
+            await AddUserClaimsToIdentity(identity, user);
+            
+            // For dynamic clients, add the client_id claim for validation
+            if (!_cookieConfigService.HasStaticConfiguration(clientId))
             {
-                var staticScheme = _cookieConfigService.GetCookieSchemeForClient(clientId);
-                await SignInWithStaticSchemeAsync(context, staticScheme, user, rememberMe);
-                _logger.LogDebug("Signed in user {UserName} with static scheme {Scheme} for client {ClientId}", 
-                    user.UserName, staticScheme, clientId);
-                return;
+                identity.AddClaim(new Claim("client_id", clientId));
+                _logger.LogDebug("🔧 Added client_id claim for dynamic client {ClientId}", clientId);
             }
 
-            // For dynamic clients, create a custom cookie with the client-specific name
-            await SignInWithDynamicCookieAsync(context, clientId, user, rememberMe);
-            _logger.LogDebug("Signed in user {UserName} with dynamic cookie for client {ClientId}", 
-                user.UserName, clientId);
+            var principal = new ClaimsPrincipal(identity);
+            var properties = new AuthenticationProperties
+            {
+                IsPersistent = rememberMe,
+                ExpiresUtc = rememberMe ? DateTimeOffset.UtcNow.AddDays(30) : DateTimeOffset.UtcNow.AddHours(24)
+            };
+
+            await context.SignInAsync(scheme, principal, properties);
+            
+            if (_cookieConfigService.HasStaticConfiguration(clientId))
+            {
+                _logger.LogDebug("✅ Signed in user {UserName} with static scheme {Scheme} for client {ClientId}", 
+                    user.UserName, scheme, clientId);
+            }
+            else
+            {
+                _logger.LogDebug("🔧 Signed in user {UserName} with dynamic scheme {Scheme} for client {ClientId}", 
+                    user.UserName, scheme, clientId);
+            }
         }
         catch (Exception ex)
         {
@@ -65,16 +85,28 @@ public class DynamicCookieService : IDynamicCookieService
 
         try
         {
-            // For clients with static configuration, check their registered scheme
-            if (_cookieConfigService.HasStaticConfiguration(clientId))
+            // CONSISTENT APPROACH: All clients (static and dynamic) use authentication schemes
+            var scheme = _cookieConfigService.GetCookieSchemeForClient(clientId);
+            var authResult = await context.AuthenticateAsync(scheme);
+            
+            if (!authResult.Succeeded || authResult.Principal?.Identity?.IsAuthenticated != true)
             {
-                var staticScheme = _cookieConfigService.GetCookieSchemeForClient(clientId);
-                var authResult = await context.AuthenticateAsync(staticScheme);
-                return authResult.Succeeded && authResult.Principal?.Identity?.IsAuthenticated == true;
+                return false;
             }
 
-            // For dynamic clients, check if their specific cookie exists and is valid
-            return await IsValidDynamicCookieAsync(context, clientId);
+            // For dynamic clients, validate that this authentication result is for the correct client
+            if (!_cookieConfigService.HasStaticConfiguration(clientId))
+            {
+                var clientIdClaim = authResult.Principal.FindFirst("client_id");
+                if (clientIdClaim?.Value != clientId)
+                {
+                    _logger.LogDebug("🔧 Authentication succeeded but for different client. Expected: {ExpectedClient}, Found: {ActualClient}", 
+                        clientId, clientIdClaim?.Value ?? "NULL");
+                    return false;
+                }
+            }
+            
+            return true;
         }
         catch (Exception ex)
         {
@@ -90,18 +122,18 @@ public class DynamicCookieService : IDynamicCookieService
 
         try
         {
-            // For clients with static configuration, sign out from their registered scheme
+            // CONSISTENT APPROACH: All clients use proper authentication schemes
+            var scheme = _cookieConfigService.GetCookieSchemeForClient(clientId);
+            await context.SignOutAsync(scheme);
+            
             if (_cookieConfigService.HasStaticConfiguration(clientId))
             {
-                var staticScheme = _cookieConfigService.GetCookieSchemeForClient(clientId);
-                await context.SignOutAsync(staticScheme);
-                _logger.LogDebug("Signed out from static scheme {Scheme} for client {ClientId}", staticScheme, clientId);
-                return;
+                _logger.LogDebug("✅ Signed out from static scheme {Scheme} for client {ClientId}", scheme, clientId);
             }
-
-            // For dynamic clients, remove their specific cookie
-            await SignOutFromDynamicCookieAsync(context, clientId);
-            _logger.LogDebug("Signed out from dynamic cookie for client {ClientId}", clientId);
+            else
+            {
+                _logger.LogDebug("🔧 Signed out from dynamic scheme {Scheme} for client {ClientId}", scheme, clientId);
+            }
         }
         catch (Exception ex)
         {
@@ -117,162 +149,42 @@ public class DynamicCookieService : IDynamicCookieService
 
         try
         {
-            // For clients with static configuration, get principal from their registered scheme
-            if (_cookieConfigService.HasStaticConfiguration(clientId))
+            // CONSISTENT APPROACH: All clients (static and dynamic) use authentication schemes
+            var scheme = _cookieConfigService.GetCookieSchemeForClient(clientId);
+            var authResult = await context.AuthenticateAsync(scheme);
+            
+            if (!authResult.Succeeded || authResult.Principal?.Identity?.IsAuthenticated != true)
             {
-                var staticScheme = _cookieConfigService.GetCookieSchemeForClient(clientId);
-                _logger.LogDebug("? STATIC PATH: Client {ClientId} using static scheme {SchemeName}", 
-                    clientId, staticScheme);
-                var authResult = await context.AuthenticateAsync(staticScheme);
-                return authResult.Succeeded ? authResult.Principal : null;
+                _logger.LogDebug("🔧 No valid authentication for client {ClientId} using scheme {SchemeName}", 
+                    clientId, scheme);
+                return null;
             }
 
-            // For dynamic clients, reconstruct principal from their cookie
-            _logger.LogDebug("?? DYNAMIC PATH: Client {ClientId} using dynamic cookie management", clientId);
-            return await GetDynamicCookiePrincipalAsync(context, clientId);
+            // For dynamic clients, validate that this authentication result is for the correct client
+            if (!_cookieConfigService.HasStaticConfiguration(clientId))
+            {
+                var clientIdClaim = authResult.Principal.FindFirst("client_id");
+                if (clientIdClaim?.Value != clientId)
+                {
+                    _logger.LogDebug("🔧 Authentication succeeded but for different client. Expected: {ExpectedClient}, Found: {ActualClient}", 
+                        clientId, clientIdClaim?.Value ?? "NULL");
+                    return null;
+                }
+                
+                _logger.LogDebug("🔧 DYNAMIC SCHEME SUCCESS: Client {ClientId} authenticated using dynamic scheme {SchemeName}", 
+                    clientId, scheme);
+            }
+            else
+            {
+                _logger.LogDebug("✅ STATIC SCHEME SUCCESS: Client {ClientId} authenticated using static scheme {SchemeName}", 
+                    clientId, scheme);
+            }
+
+            return authResult.Principal;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to get principal for client {ClientId}", clientId);
-            return null;
-        }
-    }
-
-    private async Task SignInWithStaticSchemeAsync(HttpContext context, string scheme, IdentityUser user, bool rememberMe)
-    {
-        // Create claims identity for static scheme
-        var identity = new ClaimsIdentity(scheme);
-        await AddUserClaimsToIdentity(identity, user);
-
-        var principal = new ClaimsPrincipal(identity);
-        var properties = new AuthenticationProperties
-        {
-            IsPersistent = rememberMe,
-            ExpiresUtc = rememberMe ? DateTimeOffset.UtcNow.AddDays(30) : DateTimeOffset.UtcNow.AddHours(24)
-        };
-
-        await context.SignInAsync(scheme, principal, properties);
-    }
-
-    private async Task SignInWithDynamicCookieAsync(HttpContext context, string clientId, IdentityUser user, bool rememberMe)
-    {
-        var cookieName = _cookieConfigService.GetCookieNameForClient(clientId);
-        
-        // Create a secure, signed cookie manually
-        var claims = new Dictionary<string, string>
-        {
-            [Claims.Subject] = user.Id,
-            [Claims.Email] = user.Email ?? "",
-            [Claims.Name] = await GetUserDisplayNameAsync(user),
-            [Claims.PreferredUsername] = user.UserName ?? "",
-            ["client_id"] = clientId,
-            ["iat"] = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(),
-            ["exp"] = (rememberMe ? DateTimeOffset.UtcNow.AddDays(30) : DateTimeOffset.UtcNow.AddHours(24)).ToUnixTimeSeconds().ToString()
-        };
-
-        // Add additional user claims
-        await AddUserClaimsToDictionary(claims, user);
-
-        // Create a secure cookie value (you might want to encrypt this in production)
-        var cookieValue = CreateSecureCookieValue(claims);
-
-        var cookieOptions = new CookieOptions
-        {
-            HttpOnly = true,
-            Secure = true,
-            SameSite = SameSiteMode.Lax,
-            Expires = rememberMe ? DateTimeOffset.UtcNow.AddDays(30) : DateTimeOffset.UtcNow.AddHours(24)
-        };
-
-        context.Response.Cookies.Append(cookieName, cookieValue, cookieOptions);
-    }
-
-    private async Task<bool> IsValidDynamicCookieAsync(HttpContext context, string clientId)
-    {
-        var cookieName = _cookieConfigService.GetCookieNameForClient(clientId);
-        
-        if (!context.Request.Cookies.TryGetValue(cookieName, out var cookieValue) || string.IsNullOrEmpty(cookieValue))
-        {
-            return false;
-        }
-
-        try
-        {
-            var claims = ParseSecureCookieValue(cookieValue);
-            
-            // Validate expiration
-            if (claims.TryGetValue("exp", out var expStr) && long.TryParse(expStr, out var exp))
-            {
-                var expiration = DateTimeOffset.FromUnixTimeSeconds(exp);
-                if (expiration <= DateTimeOffset.UtcNow)
-                {
-                    return false;
-                }
-            }
-
-            // Validate client ID
-            if (!claims.TryGetValue("client_id", out var cookieClientId) || cookieClientId != clientId)
-            {
-                return false;
-            }
-
-            return true;
-        }
-        catch
-        {
-            return false;
-        }
-    }
-
-    private async Task SignOutFromDynamicCookieAsync(HttpContext context, string clientId)
-    {
-        var cookieName = _cookieConfigService.GetCookieNameForClient(clientId);
-        
-        context.Response.Cookies.Delete(cookieName, new CookieOptions
-        {
-            HttpOnly = true,
-            Secure = true,
-            SameSite = SameSiteMode.Lax
-        });
-    }
-
-    private async Task<ClaimsPrincipal?> GetDynamicCookiePrincipalAsync(HttpContext context, string clientId)
-    {
-        var cookieName = _cookieConfigService.GetCookieNameForClient(clientId);
-        
-        if (!context.Request.Cookies.TryGetValue(cookieName, out var cookieValue) || string.IsNullOrEmpty(cookieValue))
-        {
-            return null;
-        }
-
-        try
-        {
-            var claims = ParseSecureCookieValue(cookieValue);
-            
-            // Validate expiration
-            if (claims.TryGetValue("exp", out var expStr) && long.TryParse(expStr, out var exp))
-            {
-                var expiration = DateTimeOffset.FromUnixTimeSeconds(exp);
-                if (expiration <= DateTimeOffset.UtcNow)
-                {
-                    return null;
-                }
-            }
-
-            // Create claims identity
-            var identity = new ClaimsIdentity("DynamicCookie");
-            foreach (var claim in claims)
-            {
-                if (claim.Key != "iat" && claim.Key != "exp") // Skip timestamp claims
-                {
-                    identity.AddClaim(new Claim(claim.Key, claim.Value));
-                }
-            }
-
-            return new ClaimsPrincipal(identity);
-        }
-        catch
-        {
             return null;
         }
     }
@@ -303,34 +215,6 @@ public class DynamicCookieService : IDynamicCookieService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error adding user claims to identity for user {UserId}", user.Id);
-        }
-    }
-
-    private async Task AddUserClaimsToDictionary(Dictionary<string, string> claims, IdentityUser user)
-    {
-        try
-        {
-            var userClaims = await _userManager.GetClaimsAsync(user);
-            foreach (var claim in userClaims)
-            {
-                // Avoid duplicates and use a safe key format
-                var key = $"uclaim_{claim.Type}";
-                if (!claims.ContainsKey(key))
-                {
-                    claims[key] = claim.Value;
-                }
-            }
-
-            // Add roles
-            var roles = await _userManager.GetRolesAsync(user);
-            for (int i = 0; i < roles.Count; i++)
-            {
-                claims[$"role_{i}"] = roles[i];
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error adding user claims to dictionary for user {UserId}", user.Id);
         }
     }
 
@@ -387,22 +271,5 @@ public class DynamicCookieService : IDynamicCookieService
             word.Length > 0 ? char.ToUpper(word[0]) + word.Substring(1).ToLower() : word);
 
         return string.Join(" ", capitalizedWords);
-    }
-
-    private string CreateSecureCookieValue(Dictionary<string, string> claims)
-    {
-        // Simple implementation - in production, you should encrypt this
-        var json = System.Text.Json.JsonSerializer.Serialize(claims);
-        var bytes = System.Text.Encoding.UTF8.GetBytes(json);
-        return Convert.ToBase64String(bytes);
-    }
-
-    private Dictionary<string, string> ParseSecureCookieValue(string cookieValue)
-    {
-        // Simple implementation - in production, you should decrypt this
-        var bytes = Convert.FromBase64String(cookieValue);
-        var json = System.Text.Encoding.UTF8.GetString(bytes);
-        return System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(json) 
-            ?? new Dictionary<string, string>();
     }
 }

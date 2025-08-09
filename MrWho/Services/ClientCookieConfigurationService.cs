@@ -61,10 +61,11 @@ public class ClientCookieConfigurationService : IClientCookieConfigurationServic
             return config.SchemeName;
         }
 
-        // For true dynamic configuration, all clients without static config use the default scheme
-        // The cookie differentiation happens at the cookie NAME level, not the scheme level
-        _logger.LogDebug("Client {ClientId} using default authentication scheme with dynamic cookie management", clientId);
-        return "Identity.Application";
+        // FIXED: For dynamic clients, return the client-specific scheme name
+        // This matches what DynamicClientCookieService creates: "Identity.Application.{clientId}"
+        var dynamicSchemeName = $"Identity.Application.{clientId}";
+        _logger.LogDebug("?? Client {ClientId} using dynamic authentication scheme: {SchemeName}", clientId, dynamicSchemeName);
+        return dynamicSchemeName;
     }
 
     public string GetCookieNameForClient(string clientId)
