@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using MrWho.Data;
@@ -7,8 +8,12 @@ using MrWho.Handlers;
 using MrWho.Services;
 using MrWho.Middleware;
 using OpenIddict.Abstractions;
+using OpenIddict.Server.AspNetCore;
+using Microsoft.AspNetCore;
 using System.Linq;
 using System.Reflection;
+using System.Security.Claims;
+using static OpenIddict.Abstractions.OpenIddictConstants;
 
 namespace MrWho.Extensions;
 
@@ -109,22 +114,209 @@ public static class WebApplicationExtensions
             return await authorizationHandler.HandleAuthorizationRequestAsync(context);
         });
 
-        // OIDC Token endpoint - now uses injected TokenHandler
-        app.MapPost("/connect/token", async (HttpContext context, ITokenHandler tokenHandler) =>
+        // CRITICAL: Add missing token endpoint
+        app.MapPost("/connect/token", async (HttpContext context) =>
         {
-            return await tokenHandler.HandleTokenRequestAsync(context);
+            var request = context.GetOpenIddictServerRequest() ??
+                          throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
+
+            if (request.IsAuthorizationCodeGrantType())
+            {
+                // Handle authorization code flow (used by Demo1 app)
+                var authResult = await context.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+                
+                if (!authResult.Succeeded)
+                {
+                    return Results.Forbid(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
+                }
+
+                // Return the tokens
+                return Results.SignIn(authResult.Principal, authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+            }
+
+            if (request.IsClientCredentialsGrantType())
+            {
+                // Handle client credentials flow
+                var identity = new ClaimsIdentity(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+                identity.AddClaim(OpenIddictConstants.Claims.Subject, request.ClientId!);
+
+                var principal = new ClaimsPrincipal(identity);
+                principal.SetScopes(request.GetScopes());
+
+                return Results.SignIn(principal, authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+            }
+
+            if (request.IsPasswordGrantType())
+            {
+                // Handle password grant flow
+                var userManager = context.RequestServices.GetRequiredService<UserManager<IdentityUser>>();
+                var user = await userManager.FindByNameAsync(request.Username!);
+
+                if (user != null && await userManager.CheckPasswordAsync(user, request.Password!))
+                {
+                    var identity = new ClaimsIdentity(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+                    identity.AddClaim(OpenIddictConstants.Claims.Subject, user.Id);
+                    identity.AddClaim(OpenIddictConstants.Claims.Email, user.Email!);
+                    identity.AddClaim(OpenIddictConstants.Claims.Name, user.UserName!);
+
+                    var principal = new ClaimsPrincipal(identity);
+                    principal.SetScopes(request.GetScopes());
+
+                    return Results.SignIn(principal, authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+                }
+
+                return Results.Forbid(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
+            }
+
+            if (request.IsRefreshTokenGrantType())
+            {
+                // Handle refresh token flow
+                var authResult = await context.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+                
+                if (!authResult.Succeeded)
+                {
+                    return Results.Forbid(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
+                }
+
+                // Return refreshed tokens
+                return Results.SignIn(authResult.Principal, authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+            }
+
+            throw new InvalidOperationException("The specified grant type is not supported.");
         });
 
-        // UserInfo endpoint (optional but recommended) - Updated to use OpenIddict validation
+        // OIDC Logout endpoint - FIXED: Enhanced client detection for proper session isolation
+        app.MapPost("/connect/logout", async (HttpContext context, IDynamicCookieService dynamicCookieService, ILogger<Program> logger) =>
+        {
+            var request = context.GetOpenIddictServerRequest() ??
+                          throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
+
+            try
+            {
+                // ENHANCED: Multiple strategies to detect which client is initiating the logout
+                var clientId = request.ClientId ?? 
+                               context.Items["ClientId"]?.ToString() ?? 
+                               context.Request.Query["client_id"].FirstOrDefault() ??
+                               context.Request.Form["client_id"].FirstOrDefault();
+                
+                // Strategy 2: Extract from post_logout_redirect_uri
+                if (string.IsNullOrEmpty(clientId))
+                {
+                    var postLogoutUri = request.PostLogoutRedirectUri ?? 
+                                       context.Request.Query["post_logout_redirect_uri"].FirstOrDefault() ??
+                                       context.Request.Form["post_logout_redirect_uri"].FirstOrDefault();
+                    
+                    if (!string.IsNullOrEmpty(postLogoutUri))
+                    {
+                        logger.LogInformation("?? CLIENT DETECTION: Trying to determine client from post_logout_redirect_uri: {Uri}", postLogoutUri);
+                        
+                        // More comprehensive port-based detection
+                        if (postLogoutUri.Contains("7257") || postLogoutUri.Contains("localhost:7257"))
+                        {
+                            clientId = "mrwho_admin_web";
+                            logger.LogInformation("? CLIENT DETECTED: Admin app (port 7257) ? {ClientId}", clientId);
+                        }
+                        else if (postLogoutUri.Contains("7037") || postLogoutUri.Contains("localhost:7037"))
+                        {
+                            clientId = "mrwho_demo1";
+                            logger.LogInformation("? CLIENT DETECTED: Demo1 app (port 7037) ? {ClientId}", clientId);
+                        }
+                    }
+                }
+                
+                // Strategy 3: Extract from ID token hint
+                if (string.IsNullOrEmpty(clientId))
+                {
+                    var idTokenHint = request.IdTokenHint ?? 
+                                     context.Request.Query["id_token_hint"].FirstOrDefault() ??
+                                     context.Request.Form["id_token_hint"].FirstOrDefault();
+                    
+                    if (!string.IsNullOrEmpty(idTokenHint))
+                    {
+                        logger.LogInformation("?? CLIENT DETECTION: Found ID token hint, length: {Length}", idTokenHint.Length);
+                        // Could decode JWT to extract client info if needed
+                    }
+                }
+                
+                // Strategy 4: Check HTTP referrer
+                if (string.IsNullOrEmpty(clientId))
+                {
+                    var referrer = context.Request.Headers.Referer.FirstOrDefault();
+                    if (!string.IsNullOrEmpty(referrer))
+                    {
+                        logger.LogInformation("?? CLIENT DETECTION: Checking referrer: {Referrer}", referrer);
+                        
+                        if (referrer.Contains("7257"))
+                        {
+                            clientId = "mrwho_admin_web";
+                            logger.LogInformation("? CLIENT DETECTED: Admin app (referrer) ? {ClientId}", clientId);
+                        }
+                        else if (referrer.Contains("7037"))
+                        {
+                            clientId = "mrwho_demo1";
+                            logger.LogInformation("? CLIENT DETECTED: Demo1 app (referrer) ? {ClientId}", clientId);
+                        }
+                    }
+                }
+                
+                // Log all available logout parameters for debugging
+                logger.LogInformation("?? LOGOUT REQUEST DEBUG: ClientId={ClientId}, PostLogoutUri={PostLogoutUri}, HasIdToken={HasIdToken}, Referrer={Referrer}",
+                    clientId ?? "NULL",
+                    request.PostLogoutRedirectUri ?? "NULL",
+                    !string.IsNullOrEmpty(request.IdTokenHint),
+                    context.Request.Headers.Referer.FirstOrDefault() ?? "NULL");
+                
+                if (!string.IsNullOrEmpty(clientId))
+                {
+                    logger.LogInformation("?? CLIENT-SPECIFIC LOGOUT: Logging out client {ClientId} using DynamicCookieService", clientId);
+                    
+                    // Use client-specific logout to maintain session isolation
+                    await dynamicCookieService.SignOutFromClientAsync(clientId);
+                    
+                    logger.LogInformation("? CLIENT-SPECIFIC LOGOUT COMPLETE: Client {ClientId} logged out, other clients should remain unaffected", clientId);
+                }
+                else
+                {
+                    logger.LogWarning("?? FALLBACK LOGOUT: No client ID detected using any strategy - this will affect ALL clients!");
+                    logger.LogWarning("   Available context: Items={Items}, Query={Query}, Form={Form}",
+                        string.Join(", ", context.Items.Keys.Select(k => $"{k}={context.Items[k]}")),
+                        string.Join(", ", context.Request.Query.Select(q => $"{q.Key}={q.Value}")),
+                        string.Join(", ", context.Request.Form.Select(f => $"{f.Key}={f.Value}")));
+                }
+
+                // IMPORTANT: Still need to return OIDC logout result for the protocol
+                return Results.SignOut(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "? Error during client-specific logout for client {ClientId}", request.ClientId);
+                
+                // Fallback to standard logout on error
+                return Results.SignOut(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
+            }
+        });
+
+        // UserInfo endpoint
         app.MapGet("/connect/userinfo", async (HttpContext context, IUserInfoHandler userInfoHandler) =>
         {
             return await userInfoHandler.HandleUserInfoRequestAsync(context);
-        }).RequireAuthorization();
+        }).RequireAuthorization("UserInfoPolicy"); // Use specific policy for UserInfo endpoint
 
-        // API Test endpoint (for debugging) - This will now work with OpenIddict validation
-        app.MapGet("/api/test", [Authorize] () =>
+        app.MapPost("/connect/userinfo", async (HttpContext context, IUserInfoHandler userInfoHandler) =>
         {
-            return Results.Ok(new { Message = "API is working!", Timestamp = DateTime.UtcNow });
+            return await userInfoHandler.HandleUserInfoRequestAsync(context);
+        }).RequireAuthorization("UserInfoPolicy"); // Use specific policy for UserInfo endpoint
+
+        // REDIRECT: Handle legacy /Account/AccessDenied to correct route
+        app.MapGet("/Account/AccessDenied", (HttpContext context) =>
+        {
+            var returnUrl = context.Request.Query["ReturnUrl"].ToString();
+            var redirectUrl = "/connect/access-denied";
+            if (!string.IsNullOrEmpty(returnUrl))
+            {
+                redirectUrl += $"?ReturnUrl={Uri.EscapeDataString(returnUrl)}";
+            }
+            return Results.Redirect(redirectUrl);
         });
 
         return app;
@@ -749,25 +941,29 @@ public static class WebApplicationExtensions
             return Results.Json(result);
         });
 
-        // Debug endpoint to check which user ID corresponds to the JWT subject
+        // Debug endpoint to find user with specific subject that was mentioned in the error
         app.MapGet("/debug/find-user-by-subject/{subject}", async (string subject, UserManager<IdentityUser> userManager, ILogger<Program> logger) =>
         {
-            logger.LogInformation("Looking for user with subject/ID {Subject}", subject);
+            logger.LogInformation("?? Looking for user with subject/ID {Subject}", subject);
             
             var user = await userManager.FindByIdAsync(subject);
             if (user == null)
             {
+                logger.LogWarning("? User not found by ID, trying by username...");
                 // Also try to find by username in case it's a username instead of ID
                 user = await userManager.FindByNameAsync(subject);
             }
 
             if (user == null)
             {
+                logger.LogError("? NO USER FOUND: Subject/ID or username '{Subject}' does not exist in database", subject);
                 return Results.NotFound($"No user found with subject/ID or username '{subject}'");
             }
 
             var claims = await userManager.GetClaimsAsync(user);
             var nameClaim = claims.FirstOrDefault(c => c.Type == "name")?.Value;
+
+            logger.LogInformation("? USER FOUND: Subject {Subject} maps to user {UserName} ({Email})", subject, user.UserName, user.Email);
 
             var result = new
             {
@@ -783,56 +979,277 @@ public static class WebApplicationExtensions
             return Results.Json(result);
         });
 
-        // Debug endpoint to check user realm assignments
-        app.MapGet("/debug/user-realms", async (UserManager<IdentityUser> userManager, IUserRealmValidationService realmValidationService, ILogger<Program> logger) =>
+        // SPECIAL DEBUG: Check for the specific subject ID from the error log
+        app.MapGet("/debug/check-subject-3b9262de", async (UserManager<IdentityUser> userManager, ILogger<Program> logger) =>
         {
-            logger.LogInformation("Checking user realm assignments");
-            
-            var users = userManager.Users.ToList();
-            var userRealms = new List<object>();
+            var subjectId = "3b9262de-0bbf-4ba1-9d58-d48f24ce1d05";
+            logger.LogInformation("?? DEBUGGING SPECIFIC SUBJECT: {SubjectId}", subjectId);
 
-            foreach (var user in users)
+            // Check if this ID exists as a user ID
+            var userById = await userManager.FindByIdAsync(subjectId);
+            logger.LogInformation("   User by ID: {Found}", userById?.UserName ?? "NOT FOUND");
+
+            // Check if this ID exists as a username
+            var userByName = await userManager.FindByNameAsync(subjectId);
+            logger.LogInformation("   User by Name: {Found}", userByName?.UserName ?? "NOT FOUND");
+
+            // List all users with their IDs to see what we have
+            var allUsers = userManager.Users.Select(u => new { u.Id, u.UserName, u.Email }).ToList();
+            
+            return Results.Json(new
             {
-                var claims = await userManager.GetClaimsAsync(user);
-                var realmClaim = claims.FirstOrDefault(c => c.Type == "realm")?.Value;
-                
-                // Test realm validation for different clients
-                var adminValidation = await realmValidationService.ValidateUserRealmAccessAsync(user, "mrwho_admin_web");
-                var demo1Validation = await realmValidationService.ValidateUserRealmAccessAsync(user, "mrwho_demo1");
-                
-                userRealms.Add(new
-                {
-                    UserId = user.Id,
-                    UserName = user.UserName,
-                    Email = user.Email,
-                    RealmClaim = realmClaim,
-                    DeterminedRealm = adminValidation.UserRealm ?? demo1Validation.UserRealm,
-                    ClientAccess = new
-                    {
-                        AdminClient = new
-                        {
-                            CanAccess = adminValidation.IsValid,
-                            Reason = adminValidation.Reason
-                        },
-                        Demo1Client = new
-                        {
-                            CanAccess = demo1Validation.IsValid,
-                            Reason = demo1Validation.Reason
-                        }
-                    }
-                });
-            }
+                SearchedSubject = subjectId,
+                UserFoundById = userById != null ? new { userById.Id, userById.UserName, userById.Email } : null,
+                UserFoundByName = userByName != null ? new { userByName.Id, userByName.UserName, userByName.Email } : null,
+                AllUsersInDatabase = allUsers,
+                PossibleIssue = "Subject ID in authorization handler may not match any actual user ID"
+            });
+        });
+        
+        // SPECIAL DEBUG: Comprehensive Demo1 troubleshooting endpoint  
+        app.MapGet("/debug/demo1-troubleshoot", async (
+            UserManager<IdentityUser> userManager, 
+            IOidcClientService oidcClientService,
+            IUserRealmValidationService realmValidationService,
+            ILogger<Program> logger) =>
+        {
+            logger.LogInformation("?? DEMO1 COMPREHENSIVE TROUBLESHOOTING");
 
             var result = new
             {
-                TotalUsers = users.Count,
-                UserRealms = userRealms,
-                Timestamp = DateTime.UtcNow
+                TestTimestamp = DateTime.UtcNow,
+                Steps = new List<object>()
             };
 
-            return Results.Json(result);
+            // Step 1: Check if demo1 user exists
+            var demo1User = await userManager.FindByNameAsync("demo1@example.com");
+            var step1 = new
+            {
+                Step = 1,
+                Description = "Check Demo1 User Exists",
+                Success = demo1User != null,
+                Details = demo1User != null ? (object)new
+                {
+                    UserId = demo1User.Id,
+                    UserName = demo1User.UserName,
+                    Email = demo1User.Email,
+                    EmailConfirmed = demo1User.EmailConfirmed
+                } : "USER NOT FOUND"
+            };
+            result.Steps.Add(step1);
+
+            if (demo1User != null)
+            {
+                // Step 2: Check user claims
+                var claims = await userManager.GetClaimsAsync(demo1User);
+                var realmClaim = claims.FirstOrDefault(c => c.Type == "realm")?.Value;
+                var step2 = new
+                {
+                    Step = 2,
+                    Description = "Check Demo1 User Claims",
+                    Success = claims.Any(),
+                    Details = (object)new
+                    {
+                        ClaimsCount = claims.Count,
+                        RealmClaim = realmClaim ?? "NO REALM CLAIM",
+                        AllClaims = claims.Select(c => new { c.Type, c.Value }).ToArray()
+                    }
+                };
+                result.Steps.Add(step2);
+
+                // Step 3: Check demo1 client exists  
+                var clients = await oidcClientService.GetEnabledClientsAsync();
+                var demo1Client = clients.FirstOrDefault(c => c.ClientId == "mrwho_demo1");
+                var step3 = new
+                {
+                    Step = 3,
+                    Description = "Check Demo1 Client Exists",
+                    Success = demo1Client != null,
+                    Details = demo1Client != null ? (object)new
+                    {
+                        demo1Client.ClientId,
+                        demo1Client.Name,
+                        demo1Client.IsEnabled,
+                        RealmName = demo1Client.Realm.Name,
+                        RealmEnabled = demo1Client.Realm.IsEnabled
+                    } : "CLIENT NOT FOUND"
+                };
+                result.Steps.Add(step3);
+
+                if (demo1Client != null)
+                {
+                    // Step 4: Test realm validation
+                    var realmValidation = await realmValidationService.ValidateUserRealmAccessAsync(demo1User, "mrwho_demo1");
+                    var step4 = new
+                    {
+                        Step = 4,
+                        Description = "Test Realm Validation",
+                        Success = realmValidation.IsValid,
+                        Details = (object)new
+                        {
+                            IsValid = realmValidation.IsValid,
+                            Reason = realmValidation.Reason,
+                            UserRealm = realmValidation.UserRealm,
+                            ClientRealm = realmValidation.ClientRealm,
+                            ErrorCode = realmValidation.ErrorCode
+                        }
+                    };
+                    result.Steps.Add(step4);
+                }
+
+                // Step 5: Check password validation
+                var passwordCheck = await userManager.CheckPasswordAsync(demo1User, "Demo123");
+                var step5 = new
+                {
+                    Step = 5,
+                    Description = "Test Password Validation",
+                    Success = passwordCheck,
+                    Details = (object)(passwordCheck ? "Password correct" : "Password INCORRECT")
+                };
+                result.Steps.Add(step5);
+            }
+
+            // Step 6: Check all users in system
+            var allUsers = userManager.Users.Select(u => new { u.Id, u.UserName, u.Email }).ToList();
+            var step6 = new
+            {
+                Step = 6,
+                Description = "List All Users in System",
+                Success = allUsers.Any(),
+                Details = (object)new
+                {
+                    TotalUsers = allUsers.Count,
+                    Users = allUsers
+                }
+            };
+            result.Steps.Add(step6);
+
+            var summary = new
+            {
+                OverallSuccess = result.Steps.All(s => ((dynamic)s).Success),
+                Issues = result.Steps.Where(s => !((dynamic)s).Success).Select(s => $"Step {((dynamic)s).Step}: {((dynamic)s).Description}").ToArray(),
+                NextSteps = !result.Steps.All(s => ((dynamic)s).Success) ? 
+                    new[] { "Fix the failed steps above", "Re-run this debug endpoint to verify fixes" } :
+                    new[] { "All checks passed - the issue may be elsewhere in the authentication flow" }
+            };
+
+            return Results.Json(new { result, summary });
         });
-        
+
+        // SPECIAL DEBUG: Check client cookie configuration status
+        app.MapGet("/debug/client-cookie-config", (IClientCookieConfigurationService cookieService, ILogger<Program> logger) =>
+        {
+            logger.LogInformation("?? Checking client cookie configurations");
+
+            var allConfigs = cookieService.GetAllClientConfigurations();
+            
+            var testClients = new[] { "mrwho_admin_web", "mrwho_demo1", "postman_client", "some_dynamic_client" };
+            var results = new List<object>();
+
+            foreach (var clientId in testClients)
+            {
+                var hasStatic = cookieService.HasStaticConfiguration(clientId);
+                var usesDynamic = cookieService.UsesDynamicCookies(clientId);
+                var schemeName = cookieService.GetCookieSchemeForClient(clientId);
+                var cookieName = cookieService.GetCookieNameForClient(clientId);
+
+                results.Add(new
+                {
+                    ClientId = clientId,
+                    HasStaticConfiguration = hasStatic,
+                    UsesDynamicCookies = usesDynamic,
+                    SchemeName = schemeName,
+                    CookieName = cookieName,
+                    Status = hasStatic ? "? STATIC" : "?? DYNAMIC"
+                });
+            }
+
+            return Results.Json(new
+            {
+                Title = "Client Cookie Configuration Analysis",
+                AllStaticConfigurations = allConfigs.Select(kvp => new
+                {
+                    kvp.Key,
+                    kvp.Value.ClientId,
+                    kvp.Value.SchemeName,
+                    kvp.Value.CookieName
+                }),
+                TestResults = results,
+                Summary = new
+                {
+                    StaticClients = results.Count(r => ((dynamic)r).HasStaticConfiguration),
+                    DynamicClients = results.Count(r => ((dynamic)r).UsesDynamicCookies),
+                    ExpectedBehavior = "Demo1 should now show as STATIC (not DYNAMIC)"
+                }
+            });
+        });
+
+        // SPECIAL DEBUG: Test dynamic vs static cookie approach
+        app.MapGet("/debug/test-dynamic-cookies", async (
+            IDynamicCookieService dynamicCookieService,
+            IClientCookieConfigurationService cookieConfigService,
+            ILogger<Program> logger,
+            HttpContext context) =>
+        {
+            logger.LogInformation("?? Testing dynamic vs static cookie approaches");
+
+            var testClients = new[] { "mrwho_admin_web", "mrwho_demo1", "postman_client" };
+            var results = new List<object>();
+
+            foreach (var clientId in testClients)
+            {
+                try
+                {
+                    var hasStatic = cookieConfigService.HasStaticConfiguration(clientId);
+                    var isAuthenticated = await dynamicCookieService.IsAuthenticatedForClientAsync(clientId);
+                    var principal = await dynamicCookieService.GetClientPrincipalAsync(clientId);
+                    
+                    var subjectClaim = principal?.FindFirst(ClaimTypes.NameIdentifier) ?? 
+                                      principal?.FindFirst(OpenIddictConstants.Claims.Subject);
+
+                    results.Add(new
+                    {
+                        ClientId = clientId,
+                        HasStaticConfig = hasStatic,
+                        IsAuthenticated = isAuthenticated,
+                        HasPrincipal = principal != null,
+                        SubjectClaim = subjectClaim != null ? new
+                        {
+                            Type = subjectClaim.Type,
+                            Value = subjectClaim.Value
+                        } : null,
+                        AllClaims = principal?.Claims.Select(c => new { c.Type, c.Value }).ToArray() ?? new object[0],
+                        CookieName = cookieConfigService.GetCookieNameForClient(clientId),
+                        SchemeName = cookieConfigService.GetCookieSchemeForClient(clientId),
+                        Status = hasStatic ? "?? STATIC" : "?? DYNAMIC"
+                    });
+                }
+                catch (Exception ex)
+                {
+                    results.Add(new
+                    {
+                        ClientId = clientId,
+                        Error = ex.Message,
+                        Status = "? ERROR"
+                    });
+                }
+            }
+
+            return Results.Json(new
+            {
+                Title = "Dynamic vs Static Cookie Test",
+                TestResults = results,
+                Notes = new
+                {
+                    Demo1Status = "Demo1 should now use DYNAMIC approach",
+                    SubjectClaimTypes = new
+                    {
+                        NameIdentifier = ClaimTypes.NameIdentifier,
+                        Subject = OpenIddictConstants.Claims.Subject
+                    }
+                }
+            });
+        });
         return app;
     }
 

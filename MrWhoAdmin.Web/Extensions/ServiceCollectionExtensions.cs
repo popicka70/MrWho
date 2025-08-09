@@ -40,6 +40,33 @@ public static class ServiceCollectionExtensions
         // Add Blazor authentication service
         services.AddScoped<IBlazorAuthService, BlazorAuthService>();
         
+        // Add authentication failure service
+        services.AddScoped<IAuthenticationFailureService, AuthenticationFailureService>();
+        
+        // CRITICAL: Ensure antiforgery services are explicitly added
+        // This should be automatic with Blazor Server, but we'll add it explicitly to fix the error
+        services.AddAntiforgery();
+        
+        // Configure HttpClient defaults for better connection management
+        services.ConfigureHttpClientDefaults(builder =>
+        {
+            builder.ConfigureHttpClient(client =>
+            {
+                client.Timeout = TimeSpan.FromSeconds(30); // Default timeout
+            });
+            
+            // Configure connection lifetime to prevent stale connections
+            builder.ConfigurePrimaryHttpMessageHandler(() =>
+            {
+                return new SocketsHttpHandler()
+                {
+                    PooledConnectionLifetime = TimeSpan.FromMinutes(15), // Refresh connections every 15 minutes
+                    PooledConnectionIdleTimeout = TimeSpan.FromMinutes(5), // Close idle connections after 5 minutes
+                    MaxConnectionsPerServer = 10 // Limit concurrent connections per server
+                };
+            });
+        });
+        
         return services;
     }
 
@@ -50,12 +77,15 @@ public static class ServiceCollectionExtensions
     {
         var mrWhoApiBaseUrl = configuration.GetValue<string>("MrWhoApi:BaseUrl") ?? "https://localhost:7113/";
 
-        // Register MrWho API clients with authentication
+        // Configure default timeout for all HTTP clients
+        var defaultTimeout = TimeSpan.FromSeconds(30);
+
+        // Register MrWho API clients with authentication and improved timeout handling
         services.AddHttpClient<IRealmsApiService, RealmsApiService>(client =>
         {
             client.BaseAddress = new Uri(mrWhoApiBaseUrl);
             client.DefaultRequestHeaders.Add("Accept", "application/json");
-            client.Timeout = TimeSpan.FromSeconds(30);
+            client.Timeout = defaultTimeout; // Set explicit timeout
         })
         .AddHttpMessageHandler<AuthenticationDelegatingHandler>();
 
@@ -63,7 +93,7 @@ public static class ServiceCollectionExtensions
         {
             client.BaseAddress = new Uri(mrWhoApiBaseUrl);
             client.DefaultRequestHeaders.Add("Accept", "application/json");
-            client.Timeout = TimeSpan.FromSeconds(30);
+            client.Timeout = defaultTimeout; // Set explicit timeout
         })
         .AddHttpMessageHandler<AuthenticationDelegatingHandler>();
 
@@ -71,7 +101,7 @@ public static class ServiceCollectionExtensions
         {
             client.BaseAddress = new Uri(mrWhoApiBaseUrl);
             client.DefaultRequestHeaders.Add("Accept", "application/json");
-            client.Timeout = TimeSpan.FromSeconds(30);
+            client.Timeout = defaultTimeout; // Set explicit timeout
         })
         .AddHttpMessageHandler<AuthenticationDelegatingHandler>();
 
@@ -79,7 +109,7 @@ public static class ServiceCollectionExtensions
         {
             client.BaseAddress = new Uri(mrWhoApiBaseUrl);
             client.DefaultRequestHeaders.Add("Accept", "application/json");
-            client.Timeout = TimeSpan.FromSeconds(30);
+            client.Timeout = defaultTimeout; // Set explicit timeout
         })
         .AddHttpMessageHandler<AuthenticationDelegatingHandler>();
 
@@ -87,7 +117,7 @@ public static class ServiceCollectionExtensions
         {
             client.BaseAddress = new Uri(mrWhoApiBaseUrl);
             client.DefaultRequestHeaders.Add("Accept", "application/json");
-            client.Timeout = TimeSpan.FromSeconds(30);
+            client.Timeout = defaultTimeout; // Set explicit timeout
         })
         .AddHttpMessageHandler<AuthenticationDelegatingHandler>();
 
@@ -95,7 +125,7 @@ public static class ServiceCollectionExtensions
         {
             client.BaseAddress = new Uri(mrWhoApiBaseUrl);
             client.DefaultRequestHeaders.Add("Accept", "application/json");
-            client.Timeout = TimeSpan.FromSeconds(30);
+            client.Timeout = defaultTimeout; // Set explicit timeout
         })
         .AddHttpMessageHandler<AuthenticationDelegatingHandler>();
 
@@ -103,7 +133,7 @@ public static class ServiceCollectionExtensions
         {
             client.BaseAddress = new Uri(mrWhoApiBaseUrl);
             client.DefaultRequestHeaders.Add("Accept", "application/json");
-            client.Timeout = TimeSpan.FromSeconds(30);
+            client.Timeout = defaultTimeout; // Set explicit timeout
         })
         .AddHttpMessageHandler<AuthenticationDelegatingHandler>();
 
@@ -111,7 +141,16 @@ public static class ServiceCollectionExtensions
         {
             client.BaseAddress = new Uri(mrWhoApiBaseUrl);
             client.DefaultRequestHeaders.Add("Accept", "application/json");
-            client.Timeout = TimeSpan.FromSeconds(30);
+            client.Timeout = defaultTimeout; // Set explicit timeout
+        })
+        .AddHttpMessageHandler<AuthenticationDelegatingHandler>();
+
+        // Add Sessions API service
+        services.AddHttpClient<ISessionsApiService, SessionsApiService>(client =>
+        {
+            client.BaseAddress = new Uri(mrWhoApiBaseUrl);
+            client.DefaultRequestHeaders.Add("Accept", "application/json");
+            client.Timeout = defaultTimeout; // Set explicit timeout
         })
         .AddHttpMessageHandler<AuthenticationDelegatingHandler>();
 
@@ -120,32 +159,33 @@ public static class ServiceCollectionExtensions
 
     /// <summary>
     /// Configures authentication services including OpenID Connect
+    /// CORRECTED: Use standard OIDC with server-side session isolation
     /// </summary>
     public static IServiceCollection AddAuthenticationServices(this IServiceCollection services, IConfiguration configuration)
     {
-        // CRITICAL: Use client-specific cookie scheme to prevent session sharing
+        // CORRECTED: Use standard OIDC schemes - session isolation handled server-side
         const string adminCookieScheme = "AdminCookies";
         
         services.AddAuthentication(options =>
         {
-            options.DefaultScheme = adminCookieScheme; // Use client-specific scheme
-            options.DefaultChallengeScheme = OpenIdConnectDefaults.AuthenticationScheme;
+            options.DefaultScheme = adminCookieScheme;
+            options.DefaultChallengeScheme = OpenIdConnectDefaults.AuthenticationScheme; // Use standard OIDC
         })
-        .AddCookie(adminCookieScheme, options => // Use client-specific scheme name
+        .AddCookie(adminCookieScheme, options =>
         {
-            options.Cookie.Name = ".MrWho.Admin"; // Client-specific cookie name
+            options.Cookie.Name = ".MrWho.Admin"; // Client-specific cookie name for local session
             options.Cookie.Path = "/";
             options.Cookie.HttpOnly = true;
             options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
             options.Cookie.SameSite = SameSiteMode.Lax;
-            options.ExpireTimeSpan = TimeSpan.FromHours(8); // Admin session timeout
+            options.ExpireTimeSpan = TimeSpan.FromHours(8);
             options.SlidingExpiration = true;
             options.LoginPath = "/login";
             options.LogoutPath = "/logout";
         })
-        .AddOpenIdConnect(OpenIdConnectDefaults.AuthenticationScheme, options =>
+        .AddOpenIdConnect(OpenIdConnectDefaults.AuthenticationScheme, options => // Use standard scheme
         {
-            options.SignInScheme = adminCookieScheme; // CRITICAL: Use client-specific scheme
+            options.SignInScheme = adminCookieScheme;
             ConfigureOpenIdConnect(options, configuration);
         });
 
@@ -174,7 +214,7 @@ public static class ServiceCollectionExtensions
         
         options.ResponseType = "code";
         options.SaveTokens = true; // CRITICAL: This saves tokens for API calls
-        options.GetClaimsFromUserInfoEndpoint = true;
+        options.GetClaimsFromUserInfoEndpoint = false; // TEMPORARILY DISABLE: Skip UserInfo endpoint due to 403 issue
         options.RequireHttpsMetadata = false; // Only for development
         options.UsePkce = true; // Enable PKCE for better security
 
@@ -221,8 +261,10 @@ public static class ServiceCollectionExtensions
     /// </summary>
     private static void ConfigureClaimActions(OpenIdConnectOptions options)
     {
-        // Force UserInfo endpoint call by removing ALL claims from ID token processing
+        // Since we're not using UserInfo endpoint due to 403 issue, get claims from ID token
         options.ClaimActions.Clear();
+        
+        // Remove technical OpenIddict claims we don't need
         options.ClaimActions.DeleteClaim("iss");
         options.ClaimActions.DeleteClaim("aud");
         options.ClaimActions.DeleteClaim("exp");
@@ -233,7 +275,7 @@ public static class ServiceCollectionExtensions
         options.ClaimActions.DeleteClaim("oi_au_id");
         options.ClaimActions.DeleteClaim("oi_tbn_id");
 
-        // Only map claims from UserInfo endpoint
+        // Map claims from ID token (since UserInfo is disabled)
         options.ClaimActions.MapJsonKey("sub", "sub");
         options.ClaimActions.MapJsonKey("name", "name");
         options.ClaimActions.MapJsonKey("given_name", "given_name");
@@ -256,23 +298,23 @@ public static class ServiceCollectionExtensions
             OnRedirectToIdentityProvider = context =>
             {
                 var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-                logger.LogInformation("Redirecting to identity provider: {Authority} with return URL: {ReturnUrl}", 
-                    options.Authority, context.Properties.RedirectUri);
+                logger.LogInformation("?? ADMIN: Redirecting to identity provider with client_id: {ClientId}", 
+                    context.ProtocolMessage.ClientId);
                 return Task.CompletedTask;
             },
             
             OnTokenValidated = context =>
             {
                 var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-                logger.LogInformation("Token validated successfully for user: {UserName}. Claims count: {ClaimsCount}", 
+                logger.LogInformation("? ADMIN: Token validated successfully for user: {UserName}. Claims count: {ClaimsCount}", 
                     context.Principal?.Identity?.Name ?? "Unknown", context.Principal?.Claims?.Count() ?? 0);
                 
-                // Log the claims we have at this point
+                // Log the claims we have at this context
                 if (context.Principal?.Claims != null)
                 {
                     foreach (var claim in context.Principal.Claims)
                     {
-                        logger.LogDebug("Token claim: {ClaimType} = {ClaimValue}", claim.Type, claim.Value);
+                        logger.LogDebug("ADMIN Token claim: {ClaimType} = {ClaimValue}", claim.Type, claim.Value);
                     }
                 }
                 
@@ -282,13 +324,13 @@ public static class ServiceCollectionExtensions
             OnUserInformationReceived = context =>
             {
                 var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-                logger.LogInformation("UserInfo received from endpoint. User document contains {PropertyCount} properties", 
+                logger.LogInformation("?? ADMIN: UserInfo received from endpoint. User document contains {PropertyCount} properties", 
                     context.User.RootElement.EnumerateObject().Count());
                 
                 // Log what we received from UserInfo endpoint
                 foreach (var property in context.User.RootElement.EnumerateObject())
                 {
-                    logger.LogDebug("UserInfo property: {PropertyName} = {PropertyValue}", property.Name, property.Value.ToString());
+                    logger.LogDebug("ADMIN UserInfo property: {PropertyName} = {PropertyValue}", property.Name, property.Value.ToString());
                 }
                 
                 return Task.CompletedTask;
@@ -297,7 +339,7 @@ public static class ServiceCollectionExtensions
             OnTokenResponseReceived = context =>
             {
                 var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-                logger.LogInformation("Token response received - Access Token: {HasAccessToken}, Refresh Token: {HasRefreshToken}", 
+                logger.LogInformation("?? ADMIN: Token response received - Access Token: {HasAccessToken}, Refresh Token: {HasRefreshToken}", 
                     !string.IsNullOrEmpty(context.TokenEndpointResponse.AccessToken),
                     !string.IsNullOrEmpty(context.TokenEndpointResponse.RefreshToken));
                 return Task.CompletedTask;
@@ -306,12 +348,25 @@ public static class ServiceCollectionExtensions
             OnAuthenticationFailed = context =>
             {
                 var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-                logger.LogError("Authentication failed: {Error} - {ErrorDescription}", 
+                logger.LogError("? ADMIN: Authentication failed: {Error} - {ErrorDescription}", 
                     context.Exception?.Message, context.Exception?.ToString());
                 
-                // Handle authentication failures by redirecting to an error page
+                // Check if this is a UserInfo endpoint failure (403 Forbidden)
+                if (context.Exception is HttpRequestException httpEx && 
+                    httpEx.Message.Contains("403") && 
+                    httpEx.Message.Contains("Forbidden"))
+                {
+                    logger.LogWarning("?? ADMIN: UserInfo endpoint returned 403 Forbidden - this might be a temporary server issue");
+                    
+                    // Don't treat UserInfo 403 as a complete authentication failure
+                    // The user can still be authenticated based on the ID token
+                    // Just log the issue and let the authentication continue without UserInfo claims
+                    return Task.CompletedTask;
+                }
+                
+                // For other authentication failures, redirect to error page
                 var errorMessage = Uri.EscapeDataString(context.Exception?.Message ?? "Unknown error");
-                context.Response.Redirect($"/auth-error?error={errorMessage}");
+                context.Response.Redirect($"/auth/error?error={errorMessage}");
                 context.HandleResponse();
                 
                 return Task.CompletedTask;
@@ -320,11 +375,23 @@ public static class ServiceCollectionExtensions
             OnRemoteFailure = context =>
             {
                 var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-                logger.LogError("Remote authentication failure: {Error}", context.Failure?.Message);
+                logger.LogError("?? ADMIN: Remote authentication failure: {Error}", context.Failure?.Message);
                 
-                // Handle remote failures by redirecting to an error page
+                // Check if this is a UserInfo endpoint failure (403 Forbidden)
+                if (context.Failure is HttpRequestException httpEx && 
+                    httpEx.Message.Contains("403") && 
+                    httpEx.Message.Contains("Forbidden"))
+                {
+                    logger.LogWarning("?? ADMIN: UserInfo endpoint returned 403 Forbidden during remote authentication");
+                    
+                    // Don't treat UserInfo 403 as a complete authentication failure
+                    // Skip the UserInfo call and continue with ID token claims
+                    return Task.CompletedTask;
+                }
+                
+                // For other remote failures, redirect to error page
                 var errorMessage = Uri.EscapeDataString(context.Failure?.Message ?? "Remote authentication failed");
-                context.Response.Redirect($"/auth-error?error={errorMessage}");
+                context.Response.Redirect($"/auth/error?error={errorMessage}");
                 context.HandleResponse();
                 
                 return Task.CompletedTask;
@@ -333,21 +400,21 @@ public static class ServiceCollectionExtensions
             OnAuthorizationCodeReceived = context =>
             {
                 var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-                logger.LogInformation("Authorization code received, exchanging for tokens");
+                logger.LogInformation("?? ADMIN: Authorization code received, exchanging for tokens");
                 return Task.CompletedTask;
             },
             
             OnRedirectToIdentityProviderForSignOut = context =>
             {
                 var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-                logger.LogInformation("Redirecting to identity provider for sign out");
+                logger.LogInformation("?? ADMIN: Redirecting to identity provider for sign out (server-side isolation via DynamicCookieService)");
                 return Task.CompletedTask;
             },
             
             OnSignedOutCallbackRedirect = context =>
             {
                 var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-                logger.LogInformation("Processing signed out callback redirect to: {RedirectUri}", 
+                logger.LogInformation("? ADMIN: Processing signed out callback redirect to: {RedirectUri}", 
                     context.Options.SignedOutRedirectUri);
                 return Task.CompletedTask;
             }

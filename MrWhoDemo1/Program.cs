@@ -9,23 +9,33 @@ builder.AddServiceDefaults();
 
 // Add services to the container.
 builder.Services.AddRazorPages();
+builder.Services.AddControllers(); // Add controllers for back-channel logout
+
+// Add session support for logout notifications
+builder.Services.AddSession(options =>
+{
+    options.IdleTimeout = TimeSpan.FromMinutes(30);
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+    options.Cookie.Name = ".MrWho.Demo1.Session";
+});
 
 // CRITICAL: Clear default claim mappings to preserve JWT claim names
 Microsoft.IdentityModel.JsonWebTokens.JsonWebTokenHandler.DefaultInboundClaimTypeMap.Clear();
 
-// CRITICAL: Use client-specific cookie scheme to prevent session sharing
+// CORRECTED: Use standard OIDC scheme - session isolation handled server-side
 const string demo1CookieScheme = "Demo1Cookies";
 
 // Add authentication services
 builder.Services.AddAuthentication(options =>
 {
-    options.DefaultScheme = demo1CookieScheme; // Use client-specific scheme
-    options.DefaultChallengeScheme = OpenIdConnectDefaults.AuthenticationScheme;
-    options.DefaultSignOutScheme = OpenIdConnectDefaults.AuthenticationScheme; // CRITICAL: Set default sign-out scheme
+    options.DefaultScheme = demo1CookieScheme;
+    options.DefaultChallengeScheme = OpenIdConnectDefaults.AuthenticationScheme; // Use standard OIDC
+    options.DefaultSignOutScheme = OpenIdConnectDefaults.AuthenticationScheme; // Use standard OIDC
 })
-.AddCookie(demo1CookieScheme, options => // Use client-specific scheme name
+.AddCookie(demo1CookieScheme, options =>
 {
-    options.Cookie.Name = ".MrWho.Demo1"; // Client-specific cookie name
+    options.Cookie.Name = ".MrWho.Demo1"; // Client-specific cookie name for local session
     options.Cookie.Path = "/";
     options.Cookie.HttpOnly = true;
     options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
@@ -34,10 +44,12 @@ builder.Services.AddAuthentication(options =>
     options.SlidingExpiration = true;
     options.LoginPath = "/Account/Login";
     options.LogoutPath = "/Account/Logout";
+    // FIXED: Use relative path that will redirect back to the identity server during OIDC flow
+    options.AccessDeniedPath = "/Account/AccessDenied";
 })
-.AddOpenIdConnect(OpenIdConnectDefaults.AuthenticationScheme, options =>
+.AddOpenIdConnect(OpenIdConnectDefaults.AuthenticationScheme, options => // Use standard OIDC scheme
 {
-    options.SignInScheme = demo1CookieScheme; // CRITICAL: Use client-specific scheme
+    options.SignInScheme = demo1CookieScheme;
     options.Authority = "https://localhost:7113"; // MrWho OIDC Server
     options.ClientId = "mrwho_demo1";
     options.ClientSecret = "Demo1Secret2024!";
@@ -90,7 +102,7 @@ builder.Services.AddAuthentication(options =>
         {
             // Log the claims for debugging
             var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-            logger.LogDebug("Claims in ID token: {Claims}", 
+            logger.LogDebug("Demo1 claims in ID token: {Claims}", 
                 string.Join(", ", context.Principal?.Claims.Select(c => $"{c.Type}={c.Value}") ?? Array.Empty<string>()));
             return Task.CompletedTask;
         },
@@ -99,10 +111,11 @@ builder.Services.AddAuthentication(options =>
         OnRedirectToIdentityProviderForSignOut = context =>
         {
             var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-            logger.LogInformation("?? LOGOUT STEP 1: Redirecting to identity provider for sign out");
+            logger.LogInformation("?? DEMO1 LOGOUT STEP 1: Redirecting to identity provider for sign out (server-side isolation via DynamicCookieService)");
             logger.LogInformation("   - Target logout URL: {LogoutUrl}", context.ProtocolMessage.IssuerAddress);
             logger.LogInformation("   - Post logout redirect URI: {PostLogoutUri}", context.ProtocolMessage.PostLogoutRedirectUri);
             logger.LogInformation("   - ID token hint: {HasIdToken}", !string.IsNullOrEmpty(context.ProtocolMessage.IdTokenHint));
+            logger.LogInformation("   - Using standard OIDC with server-side session isolation");
             return Task.CompletedTask;
         },
         
@@ -110,9 +123,9 @@ builder.Services.AddAuthentication(options =>
         OnSignedOutCallbackRedirect = context =>
         {
             var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-            logger.LogInformation("? LOGOUT STEP 2: OIDC logout completed, processing callback redirect");
+            logger.LogInformation("? DEMO1 LOGOUT STEP 2: OIDC logout completed, processing callback redirect");
             logger.LogInformation("   - Redirecting to: {RedirectUri}", context.Options.SignedOutRedirectUri);
-            logger.LogInformation("   - Logout successful: User should no longer be authenticated");
+            logger.LogInformation("   - Demo1 logout successful: User should no longer be authenticated");
             return Task.CompletedTask;
         },
         
@@ -121,7 +134,7 @@ builder.Services.AddAuthentication(options =>
         OnRemoteSignOut = context =>
         {
             var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-            logger.LogWarning("?? REMOTE LOGOUT: Received remote sign out notification from OIDC provider");
+            logger.LogWarning("?? DEMO1 REMOTE LOGOUT: Received remote sign out notification from OIDC provider");
             logger.LogWarning("   - This indicates logout was initiated from another application");
             return Task.CompletedTask;
         },
@@ -130,14 +143,14 @@ builder.Services.AddAuthentication(options =>
         OnAuthenticationFailed = context =>
         {
             var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-            logger.LogError("? Authentication failed: {Error}", context.Exception?.Message);
+            logger.LogError("? Demo1 Authentication failed: {Error}", context.Exception?.Message);
             return Task.CompletedTask;
         },
         
         OnRemoteFailure = context =>
         {
             var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-            logger.LogError("? Remote failure: {Error}", context.Failure?.Message);
+            logger.LogError("? Demo1 Remote failure: {Error}", context.Failure?.Message);
             return Task.CompletedTask;
         }
     };
@@ -159,9 +172,15 @@ app.UseHttpsRedirection();
 
 app.UseRouting();
 
+// Add session middleware for logout notifications
+app.UseSession();
+
 // Add authentication middleware
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Map controllers for back-channel logout
+app.MapControllers();
 
 app.MapStaticAssets();
 app.MapRazorPages()
@@ -200,9 +219,9 @@ if (app.Environment.IsDevelopment())
     app.MapPost("/debug/logout", async (HttpContext context) =>
     {
         await context.SignOutAsync(demo1CookieScheme);
-        await context.SignOutAsync(OpenIdConnectDefaults.AuthenticationScheme);
+        await context.SignOutAsync(OpenIdConnectDefaults.AuthenticationScheme); // Use standard OIDC scheme
         
-        return Results.Ok(new { Message = "Signed out from all schemes", Timestamp = DateTime.UtcNow });
+        return Results.Ok(new { Message = "Signed out from Demo1 using standard schemes with server-side isolation", Timestamp = DateTime.UtcNow });
     });
 
     app.MapGet("/debug/tokens", async (HttpContext context) =>
@@ -230,45 +249,47 @@ if (app.Environment.IsDevelopment())
     // Debug endpoint to test logout flow step by step
     app.MapGet("/debug/logout-flow", async (HttpContext context) =>
     {
-        var isAuthenticated = context.User.Identity?.IsAuthenticated == true;
+        var steps = new List<object>();
         
-        if (!isAuthenticated)
+        // Step 1: Check current authentication status
+        var isAuthenticated = context.User.Identity?.IsAuthenticated == true;
+        steps.Add(new { step = 1, description = "Check authentication", result = isAuthenticated });
+        
+        if (isAuthenticated)
         {
-            return Results.Json(new 
-            { 
-                Error = "Not authenticated - cannot test logout flow",
-                Suggestion = "Login first, then test logout"
+            // Step 2: Check available tokens
+            var accessToken = await context.GetTokenAsync("access_token");
+            var refreshToken = await context.GetTokenAsync("refresh_token");
+            var idToken = await context.GetTokenAsync("id_token");
+            
+            steps.Add(new { 
+                step = 2, 
+                description = "Check tokens", 
+                result = new { 
+                    hasAccessToken = !string.IsNullOrEmpty(accessToken),
+                    hasRefreshToken = !string.IsNullOrEmpty(refreshToken),
+                    hasIdToken = !string.IsNullOrEmpty(idToken)
+                }
             });
+            
+            // Step 3: Check cookies
+            var cookies = context.Request.Cookies
+                .Where(c => c.Key.Contains("Demo1") || c.Key.Contains("AspNet"))
+                .Select(c => new { name = c.Key, length = c.Value.Length })
+                .ToList();
+            
+            steps.Add(new { step = 3, description = "Check cookies", result = cookies });
         }
-
-        var accessToken = await context.GetTokenAsync("access_token");
-        var idToken = await context.GetTokenAsync("id_token");
         
         return Results.Json(new
         {
-            CurrentState = new
-            {
-                IsAuthenticated = isAuthenticated,
-                UserName = context.User.Identity?.Name,
-                AuthenticationType = context.User.Identity?.AuthenticationType,
-                HasAccessToken = !string.IsNullOrEmpty(accessToken),
-                HasIdToken = !string.IsNullOrEmpty(idToken),
-                ClaimsCount = context.User.Claims.Count()
-            },
-            LogoutFlow = new
-            {
-                Step1 = "Click logout button -> calls /Account/Logout",
-                Step2 = "SignOut() redirects to OIDC provider -> OnRedirectToIdentityProviderForSignOut fires",
-                Step3 = "OIDC provider processes logout -> clears server session",
-                Step4 = "OIDC provider redirects back -> OnSignedOutCallbackRedirect fires",
-                Step5 = "User lands on home page -> should no longer be authenticated"
-            },
-            TestActions = new
-            {
-                StandardLogout = "/Account/Logout",
-                DebugLogout = "/debug/logout",
-                ForceClear = "/debug/logout (POST method)"
-            }
+            title = "Demo1 Logout Flow Debug",
+            currentState = new { isAuthenticated = isAuthenticated },
+            sessionIsolation = "Server-side via DynamicCookieService",
+            steps = steps,
+            nextActions = isAuthenticated ? 
+                new[] { "Visit /Account/Logout to test logout flow" } : 
+                new[] { "Visit /Account/Login to authenticate first" }
         });
     });
 }

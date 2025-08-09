@@ -179,8 +179,8 @@
             {
                 <div class="alert alert-info">
                     <h4><i class="bi bi-info-circle"></i> Welcome to MrWho Demo!</h4>
-                    <p>This application demonstrates OpenID Connect authentication with the MrWho OIDC Server.</p>
-                    <p class="mb-0">Please log in to explore the authentication features and view your tokens and claims.</p>
+                    <p>This application demonstrates <strong>OpenID Connect authentication</strong> with the MrWho OIDC Server.</p>
+                    <p class="mb-0">Authentication is handled securely by redirecting to the trusted identity server.</p>
                 </div>
                 
                 <div class="row mt-4">
@@ -198,28 +198,50 @@
                     <div class="col-md-4">
                         <div class="card">
                             <div class="card-header bg-primary text-white">
-                                <h6 class="mb-0">Get Started</h6>
+                                <h6 class="mb-0"><i class="bi bi-shield-check"></i> Secure Login</h6>
                             </div>
                             <div class="card-body">
-                                <p class="small mb-3">Choose your login experience:</p>
+                                <p class="small mb-3">Login via MrWho Identity Server using OpenID Connect:</p>
+                                
+                                <div class="d-grid gap-2 mb-3">
+                                    <a href="/Account/Login?direct=true" class="btn btn-primary">
+                                        <i class="bi bi-box-arrow-in-right"></i> Login with MrWho
+                                    </a>
+                                    <small class="text-muted text-center">Direct redirect to identity server</small>
+                                </div>
                                 
                                 <div class="d-grid gap-2">
-                                    <a href="/Account/Login" class="btn btn-primary">
-                                        <i class="bi bi-box-arrow-in-right"></i> Login with Form
+                                    <a href="/Account/Login" class="btn btn-outline-primary">
+                                        <i class="bi bi-info-circle"></i> Learn About Login Process
                                     </a>
-                                    <small class="text-muted text-center">Traditional login form with demo credentials auto-fill</small>
+                                    <small class="text-muted text-center">Understand how OIDC authentication works</small>
                                 </div>
                                 
                                 <hr class="my-3">
                                 
                                 <div class="card bg-light">
                                     <div class="card-body p-2">
-                                        <h6 class="card-title small mb-1">Demo Credentials:</h6>
+                                        <h6 class="card-title small mb-1"><i class="bi bi-person-badge"></i> Demo Credentials:</h6>
                                         <p class="small mb-1"><strong>Username:</strong><br><code>demo1@example.com</code></p>
                                         <p class="small mb-0"><strong>Password:</strong><br><code>Demo123</code></p>
                                     </div>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="alert alert-light border">
+                            <h6><i class="bi bi-lightbulb"></i> How OpenID Connect Works:</h6>
+                            <ol class="mb-0 ps-3">
+                                <li><strong>Initiate Login:</strong> Click "Login with MrWho" to start the authentication process</li>
+                                <li><strong>Redirect to Identity Server:</strong> You'll be taken to the secure MrWho Identity Server</li>
+                                <li><strong>Enter Credentials:</strong> Login with your username and password on the trusted server</li>
+                                <li><strong>Return with Tokens:</strong> You'll be redirected back with authentication tokens</li>
+                                <li><strong>Access Granted:</strong> Explore all the demo features with your authenticated session</li>
+                            </ol>
                         </div>
                     </div>
                 </div>

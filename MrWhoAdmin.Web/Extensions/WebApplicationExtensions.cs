@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using MrWhoAdmin.Web.Components;
 using MrWhoAdmin.Web.Middleware;
+using MrWhoAdmin.Web.Services;
+using Radzen;
 
 namespace MrWhoAdmin.Web.Extensions;
 
@@ -16,7 +18,11 @@ public static class WebApplicationExtensions
     /// </summary>
     public static WebApplication ConfigureMiddlewarePipeline(this WebApplication app)
     {
-        if (!app.Environment.IsDevelopment())
+        if (app.Environment.IsDevelopment())
+        {
+            app.UseDeveloperExceptionPage();
+        }
+        else
         {
             app.UseExceptionHandler("/Error", createScopeForErrors: true);
             // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
@@ -24,15 +30,22 @@ public static class WebApplicationExtensions
         }
 
         app.UseHttpsRedirection();
+        app.UseStaticFiles();
+        app.UseRouting();
+        app.UseOutputCache();
+
+        // Authentication and authorization
         app.UseAuthentication();
         app.UseAuthorization();
-        
-        // Add token refresh middleware after authentication but before other middleware
-        app.UseMiddleware<TokenRefreshMiddleware>();
-        
+
+        // CRITICAL: Add antiforgery middleware for Blazor components
         app.UseAntiforgery();
-        app.UseOutputCache();
-        app.MapStaticAssets();
+
+        // Add 403 Forbidden redirect middleware after authorization
+        app.UseMiddleware<ForbiddenRedirectMiddleware>();
+
+        // Token refresh middleware for API calls
+        app.UseMiddleware<TokenRefreshMiddleware>();
 
         return app;
     }

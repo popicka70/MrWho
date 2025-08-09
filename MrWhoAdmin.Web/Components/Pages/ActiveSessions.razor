@@ -1,0 +1,427 @@
+@page "/monitoring/sessions"
+@using MrWho.Shared
+@using MrWhoAdmin.Web.Services
+@using MrWhoAdmin.Web.Components
+@inherits AuthenticatedComponentBase
+@rendermode InteractiveServer
+
+<PageTitle>Active Sessions - MrWho Admin</PageTitle>
+
+<RadzenCard Class="rz-m-12">
+    <RadzenStack Gap="1.5rem">
+        <!-- Page Header -->
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                <RadzenIcon Icon="people_outline" Style="font-size: 2rem;" />
+                <RadzenText TextStyle="TextStyle.H4" Text="Active Sessions" />
+            </RadzenStack>
+            
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem">
+                <RadzenButton Icon="refresh" 
+                             Text="Refresh" 
+                             Click="@(async () => await LoadSessionsAsync())" 
+                             IsBusy="@isLoading"
+                             ButtonStyle="ButtonStyle.Secondary" />
+                
+                <RadzenDropDown @bind-Value="@selectedFilter" 
+                               Data="@filterOptions" 
+                               TextProperty="Text" 
+                               ValueProperty="Value"
+                               Change="@(async () => await ApplyFilterAsync())"
+                               Placeholder="Filter sessions..." 
+                               Style="width: 200px;" />
+            </RadzenStack>
+        </RadzenStack>
+
+        <!-- Statistics Cards -->
+        @if (statistics != null)
+        {
+            <RadzenRow Gap="1rem">
+                <RadzenColumn Size="12" SizeMD="3">
+                    <RadzenCard Style="text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                        <RadzenStack Gap="0.5rem">
+                            <RadzenIcon Icon="people" Style="font-size: 2.5rem;" />
+                            <RadzenText TextStyle="TextStyle.H3" Text="@statistics.TotalActiveSessions.ToString()" />
+                            <RadzenText TextStyle="TextStyle.Subtitle2" Text="Active Sessions" />
+                        </RadzenStack>
+                    </RadzenCard>
+                </RadzenColumn>
+                
+                <RadzenColumn Size="12" SizeMD="3">
+                    <RadzenCard Style="text-align: center; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white;">
+                        <RadzenStack Gap="0.5rem">
+                            <RadzenIcon Icon="person" Style="font-size: 2.5rem;" />
+                            <RadzenText TextStyle="TextStyle.H3" Text="@statistics.UniqueActiveUsers.ToString()" />
+                            <RadzenText TextStyle="TextStyle.Subtitle2" Text="Active Users" />
+                        </RadzenStack>
+                    </RadzenCard>
+                </RadzenColumn>
+                
+                <RadzenColumn Size="12" SizeMD="3">
+                    <RadzenCard Style="text-align: center; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white;">
+                        <RadzenStack Gap="0.5rem">
+                            <RadzenIcon Icon="apps" Style="font-size: 2.5rem;" />
+                            <RadzenText TextStyle="TextStyle.H3" Text="@statistics.ActiveClients.ToString()" />
+                            <RadzenText TextStyle="TextStyle.Subtitle2" Text="Active Clients" />
+                        </RadzenStack>
+                    </RadzenCard>
+                </RadzenColumn>
+                
+                <RadzenColumn Size="12" SizeMD="3">
+                    <RadzenCard Style="text-align: center; background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white;">
+                        <RadzenStack Gap="0.5rem">
+                            <RadzenIcon Icon="schedule" Style="font-size: 2.5rem;" />
+                            <RadzenText TextStyle="TextStyle.H3" Text="@statistics.ExpiringSoon.ToString()" />
+                            <RadzenText TextStyle="TextStyle.Subtitle2" Text="Expiring Soon" />
+                        </RadzenStack>
+                    </RadzenCard>
+                </RadzenColumn>
+            </RadzenRow>
+        }
+
+        <!-- Sessions Data Grid -->
+        @if (isLoading)
+        {
+            <RadzenCard Style="padding: 3rem; text-align: center;">
+                <RadzenStack Gap="1rem" AlignItems="AlignItems.Center">
+                    <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+                    <RadzenText Text="Loading active sessions..." />
+                </RadzenStack>
+            </RadzenCard>
+        }
+        else if (filteredSessions?.Any() == true)
+        {
+            <RadzenDataGrid @ref="sessionsGrid" 
+                           Data="@filteredSessions" 
+                           TItem="ActiveSessionDto"
+                           AllowFiltering="true" 
+                           AllowSorting="true" 
+                           AllowPaging="true"
+                           PageSize="25"
+                           FilterMode="FilterMode.Advanced"
+                           LogicalFilterOperator="LogicalFilterOperator.And"
+                           ShowPagingSummary="true"
+                           PagingSummaryFormat="Showing {0}-{1} of {2} sessions"
+                           Class="rz-datatable-striped">
+                
+                <Columns>
+                    <RadzenDataGridColumn TItem="ActiveSessionDto" Property="UserName" Title="User" Width="150px" Frozen="true">
+                        <Template Context="session">
+                            <RadzenStack Orientation="Orientation.Vertical" Gap="0.25rem">
+                                <RadzenText TextStyle="TextStyle.Body2" Text="@session.UserName" class="rz-text-wrap" />
+                                <RadzenText TextStyle="TextStyle.Caption" Text="@session.UserEmail" class="rz-color-secondary rz-text-wrap" />
+                            </RadzenStack>
+                        </Template>
+                    </RadzenDataGridColumn>
+
+                    <RadzenDataGridColumn TItem="ActiveSessionDto" Property="ClientName" Title="Client" Width="150px">
+                        <Template Context="session">
+                            <RadzenStack Orientation="Orientation.Vertical" Gap="0.25rem">
+                                <RadzenText TextStyle="TextStyle.Body2" Text="@session.ClientName" class="rz-text-wrap" />
+                                <RadzenBadge Text="@session.SessionType" BadgeStyle="@GetSessionTypeBadgeStyle(session.SessionType)" />
+                            </RadzenStack>
+                        </Template>
+                    </RadzenDataGridColumn>
+
+                    <RadzenDataGridColumn TItem="ActiveSessionDto" Property="CreatedAt" Title="Started" Width="130px" FormatString="{0:MM/dd HH:mm}">
+                        <Template Context="session">
+                            <RadzenStack Orientation="Orientation.Vertical" Gap="0.25rem">
+                                <RadzenText TextStyle="TextStyle.Body2" Text="@session.CreatedAt.ToString("MM/dd HH:mm")" />
+                                <RadzenText TextStyle="TextStyle.Caption" Text="@GetTimeAgo(session.CreatedAt)" class="rz-color-secondary" />
+                            </RadzenStack>
+                        </Template>
+                    </RadzenDataGridColumn>
+
+                    <RadzenDataGridColumn TItem="ActiveSessionDto" Property="LastActivity" Title="Last Activity" Width="130px">
+                        <Template Context="session">
+                            @if (session.LastActivity.HasValue)
+                            {
+                                <RadzenStack Orientation="Orientation.Vertical" Gap="0.25rem">
+                                    <RadzenText TextStyle="TextStyle.Body2" Text="@session.LastActivity.Value.ToString("MM/dd HH:mm")" />
+                                    <RadzenText TextStyle="TextStyle.Caption" Text="@GetTimeAgo(session.LastActivity.Value)" class="rz-color-secondary" />
+                                </RadzenStack>
+                            }
+                            else
+                            {
+                                <RadzenText TextStyle="TextStyle.Caption" Text="No activity" class="rz-color-secondary" />
+                            }
+                        </Template>
+                    </RadzenDataGridColumn>
+
+                    <RadzenDataGridColumn TItem="ActiveSessionDto" Property="ExpiresAt" Title="Expires" Width="130px">
+                        <Template Context="session">
+                            @if (session.ExpiresAt.HasValue)
+                            {
+                                var timeUntilExpiry = session.ExpiresAt.Value - DateTime.UtcNow;
+                                var isExpiringSoon = timeUntilExpiry.TotalHours <= 1;
+                                
+                                <RadzenStack Orientation="Orientation.Vertical" Gap="0.25rem">
+                                    <RadzenText TextStyle="TextStyle.Body2" 
+                                               Text="@session.ExpiresAt.Value.ToString("MM/dd HH:mm")" 
+                                               Style="@(isExpiringSoon ? "color: var(--rz-danger);" : "")" />
+                                    <RadzenText TextStyle="TextStyle.Caption" 
+                                               Text="@GetTimeUntil(session.ExpiresAt.Value)" 
+                                               class="@(isExpiringSoon ? "rz-color-danger" : "rz-color-secondary")" />
+                                </RadzenStack>
+                            }
+                            else
+                            {
+                                <RadzenText TextStyle="TextStyle.Caption" Text="No expiry" class="rz-color-secondary" />
+                            }
+                        </Template>
+                    </RadzenDataGridColumn>
+
+                    <RadzenDataGridColumn TItem="ActiveSessionDto" Property="Scopes" Title="Scopes" Width="200px">
+                        <Template Context="session">
+                            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.25rem" Wrap="FlexWrap.Wrap">
+                                @foreach (var scope in session.Scopes.Take(4))
+                                {
+                                    <RadzenBadge Text="@scope" BadgeStyle="BadgeStyle.Light" Style="font-size: 0.75rem;" />
+                                }
+                                @if (session.Scopes.Count > 4)
+                                {
+                                    <RadzenBadge Text="@($"+{session.Scopes.Count - 4} more")" BadgeStyle="BadgeStyle.Info" Style="font-size: 0.75rem;" />
+                                }
+                            </RadzenStack>
+                        </Template>
+                    </RadzenDataGridColumn>
+
+                    <RadzenDataGridColumn TItem="ActiveSessionDto" Title="Tokens" Width="100px" Sortable="false" Filterable="false">
+                        <Template Context="session">
+                            <RadzenStack Orientation="Orientation.Vertical" Gap="0.25rem" AlignItems="AlignItems.Center">
+                                <RadzenText TextStyle="TextStyle.Body2" Text="@session.TokenCount.ToString()" />
+                                @if (session.HasRefreshToken)
+                                {
+                                    <RadzenBadge Text="Refresh" BadgeStyle="BadgeStyle.Success" Style="font-size: 0.75rem;" />
+                                }
+                            </RadzenStack>
+                        </Template>
+                    </RadzenDataGridColumn>
+
+                    <RadzenDataGridColumn TItem="ActiveSessionDto" Title="Actions" Width="120px" Sortable="false" Filterable="false">
+                        <Template Context="session">
+                            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                                <RadzenButton Icon="info" 
+                                             Size="ButtonSize.Small" 
+                                             ButtonStyle="ButtonStyle.Info" 
+                                             Click="@(async () => await ShowSessionDetails(session))"
+                                             title="View Details" />
+                                
+                                <RadzenButton Icon="logout" 
+                                             Size="ButtonSize.Small" 
+                                             ButtonStyle="ButtonStyle.Danger" 
+                                             Click="@(async () => await RevokeSession(session))"
+                                             title="Revoke Session"
+                                             IsBusy="@(revokingSessionIds.Contains(session.Id))" />
+                            </RadzenStack>
+                        </Template>
+                    </RadzenDataGridColumn>
+                </Columns>
+            </RadzenDataGrid>
+        }
+        else
+        {
+            <RadzenCard Style="padding: 3rem; text-align: center;">
+                <RadzenStack Gap="1rem" AlignItems="AlignItems.Center">
+                    <RadzenIcon Icon="inbox" Style="font-size: 4rem; color: var(--rz-text-disabled-color);" />
+                    <RadzenText TextStyle="TextStyle.H6" Text="No Active Sessions" />
+                    <RadzenText TextStyle="TextStyle.Body2" Text="There are currently no active user sessions." class="rz-color-secondary" />
+                </RadzenStack>
+            </RadzenCard>
+        }
+    </RadzenStack>
+</RadzenCard>
+
+@code {
+    private List<ActiveSessionDto>? allSessions;
+    private List<ActiveSessionDto>? filteredSessions;
+    private SessionStatisticsDto? statistics;
+    private RadzenDataGrid<ActiveSessionDto>? sessionsGrid;
+    
+    private bool isLoading = true;
+    private string selectedFilter = "all";
+    private HashSet<string> revokingSessionIds = new();
+
+    private List<FilterOption> filterOptions = new()
+    {
+        new("all", "All Sessions"),
+        new("web", "Web Sessions"),
+        new("mobile", "Mobile Sessions"),
+        new("api", "API Sessions"),
+        new("spa", "SPA Sessions"),
+        new("expiring", "Expiring Soon"),
+        new("today", "Created Today")
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+        await LoadSessionsAsync();
+        await LoadStatisticsAsync();
+    }
+
+    private async Task LoadSessionsAsync()
+    {
+        try
+        {
+            isLoading = true;
+            StateHasChanged();
+
+            allSessions = await SessionsService.GetActiveSessionsAsync();
+            await ApplyFilterAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading active sessions");
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to load active sessions");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task LoadStatisticsAsync()
+    {
+        try
+        {
+            statistics = await SessionsService.GetSessionStatisticsAsync();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading session statistics");
+        }
+    }
+
+    private async Task ApplyFilterAsync()
+    {
+        if (allSessions == null)
+        {
+            filteredSessions = null;
+            return;
+        }
+
+        filteredSessions = selectedFilter switch
+        {
+            "web" => allSessions.Where(s => s.SessionType == "Web").ToList(),
+            "mobile" => allSessions.Where(s => s.SessionType == "Mobile").ToList(),
+            "api" => allSessions.Where(s => s.SessionType == "API").ToList(),
+            "spa" => allSessions.Where(s => s.SessionType == "SPA").ToList(),
+            "expiring" => allSessions.Where(s => s.ExpiresAt.HasValue && s.ExpiresAt <= DateTime.UtcNow.AddHours(1)).ToList(),
+            "today" => allSessions.Where(s => s.CreatedAt.Date == DateTime.UtcNow.Date).ToList(),
+            _ => allSessions.ToList()
+        };
+
+        StateHasChanged();
+        await Task.CompletedTask;
+    }
+
+    private async Task ShowSessionDetails(ActiveSessionDto session)
+    {
+        var parameters = new Dictionary<string, object>
+        {
+            { "Session", session }
+        };
+
+        await DialogService.OpenAsync<SessionDetailsDialog>("Session Details", parameters, 
+            new DialogOptions 
+            { 
+                Width = "800px", 
+                Height = "600px",
+                Resizable = true,
+                Draggable = true
+            });
+    }
+
+    private async Task RevokeSession(ActiveSessionDto session)
+    {
+        var confirmed = await DialogService.Confirm(
+            $"Are you sure you want to revoke the session for {session.UserName}?",
+            "Revoke Session",
+            new ConfirmOptions 
+            { 
+                OkButtonText = "Revoke", 
+                CancelButtonText = "Cancel",
+                CloseDialogOnEsc = true
+            });
+
+        if (confirmed == true)
+        {
+            try
+            {
+                revokingSessionIds.Add(session.Id);
+                StateHasChanged();
+
+                var success = await SessionsService.RevokeSessionAsync(session.Id);
+                
+                if (success)
+                {
+                    NotificationService.Notify(NotificationSeverity.Success, "Success", 
+                        $"Session for {session.UserName} has been revoked");
+                    
+                    // Refresh the session list
+                    await LoadSessionsAsync();
+                    await LoadStatisticsAsync();
+                }
+                else
+                {
+                    NotificationService.Notify(NotificationSeverity.Error, "Error", 
+                        "Failed to revoke session");
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error revoking session {SessionId}", session.Id);
+                NotificationService.Notify(NotificationSeverity.Error, "Error", 
+                    "An error occurred while revoking the session");
+            }
+            finally
+            {
+                revokingSessionIds.Remove(session.Id);
+                StateHasChanged();
+            }
+        }
+    }
+
+    private BadgeStyle GetSessionTypeBadgeStyle(string sessionType)
+    {
+        return sessionType switch
+        {
+            "Web" => BadgeStyle.Primary,
+            "Mobile" => BadgeStyle.Success,
+            "API" => BadgeStyle.Warning,
+            "SPA" => BadgeStyle.Info,
+            "Test" => BadgeStyle.Secondary,
+            _ => BadgeStyle.Light
+        };
+    }
+
+    private string GetTimeAgo(DateTime dateTime)
+    {
+        var timeSpan = DateTime.UtcNow - dateTime;
+        
+        return timeSpan.TotalDays >= 1 ? $"{(int)timeSpan.TotalDays}d ago" :
+               timeSpan.TotalHours >= 1 ? $"{(int)timeSpan.TotalHours}h ago" :
+               timeSpan.TotalMinutes >= 1 ? $"{(int)timeSpan.TotalMinutes}m ago" : "Just now";
+    }
+
+    private string GetTimeUntil(DateTime dateTime)
+    {
+        var timeSpan = dateTime - DateTime.UtcNow;
+        
+        if (timeSpan.TotalSeconds <= 0)
+            return "Expired";
+            
+        return timeSpan.TotalDays >= 1 ? $"in {(int)timeSpan.TotalDays}d" :
+               timeSpan.TotalHours >= 1 ? $"in {(int)timeSpan.TotalHours}h" :
+               timeSpan.TotalMinutes >= 1 ? $"in {(int)timeSpan.TotalMinutes}m" : "Soon";
+    }
+
+    [Inject] private ISessionsApiService SessionsService { get; set; } = default!;
+    [Inject] private DialogService DialogService { get; set; } = default!;
+    [Inject] private NotificationService NotificationService { get; set; } = default!;
+
+    private record FilterOption(string Value, string Text);
+}

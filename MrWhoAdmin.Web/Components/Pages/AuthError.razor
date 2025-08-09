@@ -1,4 +1,5 @@
 @page "/auth-error"
+@page "/auth/error"
 @inject ILogger<AuthError> Logger
 @inject NavigationManager Navigation
 
@@ -10,7 +11,7 @@
             <div class="card border-danger">
                 <div class="card-header bg-danger text-white">
                     <h4 class="mb-0">
-                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
                         Authentication Error
                     </h4>
                 </div>
@@ -23,7 +24,7 @@
                         }
                         else
                         {
-                            <p class="mb-0">An error occurred during the authentication process. Please try again.</p>
+                            <p class="mb-0">Response status code does not indicate success: 403 (Forbidden).</p>
                         }
                     </div>
                     
@@ -37,13 +38,17 @@
                     </div>
                     
                     <div class="mt-4 d-grid gap-2 d-md-flex justify-content-md-end">
-                        <button @onclick="TryAgain" class="btn btn-primary">
-                            <i class="fas fa-redo me-1"></i>
+                        <button @onclick="@(async () => await LogoutAndRetry())" class="btn btn-primary">
+                            <i class="bi bi-arrow-clockwise me-1"></i>
                             Try Again
                         </button>
                         <button @onclick="GoHome" class="btn btn-secondary">
-                            <i class="fas fa-home me-1"></i>
+                            <i class="bi bi-house me-1"></i>
                             Go Home
+                        </button>
+                        <button @onclick="@(async () => await ForceLogout())" class="btn btn-outline-danger">
+                            <i class="bi bi-box-arrow-right me-1"></i>
+                            Clear Session & Logout
                         </button>
                     </div>
                 </div>
@@ -57,9 +62,12 @@
                     </div>
                     <div class="card-body">
                         <small class="text-muted">
-                            <strong>Error:</strong> @ErrorMessage<br/>
-                            <strong>Time:</strong> @DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss UTC")<br/>
-                            <strong>Request ID:</strong> @RequestId
+                            <strong>Error:</strong> @(ErrorMessage ?? "403 Forbidden")<br/>
+                            <strong>Description:</strong> @(ErrorDescription ?? "Authentication failed or access denied")<br/>
+                            <strong>Status Code:</strong> @(StatusCode ?? "403")<br/>
+                            <strong>Time:</strong> @DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss UTC")<br/>
+                            <strong>Request ID:</strong> @RequestId<br/>
+                            <strong>Current URL:</strong> @Navigation.Uri
                         </small>
                     </div>
                 </div>
@@ -76,6 +84,8 @@
 
 @code {
     [Parameter, SupplyParameterFromQuery] public string? Error { get; set; }
+    [Parameter, SupplyParameterFromQuery] public string? ErrorDescription { get; set; }
+    [Parameter, SupplyParameterFromQuery] public string? StatusCode { get; set; }
     
     private string? ErrorMessage => Error;
     private string RequestId = Guid.NewGuid().ToString("N")[..8];
@@ -83,13 +93,40 @@
 
     protected override void OnInitialized()
     {
-        Logger.LogWarning("Authentication error page displayed. Error: {Error}", ErrorMessage ?? "Unknown");
+        Logger.LogWarning("Authentication error page displayed. Error: {Error}, Description: {Description}, StatusCode: {StatusCode}", 
+            ErrorMessage ?? "Unknown", ErrorDescription ?? "None", StatusCode ?? "Unknown");
     }
 
-    private void TryAgain()
+    private async Task LogoutAndRetry()
     {
-        Logger.LogInformation("User retrying authentication from error page");
-        Navigation.NavigateTo("/login", forceLoad: true);
+        try
+        {
+            Logger.LogInformation("User requesting logout and retry from authentication error page");
+            
+            // Force logout and redirect to login
+            Navigation.NavigateTo("/auth/logout?returnUrl=/login", forceLoad: true);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error during logout and retry");
+            Navigation.NavigateTo("/login", forceLoad: true);
+        }
+    }
+
+    private async Task ForceLogout()
+    {
+        try
+        {
+            Logger.LogInformation("User requesting force logout from authentication error page");
+            
+            // Clear all authentication and redirect to home
+            Navigation.NavigateTo("/auth/logout?clearAll=true", forceLoad: true);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error during force logout");
+            Navigation.NavigateTo("/auth/logout", forceLoad: true);
+        }
     }
 
     private void GoHome()

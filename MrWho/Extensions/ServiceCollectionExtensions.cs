@@ -11,6 +11,7 @@ using OpenIddict.Server.AspNetCore;
 using OpenIddict.Validation.AspNetCore;
 using static OpenIddict.Abstractions.OpenIddictConstants;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.Extensions.Options;
 
 namespace MrWho.Extensions;
 
@@ -18,44 +19,46 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddMrWhoServices(this IServiceCollection services)
     {
-        // Register custom services
-        services.AddScoped<IOidcClientService, OidcClientService>();
+        // Register database access layer
         services.AddScoped<ISeedingService, SeedingService>();
         services.AddScoped<IScopeSeederService, ScopeSeederService>();
-        services.AddScoped<IOpenIddictScopeSyncService, OpenIddictScopeSyncService>();
         services.AddScoped<IApiResourceSeederService, ApiResourceSeederService>();
         services.AddScoped<IIdentityResourceSeederService, IdentityResourceSeederService>();
 
-        // Register token handler
-        services.AddScoped<ITokenHandler, TokenHandler>();
+        // Register client services
+        services.AddScoped<IOidcClientService, OidcClientService>();
+        services.AddScoped<IOpenIddictScopeSyncService, OpenIddictScopeSyncService>();
 
-        // Register authorization handler
-        services.AddScoped<IOidcAuthorizationHandler, OidcAuthorizationHandler>();
+        // Register client cookie services
+        services.AddScoped<IDynamicCookieService, DynamicCookieService>();
 
-        // Register userinfo handler
-        services.AddScoped<IUserInfoHandler, UserInfoHandler>();
+        // CORRECTED: Add complete dynamic client cookie registration system
+        services.AddHostedService<DynamicClientCookieService>();
+        
+        // Add infrastructure for dynamic cookie options
+        services.AddSingleton<IConfigureNamedOptions<CookieAuthenticationOptions>, DynamicCookieOptionsConfigurator>();
 
-        // Register User management handlers
+        // CORRECTED: Add dynamic authorization policy provider that loads schemes from database
+        // ? SINGLE SOURCE OF TRUTH: All authorization policies (static + dynamic) centralized here
+        services.AddSingleton<IAuthorizationPolicyProvider, DynamicAuthorizationPolicyProvider>();
+
+        // Register realm validation service
+        services.AddScoped<IUserRealmValidationService, UserRealmValidationService>();
+
+        // Register user handlers
         services.AddScoped<IGetUsersHandler, GetUsersHandler>();
         services.AddScoped<IGetUserHandler, GetUserHandler>();
         services.AddScoped<ICreateUserHandler, CreateUserHandler>();
         services.AddScoped<IUpdateUserHandler, UpdateUserHandler>();
         services.AddScoped<IDeleteUserHandler, DeleteUserHandler>();
-        //services.AddScoped<IChangePasswordHandler, ChangePasswordHandler>();
-        //services.AddScoped<IResetPasswordHandler, ResetPasswordHandler>();
-        //services.AddScoped<ISetLockoutHandler, SetLockoutHandler>();
 
-        // Register client cookie configuration service
-        services.AddScoped<IClientCookieConfigurationService, ClientCookieConfigurationService>();
+        // Register authorization and token handlers
+        services.AddScoped<IOidcAuthorizationHandler, OidcAuthorizationHandler>();
+        services.AddScoped<IUserInfoHandler, UserInfoHandler>();
 
-        // Register dynamic cookie service for client-specific cookies
-        services.AddScoped<IDynamicCookieService, DynamicCookieService>();
-
-        // Register HttpContextAccessor for dynamic cookie service
-        services.AddHttpContextAccessor();
-
-        // Register user realm validation service
-        services.AddScoped<IUserRealmValidationService, UserRealmValidationService>();
+        // Register back-channel logout service
+        services.AddScoped<IBackChannelLogoutService, BackChannelLogoutService>();
+        services.AddHttpClient(); // Required for back-channel logout HTTP calls
 
         return services;
     }
@@ -188,11 +191,12 @@ public static class ServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Configures multiple client-specific cookies for known clients
+    /// Configures client-specific cookies for essential clients (fallback + database clients via DynamicClientCookieService)
+    /// CORRECTED: This now handles only essential/static clients, database clients are handled by DynamicClientCookieService
     /// </summary>
     public static IServiceCollection AddMrWhoClientCookies(this IServiceCollection services)
     {
-        // Admin client cookie
+        // ESSENTIAL: Admin client cookie (always needed for bootstrap)
         services.AddClientSpecificCookie("mrwho_admin_web", ".MrWho.Admin", options =>
         {
             options.LoginPath = "/connect/login";
@@ -202,12 +206,28 @@ public static class ServiceCollectionExtensions
             options.ExpireTimeSpan = TimeSpan.FromHours(8); // Work day session
         });
 
-        // Postman/API client cookie
+        // OPTIONAL: Keep Demo1 for development/testing
+        services.AddClientSpecificCookie("mrwho_demo1", ".MrWho.Demo1", options =>
+        {
+            options.LoginPath = "/connect/login";
+            options.LogoutPath = "/connect/logout";
+            options.AccessDeniedPath = "/connect/access-denied"; // CORRECTED: Use proper connect route
+            options.Cookie.Domain = null; // Same domain only
+            options.ExpireTimeSpan = TimeSpan.FromHours(2); // Demo session timeout
+        });
+
+        // OPTIONAL: Keep Postman for API testing
         services.AddClientSpecificCookie("postman_client", ".MrWho.API", options =>
         {
             options.ExpireTimeSpan = TimeSpan.FromHours(1); // Shorter for API testing
             options.SlidingExpiration = false; // Fixed expiration for API
         });
+
+        // ?? DYNAMIC CLIENTS: All other clients are automatically registered by DynamicClientCookieService
+        // which loads from database and creates schemes like:
+        // - "my_custom_client" ? ".MrWho.MyCustomClient" 
+        // - "partner_app" ? ".MrWho.PartnerApp"
+        // - etc. (unlimited scalability!)
 
         return services;
     }
@@ -273,62 +293,28 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
-    public static IServiceCollection AddMrWhoAuthorization(this IServiceCollection services)
-    {
-        // Configure authorization to work with OpenIddict
-        services.AddAuthorization(options =>
-        {
-            options.DefaultPolicy = new AuthorizationPolicyBuilder()
-                .RequireAuthenticatedUser()
-                .AddAuthenticationSchemes("Identity.Application", OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme)
-                .Build();
-        });
-
-        return services;
-    }
-
     /// <summary>
-    /// Configures authorization with support for client-specific authentication schemes
+    /// Configures authorization with dynamic client-specific authentication schemes loaded from database
+    /// ALL policies are now handled by DynamicAuthorizationPolicyProvider for centralized configuration
     /// </summary>
     public static IServiceCollection AddMrWhoAuthorizationWithClientCookies(this IServiceCollection services)
     {
-        // Configure authorization to work with OpenIddict and client-specific cookies
-        services.AddAuthorization(options =>
-        {
-            // Default policy includes standard Identity.Application and OpenIddict validation
-            var schemes = new List<string>
-            {
-                "Identity.Application",
-                OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme,
-                // Add client-specific schemes
-                "Identity.Application.mrwho_admin_web",
-                // REMOVED: Static scheme for mrwho_demo1 to test dynamic client support
-                // "Identity.Application.mrwho_demo1",
-                "Identity.Application.postman_client"
-            };
+        // Configure authorization - all policies handled by DynamicAuthorizationPolicyProvider
+        services.AddAuthorization();
 
-            options.DefaultPolicy = new AuthorizationPolicyBuilder()
-                .RequireAuthenticatedUser()
-                .AddAuthenticationSchemes(schemes.ToArray())
-                .Build();
-
-            // Add specific policies for different client types
-            options.AddPolicy("AdminOnly", policy =>
-                policy.RequireAuthenticatedUser()
-                      .AddAuthenticationSchemes("Identity.Application.mrwho_admin_web"));
-
-            // REMOVED: Static policy for Demo access - mrwho_demo1 will use dynamic fallback
-            /*
-            options.AddPolicy("DemoAccess", policy =>
-                policy.RequireAuthenticatedUser()
-                      .AddAuthenticationSchemes("Identity.Application.mrwho_demo1"));
-            */
-
-            options.AddPolicy("ApiAccess", policy =>
-                policy.RequireAuthenticatedUser()
-                      .AddAuthenticationSchemes("Identity.Application.postman_client", 
-                                              OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme));
-        });
+        // The DynamicAuthorizationPolicyProvider (registered in AddMrWhoServices) handles:
+        // ? UserInfoPolicy - Static security policy for OpenIddict validation
+        // ? AdminOnly - Static policy for admin client authentication  
+        // ? DemoAccess - Static policy for demo client authentication
+        // ? ApiAccess - Static policy for API client + OpenIddict validation
+        // ? Default Policy - Dynamic policy loading ALL client schemes from database
+        // ? Client_{clientId} - Dynamic policies for any client (e.g., "Client_my_custom_client")
+        //
+        // Benefits:
+        // ?? Single source of truth for all authorization configuration
+        // ?? Database-driven default policy with automatic client inclusion
+        // ?? No code changes needed when adding new clients to database
+        // ?? Centralized policy logic with proper fallback handling
 
         return services;
     }
