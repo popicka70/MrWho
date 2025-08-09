@@ -12,7 +12,7 @@
     </div>
     <div>
         <label>
-            <input type="checkbox" name="RememberMe" value="true" /> Remember me
+            <input type="checkbox" name="RememberMe" value="true" @(Model.RememberMe ? "checked" : "") /> Remember me
         </label>
     </div>
     <div>

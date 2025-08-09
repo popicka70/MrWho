@@ -81,14 +81,34 @@ public class MfaController : Controller
         if (!isValid)
         {
             ModelState.AddModelError(string.Empty, "Invalid verification code.");
-            return View("Setup");
+            // Rebuild the setup model so the page can render the QR and key again
+            var key = await _userManager.GetAuthenticatorKeyAsync(user);
+            if (string.IsNullOrEmpty(key))
+            {
+                await _userManager.ResetAuthenticatorKeyAsync(user);
+                key = await _userManager.GetAuthenticatorKeyAsync(user);
+            }
+
+            var email = await _userManager.GetEmailAsync(user) ?? await _userManager.GetUserNameAsync(user);
+            var issuer = _urlEncoder.Encode("MrWho");
+            var account = _urlEncoder.Encode(email ?? user.Id);
+            var uri = string.Format(AuthenticatorUriFormat, issuer, account, key);
+            var qrDataUri = _qr.GeneratePngDataUri(uri);
+
+            var model = new SetupMfaViewModel
+            {
+                SharedKey = FormatKey(key!),
+                AuthenticatorUri = uri,
+                QrCodeDataUri = qrDataUri
+            };
+            return View("Setup", model);
         }
 
         await _userManager.SetTwoFactorEnabledAsync(user, true);
         _logger.LogInformation("User {UserId} enabled MFA.", user.Id);
 
-        var recoveryCodes = await _userManager.GenerateNewTwoFactorRecoveryCodesAsync(user, 10);
-        return View("RecoveryCodes", recoveryCodes.ToArray());
+    var recoveryCodes = await _userManager.GenerateNewTwoFactorRecoveryCodesAsync(user, 10);
+    return View("RecoveryCodes", (recoveryCodes ?? Enumerable.Empty<string>()).ToArray());
     }
 
     [HttpGet("recovery-codes")]
@@ -96,8 +116,8 @@ public class MfaController : Controller
     {
         var user = await _userManager.GetUserAsync(User);
         if (user is null) return Challenge();
-        var codes = await _userManager.GenerateNewTwoFactorRecoveryCodesAsync(user, 10);
-        return View("RecoveryCodes", codes.ToArray());
+    var codes = await _userManager.GenerateNewTwoFactorRecoveryCodesAsync(user, 10);
+    return View("RecoveryCodes", (codes ?? Enumerable.Empty<string>()).ToArray());
     }
 
     [HttpPost("disable")]
@@ -114,9 +134,9 @@ public class MfaController : Controller
 
     [AllowAnonymous]
     [HttpGet("challenge")]
-    public IActionResult ChallengeMfa(string? returnUrl = null)
+    public IActionResult ChallengeMfa(string? returnUrl = null, bool rememberMe = false)
     {
-        return View("Challenge", new VerifyMfaInput { ReturnUrl = returnUrl });
+        return View("Challenge", new VerifyMfaInput { ReturnUrl = returnUrl, RememberMe = rememberMe });
     }
 
     [AllowAnonymous]
@@ -127,34 +147,37 @@ public class MfaController : Controller
         if (!ModelState.IsValid)
             return View("Challenge", input);
 
-        var twoFactorUser = await _signInManager.GetTwoFactorAuthenticationUserAsync();
-        if (twoFactorUser is null)
-            return Forbid();
-
         var code = input.Code?.Replace(" ", string.Empty).Replace("-", string.Empty);
-        var valid = await _userManager.VerifyTwoFactorTokenAsync(
-            twoFactorUser,
-            _userManager.Options.Tokens.AuthenticatorTokenProvider,
-            code!);
+        // Complete 2FA using Identity's built-in helper (clears the two-factor cookie and signs in)
+        var result = await _signInManager.TwoFactorAuthenticatorSignInAsync(code!, input.RememberMe, input.RememberMachine);
 
-        if (!valid)
+        if (!result.Succeeded)
         {
             ModelState.AddModelError(string.Empty, "Invalid code.");
             return View("Challenge", input);
         }
 
-        await _userManager.ResetAccessFailedCountAsync(twoFactorUser);
+        // Stamp the authentication method as "mfa" to ensure AMR propagation in tokens
+        var twoFactorUser = await _signInManager.GetTwoFactorAuthenticationUserAsync();
+        if (twoFactorUser is not null)
+        {
+            await _signInManager.SignInAsync(twoFactorUser, isPersistent: input.RememberMe, authenticationMethod: "mfa");
+        }
 
-        // Sign-in and stamp the authentication method as "mfa".
-        await _signInManager.SignInAsync(twoFactorUser, isPersistent: input.RememberMe, authenticationMethod: "mfa");
-
-        if (input.RememberMachine)
+        if (input.RememberMachine && twoFactorUser is not null)
         {
             await _signInManager.RememberTwoFactorClientAsync(twoFactorUser);
         }
 
-        if (!string.IsNullOrEmpty(input.ReturnUrl) && Url.IsLocalUrl(input.ReturnUrl))
-            return Redirect(input.ReturnUrl);
+        if (!string.IsNullOrEmpty(input.ReturnUrl))
+        {
+            // Allow local redirects and absolute redirects that target the OIDC authorize endpoint
+            // This mirrors the logic used in AuthController to complete OIDC flows after login.
+            if (Url.IsLocalUrl(input.ReturnUrl) || input.ReturnUrl.Contains("/connect/authorize", StringComparison.OrdinalIgnoreCase))
+            {
+                return Redirect(input.ReturnUrl);
+            }
+        }
         return Redirect("/");
     }
 

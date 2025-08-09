@@ -109,9 +109,17 @@ public class AuthController : Controller
         if (ModelState.IsValid)
         {
             var result = await _signInManager.PasswordSignInAsync(model.Email, model.Password, model.RememberMe, lockoutOnFailure: false);
-            _logger.LogDebug("Login attempt result: Success={Success}", result.Succeeded);
+            _logger.LogDebug("Login attempt result: Success={Success}, Requires2FA={RequiresTwoFactor}", result.Succeeded, result.RequiresTwoFactor);
             
-            if (result.Succeeded)
+            if (result.RequiresTwoFactor)
+            {
+                var redirect = "/mfa/challenge" +
+                                (!string.IsNullOrEmpty(returnUrl) ? ($"?returnUrl={Uri.EscapeDataString(returnUrl)}") : string.Empty) +
+                                (model.RememberMe ? (string.IsNullOrEmpty(returnUrl) ? "?" : "&") + "rememberMe=true" : string.Empty);
+                _logger.LogDebug("Login requires 2FA, redirecting to {Redirect}", redirect);
+                return Redirect(redirect);
+            }
+            else if (result.Succeeded)
             {
                 var user = await _userManager.FindByNameAsync(model.Email);
                 if (user == null)

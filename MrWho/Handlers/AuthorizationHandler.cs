@@ -197,6 +197,25 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
             claimsIdentity.AddClaim(roleClaim);
         }
 
+        // Propagate AMR (Authentication Methods References) claims if present so clients know MFA was used
+        try
+        {
+            var amrClaims = principal?.FindAll("amr")?.ToList();
+            if (amrClaims != null && amrClaims.Count > 0)
+            {
+                foreach (var amr in amrClaims)
+                {
+                    var amrClaim = new Claim("amr", amr.Value);
+                    amrClaim.SetDestinations(OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken);
+                    claimsIdentity.AddClaim(amrClaim);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Failed to propagate amr claims to authorization identity");
+        }
+
         var authPrincipal = new ClaimsPrincipal(claimsIdentity);
         authPrincipal.SetScopes(request.GetScopes());
 
