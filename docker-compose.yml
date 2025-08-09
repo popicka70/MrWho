@@ -15,6 +15,36 @@ services:
       timeout: 5s
       retries: 10
 
+  # Optional: MySQL database for development (use this instead of SQL Server if desired)
+  mysql:
+    image: mysql:8.4
+    container_name: mrwho-mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=MrWho
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Optional: PostgreSQL database for development
+  postgres:
+    image: postgres:16
+    container_name: mrwho-postgres
+    environment:
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=MrWho
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   mrwho:
     build:
       context: .
@@ -26,7 +56,16 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_Kestrel__Certificates__Default__Password=${ASPNETCORE_Kestrel__Certificates__Default__Password}
-      - "ConnectionStrings__mrwhodb=Server=sql;Database=MrWho;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;Encrypt=False;MultipleActiveResultSets=True"
+      # Database provider selection: SqlServer | MySql | PostgreSql
+      - Database__Provider=SqlServer
+      - ConnectionStrings__mrwhodb=Server=sql;Database=MrWho;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;Encrypt=False;MultipleActiveResultSets=True
+      # Example MySQL connection (uncomment and set Database__Provider=MySql to use MySQL):
+      # - ConnectionStrings__mrwhodb=Server=mysql;Database=MrWho;User ID=root;Password=${MYSQL_ROOT_PASSWORD};
+      # Example PostgreSQL connection (uncomment and set Database__Provider=PostgreSql to use Postgres):
+      # - ConnectionStrings__mrwhodb=Host=postgres;Database=MrWho;Username=postgres;Password=${POSTGRES_PASSWORD};
+      # Optional MySQL tuning
+      # - Database__MySql__Flavor=MySql  # or MariaDb
+      # - Database__MySql__Version=8.0.36 # e.g., "11.2.0" for MariaDB
       - DISABLE_HTTPS_REDIRECT=true
       - OPENIDDICT__ISSUER=https://localhost:7113/
     ports:
