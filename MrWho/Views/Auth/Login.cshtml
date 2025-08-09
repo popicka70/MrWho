@@ -60,25 +60,75 @@
                         <input type="hidden" name="clientId" value="@ViewData["ClientId"]" />
                     }
                     
+                    <input type="hidden" asp-for="UseCode" />
                     <div class="mb-3">
                         <label asp-for="Email" class="form-label">Email</label>
                         <input asp-for="Email" class="form-control" type="email" placeholder="Enter your email" required />
                         <span asp-validation-for="Email" class="text-danger"></span>
                     </div>
-                    
-                    <div class="mb-3">
-                        <label asp-for="Password" class="form-label">Password</label>
-                        <input asp-for="Password" class="form-control" type="password" placeholder="Enter your password" required />
-                        <span asp-validation-for="Password" class="text-danger"></span>
-                    </div>
+
+                    @if (Model.UseCode)
+                    {
+                        <div class="mb-3">
+                            <label asp-for="Code" class="form-label">Authenticator code</label>
+                            <input asp-for="Code" class="form-control" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="123 456" />
+                            <span asp-validation-for="Code" class="text-danger"></span>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="mb-3">
+                            <label asp-for="Password" class="form-label">Password</label>
+                            <input asp-for="Password" class="form-control" type="password" placeholder="Enter your password" />
+                            <span asp-validation-for="Password" class="text-danger"></span>
+                        </div>
+                    }
                     
                     <div class="mb-3 form-check">
                         <input asp-for="RememberMe" class="form-check-input" type="checkbox" />
                         <label asp-for="RememberMe" class="form-check-label">Remember me</label>
                     </div>
                     
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-primary">Sign In</button>
+                    <div class="d-grid mb-3">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="bi bi-box-arrow-in-right me-2"></i>Sign In
+                        </button>
+                    </div>
+                    
+                    <!-- Alternative Authentication Methods -->
+                    <div class="d-grid gap-2">
+                        @{
+                            var qs = new Dictionary<string, string?>
+                            {
+                                { "returnUrl", ViewData["ReturnUrl"] as string },
+                                { "clientId", ViewData["ClientId"] as string },
+                                { "mode", Model.UseCode ? null : "code" }
+                            };
+                            var query = string.Join("&", qs.Where(kv => !string.IsNullOrEmpty(kv.Value))
+                                                         .Select(kv => kv.Key + "=" + Uri.EscapeDataString(kv.Value!)));
+                            var toggleHref = string.IsNullOrEmpty(query) ? "/connect/login" : ($"/connect/login?{query}");
+                            var qrQuery = string.Join("&", new[]{ ViewData["ReturnUrl"] as string is string ru && !string.IsNullOrEmpty(ru) ? $"returnUrl={Uri.EscapeDataString(ru)}" : null,
+                                                                   ViewData["ClientId"] as string is string cid && !string.IsNullOrEmpty(cid) ? $"clientId={Uri.EscapeDataString(cid)}" : null }
+                                                                   .Where(s => s != null));
+                            var qrHref = string.IsNullOrEmpty(qrQuery) ? "/qr-login/start" : ($"/qr-login/start?{qrQuery}");
+                        }
+                        
+                        @if (Model.UseCode)
+                        {
+                            <a href="@toggleHref" class="btn btn-outline-secondary auth-button">
+                                <i class="bi bi-key me-2"></i>Use password instead
+                            </a>
+                        }
+                        else
+                        {
+                            <a href="@toggleHref" class="btn btn-outline-secondary auth-button">
+                                <i class="bi bi-shield-check me-2"></i>Use authenticator code instead
+                            </a>
+                        }
+                        
+                        <a href="@qrHref" class="btn btn-outline-primary auth-button">
+                            <i class="bi bi-qr-code me-2"></i>Sign in with phone (QR)
+                        </a>
                     </div>
                 </form>
             </div>
