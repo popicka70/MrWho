@@ -39,6 +39,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IConfigureNamedOptions<CookieAuthenticationOptions>, DynamicCookieOptionsConfigurator>();
 
         // CORRECTED: Add dynamic authorization policy provider that loads schemes from database
+        // ? SINGLE SOURCE OF TRUTH: All authorization policies (static + dynamic) centralized here
         services.AddSingleton<IAuthorizationPolicyProvider, DynamicAuthorizationPolicyProvider>();
 
         // Register realm validation service
@@ -210,7 +211,7 @@ public static class ServiceCollectionExtensions
         {
             options.LoginPath = "/connect/login";
             options.LogoutPath = "/connect/logout";
-            options.AccessDeniedPath = "/connect/access-denied";
+            options.AccessDeniedPath = "/connect/access-denied"; // CORRECTED: Use proper connect route
             options.Cookie.Domain = null; // Same domain only
             options.ExpireTimeSpan = TimeSpan.FromHours(2); // Demo session timeout
         });
@@ -292,65 +293,28 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
-    public static IServiceCollection AddMrWhoAuthorization(this IServiceCollection services)
-    {
-        // Configure authorization to work with OpenIddict
-        services.AddAuthorization(options =>
-        {
-            options.DefaultPolicy = new AuthorizationPolicyBuilder()
-                .RequireAuthenticatedUser()
-                .AddAuthenticationSchemes("Identity.Application", OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme)
-                .Build();
-
-            // CRITICAL: Add specific policy for UserInfo endpoint that only uses OpenIddict validation
-            options.AddPolicy("UserInfoPolicy", policy =>
-                policy.RequireAuthenticatedUser()
-                      .AddAuthenticationSchemes(OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme));
-        });
-
-        return services;
-    }
-
     /// <summary>
     /// Configures authorization with dynamic client-specific authentication schemes loaded from database
-    /// CORRECTED: Now uses DynamicAuthorizationPolicyProvider for true database-driven scheme loading
+    /// ALL policies are now handled by DynamicAuthorizationPolicyProvider for centralized configuration
     /// </summary>
     public static IServiceCollection AddMrWhoAuthorizationWithClientCookies(this IServiceCollection services)
     {
-        // Configure authorization with dynamic policy provider
-        services.AddAuthorization(options =>
-        {
-            // Configure minimal static options - DynamicAuthorizationPolicyProvider handles the rest
-            
-            // CRITICAL: UserInfo endpoint policy (always static for security)
-            options.AddPolicy("UserInfoPolicy", policy =>
-                policy.RequireAuthenticatedUser()
-                      .AddAuthenticationSchemes(OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme));
+        // Configure authorization - all policies handled by DynamicAuthorizationPolicyProvider
+        services.AddAuthorization();
 
-            // Essential static client policies (optional - DynamicAuthorizationPolicyProvider can handle these too)
-            options.AddPolicy("AdminOnly", policy =>
-                policy.RequireAuthenticatedUser()
-                      .AddAuthenticationSchemes("Identity.Application.mrwho_admin_web"));
-
-            options.AddPolicy("DemoAccess", policy =>
-                policy.RequireAuthenticatedUser()
-                      .AddAuthenticationSchemes("Identity.Application.mrwho_demo1"));
-
-            options.AddPolicy("ApiAccess", policy =>
-                policy.RequireAuthenticatedUser()
-                      .AddAuthenticationSchemes("Identity.Application.postman_client", 
-                                              OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme));
-
-            // ?? DEFAULT POLICY: Now handled by DynamicAuthorizationPolicyProvider
-            // - Loads ALL client schemes from database at runtime
-            // - Automatically includes new clients without code changes
-            // - Falls back to essential schemes if database is unavailable
-            
-            // ?? DYNAMIC CLIENT POLICIES: Also handled by DynamicAuthorizationPolicyProvider
-            // - Use policy name format: "Client_{clientId}"
-            // - Example: services.RequireAuthorization("Client_my_custom_client")
-            // - Automatically creates policies for any client in database
-        });
+        // The DynamicAuthorizationPolicyProvider (registered in AddMrWhoServices) handles:
+        // ? UserInfoPolicy - Static security policy for OpenIddict validation
+        // ? AdminOnly - Static policy for admin client authentication  
+        // ? DemoAccess - Static policy for demo client authentication
+        // ? ApiAccess - Static policy for API client + OpenIddict validation
+        // ? Default Policy - Dynamic policy loading ALL client schemes from database
+        // ? Client_{clientId} - Dynamic policies for any client (e.g., "Client_my_custom_client")
+        //
+        // Benefits:
+        // ?? Single source of truth for all authorization configuration
+        // ?? Database-driven default policy with automatic client inclusion
+        // ?? No code changes needed when adding new clients to database
+        // ?? Centralized policy logic with proper fallback handling
 
         return services;
     }

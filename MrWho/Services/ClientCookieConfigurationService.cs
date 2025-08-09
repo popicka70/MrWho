@@ -27,6 +27,15 @@ public class ClientCookieConfigurationService : IClientCookieConfigurationServic
             }
         },
         { 
+            "mrwho_demo1", 
+            new ClientCookieConfiguration
+            {
+                ClientId = "mrwho_demo1",
+                SchemeName = "Identity.Application.mrwho_demo1",
+                CookieName = ".MrWho.Demo1"
+            }
+        },
+        { 
             "postman_client", 
             new ClientCookieConfiguration
             {
@@ -77,7 +86,10 @@ public class ClientCookieConfigurationService : IClientCookieConfigurationServic
     /// </summary>
     public bool HasStaticConfiguration(string clientId)
     {
-        return ClientCookieConfigurations.ContainsKey(clientId);
+        var hasStatic = ClientCookieConfigurations.ContainsKey(clientId);
+        _logger.LogDebug("?? Static Configuration Check: Client {ClientId} has static config: {HasStatic}", 
+            clientId, hasStatic);
+        return hasStatic;
     }
 
     /// <summary>

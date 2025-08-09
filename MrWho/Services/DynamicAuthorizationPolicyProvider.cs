@@ -5,8 +5,25 @@ using OpenIddict.Validation.AspNetCore;
 namespace MrWho.Services;
 
 /// <summary>
-/// Dynamic authorization policy provider that loads client-specific authentication schemes from database at runtime
-/// This solves the chicken-and-egg problem of needing database access during service registration
+/// SINGLE SOURCE OF TRUTH for all authorization policies in the application
+/// 
+/// This provider dynamically loads client-specific authentication schemes from database at runtime
+/// and centralizes ALL authorization policy configuration in one place. It solves the chicken-and-egg 
+/// problem of needing database access during service registration.
+/// 
+/// Handles:
+/// - Static Security Policies: UserInfoPolicy (OpenIddict validation only)
+/// - Static Client Policies: AdminOnly, DemoAccess, ApiAccess  
+/// - Dynamic Default Policy: Loads ALL client schemes from database automatically
+/// - Dynamic Client Policies: Client_{clientId} format for any database client
+/// - Fallback: Uses DefaultAuthorizationPolicyProvider for unknown policies
+/// 
+/// Benefits:
+/// ? Single location for all authorization configuration
+/// ? Database-driven policies that update automatically when clients are added
+/// ? No code changes needed for new clients
+/// ? Proper fallback handling when database is unavailable
+/// ? Thread-safe policy creation with caching
 /// </summary>
 public class DynamicAuthorizationPolicyProvider : IAuthorizationPolicyProvider
 {
@@ -63,28 +80,36 @@ public class DynamicAuthorizationPolicyProvider : IAuthorizationPolicyProvider
 
     public async Task<AuthorizationPolicy?> GetPolicyAsync(string policyName)
     {
-        // Handle special policies first
+        // ====================================================================
+        // CENTRALIZED STATIC POLICY CONFIGURATION
+        // All static authorization policies are defined here in one place
+        // ====================================================================
+        
         switch (policyName)
         {
             case "UserInfoPolicy":
+                // SECURITY: UserInfo endpoint must only use OpenIddict validation (no cookie auth)
                 return new AuthorizationPolicyBuilder()
                     .RequireAuthenticatedUser()
                     .AddAuthenticationSchemes(OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme)
                     .Build();
 
             case "AdminOnly":
+                // Admin-only access using the admin web client cookie authentication
                 return new AuthorizationPolicyBuilder()
                     .RequireAuthenticatedUser()
                     .AddAuthenticationSchemes("Identity.Application.mrwho_admin_web")
                     .Build();
 
             case "DemoAccess":
+                // Demo client access using the demo client cookie authentication
                 return new AuthorizationPolicyBuilder()
                     .RequireAuthenticatedUser()
                     .AddAuthenticationSchemes("Identity.Application.mrwho_demo1")
                     .Build();
 
             case "ApiAccess":
+                // API access supporting both Postman client cookies and OpenIddict token validation
                 return new AuthorizationPolicyBuilder()
                     .RequireAuthenticatedUser()
                     .AddAuthenticationSchemes("Identity.Application.postman_client", 
@@ -92,7 +117,11 @@ public class DynamicAuthorizationPolicyProvider : IAuthorizationPolicyProvider
                     .Build();
         }
 
-        // Check if this is a dynamic client policy request
+        // ====================================================================
+        // DYNAMIC CLIENT POLICY CONFIGURATION  
+        // Format: "Client_{clientId}" - automatically creates policies for any database client
+        // ====================================================================
+        
         if (policyName.StartsWith("Client_"))
         {
             var clientId = policyName.Replace("Client_", "");
@@ -106,13 +135,17 @@ public class DynamicAuthorizationPolicyProvider : IAuthorizationPolicyProvider
                 .Build();
         }
 
+        // ====================================================================
+        // FALLBACK TO DEFAULT PROVIDER
+        // ====================================================================
+        
         // Fall back to default provider for unknown policies
         return await _fallbackPolicyProvider.GetPolicyAsync(policyName);
     }
 
     public Task<AuthorizationPolicy> GetFallbackPolicyAsync()
     {
-        return _fallbackPolicyProvider.GetFallbackPolicyAsync();
+        return _fallbackPolicyProvider.GetFallbackPolicyAsync()!;
     }
 
     private async Task<List<string>> GetAllAuthenticationSchemesAsync()
@@ -156,6 +189,8 @@ public class DynamicAuthorizationPolicyProvider : IAuthorizationPolicyProvider
                 "Identity.Application.postman_client"
             });
         }
+
+        schemes = schemes.Distinct().ToList();
 
         return schemes;
     }

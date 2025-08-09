@@ -121,11 +121,14 @@ public class DynamicCookieService : IDynamicCookieService
             if (_cookieConfigService.HasStaticConfiguration(clientId))
             {
                 var staticScheme = _cookieConfigService.GetCookieSchemeForClient(clientId);
+                _logger.LogDebug("? STATIC PATH: Client {ClientId} using static scheme {SchemeName}", 
+                    clientId, staticScheme);
                 var authResult = await context.AuthenticateAsync(staticScheme);
                 return authResult.Succeeded ? authResult.Principal : null;
             }
 
             // For dynamic clients, reconstruct principal from their cookie
+            _logger.LogDebug("?? DYNAMIC PATH: Client {ClientId} using dynamic cookie management", clientId);
             return await GetDynamicCookiePrincipalAsync(context, clientId);
         }
         catch (Exception ex)

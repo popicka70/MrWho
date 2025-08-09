@@ -36,6 +36,7 @@ public class DynamicClientCookieService : IHostedService
             using var scope = _serviceScopeFactory.CreateScope();
             var oidcClientService = scope.ServiceProvider.GetRequiredService<IOidcClientService>();
             var authSchemeProvider = scope.ServiceProvider.GetRequiredService<IAuthenticationSchemeProvider>();
+            var cookieConfigService = scope.ServiceProvider.GetRequiredService<IClientCookieConfigurationService>();
 
             // Load all enabled clients from database
             var enabledClients = await oidcClientService.GetEnabledClientsAsync();
@@ -51,6 +52,13 @@ public class DynamicClientCookieService : IHostedService
                 if (existingScheme != null)
                 {
                     _logger.LogDebug("?? Scheme {SchemeName} already exists (static registration), skipping dynamic registration", schemeName);
+                    continue;
+                }
+
+                // Additional check: verify this client doesn't have static configuration
+                if (cookieConfigService.HasStaticConfiguration(client.ClientId))
+                {
+                    _logger.LogDebug("?? Client {ClientId} has static cookie configuration, skipping dynamic registration", client.ClientId);
                     continue;
                 }
 
@@ -124,6 +132,20 @@ public class DynamicClientCookieService : IHostedService
                 {
                     var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<DynamicClientCookieService>>();
                     logger.LogDebug("?? Dynamic cookie sign-out for client: {ClientId}", client.ClientId);
+                    return Task.CompletedTask;
+                },
+                OnRedirectToAccessDenied = context =>
+                {
+                    var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<DynamicClientCookieService>>();
+                    logger.LogWarning("?? REDIRECTING TO ACCESS DENIED for dynamic client {ClientId}: RedirectUri={RedirectUri}, ReturnUrl={ReturnUrl}", 
+                        client.ClientId, context.RedirectUri, context.Request.Query["ReturnUrl"].ToString());
+                    return Task.CompletedTask;
+                },
+                OnValidatePrincipal = context =>
+                {
+                    var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<DynamicClientCookieService>>();
+                    logger.LogDebug("?? Validating principal for dynamic client {ClientId}: IsAuthenticated={IsAuthenticated}, Name={Name}", 
+                        client.ClientId, context.Principal?.Identity?.IsAuthenticated, context.Principal?.Identity?.Name);
                     return Task.CompletedTask;
                 }
             }

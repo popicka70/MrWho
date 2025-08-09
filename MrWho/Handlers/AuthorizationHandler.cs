@@ -126,8 +126,10 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         var realmValidation = await _realmValidationService.ValidateUserRealmAccessAsync(user, clientId);
         if (!realmValidation.IsValid)
         {
-            _logger.LogWarning("User {UserName} denied access to client {ClientId}: {Reason}", 
-                user.UserName, clientId, realmValidation.Reason);
+            _logger.LogWarning("?? REALM VALIDATION FAILED: User {UserName} denied access to client {ClientId}: {Reason} (ErrorCode: {ErrorCode})", 
+                user.UserName, clientId, realmValidation.Reason, realmValidation.ErrorCode);
+            _logger.LogWarning("   ?? Realm Details: UserRealm='{UserRealm}', ClientRealm='{ClientRealm}'", 
+                realmValidation.UserRealm, realmValidation.ClientRealm);
 
             // Sign out the user from client-specific authentication since they don't have access
             try
@@ -144,8 +146,8 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
             return Results.Forbid();
         }
 
-        _logger.LogInformation("User {UserName} validated for access to client {ClientId} in realm {Realm}", 
-            user.UserName, clientId, realmValidation.ClientRealm);
+        _logger.LogInformation("? REALM VALIDATION PASSED: User {UserName} authorized for client {ClientId} (UserRealm: '{UserRealm}', ClientRealm: '{ClientRealm}')", 
+            user.UserName, clientId, realmValidation.UserRealm, realmValidation.ClientRealm);
 
         // User is authenticated and authorized for this client, create authorization code
         var claimsIdentity = new ClaimsIdentity(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);

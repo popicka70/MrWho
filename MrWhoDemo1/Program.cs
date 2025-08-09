@@ -44,6 +44,8 @@ builder.Services.AddAuthentication(options =>
     options.SlidingExpiration = true;
     options.LoginPath = "/Account/Login";
     options.LogoutPath = "/Account/Logout";
+    // FIXED: Use relative path that will redirect back to the identity server during OIDC flow
+    options.AccessDeniedPath = "/Account/AccessDenied";
 })
 .AddOpenIdConnect(OpenIdConnectDefaults.AuthenticationScheme, options => // Use standard OIDC scheme
 {
