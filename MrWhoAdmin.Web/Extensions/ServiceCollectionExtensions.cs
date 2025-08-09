@@ -163,6 +163,9 @@ public static class ServiceCollectionExtensions
     /// </summary>
     public static IServiceCollection AddAuthenticationServices(this IServiceCollection services, IConfiguration configuration)
     {
+        // Add memory cache for session invalidation tracking
+        services.AddMemoryCache();
+        
         // CORRECTED: Use standard OIDC schemes - session isolation handled server-side
         const string adminCookieScheme = "AdminCookies";
         
@@ -182,6 +185,34 @@ public static class ServiceCollectionExtensions
             options.SlidingExpiration = true;
             options.LoginPath = "/login";
             options.LogoutPath = "/logout";
+            
+            // CRITICAL: Add event to check for session invalidation on each request
+            options.Events.OnValidatePrincipal = async context =>
+            {
+                var cache = context.HttpContext.RequestServices.GetRequiredService<Microsoft.Extensions.Caching.Memory.IMemoryCache>();
+                var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+                
+                if (context.Principal?.Identity?.IsAuthenticated == true)
+                {
+                    var subjectClaim = context.Principal.FindFirst("sub")?.Value;
+                    
+                    if (!string.IsNullOrEmpty(subjectClaim))
+                    {
+                        // Check if this subject has been logged out via back-channel logout
+                        if (cache.TryGetValue($"logout_{subjectClaim}", out var logoutInfo))
+                        {
+                            logger.LogInformation("Admin Web session invalidated for subject {Subject} due to back-channel logout", subjectClaim);
+                            
+                            // Reject the principal to force re-authentication
+                            context.RejectPrincipal();
+                            await context.HttpContext.SignOutAsync(adminCookieScheme);
+                            
+                            // Remove the logout notification after processing
+                            cache.Remove($"logout_{subjectClaim}");
+                        }
+                    }
+                }
+            };
         })
         .AddOpenIdConnect(OpenIdConnectDefaults.AuthenticationScheme, options => // Use standard scheme
         {

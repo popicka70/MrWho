@@ -11,6 +11,12 @@ builder.AddServiceDefaults();
 builder.Services.AddRazorPages();
 builder.Services.AddControllers(); // Add controllers for back-channel logout
 
+// Add memory cache for session invalidation tracking
+builder.Services.AddMemoryCache();
+
+// CRITICAL: Add distributed memory cache for session support
+builder.Services.AddDistributedMemoryCache();
+
 // Add session support for logout notifications
 builder.Services.AddSession(options =>
 {
@@ -46,6 +52,34 @@ builder.Services.AddAuthentication(options =>
     options.LogoutPath = "/Account/Logout";
     // FIXED: Use relative path that will redirect back to the identity server during OIDC flow
     options.AccessDeniedPath = "/Account/AccessDenied";
+    
+    // CRITICAL: Add event to check for session invalidation on each request
+    options.Events.OnValidatePrincipal = async context =>
+    {
+        var cache = context.HttpContext.RequestServices.GetRequiredService<Microsoft.Extensions.Caching.Memory.IMemoryCache>();
+        var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+        
+        if (context.Principal?.Identity?.IsAuthenticated == true)
+        {
+            var subjectClaim = context.Principal.FindFirst("sub")?.Value;
+            
+            if (!string.IsNullOrEmpty(subjectClaim))
+            {
+                // Check if this subject has been logged out via back-channel logout
+                if (cache.TryGetValue($"logout_{subjectClaim}", out var logoutInfo))
+                {
+                    logger.LogInformation("Demo1 session invalidated for subject {Subject} due to back-channel logout", subjectClaim);
+                    
+                    // Reject the principal to force re-authentication
+                    context.RejectPrincipal();
+                    await context.HttpContext.SignOutAsync(demo1CookieScheme);
+                    
+                    // Remove the logout notification after processing
+                    cache.Remove($"logout_{subjectClaim}");
+                }
+            }
+        }
+    };
 })
 .AddOpenIdConnect(OpenIdConnectDefaults.AuthenticationScheme, options => // Use standard OIDC scheme
 {

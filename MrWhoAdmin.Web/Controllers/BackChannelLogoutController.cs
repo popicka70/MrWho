@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
 using System.Text.Json;
 
-namespace MrWhoDemo1.Controllers;
+namespace MrWhoAdmin.Web.Controllers;
 
 /// <summary>
 /// Handles back-channel logout notifications from the OIDC server
@@ -31,7 +31,7 @@ public class BackChannelLogoutController : ControllerBase
     {
         try
         {
-            _logger.LogInformation("Demo1 received back-channel logout notification");
+            _logger.LogInformation("Admin Web received back-channel logout notification");
 
             if (string.IsNullOrEmpty(logout_token))
             {
@@ -45,7 +45,7 @@ public class BackChannelLogoutController : ControllerBase
             var subject = logoutData.TryGetProperty("sub", out var subElement) ? subElement.GetString() : null;
             var sessionId = logoutData.TryGetProperty("sid", out var sidElement) ? sidElement.GetString() : null;
 
-            _logger.LogInformation("Processing Demo1 logout for subject: {Subject}, session: {SessionId}", subject, sessionId);
+            _logger.LogInformation("Processing Admin Web logout for subject: {Subject}, session: {SessionId}", subject, sessionId);
 
             // Store logout information in cache with expiration
             // This allows subsequent requests to detect that the session has been invalidated
@@ -72,7 +72,7 @@ public class BackChannelLogoutController : ControllerBase
 
             // Force logout by clearing all authentication
             // This will clear the local authentication cookie for this request
-            await HttpContext.SignOutAsync("Demo1Cookies");
+            await HttpContext.SignOutAsync("AdminCookies");
             
             // Store logout information in session for any active sessions to detect
             if (HttpContext.Session.IsAvailable)
@@ -88,12 +88,12 @@ public class BackChannelLogoutController : ControllerBase
                 }
             }
 
-            _logger.LogInformation("Demo1 back-channel logout processed successfully for subject: {Subject}", subject);
+            _logger.LogInformation("Admin Web back-channel logout processed successfully for subject: {Subject}", subject);
             return Ok();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error processing back-channel logout notification in Demo1");
+            _logger.LogError(ex, "Error processing back-channel logout notification in Admin Web");
             return StatusCode(500, "Internal server error");
         }
     }

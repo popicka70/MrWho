@@ -11,8 +11,20 @@ builder.AddServiceDefaults();
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-// Add MVC controllers for token refresh endpoint
+// Add MVC controllers for token refresh endpoint and back-channel logout
 builder.Services.AddControllers();
+
+// CRITICAL: Add distributed memory cache for session support
+builder.Services.AddDistributedMemoryCache();
+
+// Add session support for logout notifications
+builder.Services.AddSession(options =>
+{
+    options.IdleTimeout = TimeSpan.FromMinutes(30);
+    options.Cookie.HttpOnly = true;
+    options.Cookie.IsEssential = true;
+    options.Cookie.Name = ".MrWho.AdminWeb.Session";
+});
 
 builder.Services.AddOutputCache();
 
@@ -31,7 +43,7 @@ var app = builder.Build();
 app.ConfigureMiddlewarePipeline();
 app.ConfigureAuthenticationEndpoints();
 
-// Map controllers for token refresh
+// Map controllers for token refresh and back-channel logout
 app.MapControllers();
 
 app.ConfigureBlazorRouting();

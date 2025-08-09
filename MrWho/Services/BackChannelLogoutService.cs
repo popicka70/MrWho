@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authentication;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using MrWho.Data;
+using OpenIddict.Abstractions;
 
 namespace MrWho.Services;
 
@@ -46,19 +47,60 @@ public class BackChannelLogoutService : IBackChannelLogoutService
     {
         try
         {
-            // Get clients once using a dedicated scope
-            List<Models.Client> clientsToNotify;
+            // Get the specific client for this authorization
+            Models.Client? clientToNotify;
             using (var scope = _serviceProvider.CreateScope())
             {
                 var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-                clientsToNotify = await GetClientsForLogoutNotificationAsync(context, subject);
+                var authorizationManager = scope.ServiceProvider.GetRequiredService<IOpenIddictAuthorizationManager>();
+                var applicationManager = scope.ServiceProvider.GetRequiredService<IOpenIddictApplicationManager>();
+                
+                // Find the authorization and get its application
+                var authorization = await authorizationManager.FindByIdAsync(authorizationId);
+                if (authorization == null)
+                {
+                    _logger.LogWarning("Authorization {AuthorizationId} not found for logout notification", authorizationId);
+                    return;
+                }
+                
+                var applicationId = await authorizationManager.GetApplicationIdAsync(authorization);
+                if (string.IsNullOrEmpty(applicationId))
+                {
+                    _logger.LogWarning("Authorization {AuthorizationId} has no associated application", authorizationId);
+                    return;
+                }
+                
+                var application = await applicationManager.FindByIdAsync(applicationId);
+                if (application == null)
+                {
+                    _logger.LogWarning("Application {ApplicationId} not found for authorization {AuthorizationId}", applicationId, authorizationId);
+                    return;
+                }
+                
+                var clientId = await applicationManager.GetClientIdAsync(application);
+                if (string.IsNullOrEmpty(clientId))
+                {
+                    _logger.LogWarning("Application {ApplicationId} has no client ID", applicationId);
+                    return;
+                }
+                
+                // Get the client from our database if it exists
+                clientToNotify = await context.Clients
+                    .FirstOrDefaultAsync(c => c.ClientId == clientId);
+                
+                // If not in our database, create a temporary client object for notification
+                if (clientToNotify == null)
+                {
+                    clientToNotify = new Models.Client
+                    {
+                        ClientId = clientId,
+                        IsEnabled = true // Assume enabled for OpenIddict clients
+                    };
+                }
             }
 
-            // Process notifications concurrently but with separate scopes for each
-            var tasks = clientsToNotify.Select(client => 
-                NotifyClientLogoutInternalAsync(client.ClientId, subject, sessionId));
-
-            await Task.WhenAll(tasks);
+            // Send notification to the specific client
+            await NotifyClientLogoutInternalAsync(clientToNotify.ClientId, subject, sessionId);
         }
         catch (Exception ex)
         {
