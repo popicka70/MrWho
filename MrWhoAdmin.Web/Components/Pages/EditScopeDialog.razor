@@ -150,10 +150,15 @@
 
     <!-- Bottom Action Bar -->
     <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--rz-border-color);">
-        <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" JustifyContent="JustifyContent.End">
-            <RadzenButton Click="@(() => DialogService.Close())" Text="Cancel" ButtonStyle="ButtonStyle.Light" Icon="cancel" />
-            <RadzenButton ButtonType="ButtonType.Submit" Text="Update Scope" ButtonStyle="ButtonStyle.Primary" 
-                         Icon="save" IsBusy="@isSubmitting" />
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween" Gap="1rem">
+            <div style="min-height: 1.25rem;">
+                <ValidationSummary />
+            </div>
+            <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" JustifyContent="JustifyContent.End">
+                <RadzenButton Click="@(() => DialogService.Close())" Text="Cancel" ButtonStyle="ButtonStyle.Light" Icon="cancel" />
+                <RadzenButton ButtonType="ButtonType.Submit" Text="Update Scope" ButtonStyle="ButtonStyle.Primary" 
+                             Icon="save" IsBusy="@isSubmitting" />
+            </RadzenStack>
         </RadzenStack>
     </div>
 </RadzenTemplateForm>

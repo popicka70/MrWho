@@ -114,20 +114,25 @@
                     </RadzenStack>
                 </RadzenFieldset>
 
-                <!-- Action Buttons -->
-                <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" class="rz-mt-4">
-                    <RadzenButton Click="@Cancel" Icon="cancel" ButtonStyle="ButtonStyle.Light" Text="Cancel" />
-                    <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem">
-                        @if (IsEdit)
-                        {
-                            <RadzenButton Click="@DeleteRealm" Icon="delete" ButtonStyle="ButtonStyle.Danger" 
-                                         Text="Delete" Disabled="@isSaving" />
-                        }
-                        <RadzenButton ButtonType="ButtonType.Submit" Icon="save" ButtonStyle="ButtonStyle.Primary" 
-                                     Text="@(IsEdit ? "Update Realm" : "Create Realm")" 
-                                     IsBusy="@isSaving" Disabled="@isSaving" />
+                <!-- Sticky Action Bar -->
+                <div style="position: sticky; bottom: 0; background: var(--rz-base-50); border-top: 1px solid var(--rz-border-color); padding: 0.75rem 1rem; z-index: 5;" class="rz-mt-4">
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween" Gap="1rem">
+                        <div style="min-height: 1.25rem;">
+                            <ValidationSummary />
+                        </div>
+                        <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem">
+                            <RadzenButton Click="@Cancel" Icon="cancel" ButtonStyle="ButtonStyle.Light" Text="Cancel" />
+                            @if (IsEdit)
+                            {
+                                <RadzenButton Click="@(async () => await DeleteRealm())" Icon="delete" ButtonStyle="ButtonStyle.Danger" 
+                                             Text="Delete" Disabled="@isSaving" />
+                            }
+                            <RadzenButton ButtonType="ButtonType.Submit" Icon="save" ButtonStyle="ButtonStyle.Primary" 
+                                         Text="@(IsEdit ? "Update Realm" : "Create Realm")" 
+                                         IsBusy="@isSaving" Disabled="@isSaving" />
+                        </RadzenStack>
                     </RadzenStack>
-                </RadzenStack>
+                </div>
             </RadzenStack>
         </RadzenTemplateForm>
     }
