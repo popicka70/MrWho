@@ -60,25 +60,58 @@
                         <input type="hidden" name="clientId" value="@ViewData["ClientId"]" />
                     }
                     
+                    <input type="hidden" asp-for="UseCode" />
                     <div class="mb-3">
                         <label asp-for="Email" class="form-label">Email</label>
                         <input asp-for="Email" class="form-control" type="email" placeholder="Enter your email" required />
                         <span asp-validation-for="Email" class="text-danger"></span>
                     </div>
-                    
-                    <div class="mb-3">
-                        <label asp-for="Password" class="form-label">Password</label>
-                        <input asp-for="Password" class="form-control" type="password" placeholder="Enter your password" required />
-                        <span asp-validation-for="Password" class="text-danger"></span>
-                    </div>
+
+                    @if (Model.UseCode)
+                    {
+                        <div class="mb-3">
+                            <label asp-for="Code" class="form-label">Authenticator code</label>
+                            <input asp-for="Code" class="form-control" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="123 456" />
+                            <span asp-validation-for="Code" class="text-danger"></span>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="mb-3">
+                            <label asp-for="Password" class="form-label">Password</label>
+                            <input asp-for="Password" class="form-control" type="password" placeholder="Enter your password" />
+                            <span asp-validation-for="Password" class="text-danger"></span>
+                        </div>
+                    }
                     
                     <div class="mb-3 form-check">
                         <input asp-for="RememberMe" class="form-check-input" type="checkbox" />
                         <label asp-for="RememberMe" class="form-check-label">Remember me</label>
                     </div>
                     
-                    <div class="d-grid">
+                    <div class="d-grid mb-2">
                         <button type="submit" class="btn btn-primary">Sign In</button>
+                    </div>
+                    <div class="text-center">
+                        @{
+                            var qs = new Dictionary<string, string?>
+                            {
+                                { "returnUrl", ViewData["ReturnUrl"] as string },
+                                { "clientId", ViewData["ClientId"] as string },
+                                { "mode", Model.UseCode ? null : "code" }
+                            };
+                            var query = string.Join("&", qs.Where(kv => !string.IsNullOrEmpty(kv.Value))
+                                                         .Select(kv => kv.Key + "=" + Uri.EscapeDataString(kv.Value!)));
+                            var toggleHref = string.IsNullOrEmpty(query) ? "/connect/login" : ($"/connect/login?{query}");
+                        }
+                        @if (Model.UseCode)
+                        {
+                            <a href="@toggleHref">Use password instead</a>
+                        }
+                        else
+                        {
+                            <a href="@toggleHref">Use authenticator code instead</a>
+                        }
                     </div>
                 </form>
             </div>

@@ -41,7 +41,7 @@ public class AuthController : Controller
     // REMOVED: [HttpGet("authorize")] - Now handled by minimal API with client-specific cookies
 
     [HttpGet("login")]
-    public async Task<IActionResult> Login(string? returnUrl = null, string? clientId = null)
+    public async Task<IActionResult> Login(string? returnUrl = null, string? clientId = null, string? mode = null)
     {
         _logger.LogDebug("Login page requested, returnUrl = {ReturnUrl}, clientId = {ClientId}", returnUrl, clientId);
         ViewData["ReturnUrl"] = returnUrl;
@@ -69,8 +69,9 @@ public class AuthController : Controller
             }
         }
 
-        ViewData["ClientName"] = clientName;
-        return View(new LoginViewModel());
+    ViewData["ClientName"] = clientName;
+    var useCode = string.Equals(mode, "code", StringComparison.OrdinalIgnoreCase);
+    return View(new LoginViewModel { UseCode = useCode });
     }
 
     [HttpPost("login")]
@@ -108,6 +109,75 @@ public class AuthController : Controller
 
         if (ModelState.IsValid)
         {
+            // Passwordless/code-only branch
+            if (model.UseCode)
+            {
+                if (string.IsNullOrWhiteSpace(model.Email) || string.IsNullOrWhiteSpace(model.Code))
+                {
+                    ModelState.AddModelError(string.Empty, "Email and code are required.");
+                    return View(model);
+                }
+
+                var user = await _userManager.FindByNameAsync(model.Email) ?? await _userManager.FindByEmailAsync(model.Email);
+                if (user == null)
+                {
+                    _logger.LogDebug("Code-only login failed: user not found for {Email}", model.Email);
+                    ModelState.AddModelError(string.Empty, "Invalid login attempt.");
+                    return View(model);
+                }
+
+                if (!await _userManager.GetTwoFactorEnabledAsync(user))
+                {
+                    _logger.LogDebug("Code-only login not permitted: 2FA disabled for {Email}", model.Email);
+                    ModelState.AddModelError(string.Empty, "This account does not allow code-only sign in.");
+                    return View(model);
+                }
+
+                var code = model.Code.Replace(" ", string.Empty).Replace("-", string.Empty);
+                var isValid = await _userManager.VerifyTwoFactorTokenAsync(user, _userManager.Options.Tokens.AuthenticatorTokenProvider, code);
+                if (!isValid)
+                {
+                    _logger.LogDebug("Code-only login failed: invalid code for {Email}", model.Email);
+                    ModelState.AddModelError(string.Empty, "Invalid code.");
+                    return View(model);
+                }
+
+                // Successful code-only auth: sign in with MFA method so AMR propagates
+                await _signInManager.SignInAsync(user, isPersistent: model.RememberMe, authenticationMethod: "mfa");
+
+                // If we have a client ID, sign in with client-specific cookie using the dynamic service
+                if (!string.IsNullOrEmpty(clientId))
+                {
+                    try
+                    {
+                        await _dynamicCookieService.SignInWithClientCookieAsync(clientId, user, model.RememberMe);
+                        _logger.LogDebug("Signed in user {UserName} with client-specific cookie for client {ClientId}", 
+                            user.UserName, clientId);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to sign in with client-specific cookie for client {ClientId}", clientId);
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(returnUrl))
+                {
+                    if (returnUrl.Contains("/connect/authorize"))
+                    {
+                        _logger.LogDebug("Code-only login successful, redirecting to OIDC authorization endpoint: {ReturnUrl}", returnUrl);
+                        return Redirect(returnUrl);
+                    }
+                    else if (Url.IsLocalUrl(returnUrl))
+                    {
+                        _logger.LogDebug("Code-only login successful, redirecting to local URL: {ReturnUrl}", returnUrl);
+                        return Redirect(returnUrl);
+                    }
+                }
+
+                _logger.LogDebug("Code-only login successful, redirecting to Home");
+                return RedirectToAction("Index", "Home");
+            }
+
             var result = await _signInManager.PasswordSignInAsync(model.Email, model.Password, model.RememberMe, lockoutOnFailure: false);
             _logger.LogDebug("Login attempt result: Success={Success}, Requires2FA={RequiresTwoFactor}", result.Succeeded, result.RequiresTwoFactor);
             
@@ -481,4 +551,6 @@ public class LoginViewModel
     public string Email { get; set; } = string.Empty;
     public string Password { get; set; } = string.Empty;
     public bool RememberMe { get; set; }
+    public bool UseCode { get; set; }
+    public string? Code { get; set; }
 }
