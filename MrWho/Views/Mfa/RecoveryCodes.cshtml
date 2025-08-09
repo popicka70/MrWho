@@ -1,0 +1,12 @@
+@model string[]
+@{
+    ViewData["Title"] = "Recovery Codes";
+}
+<h2>Save your recovery codes</h2>
+<p>Store these codes in a safe place. Each code can be used once if you lose your authenticator.</p>
+<pre>
+@string.Join("\n", Model)
+</pre>
+<form method="get" action="/">
+    <button type="submit">Done</button>
+</form>

@@ -1,4 +1,5 @@
 using MrWho.Extensions;
+using MrWho.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -25,8 +26,19 @@ builder.Services.AddSession(options =>
     options.Cookie.Name = ".MrWho.Session";
 });
 
+// Authorization policies
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("RequireMfa", policy =>
+        policy.RequireClaim("amr", "mfa"));
+});
+
 // Business Logic Services
 // Registration is handled in AddMrWhoServices() extension method
+
+// ensure services are registered
+builder.Services.AddSingleton<IQrCodeService, QrCodeService>();
+builder.Services.AddScoped<Microsoft.AspNetCore.Authentication.IClaimsTransformation, MrWho.Services.AmrClaimsTransformation>();
 
 var app = builder.Build();
 

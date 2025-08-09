@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\MrWho.Shared\MrWho.Shared.csproj" />
+  <PackageReference Include="QRCoder" Version="1.4.3" />
     <ProjectReference Include="..\MrWhoAdmin.ServiceDefaults\MrWhoAdmin.ServiceDefaults.csproj" />
   </ItemGroup>
 

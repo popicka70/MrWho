@@ -1,0 +1,21 @@
+@model MrWho.Controllers.SetupMfaViewModel
+@{
+    ViewData["Title"] = "Set up Authenticator";
+}
+<h2>Set up Microsoft Authenticator</h2>
+<p>Scan this QR code with the Microsoft Authenticator app, then enter a code to verify.</p>
+<div>
+    <img src="@Model.QrCodeDataUri" alt="Authenticator QR" />
+</div>
+<p>Or enter this code manually: <strong>@Model.SharedKey</strong></p>
+<form method="post" action="/mfa/verify">
+    @Html.AntiForgeryToken()
+    <div>
+        <label for="code">Verification code</label>
+        <input id="code" name="Code" autocomplete="one-time-code" />
+    </div>
+    <button type="submit">Verify</button>
+    <p>
+        After verification, we'll show your recovery codes.
+    </p>
+</form>

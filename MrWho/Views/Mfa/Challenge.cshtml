@@ -1,0 +1,24 @@
+@model MrWho.Controllers.VerifyMfaInput
+@{
+    ViewData["Title"] = "Two-factor authentication";
+}
+<h2>Two-factor authentication</h2>
+<form method="post" action="/mfa/challenge">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="ReturnUrl" value="@Model.ReturnUrl" />
+    <div>
+        <label for="code">Code</label>
+        <input id="code" name="Code" autocomplete="one-time-code" />
+    </div>
+    <div>
+        <label>
+            <input type="checkbox" name="RememberMe" value="true" /> Remember me
+        </label>
+    </div>
+    <div>
+        <label>
+            <input type="checkbox" name="RememberMachine" value="true" /> Remember this device
+        </label>
+    </div>
+    <button type="submit">Verify</button>
+</form>
