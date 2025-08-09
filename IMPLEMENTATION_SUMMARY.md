@@ -128,7 +128,7 @@ dotnet test --filter "ClassName~UserInfoIdentityResourcesIntegrationTest"
 ## ? Next Steps
 
 ### 1. Admin Interface Enhancement
-The edit dialog `WrWhoAdmin.Web\Components\Pages\EditIdentityResourceDialog.razor` already supports:
+The edit dialog `MrWhoAdmin.Web\Components\Pages\EditIdentityResourceDialog.razor` already supports:
 - Adding/removing user claims
 - Configuring identity resource properties
 - Enabling/disabling resources

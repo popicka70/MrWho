@@ -193,7 +193,7 @@ Additional debug endpoints are available at:
 
 The token inspector is implemented in:
 - **Controller**: `MrWho\Controllers\TokenInspectorController.cs`
-- **Admin Page**: `WrWhoAdmin.Web\Components\Pages\TokenInspector.razor`
+- **Admin Page**: `MrWhoAdmin.Web\\Components\\Pages\\TokenInspector.razor`
 - **Route Registration**: `MrWho\Extensions\WebApplicationExtensions.cs`
 
 It uses the `System.IdentityModel.Tokens.Jwt` package for JWT parsing and validation.

@@ -75,7 +75,7 @@ cd MrWho
 dotnet run
 
 # Start MrWhoAdmin.Web (in separate terminal)
-cd WrWhoAdmin.Web  
+cd MrWhoAdmin.Web  
 dotnet run
 ```
 

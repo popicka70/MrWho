@@ -113,7 +113,7 @@ dotnet run
 
 # Wait for "Essential data created" message
 # In new terminal:
-cd WrWhoAdmin.Web  
+cd MrWhoAdmin.Web  
 dotnet run
 ```
 
@@ -130,11 +130,11 @@ dotnet run
 
 ## Key Configuration Files Updated
 
-- ? `WrWhoAdmin.Web/Extensions/ServiceCollectionExtensions.cs` - Enhanced OIDC config
-- ? `WrWhoAdmin.Web/Extensions/WebApplicationExtensions.cs` - Fixed auth endpoints  
-- ? `WrWhoAdmin.Web/Components/Routes.razor` - Improved redirect handling
-- ? `WrWhoAdmin.Web/Components/Pages/AuthError.razor` - New error page
-- ? `WrWhoAdmin.Web/Components/Pages/AuthDiagnostics.razor` - New diagnostic tool
+- ? `MrWhoAdmin.Web/Extensions/ServiceCollectionExtensions.cs` - Enhanced OIDC config
+- ? `MrWhoAdmin.Web/Extensions/WebApplicationExtensions.cs` - Fixed auth endpoints  
+- ? `MrWhoAdmin.Web/Components/Routes.razor` - Improved redirect handling
+- ? `MrWhoAdmin.Web/Components/Pages/AuthError.razor` - New error page
+- ? `MrWhoAdmin.Web/Components/Pages/AuthDiagnostics.razor` - New diagnostic tool
 
 ## Contact Information
 

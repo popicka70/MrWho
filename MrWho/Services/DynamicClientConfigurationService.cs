@@ -229,8 +229,8 @@ public class DynamicClientConfigurationService : IDynamicClientConfigurationServ
         };
     }
 
-    public async Task<CookieAuthenticationOptions> ApplyDynamicConfigurationAsync(
-        Client client, 
+    public Task<CookieAuthenticationOptions> ApplyDynamicConfigurationAsync(
+        Client client,
         CookieAuthenticationOptions options)
     {
         try
@@ -276,12 +276,12 @@ public class DynamicClientConfigurationService : IDynamicClientConfigurationServ
             _logger.LogDebug("?? Applied dynamic configuration for client {ClientId}: Session={SessionHours}h, Sliding={Sliding}, HTTPS={RequireHttps}, SameSite={SameSite}", 
                 client.ClientId, sessionHours, useSlidingExpiration, requireHttps, sameSitePolicy);
 
-            return options;
+            return Task.FromResult(options);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "? Error applying dynamic configuration for client {ClientId}", client.ClientId);
-            return options; // Return original options on error
+            return Task.FromResult(options); // Return original options on error
         }
     }
 
