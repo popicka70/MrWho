@@ -260,7 +260,12 @@ public static class ServiceCollectionExtensions
         options.RemoteSignOutPath = "/signout-oidc";
 
         // Additional configuration for OpenIddict compatibility
-        options.MetadataAddress = $"{options.Authority}.well-known/openid-configuration";
+        // Allow overriding metadata address (useful for Docker where the backchannel must reach the service by container name)
+        var metadataAddress = authConfig.GetValue<string>("MetadataAddress");
+        var resolvedMetadata = !string.IsNullOrWhiteSpace(metadataAddress)
+            ? metadataAddress
+            : $"{options.Authority}.well-known/openid-configuration";
+        options.MetadataAddress = resolvedMetadata;
 
         // Configure token refresh settings
         options.RefreshInterval = TimeSpan.FromMinutes(30); // Check for refresh every 30 minutes
@@ -268,6 +273,41 @@ public static class ServiceCollectionExtensions
         
         // CRITICAL: Skip unrecognized requests to prevent loops
         options.SkipUnrecognizedRequests = true;
+
+        // Development convenience: allow trusting self-signed certificates for the OIDC backchannel
+        // Only enable when explicitly configured
+        var allowSelfSigned = authConfig.GetValue<bool>("AllowSelfSigned", false);
+        HttpClientHandler? backchannelHandler = null;
+        if (allowSelfSigned)
+        {
+            backchannelHandler = new HttpClientHandler
+            {
+                ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+            };
+            options.BackchannelHttpHandler = backchannelHandler;
+        }
+
+        // If a metadata address is specified, force discovery via a custom ConfigurationManager
+        if (!string.IsNullOrWhiteSpace(metadataAddress))
+        {
+            var retriever = new Microsoft.IdentityModel.Protocols.HttpDocumentRetriever
+            {
+                RequireHttps = false
+            };
+            if (backchannelHandler != null)
+            {
+                // Use a custom HttpClient with our permissive handler for self-signed certs
+                retriever = new Microsoft.IdentityModel.Protocols.HttpDocumentRetriever(new HttpClient(backchannelHandler, disposeHandler: false))
+                {
+                    RequireHttps = false
+                };
+            }
+
+            options.ConfigurationManager = new Microsoft.IdentityModel.Protocols.ConfigurationManager<Microsoft.IdentityModel.Protocols.OpenIdConnect.OpenIdConnectConfiguration>(
+                resolvedMetadata,
+                new Microsoft.IdentityModel.Protocols.OpenIdConnect.OpenIdConnectConfigurationRetriever(),
+                retriever);
+        }
 
         ConfigureScopes(options);
         ConfigureClaimActions(options);
@@ -332,8 +372,21 @@ public static class ServiceCollectionExtensions
             OnRedirectToIdentityProvider = context =>
             {
                 var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-                logger.LogInformation("?? ADMIN: Redirecting to identity provider with client_id: {ClientId}", 
-                    context.ProtocolMessage.ClientId);
+                logger.LogInformation("?? ADMIN: Redirecting to identity provider with client_id: {ClientId}", context.ProtocolMessage.ClientId);
+                logger.LogInformation("ADMIN OIDC Settings: Authority={Authority}, MetadataAddress={MetadataAddress}, HasCustomConfigManager={HasCM}",
+                    context.Options.Authority, context.Options.MetadataAddress, context.Options.ConfigurationManager != null);
+
+                // Force browser redirect to host-facing Authority regardless of discovery host
+                var authority = context.Options.Authority?.TrimEnd('/') ?? string.Empty;
+                if (!string.IsNullOrEmpty(authority))
+                {
+                    var desiredAuthorize = $"{authority}/connect/authorize";
+                    if (!string.Equals(context.ProtocolMessage.IssuerAddress, desiredAuthorize, StringComparison.OrdinalIgnoreCase))
+                    {
+                        logger.LogInformation("ADMIN OIDC: Overriding IssuerAddress from {From} to {To}", context.ProtocolMessage.IssuerAddress, desiredAuthorize);
+                        context.ProtocolMessage.IssuerAddress = desiredAuthorize;
+                    }
+                }
                 return Task.CompletedTask;
             },
             

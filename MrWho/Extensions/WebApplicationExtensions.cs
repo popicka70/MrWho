@@ -31,7 +31,12 @@ public static class WebApplicationExtensions
             app.UseHsts();
         }
 
-        app.UseHttpsRedirection();
+        // Allow disabling HTTPS redirection for containerized/internal HTTP calls
+        var disableHttpsRedirect = string.Equals(Environment.GetEnvironmentVariable("DISABLE_HTTPS_REDIRECT"), "true", StringComparison.OrdinalIgnoreCase);
+        if (!disableHttpsRedirect)
+        {
+            app.UseHttpsRedirection();
+        }
         app.UseStaticFiles();
         app.UseRouting();
 
@@ -72,7 +77,12 @@ public static class WebApplicationExtensions
             app.UseHsts();
         }
 
-        app.UseHttpsRedirection();
+        // Allow disabling HTTPS redirection for containerized/internal HTTP calls
+        var disableHttpsRedirect = string.Equals(Environment.GetEnvironmentVariable("DISABLE_HTTPS_REDIRECT"), "true", StringComparison.OrdinalIgnoreCase);
+        if (!disableHttpsRedirect)
+        {
+            app.UseHttpsRedirection();
+        }
         app.UseStaticFiles();
         app.UseRouting();
 
