@@ -5,6 +5,8 @@
 @inject NavigationManager Navigation
 @inject ITokenRefreshService TokenRefreshService
 @inject IJSRuntime JSRuntime
+@using Microsoft.AspNetCore.Components.Authorization
+@implements IDisposable
 
 <PageTitle>Authentication Diagnostics</PageTitle>
 
@@ -45,30 +47,42 @@
                     <h5>Authentication State</h5>
                 </div>
                 <div class="card-body">
-                    <AuthorizeView>
-                        <Authorized>
-                            <div class="alert alert-success">
-                                ? User is authenticated as: <strong>@context.User.Identity?.Name</strong>
-                            </div>
-                            
-                            <div class="mb-2">
-                                <strong>Claims Count:</strong> @context.User.Claims.Count()
-                            </div>
-                            
-                            <div class="mb-2">
-                                <strong>Auth Type:</strong> @context.User.Identity?.AuthenticationType
-                            </div>
-                            
-                            <button @onclick="CheckTokenStatus" class="btn btn-info btn-sm">
-                                Check Token Status
-                            </button>
-                        </Authorized>
-                        <NotAuthorized>
-                            <div class="alert alert-warning">
-                                ?? User is not authenticated
-                            </div>
-                        </NotAuthorized>
-                    </AuthorizeView>
+                    @if (_hasRendered)
+                    {
+                        <CascadingAuthenticationState>
+                            <AuthorizeView>
+                                <Authorized>
+                                    <div class="alert alert-success">
+                                        ? User is authenticated as: <strong>@context.User.Identity?.Name</strong>
+                                    </div>
+                                    
+                                    <div class="mb-2">
+                                        <strong>Claims Count:</strong> @context.User.Claims.Count()
+                                    </div>
+                                    
+                                    <div class="mb-2">
+                                        <strong>Auth Type:</strong> @context.User.Identity?.AuthenticationType
+                                    </div>
+                                    
+                                    <button @onclick="CheckTokenStatus" class="btn btn-info btn-sm">
+                                        Check Token Status
+                                    </button>
+                                </Authorized>
+                                <NotAuthorized>
+                                    <div class="alert alert-warning">
+                                        ? User is not authenticated
+                                    </div>
+                                </NotAuthorized>
+                            </AuthorizeView>
+                        </CascadingAuthenticationState>
+                    }
+                    else
+                    {
+                        <div class="alert alert-info">
+                            <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                            Checking authentication state...
+                        </div>
+                    }
                 </div>
             </div>
         </div>
@@ -82,16 +96,16 @@
                 </div>
                 <div class="card-body">
                     <div class="btn-group" role="group">
-                        <button @onclick="TestOidcDiscovery" class="btn btn-primary">
+                        <button @onclick="TestOidcDiscovery" class="btn btn-primary" disabled="@(!_hasRendered)">
                             Test OIDC Discovery
                         </button>
-                        <button @onclick="TestClientConfig" class="btn btn-primary">
+                        <button @onclick="TestClientConfig" class="btn btn-primary" disabled="@(!_hasRendered)">
                             Test Client Config
                         </button>
-                        <button @onclick="ClearAuthState" class="btn btn-warning">
+                        <button @onclick="ClearAuthState" class="btn btn-warning" disabled="@(!_hasRendered)">
                             Clear Auth State
                         </button>
-                        <button @onclick="TestLogin" class="btn btn-success">
+                        <button @onclick="TestLogin" class="btn btn-success" disabled="@(!_hasRendered)">
                             Test Login Flow
                         </button>
                     </div>
@@ -150,19 +164,32 @@
     private string AuthorityStatus = "unknown";
     private string DiagnosticsResult = "";
     private bool _hasRendered = false;
+    private bool _disposed = false;
 
     protected override Task OnInitializedAsync()
     {
-        var authConfig = Configuration.GetSection("Authentication");
-        Authority = authConfig.GetValue<string>("Authority") ?? "https://localhost:7113/";
-        ClientId = authConfig.GetValue<string>("ClientId") ?? "mrwho_admin_web";
-        CurrentUrl = Navigation.Uri;
-        ExpectedCallback = Navigation.BaseUri + "signin-oidc";
+        if (_disposed) return Task.CompletedTask;
+        
+        try
+        {
+            var authConfig = Configuration.GetSection("Authentication");
+            Authority = authConfig.GetValue<string>("Authority") ?? "https://localhost:7113/";
+            ClientId = authConfig.GetValue<string>("ClientId") ?? "mrwho_admin_web";
+            CurrentUrl = Navigation.Uri;
+            ExpectedCallback = Navigation.BaseUri + "signin-oidc";
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error during initialization");
+        }
+        
         return Task.CompletedTask;
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (_disposed) return;
+        
         if (firstRender)
         {
             _hasRendered = true;
@@ -174,6 +201,8 @@
 
     private async Task CheckAuthorityStatus()
     {
+        if (_disposed) return;
+        
         try
         {
             using var httpClient = new HttpClient();
@@ -197,17 +226,15 @@
             AuthorityStatusMessage = $"? Cannot reach OIDC server: {ex.Message}";
         }
 
-        StateHasChanged();
+        if (!_disposed)
+        {
+            StateHasChanged();
+        }
     }
 
     private async Task CheckTokenStatus()
     {
-        if (!_hasRendered)
-        {
-            DiagnosticsResult = "Token status check is only available after interactive rendering.\n";
-            StateHasChanged();
-            return;
-        }
+        if (_disposed || !_hasRendered) return;
 
         DiagnosticsResult = "Checking token status...\n";
         StateHasChanged();
@@ -223,18 +250,15 @@
             DiagnosticsResult += $"Error checking token: {ex.Message}\n";
         }
 
-        StateHasChanged();
-        await Task.CompletedTask;
+        if (!_disposed)
+        {
+            StateHasChanged();
+        }
     }
 
     private async Task TestOidcDiscovery()
     {
-        if (!_hasRendered)
-        {
-            DiagnosticsResult = "OIDC Discovery test is only available after interactive rendering.\n";
-            StateHasChanged();
-            return;
-        }
+        if (_disposed || !_hasRendered) return;
 
         DiagnosticsResult = "Testing OIDC Discovery...\n";
         StateHasChanged();
@@ -264,17 +288,15 @@
             DiagnosticsResult += $"Exception: {ex.Message}\n";
         }
         
-        StateHasChanged();
+        if (!_disposed)
+        {
+            StateHasChanged();
+        }
     }
 
     private async Task TestClientConfig()
     {
-        if (!_hasRendered)
-        {
-            DiagnosticsResult = "Client Config test is only available after interactive rendering.\n";
-            StateHasChanged();
-            return;
-        }
+        if (_disposed || !_hasRendered) return;
 
         DiagnosticsResult = "Testing Client Configuration...\n";
         StateHasChanged();
@@ -319,17 +341,15 @@
             DiagnosticsResult += $"Exception: {ex.Message}\n";
         }
         
-        StateHasChanged();
+        if (!_disposed)
+        {
+            StateHasChanged();
+        }
     }
 
     private async Task ClearAuthState()
     {
-        if (!_hasRendered)
-        {
-            DiagnosticsResult = "Clear Auth State is only available after interactive rendering.\n";
-            StateHasChanged();
-            return;
-        }
+        if (_disposed || !_hasRendered) return;
 
         DiagnosticsResult = "Clearing authentication state...\n";
         StateHasChanged();
@@ -341,19 +361,16 @@
         catch (Exception ex)
         {
             DiagnosticsResult += $"Error: {ex.Message}\n";
-            StateHasChanged();
+            if (!_disposed)
+            {
+                StateHasChanged();
+            }
         }
-        await Task.CompletedTask;
     }
 
     private async Task TestLogin()
     {
-        if (!_hasRendered)
-        {
-            DiagnosticsResult = "Test Login is only available after interactive rendering.\n";
-            StateHasChanged();
-            return;
-        }
+        if (_disposed || !_hasRendered) return;
 
         DiagnosticsResult = "Starting login test...\n";
         StateHasChanged();
@@ -365,9 +382,11 @@
         catch (Exception ex)
         {
             DiagnosticsResult += $"Error: {ex.Message}\n";
-            StateHasChanged();
+            if (!_disposed)
+            {
+                StateHasChanged();
+            }
         }
-        await Task.CompletedTask;
     }
 
     private string GetStatusClass(string status)
@@ -378,5 +397,10 @@
             "error" => "text-danger",
             _ => "text-warning"
         };
+    }
+
+    public void Dispose()
+    {
+        _disposed = true;
     }
 }

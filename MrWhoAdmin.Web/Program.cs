@@ -9,7 +9,15 @@ builder.AddServiceDefaults();
 
 // Add services to the container using extension methods
 builder.Services.AddRazorComponents()
-    .AddInteractiveServerComponents();
+    .AddInteractiveServerComponents(options =>
+    {
+        // CRITICAL: Configure circuit options to prevent disposal issues
+        options.DetailedErrors = builder.Environment.IsDevelopment();
+        options.DisconnectedCircuitMaxRetained = 100;
+        options.DisconnectedCircuitRetentionPeriod = TimeSpan.FromMinutes(3);
+        options.JSInteropDefaultCallTimeout = TimeSpan.FromMinutes(1);
+        options.MaxBufferedUnacknowledgedRenderBatches = 10;
+    });
 
 // Add MVC controllers for token refresh endpoint and back-channel logout
 builder.Services.AddControllers();
@@ -34,6 +42,9 @@ builder.Services.AddHttpServices();
 builder.Services.AddApiServices(builder.Configuration);
 builder.Services.AddAuthenticationServices(builder.Configuration);
 builder.Services.AddAuthorizationServices();
+
+// Add Blazor Server circuit event handling for better error handling
+builder.Services.AddSingleton<Microsoft.AspNetCore.Components.Server.Circuits.CircuitHandler, CircuitHandlerService>();
 
 // API Services are already registered in AddApiServices() method above
 

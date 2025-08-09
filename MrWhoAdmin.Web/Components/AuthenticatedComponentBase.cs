@@ -4,9 +4,9 @@ using MrWhoAdmin.Web.Services;
 namespace MrWhoAdmin.Web.Components;
 
 /// <summary>
-/// Base component that handles authentication automatically
+/// Base component that handles authentication automatically with proper disposal and error handling
 /// </summary>
-public abstract class AuthenticatedComponentBase : ComponentBase
+public abstract class AuthenticatedComponentBase : ComponentBase, IDisposable
 {
     [Inject] protected IBlazorAuthService BlazorAuthService { get; set; } = default!;
     [Inject] protected ILogger<AuthenticatedComponentBase> Logger { get; set; } = default!;
@@ -15,9 +15,12 @@ public abstract class AuthenticatedComponentBase : ComponentBase
     protected bool IsAuthenticated { get; set; } = false;
     protected string? AuthErrorMessage { get; set; }
     private bool _hasRendered = false;
+    private bool _disposed = false;
 
     protected override async Task OnInitializedAsync()
     {
+        if (_disposed) return;
+        
         // During prerendering, we'll assume authentication is OK
         // and perform the real check after the component becomes interactive
         
@@ -28,11 +31,18 @@ public abstract class AuthenticatedComponentBase : ComponentBase
             IsAuthenticated = true; // Assume authenticated during prerendering
             
             // Check for authentication errors in URL (this is safe during prerendering)
-            if (BlazorAuthService.HasAuthenticationError())
+            try
             {
-                AuthErrorMessage = BlazorAuthService.GetAuthenticationErrorMessage();
-                Logger.LogWarning("Authentication error detected in URL: {ErrorMessage}", AuthErrorMessage);
-                IsAuthenticated = false;
+                if (BlazorAuthService.HasAuthenticationError())
+                {
+                    AuthErrorMessage = BlazorAuthService.GetAuthenticationErrorMessage();
+                    Logger.LogWarning("Authentication error detected in URL: {ErrorMessage}", AuthErrorMessage);
+                    IsAuthenticated = false;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Error checking for authentication errors during initialization");
             }
         }
         
@@ -41,6 +51,8 @@ public abstract class AuthenticatedComponentBase : ComponentBase
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (_disposed) return;
+        
         if (firstRender)
         {
             _hasRendered = true;
@@ -56,10 +68,15 @@ public abstract class AuthenticatedComponentBase : ComponentBase
     /// </summary>
     protected virtual async Task CheckAuthenticationAsync()
     {
+        if (_disposed) return;
+        
         try
         {
             IsLoading = true;
-            StateHasChanged();
+            if (!_disposed)
+            {
+                StateHasChanged();
+            }
 
             Logger.LogDebug("Checking authentication status (interactive context)");
             
@@ -98,7 +115,10 @@ public abstract class AuthenticatedComponentBase : ComponentBase
         finally
         {
             IsLoading = false;
-            StateHasChanged();
+            if (!_disposed)
+            {
+                StateHasChanged();
+            }
         }
     }
 
@@ -107,6 +127,8 @@ public abstract class AuthenticatedComponentBase : ComponentBase
     /// </summary>
     protected async Task TriggerReauthenticationAsync()
     {
+        if (_disposed) return;
+        
         try
         {
             if (!_hasRendered)
@@ -115,7 +137,10 @@ public abstract class AuthenticatedComponentBase : ComponentBase
                 // If called before first render, just set error state
                 AuthErrorMessage = "Authentication required. Please refresh the page to log in.";
                 IsAuthenticated = false;
-                StateHasChanged();
+                if (!_disposed)
+                {
+                    StateHasChanged();
+                }
                 return;
             }
 
@@ -126,7 +151,10 @@ public abstract class AuthenticatedComponentBase : ComponentBase
         {
             Logger.LogError(ex, "Error triggering re-authentication");
             AuthErrorMessage = "Failed to trigger re-authentication. Please try refreshing the page.";
-            StateHasChanged();
+            if (!_disposed)
+            {
+                StateHasChanged();
+            }
         }
     }
 
@@ -135,6 +163,8 @@ public abstract class AuthenticatedComponentBase : ComponentBase
     /// </summary>
     protected void ClearAuthError()
     {
+        if (_disposed) return;
+        
         AuthErrorMessage = null;
         StateHasChanged();
     }
@@ -152,6 +182,8 @@ public abstract class AuthenticatedComponentBase : ComponentBase
     /// </summary>
     protected RenderFragment RenderAuthenticationStatus() => builder =>
     {
+        if (_disposed) return;
+        
         if (IsLoading)
         {
             builder.OpenElement(0, "div");
@@ -168,36 +200,34 @@ public abstract class AuthenticatedComponentBase : ComponentBase
         }
         else if (!string.IsNullOrEmpty(AuthErrorMessage))
         {
-            builder.OpenElement(8, "div");
-            builder.AddAttribute(9, "class", "alert alert-danger");
-            builder.AddContent(10, AuthErrorMessage);
-            
-            // Only add the login button if we've rendered (interactive context)
-            if (_hasRendered)
-            {
-                builder.OpenElement(11, "button");
-                builder.AddAttribute(12, "type", "button");
-                builder.AddAttribute(13, "class", "btn btn-primary ms-2");
-                builder.AddAttribute(14, "onclick", EventCallback.Factory.Create(this, TriggerReauthenticationAsync));
-                builder.AddContent(15, "Login Again");
-                builder.CloseElement();
-            }
-            else
-            {
-                builder.OpenElement(16, "small");
-                builder.AddAttribute(17, "class", "text-muted d-block mt-2");
-                builder.AddContent(18, "Please refresh the page to log in.");
-                builder.CloseElement();
-            }
-            
+            builder.OpenElement(0, "div");
+            builder.AddAttribute(1, "class", "alert alert-danger");
+            builder.AddContent(2, AuthErrorMessage);
+            builder.OpenElement(3, "button");
+            builder.AddAttribute(4, "type", "button");
+            builder.AddAttribute(5, "class", "btn btn-primary mt-2");
+            builder.AddAttribute(6, "onclick", Microsoft.AspNetCore.Components.EventCallback.Factory.Create(this, TriggerReauthenticationAsync));
+            builder.AddContent(7, "Try Login Again");
+            builder.CloseElement();
             builder.CloseElement();
         }
         else if (!IsAuthenticated)
         {
-            builder.OpenElement(19, "div");
-            builder.AddAttribute(20, "class", "alert alert-warning");
-            builder.AddContent(21, "You are not authenticated. Redirecting to login...");
+            builder.OpenElement(0, "div");
+            builder.AddAttribute(1, "class", "alert alert-warning");
+            builder.AddContent(2, "Authentication required. Please log in to continue.");
+            builder.OpenElement(3, "button");
+            builder.AddAttribute(4, "type", "button");
+            builder.AddAttribute(5, "class", "btn btn-primary mt-2");
+            builder.AddAttribute(6, "onclick", Microsoft.AspNetCore.Components.EventCallback.Factory.Create(this, TriggerReauthenticationAsync));
+            builder.AddContent(7, "Login");
+            builder.CloseElement();
             builder.CloseElement();
         }
     };
+
+    public virtual void Dispose()
+    {
+        _disposed = true;
+    }
 }

@@ -43,6 +43,9 @@ public static class ServiceCollectionExtensions
         // Add authentication failure service
         services.AddScoped<IAuthenticationFailureService, AuthenticationFailureService>();
         
+        // Add circuit handler service for better Blazor Server error handling
+        services.AddScoped<CircuitHandlerService>();
+        
         // CRITICAL: Ensure antiforgery services are explicitly added
         // This should be automatic with Blazor Server, but we'll add it explicitly to fix the error
         services.AddAntiforgery();
