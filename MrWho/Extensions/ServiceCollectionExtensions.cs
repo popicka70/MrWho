@@ -13,6 +13,8 @@ using static OpenIddict.Abstractions.OpenIddictConstants;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Configuration;
+using Pomelo.EntityFrameworkCore.MySql.Infrastructure;
+using Npgsql.EntityFrameworkCore.PostgreSQL;
 
 namespace MrWho.Extensions;
 
@@ -66,13 +68,78 @@ public static class ServiceCollectionExtensions
 
     public static IServiceCollection AddMrWhoDatabase(this WebApplicationBuilder builder)
     {
-        // Configure Entity Framework with SQL Server (via Aspire)
-        builder.AddSqlServerDbContext<ApplicationDbContext>("mrwhodb", null, optionsBuilder =>
+        // Multi-provider database configuration (SqlServer/MySql/Postgres)
+        var config = builder.Configuration;
+        var services = builder.Services;
+
+        var provider = (config["Database:Provider"] ?? "SqlServer").Trim().ToLowerInvariant();
+    var connectionName = config["Database:ConnectionName"] ?? "mrwhodb";
+        var connectionString = config.GetConnectionString(connectionName) ?? config[$"ConnectionStrings:{connectionName}"];
+    var migrationsAssembly = config["Database:MigrationsAssembly"]; // optional
+
+        if (string.IsNullOrWhiteSpace(connectionString))
         {
-            optionsBuilder.UseOpenIddict();
+            throw new InvalidOperationException($"Missing connection string '{connectionName}'. Set ConnectionStrings:{connectionName} or provide Database:ConnectionName.");
+        }
+
+        services.AddDbContext<ApplicationDbContext>(options =>
+        {
+            switch (provider)
+            {
+                case "mysql":
+                case "mariadb":
+                {
+                    // Read flavor and version from config to avoid runtime autodetect issues
+                    var flavor = (config["Database:MySql:Flavor"] ?? provider).Trim().ToLowerInvariant();
+                    var versionText = config["Database:MySql:Version"] ?? (flavor == "mariadb" ? "11.2.0" : "8.0.36");
+                    if (!Version.TryParse(versionText, out var parsedVersion))
+                    {
+                        parsedVersion = flavor == "mariadb" ? new Version(11, 2, 0) : new Version(8, 0, 36);
+                    }
+
+                    if (flavor == "mariadb")
+                    {
+                        var serverVersion = new MariaDbServerVersion(parsedVersion);
+                        options.UseMySql(connectionString, serverVersion, b =>
+                        {
+                            if (!string.IsNullOrWhiteSpace(migrationsAssembly))
+                                b.MigrationsAssembly(migrationsAssembly);
+                        });
+                    }
+                    else
+                    {
+                        var serverVersion = new MySqlServerVersion(parsedVersion);
+                        options.UseMySql(connectionString, serverVersion, b =>
+                        {
+                            if (!string.IsNullOrWhiteSpace(migrationsAssembly))
+                                b.MigrationsAssembly(migrationsAssembly);
+                        });
+                    }
+                    break;
+                }
+                case "postgres":
+                case "postgresql":
+                    options.UseNpgsql(connectionString, b =>
+                    {
+                        if (!string.IsNullOrWhiteSpace(migrationsAssembly))
+                            b.MigrationsAssembly(migrationsAssembly);
+                    });
+                    break;
+                case "sqlserver":
+                default:
+                    options.UseSqlServer(connectionString, b =>
+                    {
+                        if (!string.IsNullOrWhiteSpace(migrationsAssembly))
+                            b.MigrationsAssembly(migrationsAssembly);
+                    });
+                    break;
+            }
+
+            // Required by OpenIddict EF stores
+            options.UseOpenIddict();
         });
 
-        return builder.Services;
+        return services;
     }
 
     /// <summary>
