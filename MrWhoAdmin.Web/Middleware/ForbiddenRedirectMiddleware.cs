@@ -65,8 +65,8 @@ public class ForbiddenRedirectMiddleware
                 {
                     // For Blazor requests, return a response that triggers client-side redirect
                     context.Response.StatusCode = 403;
-                    context.Response.Headers.Add("X-Auth-Error", "session_revoked");
-                    context.Response.Headers.Add("X-Auth-Error-Redirect", "/auth/error?error=access_denied&status_code=403");
+                    context.Response.Headers.Append("X-Auth-Error", "session_revoked");
+                    context.Response.Headers.Append("X-Auth-Error-Redirect", "/auth/error?error=access_denied&status_code=403");
                     await context.Response.WriteAsync("Authentication required");
                 }
                 else

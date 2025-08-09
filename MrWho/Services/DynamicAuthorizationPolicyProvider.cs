@@ -143,9 +143,9 @@ public class DynamicAuthorizationPolicyProvider : IAuthorizationPolicyProvider
         return await _fallbackPolicyProvider.GetPolicyAsync(policyName);
     }
 
-    public Task<AuthorizationPolicy> GetFallbackPolicyAsync()
+    public Task<AuthorizationPolicy?> GetFallbackPolicyAsync()
     {
-        return _fallbackPolicyProvider.GetFallbackPolicyAsync()!;
+        return _fallbackPolicyProvider.GetFallbackPolicyAsync();
     }
 
     private async Task<List<string>> GetAllAuthenticationSchemesAsync()

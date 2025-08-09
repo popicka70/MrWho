@@ -177,7 +177,7 @@ public class BackChannelLogoutService : IBackChannelLogoutService
         }
     }
 
-    public async Task<string> CreateLogoutTokenAsync(string clientId, string subject, string sessionId)
+    public Task<string> CreateLogoutTokenAsync(string clientId, string subject, string sessionId)
     {
         // For now, create a simple JWT-like structure
         // In production, this should be a properly signed JWT
@@ -195,7 +195,7 @@ public class BackChannelLogoutService : IBackChannelLogoutService
             sid = sessionId
         };
 
-        return JsonSerializer.Serialize(logoutToken);
+    return Task.FromResult(JsonSerializer.Serialize(logoutToken));
     }
 
     /// <summary>

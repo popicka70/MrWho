@@ -97,7 +97,7 @@
             ErrorMessage ?? "Unknown", ErrorDescription ?? "None", StatusCode ?? "Unknown");
     }
 
-    private async Task LogoutAndRetry()
+    private Task LogoutAndRetry()
     {
         try
         {
@@ -111,9 +111,11 @@
             Logger.LogError(ex, "Error during logout and retry");
             Navigation.NavigateTo("/login", forceLoad: true);
         }
+
+        return Task.CompletedTask;
     }
 
-    private async Task ForceLogout()
+    private Task ForceLogout()
     {
         try
         {
@@ -127,6 +129,8 @@
             Logger.LogError(ex, "Error during force logout");
             Navigation.NavigateTo("/auth/logout", forceLoad: true);
         }
+
+        return Task.CompletedTask;
     }
 
     private void GoHome()

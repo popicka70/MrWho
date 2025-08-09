@@ -125,6 +125,10 @@ public class SessionsController : ControllerBase
             }
 
             var applicationId = await _applicationManager.GetIdAsync(application);
+            if (string.IsNullOrEmpty(applicationId))
+            {
+                return NotFound($"Client '{clientId}' has no identifier");
+            }
 
             await foreach (var authorization in _authorizationManager.FindByApplicationIdAsync(applicationId))
             {
@@ -156,6 +160,11 @@ public class SessionsController : ControllerBase
     {
         try
         {
+            if (string.IsNullOrEmpty(authorizationId))
+            {
+                return BadRequest("Authorization id is required");
+            }
+
             var authorization = await _authorizationManager.FindByIdAsync(authorizationId);
             if (authorization == null)
             {
@@ -209,6 +218,10 @@ public class SessionsController : ControllerBase
                     continue;
 
                 var authorizationId = await _authorizationManager.GetIdAsync(authorization);
+                if (string.IsNullOrEmpty(authorizationId))
+                {
+                    continue;
+                }
 
                 // Revoke all tokens associated with this authorization
                 await foreach (var token in _tokenManager.FindByAuthorizationIdAsync(authorizationId))
@@ -250,6 +263,10 @@ public class SessionsController : ControllerBase
             }
 
             var applicationId = await _applicationManager.GetIdAsync(application);
+            if (string.IsNullOrEmpty(applicationId))
+            {
+                return NotFound($"Client '{clientId}' has no identifier");
+            }
             var revokedCount = 0;
 
             await foreach (var authorization in _authorizationManager.FindByApplicationIdAsync(applicationId))
@@ -259,6 +276,10 @@ public class SessionsController : ControllerBase
                     continue;
 
                 var authorizationId = await _authorizationManager.GetIdAsync(authorization);
+                if (string.IsNullOrEmpty(authorizationId))
+                {
+                    continue;
+                }
 
                 // Revoke all tokens associated with this authorization
                 await foreach (var token in _tokenManager.FindByAuthorizationIdAsync(authorizationId))
@@ -350,13 +371,16 @@ public class SessionsController : ControllerBase
 
                 // Check for tokens expiring soon (next hour)
                 var authorizationId = await _authorizationManager.GetIdAsync(authorization);
-                await foreach (var token in _tokenManager.FindByAuthorizationIdAsync(authorizationId))
+                if (!string.IsNullOrEmpty(authorizationId))
                 {
-                    var expirationDate = await _tokenManager.GetExpirationDateAsync(token);
-                    if (expirationDate.HasValue && expirationDate <= DateTimeOffset.UtcNow.AddHours(1))
+                    await foreach (var token in _tokenManager.FindByAuthorizationIdAsync(authorizationId))
                     {
-                        stats.ExpiringSoon++;
-                        break; // Only count once per session
+                        var expirationDate = await _tokenManager.GetExpirationDateAsync(token);
+                        if (expirationDate.HasValue && expirationDate <= DateTimeOffset.UtcNow.AddHours(1))
+                        {
+                            stats.ExpiringSoon++;
+                            break; // Only count once per session
+                        }
                     }
                 }
             }
@@ -412,29 +436,32 @@ public class SessionsController : ControllerBase
             DateTimeOffset? lastActivity = null;
             DateTimeOffset? expiresAt = null;
 
-            await foreach (var token in _tokenManager.FindByAuthorizationIdAsync(id))
+            if (!string.IsNullOrEmpty(id))
             {
-                var tokenStatus = await _tokenManager.GetStatusAsync(token);
-                if (tokenStatus == OpenIddictConstants.Statuses.Valid)
+                await foreach (var token in _tokenManager.FindByAuthorizationIdAsync(id))
                 {
-                    tokenCount++;
-
-                    var tokenType = await _tokenManager.GetTypeAsync(token);
-                    if (tokenType == "refresh_token")
+                    var tokenStatus = await _tokenManager.GetStatusAsync(token);
+                    if (tokenStatus == OpenIddictConstants.Statuses.Valid)
                     {
-                        hasRefreshToken = true;
-                    }
+                        tokenCount++;
 
-                    var tokenCreationDate = await _tokenManager.GetCreationDateAsync(token);
-                    if (tokenCreationDate.HasValue && (lastActivity == null || tokenCreationDate > lastActivity))
-                    {
-                        lastActivity = tokenCreationDate;
-                    }
+                        var tokenType = await _tokenManager.GetTypeAsync(token);
+                        if (tokenType == "refresh_token")
+                        {
+                            hasRefreshToken = true;
+                        }
 
-                    var tokenExpirationDate = await _tokenManager.GetExpirationDateAsync(token);
-                    if (tokenExpirationDate.HasValue && (expiresAt == null || tokenExpirationDate < expiresAt))
-                    {
-                        expiresAt = tokenExpirationDate;
+                        var tokenCreationDate = await _tokenManager.GetCreationDateAsync(token);
+                        if (tokenCreationDate.HasValue && (lastActivity == null || tokenCreationDate > lastActivity))
+                        {
+                            lastActivity = tokenCreationDate;
+                        }
+
+                        var tokenExpirationDate = await _tokenManager.GetExpirationDateAsync(token);
+                        if (tokenExpirationDate.HasValue && (expiresAt == null || tokenExpirationDate < expiresAt))
+                        {
+                            expiresAt = tokenExpirationDate;
+                        }
                     }
                 }
             }

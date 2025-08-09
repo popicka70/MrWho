@@ -12,7 +12,7 @@
             
             <div class="alert alert-success">
                 <h4><i class="bi bi-shield-check"></i> Access Granted!</h4>
-                <p>Welcome <strong>@(User.Identity.Name ?? "Unknown User")</strong>! You have successfully accessed this protected page.</p>
+                <p>Welcome <strong>@(User?.Identity?.Name ?? "Unknown User")</strong>! You have successfully accessed this protected page.</p>
             </div>
 
             <div class="row">
@@ -25,23 +25,23 @@
                             <table class="table table-borderless">
                                 <tr>
                                     <td><strong>Name:</strong></td>
-                                    <td>@(User.Identity.Name ?? "Not available")</td>
+                                    <td>@(User?.Identity?.Name ?? "Not available")</td>
                                 </tr>
                                 <tr>
                                     <td><strong>Email:</strong></td>
-                                    <td>@(User.FindFirst("email")?.Value ?? "Not available")</td>
+                                    <td>@(User?.FindFirst("email")?.Value ?? "Not available")</td>
                                 </tr>
                                 <tr>
                                     <td><strong>Subject ID:</strong></td>
-                                    <td><code>@(User.FindFirst("sub")?.Value ?? "Not available")</code></td>
+                                    <td><code>@(User?.FindFirst("sub")?.Value ?? "Not available")</code></td>
                                 </tr>
                                 <tr>
                                     <td><strong>Authentication Type:</strong></td>
-                                    <td>@(User.Identity.AuthenticationType ?? "Not available")</td>
+                                    <td>@(User?.Identity?.AuthenticationType ?? "Not available")</td>
                                 </tr>
                                 <tr>
                                     <td><strong>Claims Count:</strong></td>
-                                    <td><span class="badge bg-info">@User.Claims.Count()</span></td>
+                                    <td><span class="badge bg-info">@(User?.Claims?.Count() ?? 0)</span></td>
                                 </tr>
                             </table>
                         </div>

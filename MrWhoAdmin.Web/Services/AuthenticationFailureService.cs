@@ -40,7 +40,7 @@ public class AuthenticationFailureService : IAuthenticationFailureService
         _logger = logger;
     }
 
-    public async Task HandleAuthenticationFailureAsync(int statusCode, string? requestPath = null, string? error = null)
+    public Task HandleAuthenticationFailureAsync(int statusCode, string? requestPath = null, string? error = null)
     {
         _logger.LogWarning("Authentication failure detected. StatusCode: {StatusCode}, Path: {Path}, Error: {Error}",
             statusCode, requestPath, error);
@@ -67,14 +67,16 @@ public class AuthenticationFailureService : IAuthenticationFailureService
             // Fallback
             _navigationManager.NavigateTo("/auth/error", forceLoad: true);
         }
+
+        return Task.CompletedTask;
     }
 
-    public async Task HandleApiAuthenticationFailureAsync(HttpResponseMessage response, string? requestPath = null)
+    public Task HandleApiAuthenticationFailureAsync(HttpResponseMessage response, string? requestPath = null)
     {
         var statusCode = (int)response.StatusCode;
         var error = response.ReasonPhrase ?? "api_authentication_failed";
-        
-        await HandleAuthenticationFailureAsync(statusCode, requestPath, error);
+        HandleAuthenticationFailureAsync(statusCode, requestPath, error);
+        return Task.CompletedTask;
     }
 
     public bool IsAuthenticationFailure(HttpResponseMessage response)
