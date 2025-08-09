@@ -1,0 +1,28 @@
+@model string
+@{
+    ViewData["Title"] = "Approve sign-in";
+}
+
+<div class="row justify-content-center">
+  <div class="col-md-6 col-lg-5">
+    <div class="card">
+      <div class="card-header text-center">
+        <h4>Approve sign-in</h4>
+      </div>
+      <div class="card-body text-center">
+        @if (Model == "expired")
+        {
+          <div class="alert alert-warning">This QR session has expired. Please start again on your computer.</div>
+        }
+        else
+        {
+          <div class="alert alert-info">This will sign you in on the device that displayed the QR.</div>
+          <p>Confirm to continue.</p>
+          <form method="get" action="/">
+            <button type="submit" class="btn btn-success">Approve</button>
+          </form>
+        }
+      </div>
+    </div>
+  </div>
+</div>

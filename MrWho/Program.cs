@@ -39,6 +39,7 @@ builder.Services.AddAuthorization(options =>
 // ensure services are registered
 builder.Services.AddSingleton<IQrCodeService, QrCodeService>();
 builder.Services.AddScoped<Microsoft.AspNetCore.Authentication.IClaimsTransformation, MrWho.Services.AmrClaimsTransformation>();
+builder.Services.AddSingleton<IQrLoginStore, InMemoryQrLoginStore>();
 
 var app = builder.Build();
 
