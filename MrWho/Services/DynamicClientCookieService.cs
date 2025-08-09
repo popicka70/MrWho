@@ -154,16 +154,8 @@ public class DynamicClientCookieService : IHostedService
 
     private static int GetSessionTimeoutHours(Models.Client client)
     {
-        // Configure session timeout based on client type or settings
-        return client.ClientId switch
-        {
-            "mrwho_admin_web" => 8,    // Admin work day
-            "mrwho_demo1" => 2,        // Demo session
-            _ when client.ClientId.Contains("api") => 1,  // API clients
-            _ when client.ClientId.Contains("mobile") => 4, // Mobile apps
-            _ when client.ClientId.Contains("spa") => 2,    // SPAs
-            _ => 8  // Default enterprise clients
-        };
+        // Use the new database-driven session timeout with fallback to hardcoded logic
+        return client.GetEffectiveSessionTimeoutHours();
     }
 }
 

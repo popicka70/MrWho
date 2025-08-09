@@ -16,6 +16,7 @@ builder.Services.AddMrWhoServices();
 builder.Services.AddMrWhoClientCookies(); // Add client-specific cookies
 builder.Services.AddMrWhoOpenIddict();
 builder.Services.AddMrWhoAuthorizationWithClientCookies(); // Use authorization with client cookie support
+builder.Services.AddMrWhoMediator(); // Lightweight mediator + endpoint handlers
 
 // Add session support for client tracking
 builder.Services.AddSession(options =>

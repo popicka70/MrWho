@@ -34,6 +34,9 @@ public static class ServiceCollectionExtensions
 
         // Register client cookie services
         services.AddScoped<IDynamicCookieService, DynamicCookieService>();
+        
+        // Register dynamic client configuration service
+        services.AddScoped<IDynamicClientConfigurationService, DynamicClientConfigurationService>();
 
         // CORRECTED: Add complete dynamic client cookie registration system
         services.AddHostedService<DynamicClientCookieService>();

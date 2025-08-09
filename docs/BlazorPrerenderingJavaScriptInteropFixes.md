@@ -20,7 +20,7 @@ The issue occurred because:
 
 ### ? **1. Enhanced BlazorAuthService**
 
-**File**: `WrWhoAdmin.Web/Services/BlazorAuthService.cs`
+**File**: `MrWhoAdmin.Web/Services/BlazorAuthService.cs`
 
 **Key Changes**:
 - **Added interactive context detection**: `IsInteractiveContext()` method checks if we're in prerendering
@@ -45,7 +45,7 @@ else
 
 ### ? **2. Updated AuthenticatedComponentBase**
 
-**File**: `WrWhoAdmin.Web/Components/AuthenticatedComponentBase.cs`
+**File**: `MrWhoAdmin.Web/Components/AuthenticatedComponentBase.cs`
 
 **Key Changes**:
 - **Moved authentication checks to `OnAfterRenderAsync`**: Ensures interactive context
@@ -74,7 +74,7 @@ protected override async Task OnAfterRenderAsync(bool firstRender)
 
 ### ? **3. Fixed AuthErrorNotification Component**
 
-**File**: `WrWhoAdmin.Web/Components/Layout/AuthErrorNotification.razor`
+**File**: `MrWhoAdmin.Web/Components/Layout/AuthErrorNotification.razor`
 
 **Key Changes**:
 - **Deferred error checking**: Moved to `OnAfterRenderAsync`
@@ -83,7 +83,7 @@ protected override async Task OnAfterRenderAsync(bool firstRender)
 
 ### ? **4. Enhanced AuthDiagnostics Page**
 
-**File**: `WrWhoAdmin.Web/Components/Pages/AuthDiagnostics.razor`
+**File**: `MrWhoAdmin.Web/Components/Pages/AuthDiagnostics.razor`
 
 **Key Changes**:
 - **Interactive-only operations**: HTTP calls and navigation only after render
@@ -208,7 +208,7 @@ protected override async Task OnAfterRenderAsync(bool firstRender)
    dotnet run
    
    # Terminal 2  
-   cd WrWhoAdmin.Web
+    cd MrWhoAdmin.Web
    dotnet run
    ```
 

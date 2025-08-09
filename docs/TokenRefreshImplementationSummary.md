@@ -19,7 +19,7 @@ warn: MrWhoAdmin.Web.Services.TokenRefreshService[0]
 
 ### 1. Enhanced Token Refresh Service
 
-**File**: `WrWhoAdmin.Web/Services/TokenRefreshService.cs`
+**File**: `MrWhoAdmin.Web/Services/TokenRefreshService.cs`
 
 - Added `RefreshTokenWithReauthAsync()` method that detects when re-authentication is required
 - Added `TriggerReauthenticationAsync()` method that clears cookies and redirects to login
@@ -27,7 +27,7 @@ warn: MrWhoAdmin.Web.Services.TokenRefreshService[0]
 
 ### 2. Improved Middleware
 
-**File**: `WrWhoAdmin.Web/Middleware/TokenRefreshMiddleware.cs`
+**File**: `MrWhoAdmin.Web/Middleware/TokenRefreshMiddleware.cs`
 
 - Now automatically detects when refresh tokens are invalid/expired
 - Automatically redirects users to re-authentication flow
@@ -35,7 +35,7 @@ warn: MrWhoAdmin.Web.Services.TokenRefreshService[0]
 
 ### 3. Authentication Controller
 
-**File**: `WrWhoAdmin.Web/Controllers/AuthController.cs`
+**File**: `MrWhoAdmin.Web/Controllers/AuthController.cs`
 
 - `/auth/check-and-reauth` - Checks token status and triggers re-auth if needed
 - `/auth/login` - Initiates login flow
@@ -45,7 +45,7 @@ warn: MrWhoAdmin.Web.Services.TokenRefreshService[0]
 
 ### 4. Blazor Authentication Service
 
-**File**: `WrWhoAdmin.Web/Services/BlazorAuthService.cs`
+**File**: `MrWhoAdmin.Web/Services/BlazorAuthService.cs`
 
 - `EnsureAuthenticatedAsync()` - Checks auth status and triggers re-auth if needed
 - `TriggerReauthenticationAsync()` - Manually trigger re-authentication from Blazor components
@@ -54,7 +54,7 @@ warn: MrWhoAdmin.Web.Services.TokenRefreshService[0]
 
 ### 5. Base Component for Authentication
 
-**File**: `WrWhoAdmin.Web/Components/AuthenticatedComponentBase.cs`
+**File**: `MrWhoAdmin.Web/Components/AuthenticatedComponentBase.cs`
 
 - Base class that Blazor pages can inherit from
 - Automatically handles authentication checks on page load
@@ -63,7 +63,7 @@ warn: MrWhoAdmin.Web.Services.TokenRefreshService[0]
 
 ### 6. Authentication Error Notification
 
-**File**: `WrWhoAdmin.Web/Components/Layout/AuthErrorNotification.razor`
+**File**: `MrWhoAdmin.Web/Components/Layout/AuthErrorNotification.razor`
 
 - Shows authentication errors from URL parameters
 - Auto-dismisses after 10 seconds
@@ -71,7 +71,7 @@ warn: MrWhoAdmin.Web.Services.TokenRefreshService[0]
 
 ### 7. Enhanced API Handler
 
-**File**: `WrWhoAdmin.Web/Extensions/AuthenticationDelegatingHandler.cs`
+**File**: `MrWhoAdmin.Web/Extensions/AuthenticationDelegatingHandler.cs`
 
 - Handles authentication failures in HTTP client requests
 - Returns meaningful 401 responses when re-authentication is required
@@ -181,21 +181,21 @@ No additional configuration required. Uses existing authentication settings:
 ## Files Modified/Created
 
 ### Modified Files:
-- `WrWhoAdmin.Web/Services/TokenRefreshService.cs` - Enhanced with re-auth capabilities
-- `WrWhoAdmin.Web/Services/ITokenRefreshService.cs` - Added new method signatures
-- `WrWhoAdmin.Web/Middleware/TokenRefreshMiddleware.cs` - Added auto re-auth trigger
-- `WrWhoAdmin.Web/Extensions/AuthenticationDelegatingHandler.cs` - Enhanced error handling
-- `WrWhoAdmin.Web/Extensions/ServiceCollectionExtensions.cs` - Registered new services
-- `WrWhoAdmin.Web/Components/Pages/Home.razor` - Example implementation
-- `WrWhoAdmin.Web/Components/Pages/Realms.razor` - Example implementation
-- `WrWhoAdmin.Web/Components/Layout/MainLayout.razor` - Added error notification
+- `MrWhoAdmin.Web/Services/TokenRefreshService.cs` - Enhanced with re-auth capabilities
+- `MrWhoAdmin.Web/Services/ITokenRefreshService.cs` - Added new method signatures
+- `MrWhoAdmin.Web/Middleware/TokenRefreshMiddleware.cs` - Added auto re-auth trigger
+- `MrWhoAdmin.Web/Extensions/AuthenticationDelegatingHandler.cs` - Enhanced error handling
+- `MrWhoAdmin.Web/Extensions/ServiceCollectionExtensions.cs` - Registered new services
+- `MrWhoAdmin.Web/Components/Pages/Home.razor` - Example implementation
+- `MrWhoAdmin.Web/Components/Pages/Realms.razor` - Example implementation
+- `MrWhoAdmin.Web/Components/Layout/MainLayout.razor` - Added error notification
 
 ### New Files:
-- `WrWhoAdmin.Web/Controllers/AuthController.cs` - Authentication endpoints
-- `WrWhoAdmin.Web/Services/BlazorAuthService.cs` - Blazor authentication service
-- `WrWhoAdmin.Web/Services/IBlazorAuthService.cs` - Interface
-- `WrWhoAdmin.Web/Components/AuthenticatedComponentBase.cs` - Base component
-- `WrWhoAdmin.Web/Components/Layout/AuthErrorNotification.razor` - Error notification
+- `MrWhoAdmin.Web/Controllers/AuthController.cs` - Authentication endpoints
+- `MrWhoAdmin.Web/Services/BlazorAuthService.cs` - Blazor authentication service
+- `MrWhoAdmin.Web/Services/IBlazorAuthService.cs` - Interface
+- `MrWhoAdmin.Web/Components/AuthenticatedComponentBase.cs` - Base component
+- `MrWhoAdmin.Web/Components/Layout/AuthErrorNotification.razor` - Error notification
 - `docs/TokenRefreshAndReauth.md` - Detailed documentation
 
 ## Security Considerations

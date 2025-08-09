@@ -187,9 +187,9 @@ Run the comprehensive test script:
 - `MrWho.Shared\Models\UserClaimsModels.cs` - Claims models and DTOs
 
 ### Frontend UI
-- `WrWhoAdmin.Web\Components\Pages\EditUser.razor` - Enhanced user editor
-- `WrWhoAdmin.Web\Services\UsersApiService.cs` - Claims API client
-- `WrWhoAdmin.Web\Services\IUsersApiService.cs` - Service contracts
+- `MrWhoAdmin.Web\\Components\\Pages\\EditUser.razor` - Enhanced user editor
+- `MrWhoAdmin.Web\\Services\\UsersApiService.cs` - Claims API client
+- `MrWhoAdmin.Web\\Services\\IUsersApiService.cs` - Service contracts
 
 ### Models and DTOs
 - `MrWho.Shared\Models\UserClaimDto.cs` - User claim data transfer object

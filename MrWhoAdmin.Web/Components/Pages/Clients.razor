@@ -92,7 +92,7 @@
                                          ButtonStyle="ButtonStyle.Light" Text="Edit" />
                             <RadzenButton Click="@(() => ViewDetails(client.Id))" Icon="visibility" Size="ButtonSize.Medium" 
                                          ButtonStyle="ButtonStyle.Info" Text="View" />
-                            <RadzenButton Click="@(() => ToggleClientStatus(client))" Icon="@(client.IsEnabled ? "toggle_on" : "toggle_off")" 
+                            <RadzenButton Click="@(async () => await ToggleClientStatus(client))" Icon="@(client.IsEnabled ? "toggle_on" : "toggle_off")" 
                                          Size="ButtonSize.Medium" ButtonStyle="ButtonStyle.Warning" Text="Toggle" />
                         </RadzenStack>
                     </Template>

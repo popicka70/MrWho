@@ -89,7 +89,7 @@
                                          ButtonStyle="ButtonStyle.Light" Text="Edit" />
                             <RadzenButton Click="@(() => ResetPassword(user.Id))" Icon="lock_reset" Size="ButtonSize.Medium" 
                                          ButtonStyle="ButtonStyle.Warning" Text="Reset" />
-                            <RadzenButton Click="@(() => ToggleLockout(user))" Icon="@(IsUserLocked(user) ? "lock_open" : "lock")" 
+                            <RadzenButton Click="@(async () => await ToggleLockout(user))" Icon="@(IsUserLocked(user) ? "lock_open" : "lock")" 
                                          Size="ButtonSize.Medium" ButtonStyle="ButtonStyle.Secondary" 
                                          Text="@(IsUserLocked(user) ? "Unlock" : "Lock")" />
                         </RadzenStack>

@@ -201,10 +201,17 @@
     </RadzenStack>
 
     <!-- Form Actions -->
-    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem" class="rz-mt-6">
-        <RadzenButton Click="@(() => DialogService.Close())" Text="Cancel" ButtonStyle="ButtonStyle.Light" />
-        <RadzenButton ButtonType="ButtonType.Submit" Text="Update API Resource" ButtonStyle="ButtonStyle.Primary" IsBusy="@isSubmitting" />
-    </RadzenStack>
+    <div style="border-top: 1px solid var(--rz-border-color); padding-top: 0.75rem;" class="rz-mt-6">
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween" Gap="1rem">
+            <div style="min-height: 1.25rem;">
+                <ValidationSummary />
+            </div>
+            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                <RadzenButton Click="@(() => DialogService.Close())" Text="Cancel" ButtonStyle="ButtonStyle.Light" />
+                <RadzenButton ButtonType="ButtonType.Submit" Text="Update API Resource" ButtonStyle="ButtonStyle.Primary" IsBusy="@isSubmitting" />
+            </RadzenStack>
+        </RadzenStack>
+    </div>
 </RadzenTemplateForm>
 
 @code {
