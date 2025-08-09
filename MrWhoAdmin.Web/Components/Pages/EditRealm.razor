@@ -2,141 +2,158 @@
 @page "/realms/edit/{Id}"
 @attribute [Authorize]
 @rendermode InteractiveServer
+@inherits AuthenticatedComponentBase
 @inject NavigationManager Navigation
 @inject NotificationService NotificationService
 @inject DialogService DialogService
-@inject ILogger<EditRealm> Logger
+@inject ILogger<EditRealm> PageLogger
 @inject IRealmsApiService RealmsApi
 
 <PageTitle>@(IsEdit ? "Edit Realm" : "Add Realm") - MrWho Admin</PageTitle>
 
-<RadzenStack>
-    <RadzenBreadCrumb>
-        <RadzenBreadCrumbItem Path="/realms" Text="Realms" />
-        <RadzenBreadCrumbItem Text="@(IsEdit ? "Edit" : "Add")" />
-    </RadzenBreadCrumb>
+@if (IsLoading)
+{
+    <div class="d-flex justify-content-center align-items-center" style="min-height: 50vh;">
+        <div class="text-center">
+            <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+            <RadzenText class="rz-mt-2">Loading...</RadzenText>
+        </div>
+    </div>
+}
+else if (!IsAuthenticated)
+{
+    @RenderAuthenticationStatus()
+}
+else
+{
+    <RadzenStack>
+        <RadzenBreadCrumb>
+            <RadzenBreadCrumbItem Path="/realms" Text="Realms" />
+            <RadzenBreadCrumbItem Text="@(IsEdit ? "Edit" : "Add")" />
+        </RadzenBreadCrumb>
 
-    <RadzenText TextStyle="TextStyle.H3" TagName="TagName.H1" class="rz-pt-4">
-        <RadzenIcon Icon="@(IsEdit ? "edit" : "add_circle")" class="rz-me-1" />
-        @(IsEdit ? "Edit Realm" : "Add New Realm")
-    </RadzenText>
-</RadzenStack>
+        <RadzenText TextStyle="TextStyle.H3" TagName="TagName.H1" class="rz-pt-4">
+            <RadzenIcon Icon="@(IsEdit ? "edit" : "add_circle")" class="rz-me-1" />
+            @(IsEdit ? "Edit Realm" : "Add New Realm")
+        </RadzenText>
+    </RadzenStack>
 
-<RadzenCard class="rz-my-4">
-    @if (isLoading)
-    {
-        <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
-        <RadzenText class="rz-mt-3">Loading realm data...</RadzenText>
-    }
-    else
-    {
-        <RadzenTemplateForm Data="@model" TItem="CreateRealmRequest" Submit="@OnSave">
-            <RadzenStack Gap="2rem">
-                <!-- Basic Information -->
-                <RadzenFieldset Text="Basic Information">
-                    <RadzenStack Gap="1rem">
-                        <RadzenRow>
-                            <RadzenColumn Size="12" SizeMD="6">
-                                <RadzenFormField Text="Realm Name" Variant="Variant.Outlined">
-                                    <RadzenTextBox @bind-Value="@model.Name" 
-                                                  Placeholder="Enter realm name (e.g., 'company-prod')" 
-                                                  Style="width: 100%;" 
-                                                  Disabled="@IsEdit" />
-                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                        @(IsEdit ? "Realm name cannot be changed after creation" : "Use lowercase letters, numbers, and hyphens only")
-                                    </RadzenText>
-                                </RadzenFormField>
-                            </RadzenColumn>
-                            <RadzenColumn Size="12" SizeMD="6">
-                                <RadzenFormField Text="Display Name" Variant="Variant.Outlined">
-                                    <RadzenTextBox @bind-Value="@model.DisplayName" 
-                                                  Placeholder="Enter display name (e.g., 'Company Production')" 
-                                                  Style="width: 100%;" />
-                                </RadzenFormField>
-                            </RadzenColumn>
-                        </RadzenRow>
-                        
-                        <RadzenFormField Text="Description" Variant="Variant.Outlined">
-                            <RadzenTextArea @bind-Value="@model.Description" 
-                                           Placeholder="Enter realm description..." 
-                                           Rows="3" Style="width: 100%;" />
-                        </RadzenFormField>
-                        
-                        <RadzenFormField Text="Status" Variant="Variant.Outlined">
-                            <RadzenCheckBox @bind-Value="@model.IsEnabled" />
-                            <RadzenLabel Text="Realm is enabled" class="rz-ml-2" />
-                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary rz-mt-1">
-                                Disabled realms cannot be used for authentication
-                            </RadzenText>
-                        </RadzenFormField>
-                    </RadzenStack>
-                </RadzenFieldset>
-
-                <!-- Token Lifetimes -->
-                <RadzenFieldset Text="Token Configuration">
-                    <RadzenStack Gap="1rem">
-                        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary rz-mb-2">
-                            Configure how long different types of tokens remain valid
-                        </RadzenText>
-                        
-                        <RadzenRow>
-                            <RadzenColumn Size="12" SizeMD="4">
-                                <RadzenFormField Text="Access Token Lifetime (minutes)" Variant="Variant.Outlined">
-                                    <RadzenNumeric @bind-Value="@accessTokenMinutes" 
-                                                  Min="1" Max="1440" 
-                                                  Style="width: 100%;" />
-                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                        Recommended: 15-60 minutes
-                                    </RadzenText>
-                                </RadzenFormField>
-                            </RadzenColumn>
-                            <RadzenColumn Size="12" SizeMD="4">
-                                <RadzenFormField Text="Refresh Token Lifetime (days)" Variant="Variant.Outlined">
-                                    <RadzenNumeric @bind-Value="@refreshTokenDays" 
-                                                  Min="1" Max="365" 
-                                                  Style="width: 100%;" />
-                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                        Recommended: 7-30 days
-                                    </RadzenText>
-                                </RadzenFormField>
-                            </RadzenColumn>
-                            <RadzenColumn Size="12" SizeMD="4">
-                                <RadzenFormField Text="Authorization Code Lifetime (minutes)" Variant="Variant.Outlined">
-                                    <RadzenNumeric @bind-Value="@authCodeMinutes" 
-                                                  Min="1" Max="60" 
-                                                  Style="width: 100%;" />
-                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                        Recommended: 5-10 minutes
-                                    </RadzenText>
-                                </RadzenFormField>
-                            </RadzenColumn>
-                        </RadzenRow>
-                    </RadzenStack>
-                </RadzenFieldset>
-
-                <!-- Sticky Action Bar -->
-                <div style="position: sticky; bottom: 0; background: var(--rz-base-50); border-top: 1px solid var(--rz-border-color); padding: 0.75rem 1rem; z-index: 5;" class="rz-mt-4">
-                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween" Gap="1rem">
-                        <div style="min-height: 1.25rem;">
-                            <ValidationSummary />
-                        </div>
-                        <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem">
-                            <RadzenButton Click="@Cancel" Icon="cancel" ButtonStyle="ButtonStyle.Light" Text="Cancel" />
-                            @if (IsEdit)
-                            {
-                                <RadzenButton Click="@(async () => await DeleteRealm())" Icon="delete" ButtonStyle="ButtonStyle.Danger" 
-                                             Text="Delete" Disabled="@isSaving" />
-                            }
-                            <RadzenButton ButtonType="ButtonType.Submit" Icon="save" ButtonStyle="ButtonStyle.Primary" 
-                                         Text="@(IsEdit ? "Update Realm" : "Create Realm")" 
-                                         IsBusy="@isSaving" Disabled="@isSaving" />
+    <RadzenCard class="rz-my-4">
+        @if (isLoading)
+        {
+            <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+            <RadzenText class="rz-mt-3">Loading realm data...</RadzenText>
+        }
+        else
+        {
+            <RadzenTemplateForm Data="@model" TItem="CreateRealmRequest" Submit="@OnSave">
+                <RadzenStack Gap="2rem">
+                    <!-- Basic Information -->
+                    <RadzenFieldset Text="Basic Information">
+                        <RadzenStack Gap="1rem">
+                            <RadzenRow>
+                                <RadzenColumn Size="12" SizeMD="6">
+                                    <RadzenFormField Text="Realm Name" Variant="Variant.Outlined">
+                                        <RadzenTextBox @bind-Value="@model.Name" 
+                                                      Placeholder="Enter realm name (e.g., 'company-prod')" 
+                                                      Style="width: 100%;" 
+                                                      Disabled="@IsEdit" />
+                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                            @(IsEdit ? "Realm name cannot be changed after creation" : "Use lowercase letters, numbers, and hyphens only")
+                                        </RadzenText>
+                                    </RadzenFormField>
+                                </RadzenColumn>
+                                <RadzenColumn Size="12" SizeMD="6">
+                                    <RadzenFormField Text="Display Name" Variant="Variant.Outlined">
+                                        <RadzenTextBox @bind-Value="@model.DisplayName" 
+                                                      Placeholder="Enter display name (e.g., 'Company Production')" 
+                                                      Style="width: 100%;" />
+                                    </RadzenFormField>
+                                </RadzenColumn>
+                            </RadzenRow>
+                            
+                            <RadzenFormField Text="Description" Variant="Variant.Outlined">
+                                <RadzenTextArea @bind-Value="@model.Description" 
+                                               Placeholder="Enter realm description..." 
+                                               Rows="3" Style="width: 100%;" />
+                            </RadzenFormField>
+                            
+                            <RadzenFormField Text="Status" Variant="Variant.Outlined">
+                                <RadzenCheckBox @bind-Value="@model.IsEnabled" />
+                                <RadzenLabel Text="Realm is enabled" class="rz-ml-2" />
+                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary rz-mt-1">
+                                    Disabled realms cannot be used for authentication
+                                </RadzenText>
+                            </RadzenFormField>
                         </RadzenStack>
-                    </RadzenStack>
-                </div>
-            </RadzenStack>
-        </RadzenTemplateForm>
-    }
-</RadzenCard>
+                    </RadzenFieldset>
+
+                    <!-- Token Lifetimes -->
+                    <RadzenFieldset Text="Token Configuration">
+                        <RadzenStack Gap="1rem">
+                            <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary rz-mb-2">
+                                Configure how long different types of tokens remain valid
+                            </RadzenText>
+                            
+                            <RadzenRow>
+                                <RadzenColumn Size="12" SizeMD="4">
+                                    <RadzenFormField Text="Access Token Lifetime (minutes)" Variant="Variant.Outlined">
+                                        <RadzenNumeric @bind-Value="@accessTokenMinutes" 
+                                                      Min="1" Max="1440" 
+                                                      Style="width: 100%;" />
+                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                            Recommended: 15-60 minutes
+                                        </RadzenText>
+                                    </RadzenFormField>
+                                </RadzenColumn>
+                                <RadzenColumn Size="12" SizeMD="4">
+                                    <RadzenFormField Text="Refresh Token Lifetime (days)" Variant="Variant.Outlined">
+                                        <RadzenNumeric @bind-Value="@refreshTokenDays" 
+                                                      Min="1" Max="365" 
+                                                      Style="width: 100%;" />
+                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                            Recommended: 7-30 days
+                                        </RadzenText>
+                                    </RadzenFormField>
+                                </RadzenColumn>
+                                <RadzenColumn Size="12" SizeMD="4">
+                                    <RadzenFormField Text="Authorization Code Lifetime (minutes)" Variant="Variant.Outlined">
+                                        <RadzenNumeric @bind-Value="@authCodeMinutes" 
+                                                      Min="1" Max="60" 
+                                                      Style="width: 100%;" />
+                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                            Recommended: 5-10 minutes
+                                        </RadzenText>
+                                    </RadzenFormField>
+                                </RadzenColumn>
+                            </RadzenRow>
+                        </RadzenStack>
+                    </RadzenFieldset>
+
+                    <!-- Sticky Action Bar -->
+                    <div style="position: sticky; bottom: 0; background: var(--rz-base-50); border-top: 1px solid var(--rz-border-color); padding: 0.75rem 1rem; z-index: 5;" class="rz-mt-4">
+                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween" Gap="1rem">
+                            <div style="min-height: 1.25rem;">
+                                <ValidationSummary />
+                            </div>
+                            <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem">
+                                <RadzenButton Click="@Cancel" Icon="cancel" ButtonStyle="ButtonStyle.Light" Text="Cancel" />
+                                @if (IsEdit)
+                                {
+                                    <RadzenButton Click="@(async () => await DeleteRealm())" Icon="delete" ButtonStyle="ButtonStyle.Danger" 
+                                                 Text="Delete" Disabled="@isSaving" />
+                                }
+                                <RadzenButton ButtonType="ButtonType.Submit" Icon="save" ButtonStyle="ButtonStyle.Primary" 
+                                             Text="@(IsEdit ? "Update Realm" : "Create Realm")" 
+                                             IsBusy="@isSaving" Disabled="@isSaving" />
+                            </RadzenStack>
+                        </RadzenStack>
+                    </div>
+                </RadzenStack>
+            </RadzenTemplateForm>
+        }
+    </RadzenCard>
+}
 
 @code {
     [Parameter] public string? Id { get; set; }
@@ -151,6 +168,15 @@
     private int authCodeMinutes = 10;
 
     protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+        if (IsAuthenticated)
+        {
+            await OnAuthenticatedAsync();
+        }
+    }
+
+    protected override async Task OnAuthenticatedAsync()
     {
         if (IsEdit)
         {
@@ -187,19 +213,19 @@
                 refreshTokenDays = (int)realm.RefreshTokenLifetime.TotalDays;
                 authCodeMinutes = (int)realm.AuthorizationCodeLifetime.TotalMinutes;
 
-                Logger.LogInformation("Loaded realm {RealmName} for editing", realm.Name);
+                PageLogger.LogInformation("Loaded realm {RealmName} for editing", realm.Name);
             }
             else
             {
-                NotificationService.Notify(NotificationSeverity.Error, "Error", "Realm not found");
-                Navigation.NavigateTo("/realms");
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Realm not found or not accessible");
+                // Stay on page to allow user to re-authenticate or navigate manually
             }
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Error loading realm {RealmId}", Id);
+            PageLogger.LogError(ex, "Error loading realm {RealmId}", Id);
             NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to load realm data");
-            Navigation.NavigateTo("/realms");
+            // Stay on page to allow user to re-authenticate or navigate manually
         }
         finally
         {
@@ -247,7 +273,7 @@
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Error saving realm");
+            PageLogger.LogError(ex, "Error saving realm");
             NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to save realm");
         }
         finally
@@ -278,7 +304,7 @@
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, "Error deleting realm");
+                PageLogger.LogError(ex, "Error deleting realm");
                 NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to delete realm");
             }
         }

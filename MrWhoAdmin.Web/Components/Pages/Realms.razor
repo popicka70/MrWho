@@ -89,9 +89,9 @@ else
                     <RadzenDataGridColumn TItem="RealmDto" Title="Actions" Width="350px" Sortable="false">
                         <Template Context="realm">
                             <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
-                                <RadzenButton Click="@(() => EditRealm(realm.Id))" Icon="edit" Size="ButtonSize.Medium" 
+                                <RadzenButton Click="@(async () => await EditRealm(realm.Id))" Icon="edit" Size="ButtonSize.Medium" 
                                              ButtonStyle="ButtonStyle.Light" Text="Edit" />
-                                <RadzenButton Click="@(() => ViewClients(realm.Id))" Icon="apps" Size="ButtonSize.Medium" 
+                                <RadzenButton Click="@(async () => await ViewClients(realm.Id))" Icon="apps" Size="ButtonSize.Medium" 
                                              ButtonStyle="ButtonStyle.Info" Text="Clients" />
                                 <RadzenButton Click="@(async () => await ToggleRealmStatus(realm))" Icon="@(realm.IsEnabled ? "toggle_on" : "toggle_off")" 
                                              Size="ButtonSize.Medium" ButtonStyle="ButtonStyle.Warning" Text="Toggle" />
@@ -180,16 +180,18 @@ else
         }
     }
 
-    private void EditRealm(string realmId)
+    private async Task EditRealm(string realmId)
     {
         NotificationService.Notify(NotificationSeverity.Info, "Navigation", $"Navigating to edit realm {realmId}");
         Navigation.NavigateTo($"/realms/edit/{realmId}");
+        await Task.CompletedTask;
     }
 
-    private void ViewClients(string realmId)
+    private async Task ViewClients(string realmId)
     {
         NotificationService.Notify(NotificationSeverity.Info, "Navigation", "Viewing clients for realm");
         Navigation.NavigateTo($"/clients?realmId={realmId}");
+        await Task.CompletedTask;
     }
 
     private async Task ToggleRealmStatus(RealmDto realm)
