@@ -13,6 +13,7 @@ using Microsoft.AspNetCore;
 using System.Linq;
 using System.Reflection;
 using System.Security.Claims;
+using Microsoft.AspNetCore.Mvc;
 using static OpenIddict.Abstractions.OpenIddictConstants;
 
 namespace MrWho.Extensions;
@@ -1250,7 +1251,55 @@ public static class WebApplicationExtensions
                 }
             });
         });
+
+        // SPECIAL DEBUG: Test back-channel logout system
+        app.MapPost("/debug/test-backchannel-logout", async (
+            HttpContext context,
+            IBackChannelLogoutService backChannelService,
+            IOpenIddictAuthorizationManager authorizationManager,
+            ILogger<Program> logger,
+            [FromBody] TestBackChannelRequest request) =>
+        {
+            if (!app.Environment.IsDevelopment())
+            {
+                return Results.BadRequest("This endpoint is only available in development");
+            }
+
+            logger.LogInformation("?? Testing back-channel logout for authorization {AuthorizationId}", request.AuthorizationId);
+
+            try
+            {
+                // Test the specific back-channel logout method used by session termination
+                await backChannelService.NotifyClientLogoutAsync(request.AuthorizationId, request.Subject, request.SessionId);
+                
+                return Results.Ok(new
+                {
+                    Success = true,
+                    Message = "Back-channel logout notification sent successfully",
+                    AuthorizationId = request.AuthorizationId,
+                    Subject = request.Subject,
+                    SessionId = request.SessionId,
+                    Timestamp = DateTime.UtcNow
+                });
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error testing back-channel logout");
+                return Results.Problem($"Error testing back-channel logout: {ex.Message}");
+            }
+        });
+
         return app;
+    }
+
+    /// <summary>
+    /// Request model for testing back-channel logout
+    /// </summary>
+    public class TestBackChannelRequest
+    {
+        public string AuthorizationId { get; set; } = "";
+        public string Subject { get; set; } = "";
+        public string SessionId { get; set; } = "";
     }
 
     private static async Task InitializeDatabaseAsync(this WebApplication app)

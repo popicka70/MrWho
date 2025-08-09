@@ -34,6 +34,9 @@ public static class WebApplicationExtensions
         app.UseRouting();
         app.UseOutputCache();
 
+        // CRITICAL: Add session middleware before authentication for back-channel logout support
+        app.UseSession();
+
         // Authentication and authorization
         app.UseAuthentication();
         app.UseAuthorization();
