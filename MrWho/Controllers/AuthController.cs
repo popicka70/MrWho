@@ -19,6 +19,7 @@ public class AuthController : Controller
     private readonly UserManager<IdentityUser> _userManager;
     private readonly IClientCookieConfigurationService _cookieService;
     private readonly IDynamicCookieService _dynamicCookieService;
+    private readonly IOpenIddictApplicationManager _applicationManager;
     private readonly ILogger<AuthController> _logger;
 
     public AuthController(
@@ -26,23 +27,49 @@ public class AuthController : Controller
         UserManager<IdentityUser> userManager,
         IClientCookieConfigurationService cookieService,
         IDynamicCookieService dynamicCookieService,
+        IOpenIddictApplicationManager applicationManager,
         ILogger<AuthController> logger)
     {
         _signInManager = signInManager;
         _userManager = userManager;
         _cookieService = cookieService;
         _dynamicCookieService = dynamicCookieService;
+        _applicationManager = applicationManager;
         _logger = logger;
     }
 
     // REMOVED: [HttpGet("authorize")] - Now handled by minimal API with client-specific cookies
 
     [HttpGet("login")]
-    public IActionResult Login(string? returnUrl = null, string? clientId = null)
+    public async Task<IActionResult> Login(string? returnUrl = null, string? clientId = null)
     {
         _logger.LogDebug("Login page requested, returnUrl = {ReturnUrl}, clientId = {ClientId}", returnUrl, clientId);
         ViewData["ReturnUrl"] = returnUrl;
         ViewData["ClientId"] = clientId;
+
+        // Try to get client name if clientId is provided
+        string? clientName = null;
+        if (!string.IsNullOrEmpty(clientId))
+        {
+            try
+            {
+                var application = await _applicationManager.FindByClientIdAsync(clientId);
+                if (application != null)
+                {
+                    clientName = await _applicationManager.GetDisplayNameAsync(application);
+                    if (string.IsNullOrEmpty(clientName))
+                    {
+                        clientName = clientId; // Fallback to client ID if no display name
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to retrieve client information for clientId: {ClientId}", clientId);
+            }
+        }
+
+        ViewData["ClientName"] = clientName;
         return View(new LoginViewModel());
     }
 
@@ -52,6 +79,30 @@ public class AuthController : Controller
     {
         ViewData["ReturnUrl"] = returnUrl;
         ViewData["ClientId"] = clientId;
+
+        // Try to get client name if clientId is provided (for error scenarios)
+        string? clientName = null;
+        if (!string.IsNullOrEmpty(clientId))
+        {
+            try
+            {
+                var application = await _applicationManager.FindByClientIdAsync(clientId);
+                if (application != null)
+                {
+                    clientName = await _applicationManager.GetDisplayNameAsync(application);
+                    if (string.IsNullOrEmpty(clientName))
+                    {
+                        clientName = clientId; // Fallback to client ID if no display name
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to retrieve client information for clientId: {ClientId}", clientId);
+            }
+        }
+
+        ViewData["ClientName"] = clientName;
         _logger.LogDebug("Login POST: Email={Email}, ReturnUrl={ReturnUrl}, ClientId={ClientId}", 
             model.Email, returnUrl, clientId);
 
@@ -368,10 +419,51 @@ public class AuthController : Controller
     }
 
     [HttpGet("access-denied")]
-    public IActionResult AccessDenied(string? returnUrl = null)
+    public async Task<IActionResult> AccessDenied(string? returnUrl = null, string? clientId = null)
     {
-        _logger.LogDebug("Access denied page requested, returnUrl = {ReturnUrl}", returnUrl);
+        _logger.LogDebug("Access denied page requested, returnUrl = {ReturnUrl}, clientId = {ClientId}", returnUrl, clientId);
         ViewData["ReturnUrl"] = returnUrl;
+        ViewData["ClientId"] = clientId;
+
+        // Try to get client ID from query parameters if not provided directly
+        if (string.IsNullOrEmpty(clientId) && !string.IsNullOrEmpty(returnUrl))
+        {
+            try
+            {
+                var uri = new Uri(returnUrl);
+                var query = HttpUtility.ParseQueryString(uri.Query);
+                clientId = query["client_id"];
+                ViewData["ClientId"] = clientId;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Failed to extract client_id from returnUrl: {ReturnUrl}", returnUrl);
+            }
+        }
+
+        // Try to get client name if clientId is available
+        string? clientName = null;
+        if (!string.IsNullOrEmpty(clientId))
+        {
+            try
+            {
+                var application = await _applicationManager.FindByClientIdAsync(clientId);
+                if (application != null)
+                {
+                    clientName = await _applicationManager.GetDisplayNameAsync(application);
+                    if (string.IsNullOrEmpty(clientName))
+                    {
+                        clientName = clientId; // Fallback to client ID if no display name
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to retrieve client information for clientId: {ClientId}", clientId);
+            }
+        }
+
+        ViewData["ClientName"] = clientName;
         return View();
     }
 }

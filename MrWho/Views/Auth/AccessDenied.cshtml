@@ -1,16 +1,35 @@
 @{
     ViewData["Title"] = "Access Denied";
+    var clientId = ViewData["ClientId"] as string;
+    var clientName = ViewData["ClientName"] as string;
+    var returnUrl = ViewData["ReturnUrl"] as string;
 }
 
 <div class="row justify-content-center">
     <div class="col-md-8 col-lg-6">
+        <!-- MrWho Logo -->
+        <div class="text-center mb-4">
+            <img src="~/images/AuthMrWho.jpeg" alt="MrWho Identity Server" class="mrwho-logo" />
+        </div>
+        
         <div class="card border-warning">
             <div class="card-header bg-warning text-dark">
                 <h4 class="mb-0"><i class="bi bi-exclamation-triangle-fill"></i> Access Denied</h4>
+                @if (!string.IsNullOrEmpty(clientName))
+                {
+                    <p class="mb-0 mt-1">Unable to access <strong>@clientName</strong></p>
+                }
             </div>
             <div class="card-body">
                 <div class="alert alert-warning" role="alert">
-                    <strong>Sorry, you don't have permission to access this application.</strong>
+                    @if (!string.IsNullOrEmpty(clientName))
+                    {
+                        <strong>Sorry, you don't have permission to access @clientName.</strong>
+                    }
+                    else
+                    {
+                        <strong>Sorry, you don't have permission to access this application.</strong>
+                    }
                 </div>
                 
                 <p>This could happen for several reasons:</p>
@@ -20,6 +39,17 @@
                     <li><strong>Account Status:</strong> Your account may be disabled or require additional setup.</li>
                 </ul>
 
+                @if (!string.IsNullOrEmpty(clientId) && !string.IsNullOrEmpty(clientName) && clientId != clientName)
+                {
+                    <div class="card bg-light mb-3">
+                        <div class="card-body p-2">
+                            <h6 class="card-title small mb-1"><i class="bi bi-info-circle"></i> Application Details:</h6>
+                            <p class="small mb-1"><strong>Application:</strong> @clientName</p>
+                            <p class="small mb-0"><strong>Client ID:</strong> <code>@clientId</code></p>
+                        </div>
+                    </div>
+                }
+
                 <h6 class="mt-4">What you can do:</h6>
                 <ul>
                     <li>Contact your administrator for access to this application</li>
@@ -27,17 +57,17 @@
                     <li>Ensure you're using the correct application URL</li>
                 </ul>
 
-                @if (!string.IsNullOrEmpty(Context.Request.Query["ReturnUrl"]))
+                @if (!string.IsNullOrEmpty(returnUrl))
                 {
                     <div class="mt-4">
                         <small class="text-muted">
-                            <strong>Application:</strong> @Context.Request.Query["ReturnUrl"]
+                            <strong>Attempted URL:</strong> <span class="text-break">@returnUrl</span>
                         </small>
                     </div>
                 }
 
                 <div class="d-flex gap-2 mt-4">
-                    <a href="/connect/login" class="btn btn-primary">
+                    <a href="/connect/login@(!string.IsNullOrEmpty(clientId) ? $"?clientId={Uri.EscapeDataString(clientId)}" : "")" class="btn btn-primary">
                         <i class="bi bi-arrow-left"></i> Try Different Account
                     </a>
                     <a href="/" class="btn btn-outline-secondary">
@@ -52,5 +82,8 @@
 <style>
     .card-header .bi {
         margin-right: 8px;
+    }
+    .text-break {
+        word-break: break-all;
     }
 </style>

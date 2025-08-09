@@ -3,6 +3,21 @@ body {
     background-color: #f8f9fa;
 }
 
+/* MrWho Logo Styles */
+.mrwho-logo {
+    max-width: 200px;
+    height: auto;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Responsive logo sizing */
+@media (max-width: 576px) {
+    .mrwho-logo {
+        max-width: 150px;
+    }
+}
+
 /* Token Inspector Specific Styles */
 .token-inspector-container {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
