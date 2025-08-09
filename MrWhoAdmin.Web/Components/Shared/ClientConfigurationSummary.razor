@@ -1,0 +1,332 @@
+@using MrWho.Shared.Models
+@inject ILogger<ClientConfigurationSummary> Logger
+
+<RadzenCard class="rz-mb-4">
+    <RadzenStack>
+        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-3">
+            <RadzenIcon Icon="settings" class="rz-me-1" />
+            Effective Configuration Summary
+        </RadzenText>
+        
+        <RadzenAlert AlertStyle="AlertStyle.Info" ShowIcon="true" class="rz-mb-3">
+            <RadzenText TextStyle="TextStyle.Body2">
+                This summary shows the <strong>effective configuration</strong> that will be used for this client, 
+                combining client-specific settings, realm defaults, and system defaults using the priority hierarchy.
+            </RadzenText>
+        </RadzenAlert>
+
+        <RadzenTabs TabPosition="TabPosition.Top" RenderMode="TabRenderMode.Client">
+            <Tabs>
+                <!-- Session Configuration Summary -->
+                <RadzenTabsItem Text="Session & Cookies" Icon="schedule">
+                    <div style="padding: 1rem;">
+                        <RadzenDataList Data="@GetSessionConfigItems()" TItem="ConfigItem">
+                            <Template Context="item">
+                                <RadzenCard class="rz-p-3 rz-mb-2" Style="border-left: 4px solid var(--rz-primary);">
+                                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Start">
+                                        <RadzenStack Gap="0.25rem">
+                                            <RadzenText TextStyle="TextStyle.Subtitle2" Text="@item.Name" />
+                                            <RadzenText TextStyle="TextStyle.Body2" Text="@item.Description" class="rz-color-secondary" />
+                                        </RadzenStack>
+                                        <RadzenStack Gap="0.25rem" Style="text-align: right;">
+                                            <RadzenBadge Text="@item.EffectiveValue" BadgeStyle="@GetConfigBadgeStyle(item.Source)" />
+                                            <RadzenText TextStyle="TextStyle.Caption" Text="@GetSourceDescription(item.Source)" class="rz-color-secondary" />
+                                        </RadzenStack>
+                                    </RadzenStack>
+                                </RadzenCard>
+                            </Template>
+                        </RadzenDataList>
+                    </div>
+                </RadzenTabsItem>
+
+                <!-- Security Configuration Summary -->
+                <RadzenTabsItem Text="Security & MFA" Icon="security">
+                    <div style="padding: 1rem;">
+                        <RadzenDataList Data="@GetSecurityConfigItems()" TItem="ConfigItem">
+                            <Template Context="item">
+                                <RadzenCard class="rz-p-3 rz-mb-2" Style="border-left: 4px solid var(--rz-success);">
+                                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Start">
+                                        <RadzenStack Gap="0.25rem">
+                                            <RadzenText TextStyle="TextStyle.Subtitle2" Text="@item.Name" />
+                                            <RadzenText TextStyle="TextStyle.Body2" Text="@item.Description" class="rz-color-secondary" />
+                                        </RadzenStack>
+                                        <RadzenStack Gap="0.25rem" Style="text-align: right;">
+                                            <RadzenBadge Text="@item.EffectiveValue" BadgeStyle="@GetConfigBadgeStyle(item.Source)" />
+                                            <RadzenText TextStyle="TextStyle.Caption" Text="@GetSourceDescription(item.Source)" class="rz-color-secondary" />
+                                        </RadzenStack>
+                                    </RadzenStack>
+                                </RadzenCard>
+                            </Template>
+                        </RadzenDataList>
+                    </div>
+                </RadzenTabsItem>
+
+                <!-- Token & Rate Limiting Summary -->
+                <RadzenTabsItem Text="Tokens & Limits" Icon="token">
+                    <div style="padding: 1rem;">
+                        <RadzenDataList Data="@GetTokenConfigItems()" TItem="ConfigItem">
+                            <Template Context="item">
+                                <RadzenCard class="rz-p-3 rz-mb-2" Style="border-left: 4px solid var(--rz-warning);">
+                                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Start">
+                                        <RadzenStack Gap="0.25rem">
+                                            <RadzenText TextStyle="TextStyle.Subtitle2" Text="@item.Name" />
+                                            <RadzenText TextStyle="TextStyle.Body2" Text="@item.Description" class="rz-color-secondary" />
+                                        </RadzenStack>
+                                        <RadzenStack Gap="0.25rem" Style="text-align: right;">
+                                            <RadzenBadge Text="@item.EffectiveValue" BadgeStyle="@GetConfigBadgeStyle(item.Source)" />
+                                            <RadzenText TextStyle="TextStyle.Caption" Text="@GetSourceDescription(item.Source)" class="rz-color-secondary" />
+                                        </RadzenStack>
+                                    </RadzenStack>
+                                </RadzenCard>
+                            </Template>
+                        </RadzenDataList>
+                    </div>
+                </RadzenTabsItem>
+
+                <!-- Configuration Hierarchy -->
+                <RadzenTabsItem Text="Configuration Hierarchy" Icon="account_tree">
+                    <div style="padding: 1rem;">
+                        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-3">Configuration Priority Hierarchy</RadzenText>
+                        
+                        <RadzenStack Gap="1rem">
+                            <RadzenCard class="rz-p-3" Style="border-left: 4px solid var(--rz-danger);">
+                                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem">
+                                    <RadzenBadge Text="1" BadgeStyle="BadgeStyle.Danger" />
+                                    <RadzenStack Gap="0.25rem">
+                                        <RadzenText TextStyle="TextStyle.Subtitle1" Text="Client-Specific Configuration" />
+                                        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
+                                            Highest priority. Values set directly on this client override all others.
+                                        </RadzenText>
+                                    </RadzenStack>
+                                </RadzenStack>
+                            </RadzenCard>
+
+                            <RadzenCard class="rz-p-3" Style="border-left: 4px solid var(--rz-warning);">
+                                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem">
+                                    <RadzenBadge Text="2" BadgeStyle="BadgeStyle.Warning" />
+                                    <RadzenStack Gap="0.25rem">
+                                        <RadzenText TextStyle="TextStyle.Subtitle1" Text="Realm Default Configuration" />
+                                        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
+                                            Medium priority. Default values set for the "@(RealmName ?? "current")" realm.
+                                        </RadzenText>
+                                    </RadzenStack>
+                                </RadzenStack>
+                            </RadzenCard>
+
+                            <RadzenCard class="rz-p-3" Style="border-left: 4px solid var(--rz-info);">
+                                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem">
+                                    <RadzenBadge Text="3" BadgeStyle="BadgeStyle.Info" />
+                                    <RadzenStack Gap="0.25rem">
+                                        <RadzenText TextStyle="TextStyle.Subtitle1" Text="System Default Configuration" />
+                                        <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">
+                                            Lowest priority. Fallback values used when no client or realm configuration is set.
+                                        </RadzenText>
+                                    </RadzenStack>
+                                </RadzenStack>
+                            </RadzenCard>
+                        </RadzenStack>
+
+                        <RadzenAlert AlertStyle="AlertStyle.Info" ShowIcon="true" class="rz-mt-4">
+                            <RadzenText TextStyle="TextStyle.Body2">
+                                <strong>Example:</strong> If a client has SessionTimeoutHours = 4, realm default = 8, and system default = 6, 
+                                the effective value will be <strong>4 hours</strong> (client-specific wins).
+                                If the client value is empty/null, it falls back to realm default (8), and so on.
+                            </RadzenText>
+                        </RadzenAlert>
+                    </div>
+                </RadzenTabsItem>
+            </Tabs>
+        </RadzenTabs>
+    </RadzenStack>
+</RadzenCard>
+
+@code {
+    [Parameter] public ClientDto? Client { get; set; }
+    [Parameter] public RealmDto? Realm { get; set; }
+    [Parameter] public string? RealmName { get; set; }
+
+    private List<ConfigItem> GetSessionConfigItems()
+    {
+        if (Client == null) return new List<ConfigItem>();
+
+        var items = new List<ConfigItem>();
+
+        // Session Timeout
+        var sessionTimeout = GetEffectiveValue(
+            Client.SessionTimeoutHours, 
+            Realm?.DefaultSessionTimeoutHours, 
+            8); // System default
+        items.Add(new ConfigItem(
+            "Session Timeout",
+            "How long user sessions remain active",
+            $"{sessionTimeout} hours",
+            GetConfigSource(Client.SessionTimeoutHours, Realm?.DefaultSessionTimeoutHours)));
+
+        // Remember Me Duration
+        var rememberMe = GetEffectiveValue(
+            Client.RememberMeDurationDays, 
+            Realm?.DefaultRememberMeDurationDays, 
+            30); // System default
+        items.Add(new ConfigItem(
+            "Remember Me Duration",
+            "Duration for 'Remember Me' functionality",
+            $"{rememberMe} days",
+            GetConfigSource(Client.RememberMeDurationDays, Realm?.DefaultRememberMeDurationDays)));
+
+        // Sliding Expiration
+        var slidingExpiration = GetEffectiveValue(
+            Client.UseSlidingSessionExpiration, 
+            Realm?.DefaultUseSlidingSessionExpiration, 
+            true); // System default
+        items.Add(new ConfigItem(
+            "Sliding Expiration",
+            "Whether session timeout resets on activity",
+            slidingExpiration == true ? "Enabled" : "Disabled",
+            GetConfigSource(Client.UseSlidingSessionExpiration, Realm?.DefaultUseSlidingSessionExpiration)));
+
+        // HTTPS for Cookies
+        var httpsRequired = GetEffectiveValue(
+            Client.RequireHttpsForCookies, 
+            Realm?.DefaultRequireHttpsForCookies, 
+            false); // System default
+        items.Add(new ConfigItem(
+            "HTTPS Required for Cookies",
+            "Whether cookies require HTTPS",
+            httpsRequired == true ? "Required" : "Not Required",
+            GetConfigSource(Client.RequireHttpsForCookies, Realm?.DefaultRequireHttpsForCookies)));
+
+        return items;
+    }
+
+    private List<ConfigItem> GetSecurityConfigItems()
+    {
+        if (Client == null) return new List<ConfigItem>();
+
+        var items = new List<ConfigItem>();
+
+        // MFA Requirement
+        var requireMfa = GetEffectiveValue(
+            Client.RequireMfa, 
+            Realm?.DefaultRequireMfa, 
+            false); // System default
+        items.Add(new ConfigItem(
+            "MFA Required",
+            "Whether multi-factor authentication is required",
+            requireMfa == true ? "Required" : "Optional",
+            GetConfigSource(Client.RequireMfa, Realm?.DefaultRequireMfa)));
+
+        // Consent Requirement
+        var requireConsent = GetEffectiveValue(
+            Client.RequireConsent, 
+            Realm?.DefaultRequireConsent, 
+            false); // System default
+        items.Add(new ConfigItem(
+            "User Consent Required",
+            "Whether user consent is required for authorization",
+            requireConsent == true ? "Required" : "Not Required",
+            GetConfigSource(Client.RequireConsent, Realm?.DefaultRequireConsent)));
+
+        // UserInfo Endpoint Access
+        var allowUserInfo = GetEffectiveValue(
+            Client.AllowAccessToUserInfoEndpoint, 
+            null, // No realm default for this
+            true); // System default
+        items.Add(new ConfigItem(
+            "UserInfo Endpoint Access",
+            "Whether client can access UserInfo endpoint",
+            allowUserInfo == true ? "Allowed" : "Denied",
+            GetConfigSource(Client.AllowAccessToUserInfoEndpoint, null)));
+
+        return items;
+    }
+
+    private List<ConfigItem> GetTokenConfigItems()
+    {
+        if (Client == null) return new List<ConfigItem>();
+
+        var items = new List<ConfigItem>();
+
+        // ID Token Lifetime
+        var idTokenLifetime = GetEffectiveValue(
+            Client.IdTokenLifetimeMinutes, 
+            null, // No realm default for this
+            60); // System default
+        items.Add(new ConfigItem(
+            "ID Token Lifetime",
+            "How long ID tokens remain valid",
+            $"{idTokenLifetime} minutes",
+            GetConfigSource(Client.IdTokenLifetimeMinutes, null)));
+
+        // Rate Limit Per Hour
+        var rateLimitHour = GetEffectiveValue(
+            Client.RateLimitRequestsPerHour, 
+            Realm?.DefaultRateLimitRequestsPerHour, 
+            null); // System default (unlimited)
+        items.Add(new ConfigItem(
+            "Rate Limit (Per Hour)",
+            "Maximum requests per hour",
+            rateLimitHour?.ToString() ?? "Unlimited",
+            GetConfigSource(Client.RateLimitRequestsPerHour, Realm?.DefaultRateLimitRequestsPerHour)));
+
+        // Refresh Token Behavior
+        var oneTimeTokens = GetEffectiveValue(
+            Client.UseOneTimeRefreshTokens, 
+            Realm?.DefaultUseOneTimeRefreshTokens, 
+            false); // System default
+        items.Add(new ConfigItem(
+            "Refresh Token Rotation",
+            "Whether refresh tokens are one-time use",
+            oneTimeTokens == true ? "One-time (Rotation)" : "Reusable",
+            GetConfigSource(Client.UseOneTimeRefreshTokens, Realm?.DefaultUseOneTimeRefreshTokens)));
+
+        return items;
+    }
+
+    // Generic helper to get effective value with fallback hierarchy
+    private T GetEffectiveValue<T>(T? clientValue, T? realmDefault, T systemDefault)
+    {
+        return clientValue ?? realmDefault ?? systemDefault;
+    }
+
+    // Determine the source of the configuration
+    private ConfigSource GetConfigSource<T>(T? clientValue, T? realmDefault)
+    {
+        if (clientValue != null && !EqualityComparer<T>.Default.Equals(clientValue, default(T)))
+            return ConfigSource.Client;
+        if (realmDefault != null && !EqualityComparer<T>.Default.Equals(realmDefault, default(T)))
+            return ConfigSource.Realm;
+        return ConfigSource.System;
+    }
+
+    private BadgeStyle GetConfigBadgeStyle(ConfigSource source)
+    {
+        return source switch
+        {
+            ConfigSource.Client => BadgeStyle.Danger,
+            ConfigSource.Realm => BadgeStyle.Warning,
+            ConfigSource.System => BadgeStyle.Info,
+            _ => BadgeStyle.Secondary
+        };
+    }
+
+    private string GetSourceDescription(ConfigSource source)
+    {
+        return source switch
+        {
+            ConfigSource.Client => "Client Override",
+            ConfigSource.Realm => "Realm Default",
+            ConfigSource.System => "System Default",
+            _ => "Unknown"
+        };
+    }
+
+    // Supporting types
+    public record ConfigItem(string Name, string Description, string EffectiveValue, ConfigSource Source);
+
+    public enum ConfigSource
+    {
+        Client,
+        Realm,
+        System
+    }
+}
