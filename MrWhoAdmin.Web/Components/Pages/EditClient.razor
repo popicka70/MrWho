@@ -113,10 +113,10 @@
                                     </RadzenFormField>
 
                                     <RadzenFormField Text="Status" Variant="Variant.Outlined">
-                                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                            <RadzenCheckBox @bind-Value="@model.IsEnabled" />
-                                            <RadzenLabel Text="Client is enabled" />
-                                        </RadzenStack>
+                                        <RadzenSwitch @bind-Value="@model.IsEnabled" OnLabel="Enabled" OffLabel="Disabled" />
+                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                            Toggle to enable or disable this client
+                                        </RadzenText>
                                     </RadzenFormField>
                                 </RadzenStack>
                             </RadzenFieldset>
@@ -154,12 +154,12 @@
                                     </RadzenRow>
 
                                     <RadzenFormField Text="Session Expiration Type" Variant="Variant.Outlined">
-                                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem">
-                                            <RadzenCheckBox @bind-Value="@model.UseSlidingSessionExpiration" />
+                                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                            <RadzenCheckBox @bind-Value="@model.UseSlidingSessionExpiration" TriState="true" />
                                             <RadzenLabel Text="Use sliding expiration (extends session on activity)" />
                                         </RadzenStack>
                                         <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                            When enabled, session timeout resets on user activity
+                                            When enabled, session timeout resets on user activity (leave unset to use default)
                                         </RadzenText>
                                     </RadzenFormField>
                                 </RadzenStack>
@@ -180,12 +180,12 @@
                                     </RadzenFormField>
 
                                     <RadzenFormField Text="HTTPS Cookie Requirement" Variant="Variant.Outlined">
-                                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem">
-                                            <RadzenCheckBox @bind-Value="@model.RequireHttpsForCookies" />
+                                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                            <RadzenCheckBox @bind-Value="@model.RequireHttpsForCookies" TriState="true" />
                                             <RadzenLabel Text="Require HTTPS for secure cookies" />
                                         </RadzenStack>
                                         <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                            Force secure flag on cookies (recommended for production)
+                                            Force secure flag on cookies (recommended for production; leave unset to use default)
                                         </RadzenText>
                                     </RadzenFormField>
                                 </RadzenStack>
@@ -223,17 +223,23 @@
                                         </RadzenColumn>
                                     </RadzenRow>
 
-                                    <RadzenFormField Text="Access Token Type" Variant="Variant.Outlined">
-                                        <RadzenDropDown @bind-Value="@model.AccessTokenType" 
-                                                       Data="@accessTokenTypes" 
-                                                       TextProperty="Text" 
-                                                       ValueProperty="Value" 
-                                                       Style="width: 100%;" 
-                                                       Placeholder="Select token type..." />
-                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                            JWT (self-contained) vs Reference (database lookup)
-                                        </RadzenText>
-                                    </RadzenFormField>
+                                    <RadzenRow>
+                                        <RadzenColumn Size="12" SizeMD="6">
+                                            <RadzenFormField Text="Access Token Type" Variant="Variant.Outlined">
+                                                <RadzenDropDown @bind-Value="@model.AccessTokenType" 
+                                                               Data="@accessTokenTypes" 
+                                                               TextProperty="Text" 
+                                                               ValueProperty="Value" 
+                                                               Style="width: 100%;" 
+                                                               Placeholder="Select token type..." />
+                                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                    JWT (self-contained) vs Reference (database lookup)
+                                                </RadzenText>
+                                            </RadzenFormField>
+                                        </RadzenColumn>
+                                        <RadzenColumn Size="12" SizeMD="6">
+                                        </RadzenColumn>
+                                    </RadzenRow>
                                 </RadzenStack>
                             </RadzenFieldset>
 
@@ -253,18 +259,33 @@
                                         </RadzenColumn>
                                         <RadzenColumn Size="12" SizeMD="6">
                                             <RadzenFormField Text="Token Security" Variant="Variant.Outlined">
-                                                <RadzenStack Gap="0.5rem">
-                                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                                        <RadzenCheckBox @bind-Value="@model.UseOneTimeRefreshTokens" />
+                                                <RadzenStack Gap="0.75rem" Style="max-width: 480px;">
+                                                    <RadzenStack Gap="0.25rem">
                                                         <RadzenLabel Text="One-time refresh tokens (rotation)" />
+                                                        <RadzenDropDown @bind-Value="@model.UseOneTimeRefreshTokens"
+                                                                       Data="@triStateOptions"
+                                                                       TextProperty="Text"
+                                                                       ValueProperty="Value"
+                                                                       Style="width: 100%;"
+                                                                       Placeholder="Use realm default" />
                                                     </RadzenStack>
-                                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                                        <RadzenCheckBox @bind-Value="@model.HashAccessTokens" />
+                                                    <RadzenStack Gap="0.25rem">
                                                         <RadzenLabel Text="Hash access tokens in database" />
+                                                        <RadzenDropDown @bind-Value="@model.HashAccessTokens"
+                                                                       Data="@triStateOptions"
+                                                                       TextProperty="Text"
+                                                                       ValueProperty="Value"
+                                                                       Style="width: 100%;"
+                                                                       Placeholder="Use realm default" />
                                                     </RadzenStack>
-                                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                                        <RadzenCheckBox @bind-Value="@model.UpdateAccessTokenClaimsOnRefresh" />
+                                                    <RadzenStack Gap="0.25rem">
                                                         <RadzenLabel Text="Update claims on token refresh" />
+                                                        <RadzenDropDown @bind-Value="@model.UpdateAccessTokenClaimsOnRefresh"
+                                                                       Data="@triStateOptions"
+                                                                       TextProperty="Text"
+                                                                       ValueProperty="Value"
+                                                                       Style="width: 100%;"
+                                                                       Placeholder="Use realm default" />
                                                     </RadzenStack>
                                                 </RadzenStack>
                                             </RadzenFormField>
@@ -283,11 +304,11 @@
                                     <RadzenFormField Text="Consent Requirements" Variant="Variant.Outlined">
                                         <RadzenStack Gap="0.5rem">
                                             <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                                <RadzenCheckBox @bind-Value="@model.RequireConsent" />
+                                                <RadzenCheckBox @bind-Value="@model.RequireConsent" TriState="true" />
                                                 <RadzenLabel Text="Require user consent for authorization" />
                                             </RadzenStack>
                                             <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                                <RadzenCheckBox @bind-Value="@model.AllowRememberConsent" />
+                                                <RadzenCheckBox @bind-Value="@model.AllowRememberConsent" TriState="true" />
                                                 <RadzenLabel Text="Allow users to remember consent" />
                                             </RadzenStack>
                                         </RadzenStack>
@@ -303,15 +324,15 @@
                                     <RadzenFormField Text="API Endpoint Access" Variant="Variant.Outlined">
                                         <RadzenStack Gap="0.5rem">
                                             <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                                <RadzenCheckBox @bind-Value="@model.AllowAccessToUserInfoEndpoint" />
+                                                <RadzenCheckBox @bind-Value="@model.AllowAccessToUserInfoEndpoint" TriState="true" />
                                                 <RadzenLabel Text="Allow access to UserInfo endpoint" />
                                             </RadzenStack>
                                             <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                                <RadzenCheckBox @bind-Value="@model.AllowAccessToIntrospectionEndpoint" />
+                                                <RadzenCheckBox @bind-Value="@model.AllowAccessToIntrospectionEndpoint" TriState="true" />
                                                 <RadzenLabel Text="Allow token introspection" />
                                             </RadzenStack>
                                             <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                                <RadzenCheckBox @bind-Value="@model.AllowAccessToRevocationEndpoint" />
+                                                <RadzenCheckBox @bind-Value="@model.AllowAccessToRevocationEndpoint" TriState="true" />
                                                 <RadzenLabel Text="Allow token revocation" />
                                             </RadzenStack>
                                         </RadzenStack>
@@ -327,15 +348,15 @@
                                     <RadzenFormField Text="Client Claims Behavior" Variant="Variant.Outlined">
                                         <RadzenStack Gap="0.5rem">
                                             <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                                <RadzenCheckBox @bind-Value="@model.IncludeJwtId" />
+                                                <RadzenCheckBox @bind-Value="@model.IncludeJwtId" TriState="true" />
                                                 <RadzenLabel Text="Include JWT ID in tokens" />
                                             </RadzenStack>
                                             <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                                <RadzenCheckBox @bind-Value="@model.AlwaysSendClientClaims" />
+                                                <RadzenCheckBox @bind-Value="@model.AlwaysSendClientClaims" TriState="true" />
                                                 <RadzenLabel Text="Always send client claims" />
                                             </RadzenStack>
                                             <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                                <RadzenCheckBox @bind-Value="@model.AlwaysIncludeUserClaimsInIdToken" />
+                                                <RadzenCheckBox @bind-Value="@model.AlwaysIncludeUserClaimsInIdToken" TriState="true" />
                                                 <RadzenLabel Text="Always include user claims in ID token" />
                                             </RadzenStack>
                                         </RadzenStack>
@@ -360,8 +381,8 @@
                             <RadzenFieldset Text="MFA Requirements">
                                 <RadzenStack Gap="1rem">
                                     <RadzenFormField Text="MFA Enforcement" Variant="Variant.Outlined">
-                                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem">
-                                            <RadzenCheckBox @bind-Value="@model.RequireMfa" />
+                                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                            <RadzenCheckBox @bind-Value="@model.RequireMfa" TriState="true" />
                                             <RadzenLabel Text="Require multi-factor authentication" />
                                         </RadzenStack>
                                         <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
@@ -383,8 +404,8 @@
                                         </RadzenColumn>
                                         <RadzenColumn Size="12" SizeMD="6">
                                             <RadzenFormField Text="Session MFA Memory" Variant="Variant.Outlined">
-                                                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem">
-                                                    <RadzenCheckBox @bind-Value="@model.RememberMfaForSession" />
+                                                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                                    <RadzenCheckBox @bind-Value="@model.RememberMfaForSession" TriState="true" />
                                                     <RadzenLabel Text="Remember MFA for session duration" />
                                                 </RadzenStack>
                                                 <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
@@ -573,8 +594,8 @@
                                         </RadzenFormField>
 
                                         <RadzenFormField Text="Back-Channel Settings" Variant="Variant.Outlined">
-                                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem">
-                                                <RadzenCheckBox @bind-Value="@model.BackChannelLogoutSessionRequired" />
+                                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                                <RadzenCheckBox @bind-Value="@model.BackChannelLogoutSessionRequired" TriState="true" />
                                                 <RadzenLabel Text="Include session ID in logout tokens" />
                                             </RadzenStack>
                                             <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
@@ -596,8 +617,8 @@
                                         </RadzenFormField>
 
                                         <RadzenFormField Text="Front-Channel Settings" Variant="Variant.Outlined">
-                                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem">
-                                                <RadzenCheckBox @bind-Value="@model.FrontChannelLogoutSessionRequired" />
+                                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                                <RadzenCheckBox @bind-Value="@model.FrontChannelLogoutSessionRequired" TriState="true" />
                                                 <RadzenLabel Text="Require session ID for front-channel logout" />
                                             </RadzenStack>
                                         </RadzenFormField>
@@ -645,15 +666,15 @@
                                         <RadzenFormField Text="Development Settings" Variant="Variant.Outlined">
                                             <RadzenStack Gap="0.5rem">
                                                 <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                                    <RadzenCheckBox @bind-Value="@model.EnableDetailedErrors" />
+                                                    <RadzenCheckBox @bind-Value="@model.EnableDetailedErrors" TriState="true" />
                                                     <RadzenLabel Text="Enable detailed error responses" />
                                                 </RadzenStack>
                                                 <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                                    <RadzenCheckBox @bind-Value="@model.LogSensitiveData" />
+                                                    <RadzenCheckBox @bind-Value="@model.LogSensitiveData" TriState="true" />
                                                     <RadzenLabel Text="Log sensitive data (development only)" />
                                                 </RadzenStack>
                                                 <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                                    <RadzenCheckBox @bind-Value="@model.EnableLocalLogin" />
+                                                    <RadzenCheckBox @bind-Value="@model.EnableLocalLogin" TriState="true" />
                                                     <RadzenLabel Text="Enable local login (username/password)" />
                                                 </RadzenStack>
                                             </RadzenStack>
@@ -704,23 +725,26 @@
                     </Tabs>
                 </RadzenTabs>
 
-                <!-- Action Buttons -->
-                <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" class="rz-mt-4" JustifyContent="JustifyContent.SpaceBetween">
-                    <RadzenButton Text="Cancel" Icon="cancel" ButtonStyle="ButtonStyle.Light" 
-                                Click="@CancelEdit" />
-                    
-                    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
-                        @if (IsEdit)
-                        {
-                            <RadzenButton Text="Reset to Defaults" Icon="restore" ButtonStyle="ButtonStyle.Warning" 
-                                        Click="@(async () => await ResetToDefaults())" />
-                        }
-                        <RadzenButton Text="@(IsEdit ? "Update Client" : "Create Client")" 
-                                    Icon="@(IsEdit ? "save" : "add_circle")" 
-                                    ButtonStyle="ButtonStyle.Primary" 
-                                    ButtonType="ButtonType.Submit" />
+                <!-- Sticky Action Bar with Validation Summary -->
+                <div class="rz-mt-4" style="position: sticky; bottom: 0; background: var(--rz-base-background); border-top: 1px solid var(--rz-panel-border); padding: 0.75rem 1rem; z-index: 10;">
+                    <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                        <ValidationSummary />
+
+                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                            <RadzenButton Text="Cancel" Icon="cancel" ButtonStyle="ButtonStyle.Light" 
+                                          Click="@CancelEdit" />
+                            @if (IsEdit)
+                            {
+                                <RadzenButton Text="Reset to Defaults" Icon="restore" ButtonStyle="ButtonStyle.Warning" 
+                                              Click="@(async () => await ResetToDefaults())" />
+                            }
+                            <RadzenButton Text="@(IsEdit ? "Update Client" : "Create Client")" 
+                                          Icon="@(IsEdit ? "save" : "add_circle")" 
+                                          ButtonStyle="ButtonStyle.Primary" 
+                                          ButtonType="ButtonType.Submit" />
+                        </RadzenStack>
                     </RadzenStack>
-                </RadzenStack>
+                </div>
             </RadzenTemplateForm>
         }
     </RadzenCard>
@@ -739,6 +763,7 @@
         private List<DropdownItem<string>> sameSitePolicies = new();
         private List<DropdownItem<string>> accessTokenTypes = new();
         private List<DropdownItem<string>> availableMfaMethods = new();
+    private List<DropdownItem<bool?>> triStateOptions = new();
 
         private bool IsEdit => !string.IsNullOrEmpty(Id);
 
@@ -794,6 +819,13 @@
                 new("Push Notifications", "push"),
                 new("Hardware Token", "hardware"),
                 new("Biometric", "biometric")
+            };
+
+            triStateOptions = new()
+            {
+                new("Use realm default", null),
+                new("Enabled", true),
+                new("Disabled", false)
             };
         }
 
