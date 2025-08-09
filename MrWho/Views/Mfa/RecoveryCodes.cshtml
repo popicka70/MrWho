@@ -2,11 +2,177 @@
 @{
     ViewData["Title"] = "Recovery Codes";
 }
-<h2>Save your recovery codes</h2>
-<p>Store these codes in a safe place. Each code can be used once if you lose your authenticator.</p>
-<pre>
-@string.Join("\n", Model)
-</pre>
-<form method="get" action="/">
-    <button type="submit">Done</button>
-</form>
+
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <!-- MrWho Logo -->
+        <div class="text-center mb-4">
+            <img src="~/images/AuthMrWho.jpeg" alt="MrWho Identity Server" class="mrwho-logo" />
+        </div>
+        
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h4 class="text-center mb-1">
+                    <i class="bi bi-check-circle me-2"></i>Two-Factor Authentication Enabled!
+                </h4>
+                <p class="text-center mb-0 opacity-75">Save your recovery codes now</p>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-warning">
+                    <h5><i class="bi bi-exclamation-triangle me-2"></i>Important - Save These Codes!</h5>
+                    <ul class="mb-0">
+                        <li>Each code can only be used <strong>once</strong></li>
+                        <li>Use them if you lose access to your authenticator app</li>
+                        <li>Store them in a <strong>secure location</strong> (password manager recommended)</li>
+                        <li>Don't share these codes with anyone</li>
+                    </ul>
+                </div>
+                
+                <div class="mb-4">
+                    <h5>Your Recovery Codes:</h5>
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <div class="recovery-codes font-monospace" id="recoveryCodes">
+@for (int i = 0; i < Model.Length; i++)
+{
+    <div class="recovery-code-item d-flex justify-content-between align-items-center py-2 @(i % 2 == 0 ? "bg-white" : "") px-3 rounded">
+        <span class="fw-bold">@(i + 1).</span>
+        <code class="fs-5 text-primary">@Model[i]</code>
+    </div>
+}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="d-grid gap-2 mb-3">
+                    <button type="button" class="btn btn-outline-primary" onclick="copyAllCodes()">
+                        <i class="bi bi-clipboard me-2"></i>Copy All Codes
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" onclick="printCodes()">
+                        <i class="bi bi-printer me-2"></i>Print Codes
+                    </button>
+                </div>
+                
+                <!-- Confirmation Checkbox -->
+                <div class="form-check mb-3 p-3 bg-light rounded">
+                    <input class="form-check-input" type="checkbox" id="confirmSaved" required>
+                    <label class="form-check-label fw-bold" for="confirmSaved">
+                        <i class="bi bi-shield-check me-2 text-success"></i>
+                        I have saved these recovery codes in a secure location
+                    </label>
+                </div>
+                
+                <form method="get" action="/">
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-success btn-lg" id="continueBtn" disabled>
+                            <i class="bi bi-arrow-right me-2"></i>Continue to Dashboard
+                        </button>
+                    </div>
+                </form>
+                
+                <div class="mt-3 text-center">
+                    <small class="text-muted">
+                        <i class="bi bi-info-circle me-1"></i>
+                        You can generate new recovery codes later from your profile settings if needed.
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Styles {
+    <style>
+        .recovery-code-item {
+            border-left: 4px solid #0d6efd;
+            transition: background-color 0.2s ease;
+        }
+        
+        .recovery-code-item:hover {
+            background-color: #e3f2fd !important;
+        }
+    </style>
+}
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const confirmCheckbox = document.getElementById('confirmSaved');
+            const continueBtn = document.getElementById('continueBtn');
+            
+            confirmCheckbox.addEventListener('change', function() {
+                continueBtn.disabled = !this.checked;
+            });
+        });
+        
+        function copyAllCodes() {
+            const codes = @Html.Raw(Json.Serialize(Model));
+            const codesText = codes.join('\n');
+            
+            navigator.clipboard.writeText(codesText).then(function() {
+                // Show temporary success feedback
+                const button = event.target;
+                const originalText = button.innerHTML;
+                button.innerHTML = '<i class="bi bi-check me-2"></i>Copied!';
+                button.classList.remove('btn-outline-primary');
+                button.classList.add('btn-success');
+                
+                setTimeout(function() {
+                    button.innerHTML = originalText;
+                    button.classList.remove('btn-success');
+                    button.classList.add('btn-outline-primary');
+                }, 2000);
+            }).catch(function() {
+                alert('Failed to copy codes to clipboard. Please copy them manually.');
+            });
+        }
+        
+        function printCodes() {
+            const codes = @Html.Raw(Json.Serialize(Model));
+            const printWindow = window.open('', '_blank');
+            const currentDate = new Date().toLocaleDateString();
+            
+            printWindow.document.write(`
+                <html>
+                <head>
+                    <title>MrWho Recovery Codes</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; margin: 40px; }
+                        .header { text-align: center; margin-bottom: 30px; }
+                        .codes { background: #f8f9fa; padding: 20px; border-radius: 8px; }
+                        .code-item { margin: 10px 0; font-size: 16px; font-family: monospace; }
+                        .warning { background: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0; }
+                        .footer { margin-top: 30px; font-size: 12px; color: #666; }
+                        .btn, .form-check, .alert { display: none !important; }
+                        .card { border: none !important; }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <h1>MrWho Recovery Codes</h1>
+                        <p>Generated on: ${currentDate}</p>
+                    </div>
+                    <div class="warning">
+                        <strong>?? SECURITY WARNING:</strong>
+                        <ul>
+                            <li>Each code can only be used once</li>
+                            <li>Store this document in a secure location</li>
+                            <li>Do not share these codes with anyone</li>
+                            <li>Use only if you lose access to your authenticator app</li>
+                        </ul>
+                    </div>
+                    <div class="codes">
+                        ${codes.map((code, index) => `<div class="code-item">${index + 1}. ${code}</div>`).join('')}
+                    </div>
+                    <div class="footer">
+                        <p>MrWho Identity Server - Two-Factor Authentication Recovery Codes</p>
+                    </div>
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+            printWindow.print();
+        }
+    </script>
+}

@@ -2,20 +2,157 @@
 @{
     ViewData["Title"] = "Set up Authenticator";
 }
-<h2>Set up Microsoft Authenticator</h2>
-<p>Scan this QR code with the Microsoft Authenticator app, then enter a code to verify.</p>
-<div>
-    <img src="@Model.QrCodeDataUri" alt="Authenticator QR" />
-</div>
-<p>Or enter this code manually: <strong>@Model.SharedKey</strong></p>
-<form method="post" action="/mfa/verify">
-    @Html.AntiForgeryToken()
-    <div>
-        <label for="code">Verification code</label>
-        <input id="code" name="Code" autocomplete="one-time-code" />
+
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <!-- MrWho Logo -->
+        <div class="text-center mb-4">
+            <img src="~/images/AuthMrWho.jpeg" alt="MrWho Identity Server" class="mrwho-logo" />
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h4 class="text-center">
+                    <i class="bi bi-shield-check me-2"></i>Set up Two-Factor Authentication
+                </h4>
+                <p class="text-center text-muted small mb-0">Secure your account with an authenticator app</p>
+            </div>
+            <div class="card-body">
+                <div asp-validation-summary="All" class="text-danger mb-3"></div>
+                
+                <!-- Step 1: Download App -->
+                <div class="mb-4">
+                    <h5 class="text-primary">
+                        <i class="bi bi-1-circle me-2"></i>Download an Authenticator App
+                    </h5>
+                    <p class="text-muted">Install one of these apps on your mobile device:</p>
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <div class="card bg-light">
+                                <div class="card-body text-center py-3">
+                                    <i class="bi bi-microsoft text-primary" style="font-size: 2rem;"></i>
+                                    <p class="small mb-0 mt-2">Microsoft Authenticator</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="card bg-light">
+                                <div class="card-body text-center py-3">
+                                    <i class="bi bi-google text-success" style="font-size: 2rem;"></i>
+                                    <p class="small mb-0 mt-2">Google Authenticator</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Step 2: Scan QR Code -->
+                <div class="mb-4">
+                    <h5 class="text-primary">
+                        <i class="bi bi-2-circle me-2"></i>Scan QR Code
+                    </h5>
+                    <p class="text-muted">Open your authenticator app and scan this QR code:</p>
+                    <div class="text-center mb-3">
+                        <div class="border border-2 border-primary rounded p-3 d-inline-block">
+                            <img src="@Model.QrCodeDataUri" alt="Authenticator QR Code" class="img-fluid" style="max-width: 200px;" />
+                        </div>
+                    </div>
+                    
+                    <!-- Manual Entry Option -->
+                    <div class="alert alert-info">
+                        <h6><i class="bi bi-keyboard me-2"></i>Can't scan? Enter manually:</h6>
+                        <div class="input-group">
+                            <input type="text" 
+                                   class="form-control font-monospace" 
+                                   value="@Model.SharedKey" 
+                                   readonly 
+                                   id="manualKey" />
+                            <button class="btn btn-outline-primary" type="button" onclick="copyToClipboard()">
+                                <i class="bi bi-clipboard"></i> Copy
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Step 3: Verify -->
+                <div class="mb-4">
+                    <h5 class="text-primary">
+                        <i class="bi bi-3-circle me-2"></i>Verify Setup
+                    </h5>
+                    <form method="post" action="/mfa/verify">
+                        @Html.AntiForgeryToken()
+                        <div class="mb-3">
+                            <label for="code" class="form-label">Enter verification code from your app</label>
+                            <input id="code" 
+                                   name="Code" 
+                                   class="form-control form-control-lg text-center" 
+                                   autocomplete="one-time-code" 
+                                   inputmode="numeric"
+                                   placeholder="123 456"
+                                   style="letter-spacing: 0.5em; font-family: monospace;"
+                                   maxlength="7"
+                                   required />
+                            <div class="form-text">
+                                <i class="bi bi-info-circle me-1"></i>
+                                Enter the 6-digit code displayed in your authenticator app
+                            </div>
+                        </div>
+                        
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-success btn-lg">
+                                <i class="bi bi-check-circle me-2"></i>Verify & Enable 2FA
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                
+                <div class="alert alert-warning">
+                    <h6><i class="bi bi-exclamation-triangle me-2"></i>Important</h6>
+                    <p class="mb-0">After verification, you'll receive recovery codes. Keep these safe - you'll need them if you lose access to your authenticator app.</p>
+                </div>
+            </div>
+        </div>
     </div>
-    <button type="submit">Verify</button>
-    <p>
-        After verification, we'll show your recovery codes.
-    </p>
-</form>
+</div>
+
+@section Scripts {
+    <script>
+        // Auto-focus the code input and format as user types
+        document.addEventListener('DOMContentLoaded', function() {
+            const codeInput = document.getElementById('code');
+            if (codeInput) {
+                codeInput.focus();
+                
+                // Format input as user types (add space after 3 digits)
+                codeInput.addEventListener('input', function(e) {
+                    let value = e.target.value.replace(/\s/g, '');
+                    if (value.length > 3) {
+                        value = value.slice(0, 3) + ' ' + value.slice(3, 6);
+                    }
+                    e.target.value = value;
+                });
+            }
+        });
+        
+        // Copy manual key to clipboard
+        function copyToClipboard() {
+            const keyInput = document.getElementById('manualKey');
+            keyInput.select();
+            keyInput.setSelectionRange(0, 99999); // For mobile devices
+            navigator.clipboard.writeText(keyInput.value).then(function() {
+                // Show temporary success feedback
+                const button = event.target.closest('button');
+                const originalText = button.innerHTML;
+                button.innerHTML = '<i class="bi bi-check"></i> Copied!';
+                button.classList.remove('btn-outline-primary');
+                button.classList.add('btn-success');
+                
+                setTimeout(function() {
+                    button.innerHTML = originalText;
+                    button.classList.remove('btn-success');
+                    button.classList.add('btn-outline-primary');
+                }, 2000);
+            });
+        }
+    </script>
+}

@@ -89,10 +89,14 @@
                         <label asp-for="RememberMe" class="form-check-label">Remember me</label>
                     </div>
                     
-                    <div class="d-grid mb-2">
-                        <button type="submit" class="btn btn-primary">Sign In</button>
+                    <div class="d-grid mb-3">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="bi bi-box-arrow-in-right me-2"></i>Sign In
+                        </button>
                     </div>
-                    <div class="text-center">
+                    
+                    <!-- Alternative Authentication Methods -->
+                    <div class="d-grid gap-2">
                         @{
                             var qs = new Dictionary<string, string?>
                             {
@@ -108,17 +112,23 @@
                                                                    .Where(s => s != null));
                             var qrHref = string.IsNullOrEmpty(qrQuery) ? "/qr-login/start" : ($"/qr-login/start?{qrQuery}");
                         }
+                        
                         @if (Model.UseCode)
                         {
-                            <a href="@toggleHref">Use password instead</a>
+                            <a href="@toggleHref" class="btn btn-outline-secondary auth-button">
+                                <i class="bi bi-key me-2"></i>Use password instead
+                            </a>
                         }
                         else
                         {
-                            <a href="@toggleHref">Use authenticator code instead</a>
+                            <a href="@toggleHref" class="btn btn-outline-secondary auth-button">
+                                <i class="bi bi-shield-check me-2"></i>Use authenticator code instead
+                            </a>
                         }
-                        <div class="mt-2">
-                            <a href="@qrHref">Sign in with phone (QR)</a>
-                        </div>
+                        
+                        <a href="@qrHref" class="btn btn-outline-primary auth-button">
+                            <i class="bi bi-qr-code me-2"></i>Sign in with phone (QR)
+                        </a>
                     </div>
                 </form>
             </div>

@@ -2,23 +2,107 @@
 @{
     ViewData["Title"] = "Two-factor authentication";
 }
-<h2>Two-factor authentication</h2>
-<form method="post" action="/mfa/challenge">
-    @Html.AntiForgeryToken()
-    <input type="hidden" name="ReturnUrl" value="@Model.ReturnUrl" />
-    <div>
-        <label for="code">Code</label>
-        <input id="code" name="Code" autocomplete="one-time-code" />
+
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-4">
+        <!-- MrWho Logo -->
+        <div class="text-center mb-4">
+            <img src="~/images/AuthMrWho.jpeg" alt="MrWho Identity Server" class="mrwho-logo" />
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h4 class="text-center">
+                    <i class="bi bi-shield-check me-2"></i>Two-Factor Authentication
+                </h4>
+                <p class="text-center text-muted small mb-0">Enter the code from your authenticator app</p>
+            </div>
+            <div class="card-body">
+                <form method="post" action="/mfa/challenge">
+                    @Html.AntiForgeryToken()
+                    <div asp-validation-summary="All" class="text-danger"></div>
+                    
+                    <input type="hidden" name="ReturnUrl" value="@Model.ReturnUrl" />
+                    <input type="hidden" name="RememberMe" value="@Model.RememberMe" />
+                    
+                    <div class="mb-3">
+                        <label for="code" class="form-label">Authenticator Code</label>
+                        <input id="code" 
+                               name="Code" 
+                               class="form-control form-control-lg text-center" 
+                               autocomplete="one-time-code" 
+                               inputmode="numeric"
+                               placeholder="123 456"
+                               style="letter-spacing: 0.5em; font-family: monospace;"
+                               maxlength="7"
+                               required />
+                        <span asp-validation-for="Code" class="text-danger"></span>
+                        <div class="form-text">
+                            <i class="bi bi-info-circle me-1"></i>
+                            Enter the 6-digit code from your authenticator app
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" 
+                               name="RememberMachine" 
+                               class="form-check-input" 
+                               id="rememberMachine" />
+                        <label for="rememberMachine" class="form-check-label">
+                            <i class="bi bi-device-hdd me-1"></i>
+                            Remember this device for 30 days
+                        </label>
+                    </div>
+                    
+                    <div class="d-grid mb-3">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="bi bi-check-circle me-2"></i>Verify Code
+                        </button>
+                    </div>
+                    
+                    <!-- Alternative Options -->
+                    <div class="text-center">
+                        <p class="text-muted mb-2">Having trouble?</p>
+                        <div class="d-grid gap-2">
+                            <a href="/mfa/recovery-codes" class="btn btn-outline-warning auth-button">
+                                <i class="bi bi-key me-2"></i>Use recovery code instead
+                            </a>
+                            <a href="/auth/logout" class="btn btn-outline-secondary auth-button">
+                                <i class="bi bi-arrow-left me-2"></i>Back to login
+                            </a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
-    <div>
-        <label>
-            <input type="checkbox" name="RememberMe" value="true" @(Model.RememberMe ? "checked" : "") /> Remember me
-        </label>
-    </div>
-    <div>
-        <label>
-            <input type="checkbox" name="RememberMachine" value="true" /> Remember this device
-        </label>
-    </div>
-    <button type="submit">Verify</button>
-</form>
+</div>
+
+@section Scripts {
+    <script>
+        // Auto-focus the code input and format as user types
+        document.addEventListener('DOMContentLoaded', function() {
+            const codeInput = document.getElementById('code');
+            if (codeInput) {
+                codeInput.focus();
+                
+                // Format input as user types (add space after 3 digits)
+                codeInput.addEventListener('input', function(e) {
+                    let value = e.target.value.replace(/\s/g, '');
+                    if (value.length > 3) {
+                        value = value.slice(0, 3) + ' ' + value.slice(3, 6);
+                    }
+                    e.target.value = value;
+                });
+                
+                // Submit form when 6 digits are entered
+                codeInput.addEventListener('input', function(e) {
+                    const cleanValue = e.target.value.replace(/\s/g, '');
+                    if (cleanValue.length === 6) {
+                        e.target.form.submit();
+                    }
+                });
+            }
+        });
+    </script>
+}
