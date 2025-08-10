@@ -6,7 +6,8 @@
 <RadzenTemplateForm TItem="CreateApiResourceRequest" Data="@model" Submit="@OnSubmit">
     <RadzenStack Gap="1rem">
         <!-- Basic Information -->
-        <RadzenFieldset Text="Basic Information">
+        <RadzenStack Gap="0.75rem">
+            <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Basic Information</RadzenText>
             <RadzenStack Gap="1rem">
                 <RadzenRow>
                     <RadzenColumn Size="12" SizeMD="6">
@@ -33,10 +34,11 @@
                     </RadzenColumn>
                 </RadzenRow>
             </RadzenStack>
-        </RadzenFieldset>
+        </RadzenStack>
 
         <!-- Scopes -->
-        <RadzenFieldset Text="Scopes">
+        <RadzenStack Gap="0.75rem">
+            <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Scopes</RadzenText>
             <RadzenStack Gap="1rem">
                 <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
                     Define the scopes that this API resource supports. These scopes can be requested by clients to access this API.
@@ -73,10 +75,11 @@
                     </RadzenAlert>
                 }
             </RadzenStack>
-        </RadzenFieldset>
+        </RadzenStack>
 
         <!-- User Claims -->
-        <RadzenFieldset Text="User Claims">
+        <RadzenStack Gap="0.75rem">
+            <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">User Claims</RadzenText>
             <RadzenStack Gap="1rem">
                 <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
                     Define which user claims should be included in access tokens for this API resource.
@@ -113,10 +116,11 @@
                     </RadzenAlert>
                 }
             </RadzenStack>
-        </RadzenFieldset>
+        </RadzenStack>
 
         <!-- Secrets -->
-        <RadzenFieldset Text="API Secrets (Optional)">
+        <RadzenStack Gap="0.75rem">
+            <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">API Secrets (Optional)</RadzenText>
             <RadzenStack Gap="1rem">
                 <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
                     API secrets are used for token introspection and other server-to-server scenarios. They are optional for most APIs.
@@ -186,7 +190,7 @@
                     </RadzenStack>
                 }
             </RadzenStack>
-        </RadzenFieldset>
+        </RadzenStack>
     </RadzenStack>
 
     <!-- Form Actions -->

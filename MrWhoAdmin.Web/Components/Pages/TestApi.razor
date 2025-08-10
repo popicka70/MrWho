@@ -26,19 +26,21 @@
 
         @if (testResults.Any())
         {
-            <RadzenFieldset Text="Test Results">
-                @foreach (var result in testResults)
-                {
-                    <RadzenAlert AlertStyle="@(result.Success ? AlertStyle.Success : AlertStyle.Danger)" 
-                                class="rz-mb-2">
-                        <RadzenText><strong>@result.Service:</strong> @result.Message</RadzenText>
-                        @if (!string.IsNullOrEmpty(result.Details))
-                        {
-                            <RadzenText TextStyle="TextStyle.Caption">@result.Details</RadzenText>
-                        }
-                    </RadzenAlert>
-                }
-            </RadzenFieldset>
+            <RadzenStack Gap="0.75rem">
+                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Test Results</RadzenText>
+                <RadzenStack Gap="0.5rem">
+                    @foreach (var result in testResults)
+                    {
+                        <RadzenAlert AlertStyle="@(result.Success ? AlertStyle.Success : AlertStyle.Danger)" class="rz-mb-2">
+                            <RadzenText><strong>@result.Service:</strong> @result.Message</RadzenText>
+                            @if (!string.IsNullOrEmpty(result.Details))
+                            {
+                                <RadzenText TextStyle="TextStyle.Caption">@result.Details</RadzenText>
+                            }
+                        </RadzenAlert>
+                    }
+                </RadzenStack>
+            </RadzenStack>
         }
     </RadzenStack>
 </RadzenCard>
