@@ -10,7 +10,7 @@ namespace MrWho.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
+[Authorize(Policy = "AdminClientApi")]
 public class ScopesController : ControllerBase
 {
     private readonly ApplicationDbContext _context;

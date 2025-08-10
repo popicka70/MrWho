@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.Extensions.Options;
 using OpenIddict.Validation.AspNetCore;
+using System.Security.Claims;
+using MrWho.Shared;
 
 namespace MrWho.Services;
 
@@ -114,6 +116,33 @@ public class DynamicAuthorizationPolicyProvider : IAuthorizationPolicyProvider
                     .RequireAuthenticatedUser()
                     .AddAuthenticationSchemes("Identity.Application.postman_client", 
                                             OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme)
+                    .Build();
+
+            case "AdminClientApi":
+                // Strict API/debug access: require OpenIddict token with mrwho.use scope and admin client presenter
+                return new AuthorizationPolicyBuilder()
+                    .RequireAuthenticatedUser()
+                    .AddAuthenticationSchemes(OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme)
+                    .RequireAssertion(ctx =>
+                    {
+                        var user = ctx.User;
+                        if (user?.Identity?.IsAuthenticated != true)
+                            return false;
+
+                        // Scope check: allow multiple 'scope' claims or space-delimited values
+                        bool hasMrWhoUse = user.FindAll("scope")
+                            .Any(c => c.Value.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                                              .Contains(StandardScopes.MrWhoUse));
+
+                        if (!hasMrWhoUse)
+                            return false;
+
+                        // Client check: accept azp or client_id matching the admin client id
+                        string adminClientId = MrWhoConstants.AdminClientId;
+                        bool isAdminClient = user.HasClaim(c => (c.Type == "azp" || c.Type == "client_id") && c.Value == adminClientId);
+
+                        return isAdminClient;
+                    })
                     .Build();
         }
 
