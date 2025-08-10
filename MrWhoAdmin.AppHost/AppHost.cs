@@ -8,6 +8,8 @@ var sqlServer = builder.AddSqlServer("sqlserver")
 
 var mrWho = builder.AddProject<Projects.MrWho>("mrwho")
     .WithReference(sqlServer)
+    .WithEnvironment("Database__Provider", "SqlServer")
+    .WithEnvironment("Database__MigrationsAssembly", "MrWho.Migrations.SqlServer")
     .WaitFor(sqlServer);
 
 var adminWeb = builder.AddProject<Projects.MrWhoAdmin_Web>("webfrontend")

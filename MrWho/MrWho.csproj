@@ -36,6 +36,19 @@
 
   <ItemGroup>
     <Folder Include="Migrations\" />
+    <!-- Ensure provider-specific migrations assemblies are copied alongside the app when publishing/running -->
+    <Content Include="..\MrWho.Migrations.SqlServer\bin\$(Configuration)\net9.0\MrWho.Migrations.SqlServer.dll">
+      <Link>MrWho.Migrations.SqlServer.dll</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\MrWho.Migrations.PostgreSql\bin\$(Configuration)\net9.0\MrWho.Migrations.PostgreSql.dll">
+      <Link>MrWho.Migrations.PostgreSql.dll</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\MrWho.Migrations.MySql\bin\$(Configuration)\net9.0\MrWho.Migrations.MySql.dll">
+      <Link>MrWho.Migrations.MySql.dll</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
 </Project>
