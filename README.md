@@ -251,3 +251,75 @@ dotnet dev-certs https --trust
 - [OAuth 2.0 RFC](https://tools.ietf.org/html/rfc6749)
 - [OpenID Connect Specification](https://openid.net/connect/)
 - [ASP.NET Core Identity Documentation](https://docs.microsoft.com/en-us/aspnet/core/security/authentication/identity)
+
+## 🐘 Run with PostgreSQL via Docker Compose
+
+This repository includes an alternative Docker Compose file to run the stack with PostgreSQL instead of SQL Server.
+
+Prerequisites environment variables (example values):
+
+```powershell
+$env:POSTGRES_PASSWORD = "YourStrong!Passw0rd"; echo ""
+$env:ASPNETCORE_Kestrel__Certificates__Default__Password = "your-cert-password"; echo ""
+$env:LOCAL_HTTPS_CERT_DIR = (Resolve-Path "./certs").Path; echo ""
+```
+
+Start the Postgres-based stack:
+
+```powershell
+docker compose -f "docker-compose.postgres.yml" up --build -d; echo ""
+```
+
+Key settings used by the Postgres compose:
+- Database provider: `Database:Provider=PostgreSql`
+- Migrations assembly: `MrWho.Migrations.PostgreSql`
+- Connection string: `Host=postgres;Database=MrWho;Username=postgres;Password=${POSTGRES_PASSWORD}`
+
+Validate OIDC discovery endpoint (note the hyphen):
+- https://localhost:7113/.well-known/openid-configuration
+
+## 🐬 Run with MySQL via Docker Compose
+
+Prerequisites environment variables (example values):
+
+```powershell
+$env:MYSQL_ROOT_PASSWORD = "YourStrong!Passw0rd"; echo ""
+$env:ASPNETCORE_Kestrel__Certificates__Default__Password = "your-cert-password"; echo ""
+$env:LOCAL_HTTPS_CERT_DIR = (Resolve-Path "./certs").Path; echo ""
+```
+
+Start the MySQL-based stack:
+
+```powershell
+docker compose -f "docker-compose.mysql.yml" up --build -d; echo ""
+```
+
+Key settings used by the MySQL compose:
+- Database provider: `Database:Provider=MySql`
+- Migrations assembly: `MrWho.Migrations.MySql`
+- Connection string: `Server=mysql;Database=MrWho;User ID=root;Password=${MYSQL_ROOT_PASSWORD};`
+- Optional: set `Database:MySql:Flavor` to `MariaDb` and `Database:MySql:Version` (e.g., `11.2.0`) if targeting MariaDB
+
+Note: Compose files bind only HTTPS ports to the host. Internal service-to-service HTTP remains available within the Docker network.
+
+## 🦭 Run with MariaDB via Docker Compose
+
+Prerequisites environment variables (example values):
+
+```powershell
+$env:MARIADB_ROOT_PASSWORD = "YourStrong!Passw0rd"; echo ""
+$env:ASPNETCORE_Kestrel__Certificates__Default__Password = "your-cert-password"; echo ""
+$env:LOCAL_HTTPS_CERT_DIR = (Resolve-Path "./certs").Path; echo ""
+```
+
+Start the MariaDB-based stack:
+
+```powershell
+docker compose -f "docker-compose.mariadb.yml" up --build -d; echo ""
+```
+
+Key settings used by the MariaDB compose:
+- Database provider: `Database:Provider=MySql`
+- MariaDB flavor/version: `Database:MySql:Flavor=MariaDb`, `Database:MySql:Version=11.2.0`
+- Migrations assembly: `MrWho.Migrations.MySql`
+- Connection string: `Server=mariadb;Database=MrWho;User ID=root;Password=${MARIADB_ROOT_PASSWORD};`

@@ -69,7 +69,6 @@ services:
       - DISABLE_HTTPS_REDIRECT=true
       - OPENIDDICT__ISSUER=https://localhost:7113/
     ports:
-      - "7112:8080"  # HTTP
       - "7113:8443"  # HTTPS
     volumes:
       - ${LOCAL_HTTPS_CERT_DIR}:/https:ro
@@ -93,7 +92,6 @@ services:
       # Allow self-signed certs for local dev only
       - "Authentication__AllowSelfSigned=true"
     ports:
-      - "7256:8080"  # HTTP
       - "7257:8443"  # HTTPS
     volumes:
       - ${LOCAL_HTTPS_CERT_DIR}:/https:ro
