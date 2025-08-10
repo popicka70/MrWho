@@ -6,44 +6,12 @@ services:
     container_name: mrwho-identity
     environment:
       ASPNETCORE_ENVIRONMENT: Development
-      ASPNETCORE_Kestrel__Certificates__Default__Password: ${ASPNETCORE_Kestrel__Certificates__Default__Password}
       DOTNET_RUNNING_IN_CONTAINER: "false"
       Database__Provider: PostgreSql
       Database__MigrationsAssembly: MrWho.Migrations.PostgreSql
       # External Neon Postgres connection (set NEON_PG_CONNSTR in your .env)
-      # Example (key-value): Host=ep-polished-morning-a2ru6vwg-pooler.eu-central-1.aws.neon.tech;Database=neondb;Username=neondb_owner;Password=******;Ssl Mode=Require;Channel Binding=Require
-      # Example (URI): postgresql://neondb_owner:******@ep-polished-morning-a2ru6vwg-pooler.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
       ConnectionStrings__mrwhodb: ${NEON_PG_CONNSTR}
       DISABLE_HTTPS_REDIRECT: "true"
-      OPENIDDICT__ISSUER: https://localhost:7113/
+      OPENIDDICT__ISSUER: https://localhost:8081/
     ports:
-      - "7113:8443"  # HTTPS
-    volumes:
-      - ${LOCAL_HTTPS_CERT_DIR}:/https:ro
-      - mrwho-dp-keys:/root/.aspnet/DataProtection-Keys
-
-  admin:
-    build:
-      context: .
-      dockerfile: MrWhoAdmin.Web/Dockerfile
-    container_name: mrwho-admin-web
-    depends_on:
-      - mrwho
-    environment:
-      - ASPNETCORE_ENVIRONMENT=Development
-      - ASPNETCORE_Kestrel__Certificates__Default__Password=${ASPNETCORE_Kestrel__Certificates__Default__Password}
-      # Point Admin Web to the Identity service inside the compose network
-      - "MrWhoApi__BaseUrl=http://mrwho:8080/"
-      # Authority must be host-facing so the browser can reach it
-      - "Authentication__Authority=https://localhost:7113/"
-      # Make the backchannel (server-to-server) metadata call use container host mapping
-      - "Authentication__MetadataAddress=https://mrwho:8443/.well-known/openid-configuration"
-      # Allow self-signed certs for local dev only
-      - "Authentication__AllowSelfSigned=true"
-    ports:
-      - "7257:8443"  # HTTPS
-    volumes:
-      - ${LOCAL_HTTPS_CERT_DIR}:/https:ro
-
-volumes:
-  mrwho-dp-keys:
+      - "8081:8080"  # HTTP
