@@ -3,11 +3,7 @@
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS base
 WORKDIR /app
 EXPOSE 8080
-EXPOSE 8443
-ENV ASPNETCORE_URLS=http://+:8080;https://+:8443
-# Path to dev cert mounted as a volume
-ENV ASPNETCORE_Kestrel__Certificates__Default__Path=/https/aspnetapp.pfx
-# Password is supplied via environment at runtime
+ENV ASPNETCORE_URLS=http://+:8080
 
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
@@ -40,4 +36,4 @@ RUN dotnet publish "MrWho/MrWho.csproj" -c Release -o /app/publish -p:UseAppHost
 FROM base AS final
 WORKDIR /app
 COPY --from=build /app/publish .
-ENTRYPOINT ["dotnet", "MrWho.dll"]
+ENTRYPOINT ["/bin/sh","-c","ASPNETCORE_URLS=http://+:${PORT:-8080} dotnet MrWho.dll"]
