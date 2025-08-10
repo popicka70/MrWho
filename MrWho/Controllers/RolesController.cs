@@ -9,7 +9,7 @@ namespace MrWho.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
+[Authorize(Policy = "AdminClientApi")]
 public class RolesController : ControllerBase
 {
     private readonly RoleManager<IdentityRole> _roleManager;

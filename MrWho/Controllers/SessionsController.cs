@@ -15,7 +15,7 @@ namespace MrWho.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-[Authorize] // Require authentication for all session endpoints
+[Authorize(Policy = "AdminClientApi")] // Require authentication for all session endpoints with AdminClientApi policy
 public class SessionsController : ControllerBase
 {
     private readonly ApplicationDbContext _context;

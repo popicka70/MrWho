@@ -167,70 +167,51 @@ public static class WebApplicationExtensions
 
     public static WebApplication AddMrWhoDebugEndpoints(this WebApplication app)
     {
-    // Debug endpoints discovery via mediator
-    app.MapGet("/debug", (IMediator mediator) => mediator.Send(new DebugIndexRequest()));
+        // Group all debug endpoints and secure with AdminClientApi policy
+        var debug = app.MapGroup("/debug").RequireAuthorization("AdminClientApi");
 
-    // Client cookies
-    app.MapGet("/debug/client-cookies", (HttpContext context, IMediator mediator) => mediator.Send(new ClientCookiesDebugRequest(context)));
+        // Debug endpoints discovery via mediator
+        debug.MapGet("/", (IMediator mediator) => mediator.Send(new DebugIndexRequest()));
 
-    app.MapGet("/debug/client-info", (IMediator mediator) => mediator.Send(new ClientInfoRequest()));
+        // Client cookies
+        debug.MapGet("/client-cookies", (HttpContext context, IMediator mediator) => mediator.Send(new ClientCookiesDebugRequest(context)));
+        debug.MapGet("/client-info", (IMediator mediator) => mediator.Send(new ClientInfoRequest()));
 
-    // DB client config
-    app.MapGet("/debug/db-client-config", (IMediator mediator) => mediator.Send(new DbClientConfigRequest()));
+        // DB client config
+        debug.MapGet("/db-client-config", (IMediator mediator) => mediator.Send(new DbClientConfigRequest()));
+        debug.MapGet("/admin-client-info", (IMediator mediator) => mediator.Send(new AdminClientInfoRequest()));
+        debug.MapGet("/demo1-client-info", (IMediator mediator) => mediator.Send(new Demo1ClientInfoRequest()));
 
-    app.MapGet("/debug/admin-client-info", (IMediator mediator) => mediator.Send(new AdminClientInfoRequest()));
+        // Essential data
+        debug.MapGet("/essential-data", (IMediator mediator) => mediator.Send(new EssentialDataRequest()));
 
-    app.MapGet("/debug/demo1-client-info", (IMediator mediator) => mediator.Send(new Demo1ClientInfoRequest()));
+        // Client permissions
+        debug.MapGet("/client-permissions", (IMediator mediator) => mediator.Send(new ClientPermissionsRequest()));
 
-    // Essential data
-    app.MapGet("/debug/essential-data", (IMediator mediator) => mediator.Send(new EssentialDataRequest()));
+        // Dev-only endpoints
+        debug.MapPost("/reset-admin-client", (IMediator mediator) => mediator.Send(new ResetAdminClientRequest()));
+        debug.MapPost("/fix-api-permissions", (IMediator mediator) => mediator.Send(new FixApiPermissionsRequest()));
+        debug.MapGet("/openiddict-scopes", (IMediator mediator) => mediator.Send(new OpenIddictScopesRequest()));
+        debug.MapPost("/sync-scopes", (IMediator mediator) => mediator.Send(new SyncScopesRequest()));
 
-    // Client permissions
-    app.MapGet("/debug/client-permissions", (IMediator mediator) => mediator.Send(new ClientPermissionsRequest()));
+        // User/claims related
+        debug.MapGet("/userinfo-test", (HttpContext context, IMediator mediator) => mediator.Send(new UserInfoTestRequest(context)));
+        debug.MapGet("/current-claims", (HttpContext context, IMediator mediator) => mediator.Send(new CurrentClaimsRequest(context)));
+        debug.MapGet("/identity-resources", (IMediator mediator) => mediator.Send(new IdentityResourcesRequest()));
+        debug.MapGet("/user-claims/{userId}", (string userId, IMediator mediator) => mediator.Send(new UserClaimsByUserIdRequest(userId)));
+        debug.MapGet("/all-users", (IMediator mediator) => mediator.Send(new AllUsersRequest()));
+        debug.MapGet("/find-user-by-subject/{subject}", (string subject, IMediator mediator) => mediator.Send(new FindUserBySubjectRequest(subject)));
 
-        // Debug endpoint to reset admin client (DEVELOPMENT ONLY)
-    app.MapPost("/debug/reset-admin-client", (IMediator mediator) => mediator.Send(new ResetAdminClientRequest()));
+        // Special checks
+        debug.MapGet("/check-subject-3b9262de", (IMediator mediator) => mediator.Send(new CheckSpecificSubjectRequest()));
+        debug.MapGet("/demo1-troubleshoot", (IMediator mediator) => mediator.Send(new Demo1TroubleshootRequest()));
 
-        // Debug endpoint to fix API permissions format (DEVELOPMENT ONLY)
-    app.MapPost("/debug/fix-api-permissions", (IMediator mediator) => mediator.Send(new FixApiPermissionsRequest()));
-
-        // Debug endpoint to show OpenIddict scope information (DEVELOPMENT ONLY)
-    app.MapGet("/debug/openiddict-scopes", (IMediator mediator) => mediator.Send(new OpenIddictScopesRequest()));
-
-        // Debug endpoint to manually synchronize all scopes (DEVELOPMENT ONLY)
-    app.MapPost("/debug/sync-scopes", (IMediator mediator) => mediator.Send(new SyncScopesRequest()));
- 
-        // Debug endpoint to test UserInfo handler directly
-    app.MapGet("/debug/userinfo-test", (HttpContext context, IMediator mediator) => mediator.Send(new UserInfoTestRequest(context))).RequireAuthorization();
-
-        // Debug endpoint to check current claims in ClaimsPrincipal
-    app.MapGet("/debug/current-claims", (HttpContext context, IMediator mediator) => mediator.Send(new CurrentClaimsRequest(context))).RequireAuthorization();
-
-        // Debug endpoint to check identity resources in database
-    app.MapGet("/debug/identity-resources", (IMediator mediator) => mediator.Send(new IdentityResourcesRequest()));
-
-        // Debug endpoint to check user claims for a specific user
-    app.MapGet("/debug/user-claims/{userId}", (string userId, IMediator mediator) => mediator.Send(new UserClaimsByUserIdRequest(userId)));
-
-        // Debug endpoint to list all users in the system
-    app.MapGet("/debug/all-users", (IMediator mediator) => mediator.Send(new AllUsersRequest()));
-
-        // Debug endpoint to find user with specific subject that was mentioned in the error
-    app.MapGet("/debug/find-user-by-subject/{subject}", (string subject, IMediator mediator) => mediator.Send(new FindUserBySubjectRequest(subject)));
-
-        // SPECIAL DEBUG: Check for the specific subject ID from the error log
-    app.MapGet("/debug/check-subject-3b9262de", (IMediator mediator) => mediator.Send(new CheckSpecificSubjectRequest()));
-        
-        // SPECIAL DEBUG: Comprehensive Demo1 troubleshooting endpoint  
-    app.MapGet("/debug/demo1-troubleshoot", (IMediator mediator) => mediator.Send(new Demo1TroubleshootRequest()));
-
-        // SPECIAL DEBUG: Check client cookie configuration status
-        app.MapGet("/debug/client-cookie-config", (IClientCookieConfigurationService cookieService, ILogger<Program> logger) =>
+        // Client cookie configuration status
+        debug.MapGet("/client-cookie-config", (IClientCookieConfigurationService cookieService, ILogger<Program> logger) =>
         {
             logger.LogInformation("?? Checking client cookie configurations");
 
             var allConfigs = cookieService.GetAllClientConfigurations();
-            
             var testClients = new[] { "mrwho_admin_web", "mrwho_demo1", "postman_client", "some_dynamic_client" };
             var results = new List<object>();
 
@@ -272,8 +253,8 @@ public static class WebApplicationExtensions
             });
         });
 
-        // SPECIAL DEBUG: Test dynamic vs static cookie approach
-        app.MapGet("/debug/test-dynamic-cookies", async (
+        // Test dynamic vs static cookie approach
+        debug.MapGet("/test-dynamic-cookies", async (
             IDynamicCookieService dynamicCookieService,
             IClientCookieConfigurationService cookieConfigService,
             ILogger<Program> logger,
@@ -291,8 +272,8 @@ public static class WebApplicationExtensions
                     var hasStatic = cookieConfigService.HasStaticConfiguration(clientId);
                     var isAuthenticated = await dynamicCookieService.IsAuthenticatedForClientAsync(clientId);
                     var principal = await dynamicCookieService.GetClientPrincipalAsync(clientId);
-                    
-                    var subjectClaim = principal?.FindFirst(ClaimTypes.NameIdentifier) ?? 
+
+                    var subjectClaim = principal?.FindFirst(ClaimTypes.NameIdentifier) ??
                                       principal?.FindFirst(OpenIddictConstants.Claims.Subject);
 
                     results.Add(new
@@ -339,8 +320,8 @@ public static class WebApplicationExtensions
             });
         });
 
-        // SPECIAL DEBUG: Test back-channel logout system
-        app.MapPost("/debug/test-backchannel-logout", async (
+        // Test back-channel logout system
+        debug.MapPost("/test-backchannel-logout", async (
             HttpContext context,
             IBackChannelLogoutService backChannelService,
             IOpenIddictAuthorizationManager authorizationManager,
@@ -356,9 +337,8 @@ public static class WebApplicationExtensions
 
             try
             {
-                // Test the specific back-channel logout method used by session termination
                 await backChannelService.NotifyClientLogoutAsync(request.AuthorizationId, request.Subject, request.SessionId);
-                
+
                 return Results.Ok(new
                 {
                     Success = true,

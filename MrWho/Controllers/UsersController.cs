@@ -13,7 +13,7 @@ namespace MrWho.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
+[Authorize(Policy = "AdminClientApi")]
 public class UsersController : ControllerBase
 {
     private readonly IGetUsersHandler _getUsersHandler;

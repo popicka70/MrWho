@@ -34,6 +34,7 @@ public class TokenInspectorController : Controller // Changed from ControllerBas
     /// API endpoint for decoding and inspecting JWT tokens
     /// </summary>
     [HttpPost("decode")]
+    [Authorize(Policy = "AdminClientApi")]
     public IActionResult DecodeToken([FromBody] DecodeTokenRequest request)
     {
         try
@@ -117,7 +118,7 @@ public class TokenInspectorController : Controller // Changed from ControllerBas
     /// This mimics OAuth 2.0 token introspection (RFC 7662)
     /// </summary>
     [HttpPost("introspect")]
-    [Authorize] // Require authorization for introspection
+    [Authorize(Policy = "AdminClientApi")] // Require admin client API access
     public IActionResult IntrospectToken([FromBody] IntrospectTokenRequest request)
     {
         try
@@ -183,7 +184,7 @@ public class TokenInspectorController : Controller // Changed from ControllerBas
     /// Current user's token information endpoint
     /// </summary>
     [HttpGet("current")]
-    [Authorize]
+    [Authorize(Policy = "AdminClientApi")]
     public IActionResult GetCurrentTokenInfo()
     {
         try

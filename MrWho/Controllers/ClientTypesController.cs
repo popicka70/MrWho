@@ -7,7 +7,7 @@ namespace MrWho.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
+[Authorize(Policy = "AdminClientApi")]
 public class ClientTypesController : ControllerBase
 {
     private readonly ILogger<ClientTypesController> _logger;
