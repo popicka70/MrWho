@@ -1,11 +1,12 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using MrWho.Models;
 
 namespace MrWho.Data;
 
-public class ApplicationDbContext : IdentityDbContext<IdentityUser>
+public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtectionKeyContext
 {
     public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
         : base(options)
@@ -34,6 +35,9 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>
     public DbSet<IdentityResource> IdentityResources { get; set; }
     public DbSet<IdentityResourceClaim> IdentityResourceClaims { get; set; }
     public DbSet<IdentityResourceProperty> IdentityResourceProperties { get; set; }
+
+    // Data Protection keys for antiforgery/auth cookie encryption persistence
+    public DbSet<Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.DataProtectionKey> DataProtectionKeys { get; set; }
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -202,6 +206,13 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>
                   .WithMany(ar => ar.Secrets)
                   .HasForeignKey(ars => ars.ApiResourceId)
                   .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Configure DataProtectionKey entity
+    builder.Entity<Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.DataProtectionKey>(entity =>
+        {
+            entity.HasKey(k => k.Id);
+            entity.Property(k => k.FriendlyName).HasMaxLength(256);
         });
     }
 }

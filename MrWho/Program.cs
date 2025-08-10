@@ -1,4 +1,6 @@
 using MrWho.Extensions;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using MrWho.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -9,6 +11,10 @@ builder.AddServiceDefaults();
 builder.Services.AddControllersWithViews();
 builder.Services.AddMrWhoAntiforgery();
 builder.AddMrWhoDatabase();
+
+// Persist Data Protection keys in the application database so tokens/cookies are stable across restarts
+builder.Services.AddDataProtection()
+    .PersistKeysToDbContext<MrWho.Data.ApplicationDbContext>();
 
 // Use new client-specific cookie configuration instead of standard Identity
 builder.Services.AddMrWhoIdentityWithClientCookies();

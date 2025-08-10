@@ -17,10 +17,30 @@ namespace MrWho.Migrations.SqlServer.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.7")
+                .HasAnnotation("ProductVersion", "9.0.8")
                 .HasAnnotation("Relational:MaxIdentifierLength", 128);
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
+
+            modelBuilder.Entity("Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.DataProtectionKey", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("FriendlyName")
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
+
+                    b.Property<string>("Xml")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("DataProtectionKeys");
+                });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
                 {
@@ -344,6 +364,19 @@ namespace MrWho.Migrations.SqlServer.Migrations
                     b.Property<double?>("AccessTokenLifetime")
                         .HasColumnType("float");
 
+                    b.Property<string>("AccessTokenType")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<bool?>("AllowAccessToIntrospectionEndpoint")
+                        .HasColumnType("bit");
+
+                    b.Property<bool?>("AllowAccessToRevocationEndpoint")
+                        .HasColumnType("bit");
+
+                    b.Property<bool?>("AllowAccessToUserInfoEndpoint")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("AllowAuthorizationCodeFlow")
                         .HasColumnType("bit");
 
@@ -356,8 +389,40 @@ namespace MrWho.Migrations.SqlServer.Migrations
                     b.Property<bool>("AllowRefreshTokenFlow")
                         .HasColumnType("bit");
 
+                    b.Property<bool?>("AllowRememberConsent")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("AllowedCorsOrigins")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<string>("AllowedIdentityProviders")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("AllowedMfaMethods")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<bool?>("AlwaysIncludeUserClaimsInIdToken")
+                        .HasColumnType("bit");
+
+                    b.Property<bool?>("AlwaysSendClientClaims")
+                        .HasColumnType("bit");
+
                     b.Property<double?>("AuthorizationCodeLifetime")
                         .HasColumnType("float");
+
+                    b.Property<bool?>("BackChannelLogoutSessionRequired")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("BackChannelLogoutUri")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("ClientClaimsPrefix")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<string>("ClientId")
                         .IsRequired()
@@ -371,23 +436,116 @@ namespace MrWho.Migrations.SqlServer.Migrations
                     b.Property<int>("ClientType")
                         .HasColumnType("int");
 
+                    b.Property<string>("ClientUri")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("CookieSameSitePolicy")
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
                     b.Property<string>("CreatedBy")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("CustomCssUrl")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("CustomErrorPageUrl")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("CustomJavaScriptUrl")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("CustomLoginPageUrl")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("CustomLogoutPageUrl")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
                     b.Property<string>("Description")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
+                    b.Property<int?>("DeviceCodeLifetimeMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("DeviceCodePollingIntervalSeconds")
+                        .HasColumnType("int");
+
+                    b.Property<bool?>("EnableDetailedErrors")
+                        .HasColumnType("bit");
+
+                    b.Property<bool?>("EnableLocalLogin")
+                        .HasColumnType("bit");
+
+                    b.Property<bool?>("FrontChannelLogoutSessionRequired")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("FrontChannelLogoutUri")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<bool?>("HashAccessTokens")
+                        .HasColumnType("bit");
+
+                    b.Property<int?>("IdTokenLifetimeMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<bool?>("IncludeJwtId")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("IsEnabled")
                         .HasColumnType("bit");
+
+                    b.Property<bool?>("LogSensitiveData")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("LogoUri")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<int?>("MaxRefreshTokensPerUser")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("MfaGracePeriodMinutes")
+                        .HasColumnType("int");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("PageTitlePrefix")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<bool?>("PairWiseSubjectSalt")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("PolicyUri")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("ProtocolType")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<int?>("RateLimitRequestsPerDay")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("RateLimitRequestsPerHour")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("RateLimitRequestsPerMinute")
+                        .HasColumnType("int");
 
                     b.Property<string>("RealmId")
                         .IsRequired()
@@ -396,10 +554,42 @@ namespace MrWho.Migrations.SqlServer.Migrations
                     b.Property<double?>("RefreshTokenLifetime")
                         .HasColumnType("float");
 
+                    b.Property<int?>("RememberMeDurationDays")
+                        .HasColumnType("int");
+
+                    b.Property<bool?>("RememberMfaForSession")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("RequireClientSecret")
                         .HasColumnType("bit");
 
+                    b.Property<bool?>("RequireConsent")
+                        .HasColumnType("bit");
+
+                    b.Property<bool?>("RequireHttpsForCookies")
+                        .HasColumnType("bit");
+
+                    b.Property<bool?>("RequireMfa")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("RequirePkce")
+                        .HasColumnType("bit");
+
+                    b.Property<int?>("SessionTimeoutHours")
+                        .HasColumnType("int");
+
+                    b.Property<bool?>("ShowClientLogo")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("ThemeName")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("TosUri")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<bool?>("UpdateAccessTokenClaimsOnRefresh")
                         .HasColumnType("bit");
 
                     b.Property<DateTime>("UpdatedAt")
@@ -407,6 +597,16 @@ namespace MrWho.Migrations.SqlServer.Migrations
 
                     b.Property<string>("UpdatedBy")
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool?>("UseOneTimeRefreshTokens")
+                        .HasColumnType("bit");
+
+                    b.Property<bool?>("UseSlidingSessionExpiration")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("UserCodeType")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.HasKey("Id");
 
@@ -625,13 +825,83 @@ namespace MrWho.Migrations.SqlServer.Migrations
                     b.Property<string>("CreatedBy")
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<bool>("DefaultAllowRememberConsent")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("DefaultAllowedMfaMethods")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("DefaultCookieSameSitePolicy")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<bool>("DefaultEnableDetailedErrors")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("DefaultIncludeJwtId")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("DefaultLogSensitiveData")
+                        .HasColumnType("bit");
+
+                    b.Property<int?>("DefaultMaxRefreshTokensPerUser")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("DefaultMfaGracePeriodMinutes")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("DefaultRateLimitRequestsPerDay")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("DefaultRateLimitRequestsPerHour")
+                        .HasColumnType("int");
+
+                    b.Property<int?>("DefaultRateLimitRequestsPerMinute")
+                        .HasColumnType("int");
+
+                    b.Property<int>("DefaultRememberMeDurationDays")
+                        .HasColumnType("int");
+
+                    b.Property<bool>("DefaultRememberMfaForSession")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("DefaultRequireConsent")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("DefaultRequireHttpsForCookies")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("DefaultRequireMfa")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("DefaultSessionTimeoutHours")
+                        .HasColumnType("int");
+
+                    b.Property<string>("DefaultThemeName")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<bool>("DefaultUseOneTimeRefreshTokens")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("DefaultUseSlidingSessionExpiration")
+                        .HasColumnType("bit");
+
                     b.Property<string>("Description")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
+                    b.Property<TimeSpan>("DeviceCodeLifetime")
+                        .HasColumnType("time");
+
                     b.Property<string>("DisplayName")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
+
+                    b.Property<TimeSpan>("IdTokenLifetime")
+                        .HasColumnType("time");
 
                     b.Property<bool>("IsEnabled")
                         .HasColumnType("bit");
@@ -640,6 +910,26 @@ namespace MrWho.Migrations.SqlServer.Migrations
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("RealmCustomCssUrl")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("RealmLogoUri")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("RealmPolicyUri")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("RealmTosUri")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("RealmUri")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
 
                     b.Property<double>("RefreshTokenLifetime")
                         .HasColumnType("float");
