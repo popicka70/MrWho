@@ -1,0 +1,18 @@
+[build]
+# Use the Dockerfile for the MrWho service (nested in the repo)
+builder = "DOCKERFILE"
+dockerfilePath = "MrWho/MrWho/Dockerfile"
+
+[deploy]
+# Rely on the Dockerfile ENTRYPOINT; no startCommand needed
+# If you add a custom startCommand later, it will override the Docker ENTRYPOINT.
+
+# Basic health check (root path responds in this app); remove or change if needed
+healthcheckPath = "/"
+restartPolicyType = "ALWAYS"
+
+# Note about PORT handling on Railway:
+# - This app currently listens on 8080/8443 per ASPNETCORE_URLS in the Dockerfile.
+# - Set a service variable PORT=8080 on Railway so traffic is routed correctly.
+# - Alternatively, modify the Dockerfile/entrypoint to respect $PORT at runtime.
+
