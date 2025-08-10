@@ -29,8 +29,12 @@
                 
                 <RadzenRow>
                     <RadzenColumn Size="12" SizeMD="6">
-                        <RadzenCheckBox @bind-Value="@model.IsEnabled" Name="IsEnabled" />
-                        <RadzenLabel Text="Enabled" Component="IsEnabled" class="rz-ms-2" />
+                        <RadzenFormField Text="Enabled" Variant="Variant.Outlined">
+                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" Style="margin-top: 0.5rem;">
+                                <RadzenCheckBox @bind-Value="@model.IsEnabled" Name="IsEnabled" />
+                                <RadzenLabel Text="Enabled" Component="IsEnabled" />
+                            </RadzenStack>
+                        </RadzenFormField>
                     </RadzenColumn>
                 </RadzenRow>
             </RadzenStack>
