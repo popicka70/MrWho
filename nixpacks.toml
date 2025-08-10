@@ -1,0 +1,5 @@
+[phases.build]
+cmds = ["docker-compose build"]
+
+[phases.start]
+cmd = "docker-compose up"
