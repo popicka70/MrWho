@@ -241,14 +241,15 @@ public class ScopeSeederService : IScopeSeederService
                 updated = true;
             }
 
-            // Check if claims need updating
+            // Ensure standard claims exist but preserve any custom claims added by admins
             var existingClaims = existingScope.Claims.Select(c => c.ClaimType).ToHashSet();
-            var expectedClaims = standardScope.Claims.ToHashSet();
+            var requiredClaims = standardScope.Claims.ToHashSet();
 
-            if (!existingClaims.SetEquals(expectedClaims))
+            // Add any missing required claims
+            var missing = requiredClaims.Except(existingClaims).ToList();
+            if (missing.Count > 0)
             {
-                _context.ScopeClaims.RemoveRange(existingScope.Claims);
-                foreach (var claimType in standardScope.Claims)
+                foreach (var claimType in missing)
                 {
                     _context.ScopeClaims.Add(new ScopeClaim
                     {

@@ -221,45 +221,65 @@ public class ScopesController : ControllerBase
             return NotFound($"Scope with ID '{id}' not found.");
         }
 
-        // Prevent modification of standard scopes
         if (scope.IsStandard)
         {
-            return BadRequest("Standard scopes cannot be modified.");
-        }
-
-        // Update properties
-        if (!string.IsNullOrEmpty(request.DisplayName))
-            scope.DisplayName = request.DisplayName;
-        scope.Description = request.Description;
-        if (request.IsEnabled.HasValue)
-            scope.IsEnabled = request.IsEnabled.Value;
-        if (request.IsRequired.HasValue)
-            scope.IsRequired = request.IsRequired.Value;
-        if (request.ShowInDiscoveryDocument.HasValue)
-            scope.ShowInDiscoveryDocument = request.ShowInDiscoveryDocument.Value;
-        if (request.Type.HasValue)
-            scope.Type = request.Type.Value;
-
-        scope.UpdatedAt = DateTime.UtcNow;
-        scope.UpdatedBy = User.Identity?.Name;
-
-        // Update claims if provided
-        if (request.Claims != null)
-        {
-            _context.ScopeClaims.RemoveRange(scope.Claims);
-            foreach (var claimType in request.Claims)
+            // For standard scopes, only allow updating claims. All other fields remain immutable.
+            if (request.Claims != null)
             {
-                _context.ScopeClaims.Add(new ScopeClaim
+                _context.ScopeClaims.RemoveRange(scope.Claims);
+                foreach (var claimType in request.Claims)
                 {
-                    ScopeId = scope.Id,
-                    ClaimType = claimType
-                });
+                    _context.ScopeClaims.Add(new ScopeClaim
+                    {
+                        ScopeId = scope.Id,
+                        ClaimType = claimType
+                    });
+                }
             }
+
+            scope.UpdatedAt = DateTime.UtcNow;
+            scope.UpdatedBy = User.Identity?.Name;
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Standard scope '{ScopeName}' claims updated successfully", scope.Name);
         }
+        else
+        {
+            // Update properties
+            if (!string.IsNullOrEmpty(request.DisplayName))
+                scope.DisplayName = request.DisplayName;
+            scope.Description = request.Description;
+            if (request.IsEnabled.HasValue)
+                scope.IsEnabled = request.IsEnabled.Value;
+            if (request.IsRequired.HasValue)
+                scope.IsRequired = request.IsRequired.Value;
+            if (request.ShowInDiscoveryDocument.HasValue)
+                scope.ShowInDiscoveryDocument = request.ShowInDiscoveryDocument.Value;
+            if (request.Type.HasValue)
+                scope.Type = request.Type.Value;
 
-        await _context.SaveChangesAsync();
+            scope.UpdatedAt = DateTime.UtcNow;
+            scope.UpdatedBy = User.Identity?.Name;
 
-        _logger.LogInformation("Scope '{ScopeName}' updated successfully", scope.Name);
+            // Update claims if provided
+            if (request.Claims != null)
+            {
+                _context.ScopeClaims.RemoveRange(scope.Claims);
+                foreach (var claimType in request.Claims)
+                {
+                    _context.ScopeClaims.Add(new ScopeClaim
+                    {
+                        ScopeId = scope.Id,
+                        ClaimType = claimType
+                    });
+                }
+            }
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Scope '{ScopeName}' updated successfully", scope.Name);
+        }
 
         // CRITICAL: Synchronize the updated scope with OpenIddict
         try

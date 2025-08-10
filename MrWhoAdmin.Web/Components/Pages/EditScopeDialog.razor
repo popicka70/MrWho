@@ -9,13 +9,23 @@
     <RadzenTabs @bind-SelectedIndex="@selectedTabIndex" TabPosition="TabPosition.Top" RenderMode="TabRenderMode.Client" 
                Style="width: 100%; height: 480px;">
         <Tabs>
+            @if (originalScope?.IsStandard == true)
+            {
+                <RadzenTabsItem Text="Notice" Icon="info">
+                    <div style="padding: 1rem;">
+                        <RadzenAlert AlertStyle="AlertStyle.Warning">
+                            <RadzenText>You're editing a standard scope. Only claims can be modified; other settings are read-only.</RadzenText>
+                        </RadzenAlert>
+                    </div>
+                </RadzenTabsItem>
+            }
             <!-- Basic Information Tab -->
             <RadzenTabsItem Text="Basic Information" Icon="info">
                 <div style="padding: 1rem; max-height: 450px; overflow-y: auto;">
                     <RadzenStack Gap="1rem">
                         <RadzenFormField Text="Scope Name" Variant="Variant.Outlined">
                             <ChildContent>
-                                <RadzenTextBox Value="@originalScope.Name" Style="width: 100%;" Disabled="true" />
+                                <RadzenTextBox Value="@(originalScope?.Name ?? string.Empty)" Style="width: 100%;" Disabled="true" />
                             </ChildContent>
                             <Helper>
                                 <RadzenText TextStyle="TextStyle.Caption" Text="Scope name cannot be changed" />
@@ -24,22 +34,40 @@
 
                         <RadzenFormField Text="Display Name" Variant="Variant.Outlined">
                             <ChildContent>
-                                <RadzenTextBox @bind-Value="@model.DisplayName" Style="width: 100%;" Placeholder="Human-readable name" />
+                                <RadzenTextBox @bind-Value="@model.DisplayName" Style="width: 100%;" Placeholder="Human-readable name" Disabled="@(originalScope?.IsStandard ?? false)" />
                             </ChildContent>
+                            <Helper>
+                                @if (originalScope?.IsStandard == true)
+                                {
+                                    <RadzenText TextStyle="TextStyle.Caption" Text="Display name of standard scopes is managed by the system." />
+                                }
+                            </Helper>
                         </RadzenFormField>
 
                         <RadzenFormField Text="Description" Variant="Variant.Outlined">
                             <ChildContent>
                                 <RadzenTextArea @bind-Value="@model.Description" Style="width: 100%; height: 80px;" 
-                                               Placeholder="Description of what this scope provides access to" />
+                                               Placeholder="Description of what this scope provides access to" Disabled="@(originalScope?.IsStandard ?? false)" />
                             </ChildContent>
+                            <Helper>
+                                @if (originalScope?.IsStandard == true)
+                                {
+                                    <RadzenText TextStyle="TextStyle.Caption" Text="Description of standard scopes is managed by the system." />
+                                }
+                            </Helper>
                         </RadzenFormField>
 
                         <RadzenFormField Text="Scope Type" Variant="Variant.Outlined">
                             <ChildContent>
                                 <RadzenDropDown @bind-Value="@model.Type" Data="@scopeTypes" TextProperty="Text" ValueProperty="Value" 
-                                               Style="width: 100%;" />
+                                               Style="width: 100%;" Disabled="@(originalScope?.IsStandard ?? false)" />
                             </ChildContent>
+                            <Helper>
+                                @if (originalScope?.IsStandard == true)
+                                {
+                                    <RadzenText TextStyle="TextStyle.Caption" Text="Type of standard scopes is managed by the system." />
+                                }
+                            </Helper>
                         </RadzenFormField>
                     </RadzenStack>
                 </div>
@@ -57,7 +85,7 @@
                                 <RadzenFormField Text="Enabled" Variant="Variant.Outlined">
                                     <ChildContent>
                                         <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" Style="margin-top: 0.5rem;">
-                                            <RadzenCheckBox @bind-Value="@model.IsEnabled" Name="isEnabled" />
+                                            <RadzenCheckBox @bind-Value="@model.IsEnabled" Name="isEnabled" Disabled="@(originalScope?.IsStandard ?? false)" />
                                             <RadzenLabel Text="Scope is enabled" Component="isEnabled" />
                                         </RadzenStack>
                                     </ChildContent>
@@ -72,7 +100,7 @@
                                 <RadzenFormField Text="Required" Variant="Variant.Outlined">
                                     <ChildContent>
                                         <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" Style="margin-top: 0.5rem;">
-                                            <RadzenCheckBox @bind-Value="@model.IsRequired" Name="isRequired" />
+                                            <RadzenCheckBox @bind-Value="@model.IsRequired" Name="isRequired" Disabled="@(originalScope?.IsStandard ?? false)" />
                                             <RadzenLabel Text="This scope is required" Component="isRequired" />
                                         </RadzenStack>
                                     </ChildContent>
@@ -87,7 +115,7 @@
                                 <RadzenFormField Text="Show in Discovery" Variant="Variant.Outlined">
                                     <ChildContent>
                                         <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" Style="margin-top: 0.5rem;">
-                                            <RadzenCheckBox @bind-Value="@model.ShowInDiscoveryDocument" Name="showInDiscovery" />
+                                            <RadzenCheckBox @bind-Value="@model.ShowInDiscoveryDocument" Name="showInDiscovery" Disabled="@(originalScope?.IsStandard ?? false)" />
                                             <RadzenLabel Text="Show in discovery document" Component="showInDiscovery" />
                                         </RadzenStack>
                                     </ChildContent>

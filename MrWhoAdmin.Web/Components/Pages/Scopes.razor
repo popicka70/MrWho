@@ -106,7 +106,7 @@
                     <Template Context="scope">
                         <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
                             <RadzenButton Click="@(async () => await ShowEditScopeDialog(scope))" Icon="edit" Size="ButtonSize.Medium" 
-                                         ButtonStyle="ButtonStyle.Light" Text="Edit" Disabled="@scope.IsStandard" Style="min-width: 100px;" />
+                                         ButtonStyle="ButtonStyle.Light" Text="@((scope.IsStandard ? "Edit Claims" : "Edit"))" Style="min-width: 120px;" />
                             <RadzenButton Click="@(async () => await ViewScopeDetails(scope))" Icon="visibility" Size="ButtonSize.Medium" 
                                          ButtonStyle="ButtonStyle.Info" Text="View" Style="min-width: 100px;" />
                             <RadzenButton Click="@(async () => await ToggleScopeStatus(scope))" Icon="@(scope.IsEnabled ? "toggle_on" : "toggle_off")" 
@@ -190,11 +190,9 @@
 
     private async Task ShowEditScopeDialog(ScopeDto scope)
     {
-        if (scope.IsStandard)
-        {
-            NotificationService.Notify(NotificationSeverity.Warning, "Cannot Edit", "Standard scopes cannot be modified");
-            return;
-        }
+    // Removed hard block for standard scopes
+    // NotificationService.Notify(NotificationSeverity.Warning, "Cannot Edit", "Standard scopes cannot be modified");
+    // return;
 
         var result = await DialogService.OpenAsync<EditScopeDialog>("Edit Scope", 
             new Dictionary<string, object> { { "Scope", scope } }, 
