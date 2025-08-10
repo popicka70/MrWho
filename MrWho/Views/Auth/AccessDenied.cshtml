@@ -3,6 +3,30 @@
     var clientId = ViewData["ClientId"] as string;
     var clientName = ViewData["ClientName"] as string;
     var returnUrl = ViewData["ReturnUrl"] as string;
+    // Build a route value dictionary preserving existing query params
+    var routeParams = new System.Collections.Generic.Dictionary<string, string?>(System.StringComparer.OrdinalIgnoreCase);
+    if (!string.IsNullOrEmpty(returnUrl)) routeParams["returnUrl"] = returnUrl;
+    if (!string.IsNullOrEmpty(clientId)) routeParams["clientId"] = clientId;
+    var query = Context?.Request?.Query;
+    if (query != null)
+    {
+        foreach (var kvp in query)
+        {
+            var key = kvp.Key;
+            if (string.IsNullOrEmpty(key)) continue;
+            if (string.Equals(key, "returnUrl", System.StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(key, "clientId", System.StringComparison.OrdinalIgnoreCase))
+            {
+                // Already handled explicitly above
+                continue;
+            }
+            var value = kvp.Value.ToString();
+            if (!string.IsNullOrEmpty(value))
+            {
+                routeParams[key] = value;
+            }
+        }
+    }
 }
 
 <div class="row justify-content-center">
@@ -37,21 +61,6 @@
                     <li><strong>Realm Restriction:</strong> Your user account may belong to a different realm than the one required for this application.</li>
                     <li><strong>Client Access:</strong> The application you're trying to access may not be configured for your user type.</li>
                     <li><strong>Account Status:</strong> Your account may be disabled or require additional setup.</li>
-                </ul>
-
-                @if (!string.IsNullOrEmpty(clientId) && !string.IsNullOrEmpty(clientName) && clientId != clientName)
-                {
-                    <div class="card bg-light mb-3">
-                        <div class="card-body p-2">
-                            <h6 class="card-title small mb-1"><i class="bi bi-info-circle"></i> Application Details:</h6>
-                            <p class="small mb-1"><strong>Application:</strong> @clientName</p>
-                            <p class="small mb-0"><strong>Client ID:</strong> <code>@clientId</code></p>
-                        </div>
-                    </div>
-                }
-
-                <h6 class="mt-4">What you can do:</h6>
-                <ul>
                     <li>Contact your administrator for access to this application</li>
                     <li>Try logging in with a different account</li>
                     <li>Ensure you're using the correct application URL</li>
@@ -67,7 +76,9 @@
                 }
 
                 <div class="d-flex gap-2 mt-4">
-                    <a href="/connect/login@(!string.IsNullOrEmpty(clientId) ? $"?clientId={Uri.EscapeDataString(clientId)}" : "")" class="btn btn-primary">
+                    <a asp-controller="Auth" asp-action="Login"
+                       asp-all-route-data="@routeParams"
+                       class="btn btn-primary">
                         <i class="bi bi-arrow-left"></i> Try Different Account
                     </a>
                     <a href="/" class="btn btn-outline-secondary">
