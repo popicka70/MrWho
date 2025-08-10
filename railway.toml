@@ -1,7 +1,7 @@
 [build]
 # Use the Dockerfile for the MrWho service (nested in the repo)
 builder = "DOCKERFILE"
-dockerfilePath = "MrWho/MrWho/Dockerfile"
+dockerfilePath = "Dockerfile"
 
 [deploy]
 # Rely on the Dockerfile ENTRYPOINT; no startCommand needed
