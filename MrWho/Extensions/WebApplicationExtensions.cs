@@ -35,17 +35,9 @@ public static class WebApplicationExtensions
             app.UseHsts();
         }
 
-        // Behind a reverse proxy (Railway, containers), honor X-Forwarded-* so Request.Scheme becomes https
-        // Place this BEFORE redirection/auth so downstream sees the correct scheme/remote IP
-        app.UseForwardedHeaders(new ForwardedHeadersOptions
-        {
-            ForwardedHeaders = ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedFor
-        });
-        // Trust hosting platform's proxy headers (Railway/containers). If you self-host behind a known proxy,
-        // replace this with explicit KnownNetworks/KnownProxies entries.
-        var forwardedOptions = app.Services.GetRequiredService<IOptions<ForwardedHeadersOptions>>().Value;
-        forwardedOptions.KnownNetworks.Clear();
-        forwardedOptions.KnownProxies.Clear();
+    // Behind a reverse proxy (Railway, containers), honor X-Forwarded-* so Request.Scheme becomes https
+    // Place this BEFORE redirection/auth so downstream sees the correct scheme/remote IP. Options are configured in DI.
+    app.UseForwardedHeaders();
 
         // Allow disabling HTTPS redirection for containerized/internal HTTP calls
         var disableHttpsRedirect = string.Equals(Environment.GetEnvironmentVariable("DISABLE_HTTPS_REDIRECT"), "true", StringComparison.OrdinalIgnoreCase);
@@ -93,15 +85,9 @@ public static class WebApplicationExtensions
             app.UseHsts();
         }
 
-        // Behind a reverse proxy (Railway, containers), honor X-Forwarded-* so Request.Scheme becomes https
-        // Place this BEFORE redirection/auth so downstream sees the correct scheme/remote IP
-        app.UseForwardedHeaders(new ForwardedHeadersOptions
-        {
-            ForwardedHeaders = ForwardedHeaders.XForwardedProto | ForwardedHeaders.XForwardedFor
-        });
-        var forwardedOptions2 = app.Services.GetRequiredService<IOptions<ForwardedHeadersOptions>>().Value;
-        forwardedOptions2.KnownNetworks.Clear();
-        forwardedOptions2.KnownProxies.Clear();
+    // Behind a reverse proxy (Railway, containers), honor X-Forwarded-* so Request.Scheme becomes https
+    // Options are configured in DI; use parameterless overload here.
+    app.UseForwardedHeaders();
 
         // Allow disabling HTTPS redirection for containerized/internal HTTP calls
         var disableHttpsRedirect = string.Equals(Environment.GetEnvironmentVariable("DISABLE_HTTPS_REDIRECT"), "true", StringComparison.OrdinalIgnoreCase);

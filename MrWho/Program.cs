@@ -2,6 +2,7 @@ using MrWho.Extensions;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using MrWho.Services;
+using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -23,6 +24,17 @@ builder.Services.AddMrWhoClientCookies(); // Add client-specific cookies
 builder.Services.AddMrWhoOpenIddict();
 builder.Services.AddMrWhoAuthorizationWithClientCookies(); // Use authorization with client cookie support
 builder.Services.AddMrWhoMediator(); // Lightweight mediator + endpoint handlers
+
+// Honor X-Forwarded-* headers from the hosting platform (Railway/reverse proxies)
+// so Request.Scheme becomes https and OpenIddict doesn't reject requests.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    // Trust all proxy networks by default (Railway manages TLS). If you have fixed proxies,
+    // replace with explicit KnownNetworks/KnownProxies entries.
+    options.KnownNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 
 // Add session support for client tracking
 builder.Services.AddSession(options =>
