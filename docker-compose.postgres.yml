@@ -24,7 +24,7 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_Kestrel__Certificates__Default__Password=${ASPNETCORE_Kestrel__Certificates__Default__Password}
-      # Switch provider to PostgreSQL and point to the postgres service
+      - DOTNET_RUNNING_IN_CONTAINER=false
       - Database__Provider=PostgreSql
       - Database__MigrationsAssembly=MrWho.Migrations.PostgreSql
       - ConnectionStrings__mrwhodb=Host=postgres;Database=MrWho;Username=postgres;Password=${POSTGRES_PASSWORD};
@@ -34,6 +34,7 @@ services:
       - "7113:8443"  # HTTPS
     volumes:
       - ${LOCAL_HTTPS_CERT_DIR}:/https:ro
+      - mrwho-dp-keys:/root/.aspnet/DataProtection-Keys
 
   admin:
     build:
@@ -57,3 +58,6 @@ services:
       - "7257:8443"  # HTTPS
     volumes:
       - ${LOCAL_HTTPS_CERT_DIR}:/https:ro
+
+volumes:
+  mrwho-dp-keys:
