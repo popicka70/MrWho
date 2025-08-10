@@ -455,6 +455,8 @@ namespace MrWho.Migrations.MySql.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("ClientId", "Uri")
+                        .HasDatabaseName("IX_ClientPostLogoutUris_ClientId_Uri")
+                        .HasAnnotation("MySql:IndexPrefixLength", new[] { 255, 512 })
                         .IsUnique();
 
                     b.ToTable("ClientPostLogoutUris");
@@ -477,6 +479,8 @@ namespace MrWho.Migrations.MySql.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("ClientId", "Uri")
+                        .HasDatabaseName("IX_ClientRedirectUris_ClientId_Uri")
+                        .HasAnnotation("MySql:IndexPrefixLength", new[] { 255, 512 })
                         .IsUnique();
 
                     b.ToTable("ClientRedirectUris");
@@ -833,7 +837,9 @@ namespace MrWho.Migrations.MySql.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ApplicationId", "Status", "Subject", "Type");
+                    b.HasIndex("ApplicationId", "Status", "Subject", "Type")
+                        .HasDatabaseName("IX_OpenIddictTokens_ApplicationId_Status_Subject_Type")
+                        .HasAnnotation("MySql:IndexPrefixLength", new[] { 255, 50, 191, 150 });
 
                     b.ToTable("OpenIddictAuthorizations", (string)null);
                 });
