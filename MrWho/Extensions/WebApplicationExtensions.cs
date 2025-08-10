@@ -17,6 +17,7 @@ using System.Reflection;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using static OpenIddict.Abstractions.OpenIddictConstants;
+using MrWho.Shared;
 
 namespace MrWho.Extensions;
 
@@ -168,7 +169,7 @@ public static class WebApplicationExtensions
     public static WebApplication AddMrWhoDebugEndpoints(this WebApplication app)
     {
         // Group all debug endpoints and secure with AdminClientApi policy
-        var debug = app.MapGroup("/debug").RequireAuthorization("AdminClientApi");
+        var debug = app.MapGroup("/debug").RequireAuthorization(AuthorizationPolicies.AdminClientApi);
 
         // Debug endpoints discovery via mediator
         debug.MapGet("/", (IMediator mediator) => mediator.Send(new DebugIndexRequest()));

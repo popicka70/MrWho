@@ -5,6 +5,7 @@ using MrWho.Handlers.Users;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using MrWho.Shared.Models;
+using MrWho.Shared;
 using System.Security.Claims;
 using System.Globalization;
 using MrWho.Data;
@@ -13,7 +14,7 @@ namespace MrWho.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Policy = "AdminClientApi")]
+[Authorize(Policy = AuthorizationPolicies.AdminClientApi)]
 public class UsersController : ControllerBase
 {
     private readonly IGetUsersHandler _getUsersHandler;

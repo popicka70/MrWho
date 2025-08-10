@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
+using MrWho.Shared;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using OpenIddict.Abstractions;
 using MrWho.Data;
-using MrWho.Shared;
 using MrWho.Services;
 using Microsoft.AspNetCore.Identity;
 using System.Collections.Immutable;
@@ -15,7 +15,7 @@ namespace MrWho.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Policy = "AdminClientApi")] // Require authentication for all session endpoints with AdminClientApi policy
+[Authorize(Policy = AuthorizationPolicies.AdminClientApi)] // Require authentication for all session endpoints with AdminClientApi policy
 public class SessionsController : ControllerBase
 {
     private readonly ApplicationDbContext _context;

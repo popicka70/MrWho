@@ -5,9 +5,11 @@ using System.Security.Claims;
 using System.Text.Json;
 using OpenIddict.Abstractions;
 using OpenIddict.Server.AspNetCore;
+using MrWho.Shared;
 
 namespace MrWho.Controllers;
 
+[Authorize] // Require authenticated users for all actions in this controller
 [Route("identity/[controller]")]
 [Route("identity/token-inspector")] // Add explicit route for the kebab-case URL
 public class TokenInspectorController : Controller // Changed from ControllerBase to Controller
@@ -34,7 +36,7 @@ public class TokenInspectorController : Controller // Changed from ControllerBas
     /// API endpoint for decoding and inspecting JWT tokens
     /// </summary>
     [HttpPost("decode")]
-    [Authorize(Policy = "AdminClientApi")]
+    [Authorize] // Only require authentication for token inspection
     public IActionResult DecodeToken([FromBody] DecodeTokenRequest request)
     {
         try
@@ -118,7 +120,7 @@ public class TokenInspectorController : Controller // Changed from ControllerBas
     /// This mimics OAuth 2.0 token introspection (RFC 7662)
     /// </summary>
     [HttpPost("introspect")]
-    [Authorize(Policy = "AdminClientApi")] // Require admin client API access
+    [Authorize] // Only require authentication
     public IActionResult IntrospectToken([FromBody] IntrospectTokenRequest request)
     {
         try
@@ -184,7 +186,7 @@ public class TokenInspectorController : Controller // Changed from ControllerBas
     /// Current user's token information endpoint
     /// </summary>
     [HttpGet("current")]
-    [Authorize(Policy = "AdminClientApi")]
+    [Authorize] // Only require authentication
     public IActionResult GetCurrentTokenInfo()
     {
         try

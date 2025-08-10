@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using MrWho.Shared;
 using MrWho.Shared.Models;
 using System.Security.Claims;
 
@@ -9,7 +10,7 @@ namespace MrWho.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Policy = "AdminClientApi")]
+[Authorize(Policy = AuthorizationPolicies.AdminClientApi)]
 public class RolesController : ControllerBase
 {
     private readonly RoleManager<IdentityRole> _roleManager;

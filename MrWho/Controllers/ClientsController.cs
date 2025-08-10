@@ -5,12 +5,13 @@ using MrWho.Data;
 using MrWho.Models;
 using MrWho.Shared.Models;
 using OpenIddict.Abstractions;
+using MrWho.Shared;
 
 namespace MrWho.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Policy = "AdminClientApi")]
+[Authorize(Policy = AuthorizationPolicies.AdminClientApi)]
 public class ClientsController : ControllerBase
 {
     private readonly ApplicationDbContext _context;

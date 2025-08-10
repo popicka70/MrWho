@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using MrWho.Shared;
 using MrWho.Data;
 using MrWho.Models;
 using MrWho.Shared.Models;
@@ -9,7 +10,7 @@ namespace MrWho.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Policy = "AdminClientApi")]
+[Authorize(Policy = AuthorizationPolicies.AdminClientApi)]
 public class RealmsController : ControllerBase
 {
     private readonly ApplicationDbContext _context;

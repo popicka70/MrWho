@@ -87,7 +87,7 @@ public class DynamicAuthorizationPolicyProvider : IAuthorizationPolicyProvider
         // All static authorization policies are defined here in one place
         // ====================================================================
         
-        switch (policyName)
+    switch (policyName)
         {
             case "UserInfoPolicy":
                 // SECURITY: UserInfo endpoint must only use OpenIddict validation (no cookie auth)
@@ -118,7 +118,7 @@ public class DynamicAuthorizationPolicyProvider : IAuthorizationPolicyProvider
                                             OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme)
                     .Build();
 
-            case "AdminClientApi":
+            case AuthorizationPolicies.AdminClientApi:
                 // Strict API/debug access: require OpenIddict token with mrwho.use scope and admin client presenter
                 return new AuthorizationPolicyBuilder()
                     .RequireAuthenticatedUser()
