@@ -49,7 +49,8 @@ else
             <RadzenTemplateForm Data="@model" TItem="CreateRealmRequest" Submit="@OnSave">
                 <RadzenStack Gap="2rem">
                     <!-- Basic Information -->
-                    <RadzenFieldset Text="Basic Information">
+                    <RadzenStack Gap="0.75rem" class="rz-mb-2">
+                        <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Basic Information</RadzenText>
                         <RadzenStack Gap="1rem">
                             <RadzenRow>
                                 <RadzenColumn Size="12" SizeMD="6">
@@ -79,17 +80,20 @@ else
                             </RadzenFormField>
                             
                             <RadzenFormField Text="Status" Variant="Variant.Outlined">
-                                <RadzenCheckBox @bind-Value="@model.IsEnabled" />
-                                <RadzenLabel Text="Realm is enabled" class="rz-ml-2" />
+                                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" Style="margin-top: 0.5rem;">
+                                    <RadzenCheckBox @bind-Value="@model.IsEnabled" />
+                                    <RadzenLabel Text="Realm is enabled" />
+                                </RadzenStack>
                                 <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary rz-mt-1">
                                     Disabled realms cannot be used for authentication
                                 </RadzenText>
                             </RadzenFormField>
                         </RadzenStack>
-                    </RadzenFieldset>
+                    </RadzenStack>
 
                     <!-- Token Lifetimes -->
-                    <RadzenFieldset Text="Token Configuration">
+                    <RadzenStack Gap="0.75rem" class="rz-mb-2">
+                        <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Token Configuration</RadzenText>
                         <RadzenStack Gap="1rem">
                             <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary rz-mb-2">
                                 Configure how long different types of tokens remain valid
@@ -128,7 +132,7 @@ else
                                 </RadzenColumn>
                             </RadzenRow>
                         </RadzenStack>
-                    </RadzenFieldset>
+                    </RadzenStack>
 
                     <!-- Sticky Action Bar -->
                     <div style="position: sticky; bottom: 0; background: var(--rz-base-50); border-top: 1px solid var(--rz-border-color); padding: 0.75rem 1rem; z-index: 5;" class="rz-mt-4">

@@ -39,7 +39,8 @@ else
                     <div style="padding: 1rem;">
                         <RadzenTemplateForm Data="@userModel" TItem="object" Submit="@OnSaveUser">
                             <RadzenStack Gap="2rem">
-                                <RadzenFieldset Text="User Information">
+                                <RadzenStack Gap="0.75rem" class="rz-mb-2">
+                                    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">User Information</RadzenText>
                                     <RadzenStack Gap="1rem">
                                         <RadzenRow>
                                             <RadzenColumn Size="12" SizeMD="6">
@@ -134,24 +135,33 @@ else
                                             </RadzenFormField>
                                         }
 
-                                        <RadzenFieldset Text="Status">
-                                            <RadzenRow Gap="1rem">
-                                                <RadzenColumn Size="4">
-                                                    <RadzenCheckBox @bind-Value="@userModel.EmailConfirmed" Name="emailConfirmed" />
-                                                    <RadzenLabel Text="Email Confirmed" Component="emailConfirmed" Style="margin-left: 8px;" />
-                                                </RadzenColumn>
-                                                <RadzenColumn Size="4">
-                                                    <RadzenCheckBox @bind-Value="@userModel.PhoneNumberConfirmed" Name="phoneConfirmed" />
-                                                    <RadzenLabel Text="Phone Confirmed" Component="phoneConfirmed" Style="margin-left: 8px;" />
-                                                </RadzenColumn>
-                                                <RadzenColumn Size="4">
-                                                    <RadzenCheckBox @bind-Value="@userModel.TwoFactorEnabled" Name="twoFactor" />
-                                                    <RadzenLabel Text="Two Factor Enabled" Component="twoFactor" Style="margin-left: 8px;" />
-                                                </RadzenColumn>
-                                            </RadzenRow>
-                                        </RadzenFieldset>
+                                        <RadzenStack Gap="0.75rem" class="rz-mt-2">
+                                            <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Status</RadzenText>
+                                            <RadzenFormField Text="Account Status" Variant="Variant.Outlined">
+                                                <RadzenRow Gap="1rem" Style="margin-top: 0.5rem;">
+                                                    <RadzenColumn Size="4">
+                                                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                                            <RadzenCheckBox @bind-Value="@userModel.EmailConfirmed" Name="emailConfirmed" />
+                                                            <RadzenLabel Text="Email Confirmed" Component="emailConfirmed" />
+                                                        </RadzenStack>
+                                                    </RadzenColumn>
+                                                    <RadzenColumn Size="4">
+                                                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                                            <RadzenCheckBox @bind-Value="@userModel.PhoneNumberConfirmed" Name="phoneConfirmed" />
+                                                            <RadzenLabel Text="Phone Confirmed" Component="phoneConfirmed" />
+                                                        </RadzenStack>
+                                                    </RadzenColumn>
+                                                    <RadzenColumn Size="4">
+                                                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                                            <RadzenCheckBox @bind-Value="@userModel.TwoFactorEnabled" Name="twoFactor" />
+                                                            <RadzenLabel Text="Two Factor Enabled" Component="twoFactor" />
+                                                        </RadzenStack>
+                                                    </RadzenColumn>
+                                                </RadzenRow>
+                                            </RadzenFormField>
+                                        </RadzenStack>
                                     </RadzenStack>
-                                </RadzenFieldset>
+                                </RadzenStack>
 
                                 <!-- Sticky Action Bar -->
                                 <div style="position: sticky; bottom: 0; background: var(--rz-base-50); border-top: 1px solid var(--rz-border-color); padding: 0.75rem 1rem; z-index: 5;" class="rz-mt-4">
@@ -241,7 +251,8 @@ else
                                 </RadzenCard>
 
                                 <!-- Current Claims List -->
-                                <RadzenFieldset Text="Current Claims">
+                                <RadzenStack Gap="0.75rem">
+                                    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Current Claims</RadzenText>
                                     @if (userClaims.Any())
                                     {
                                         <div style="max-height: 400px; overflow-y: auto;">
@@ -283,7 +294,7 @@ else
                                             <RadzenText>No claims assigned to this user. Add claims above to provide additional user information.</RadzenText>
                                         </RadzenAlert>
                                     }
-                                </RadzenFieldset>
+                                </RadzenStack>
                             </RadzenStack>
                         </div>
                     </RadzenTabsItem>
@@ -332,7 +343,8 @@ else
                                 </RadzenCard>
 
                                 <!-- Current Roles List -->
-                                <RadzenFieldset Text="Assigned Roles">
+                                <RadzenStack Gap="0.75rem">
+                                    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Assigned Roles</RadzenText>
                                     @if (userRoles.Any())
                                     {
                                         <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" Wrap="FlexWrap.Wrap">
@@ -358,7 +370,7 @@ else
                                             <RadzenText>No roles assigned to this user. Assign roles above to grant permissions.</RadzenText>
                                         </RadzenAlert>
                                     }
-                                </RadzenFieldset>
+                                </RadzenStack>
                             </RadzenStack>
                         </div>
                     </RadzenTabsItem>
@@ -370,7 +382,8 @@ else
                                 <RadzenText TextStyle="TextStyle.H6" Text="Security Management" />
                                 
                                 <!-- Account Status -->
-                                <RadzenFieldset Text="Account Status">
+                                <RadzenStack Gap="0.75rem">
+                                    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Account Status</RadzenText>
                                     <RadzenStack Gap="1rem">
                                         <RadzenRow>
                                             <RadzenColumn Size="12" SizeMD="6">
@@ -418,10 +431,11 @@ else
                                             </RadzenColumn>
                                         </RadzenRow>
                                     </RadzenStack>
-                                </RadzenFieldset>
+                                </RadzenStack>
 
                                 <!-- Session Management -->
-                                <RadzenFieldset Text="Session Management">
+                                <RadzenStack Gap="0.75rem">
+                                    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Session Management</RadzenText>
                                     <RadzenCard>
                                         <RadzenStack Gap="1rem">
                                             <RadzenText TextStyle="TextStyle.Subtitle1" Text="Active Sessions" />
@@ -435,7 +449,7 @@ else
                                                          IsBusy="@isForcingLogout" />
                                         </RadzenStack>
                                     </RadzenCard>
-                                </RadzenFieldset>
+                                </RadzenStack>
                             </RadzenStack>
                         </div>
                     </RadzenTabsItem>

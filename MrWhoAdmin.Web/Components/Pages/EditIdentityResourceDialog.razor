@@ -20,25 +20,42 @@
     </RadzenFormField>
 
     <RadzenRow Gap="1rem">
-        <RadzenColumn Size="3">
-            <RadzenCheckBox @bind-Value="@isEnabled" Name="isEnabled" />
-            <RadzenLabel Text="Enabled" Component="isEnabled" Style="margin-left: 8px;" />
+        <RadzenColumn Size="12" SizeMD="3">
+            <RadzenFormField Text="Enabled" Variant="Variant.Outlined">
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" Style="margin-top: 0.5rem;">
+                    <RadzenCheckBox @bind-Value="@isEnabled" Name="isEnabled" />
+                    <RadzenLabel Text="Enabled" Component="isEnabled" />
+                </RadzenStack>
+            </RadzenFormField>
         </RadzenColumn>
-        <RadzenColumn Size="3">
-            <RadzenCheckBox @bind-Value="@isRequired" Name="isRequired" />
-            <RadzenLabel Text="Required" Component="isRequired" Style="margin-left: 8px;" />
+        <RadzenColumn Size="12" SizeMD="3">
+            <RadzenFormField Text="Required" Variant="Variant.Outlined">
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" Style="margin-top: 0.5rem;">
+                    <RadzenCheckBox @bind-Value="@isRequired" Name="isRequired" />
+                    <RadzenLabel Text="Required" Component="isRequired" />
+                </RadzenStack>
+            </RadzenFormField>
         </RadzenColumn>
-        <RadzenColumn Size="3">
-            <RadzenCheckBox @bind-Value="@showInDiscoveryDocument" Name="showInDiscovery" />
-            <RadzenLabel Text="Show in Discovery" Component="showInDiscovery" Style="margin-left: 8px;" />
+        <RadzenColumn Size="12" SizeMD="3">
+            <RadzenFormField Text="Show in Discovery" Variant="Variant.Outlined">
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" Style="margin-top: 0.5rem;">
+                    <RadzenCheckBox @bind-Value="@showInDiscoveryDocument" Name="showInDiscovery" />
+                    <RadzenLabel Text="Show in Discovery" Component="showInDiscovery" />
+                </RadzenStack>
+            </RadzenFormField>
         </RadzenColumn>
-        <RadzenColumn Size="3">
-            <RadzenCheckBox @bind-Value="@emphasize" Name="emphasize" />
-            <RadzenLabel Text="Emphasize" Component="emphasize" Style="margin-left: 8px;" />
+        <RadzenColumn Size="12" SizeMD="3">
+            <RadzenFormField Text="Emphasize" Variant="Variant.Outlined">
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" Style="margin-top: 0.5rem;">
+                    <RadzenCheckBox @bind-Value="@emphasize" Name="emphasize" />
+                    <RadzenLabel Text="Emphasize" Component="emphasize" />
+                </RadzenStack>
+            </RadzenFormField>
         </RadzenColumn>
     </RadzenRow>
 
-    <RadzenFieldset Text="User Claims">
+    <RadzenStack Gap="0.75rem">
+        <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">User Claims</RadzenText>
         <RadzenStack Gap="0.5rem">
             <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
                 <RadzenDropDown @bind-Value="@selectedClaimType" Data="@availableClaimTypes" 
@@ -146,9 +163,10 @@
                 </RadzenAlert>
             }
         </RadzenStack>
-    </RadzenFieldset>
+    </RadzenStack>
 
-    <RadzenFieldset Text="Properties">
+    <RadzenStack Gap="0.75rem">
+        <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Properties</RadzenText>
         <RadzenStack Gap="0.5rem">
             <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
                 <RadzenTextBox @bind-Value="@newPropertyKey" Placeholder="Property key" Style="width: 200px;" />
@@ -179,7 +197,7 @@
                 </RadzenAlert>
             }
         </RadzenStack>
-    </RadzenFieldset>
+    </RadzenStack>
 
     <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" class="rz-mt-4">
         <RadzenButton Text="Update" Icon="save" ButtonStyle="ButtonStyle.Primary" 

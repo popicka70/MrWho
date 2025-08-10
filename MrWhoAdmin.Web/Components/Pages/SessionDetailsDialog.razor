@@ -11,7 +11,8 @@
     </RadzenStack>
 
     <!-- User Information -->
-    <RadzenFieldset Text="User Information">
+    <RadzenStack Gap="0.75rem">
+        <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">User Information</RadzenText>
         <RadzenRow Gap="1rem">
             <RadzenColumn Size="12" SizeMD="6">
                 <RadzenFormField Text="User Name" Variant="Variant.Outlined">
@@ -28,10 +29,11 @@
         <RadzenFormField Text="Subject (User ID)" Variant="Variant.Outlined">
             <RadzenTextBox Value="@Session.Subject" ReadOnly="true" Style="width: 100%; font-family: monospace;" />
         </RadzenFormField>
-    </RadzenFieldset>
+    </RadzenStack>
 
     <!-- Client Information -->
-    <RadzenFieldset Text="Client Information">
+    <RadzenStack Gap="0.75rem">
+        <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Client Information</RadzenText>
         <RadzenRow Gap="1rem">
             <RadzenColumn Size="12" SizeMD="6">
                 <RadzenFormField Text="Client ID" Variant="Variant.Outlined">
@@ -46,19 +48,20 @@
         </RadzenRow>
         
         <RadzenFormField Text="Session Type" Variant="Variant.Outlined">
-            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" Style="margin-top: 0.5rem;">
                 <RadzenBadge Text="@Session.SessionType" BadgeStyle="@GetSessionTypeBadgeStyle(Session.SessionType)" />
                 <RadzenText Text="@Session.SessionType" />
             </RadzenStack>
         </RadzenFormField>
-    </RadzenFieldset>
+    </RadzenStack>
 
     <!-- Session Timeline -->
-    <RadzenFieldset Text="Session Timeline">
+    <RadzenStack Gap="0.75rem">
+        <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Session Timeline</RadzenText>
         <RadzenRow Gap="1rem">
             <RadzenColumn Size="12" SizeMD="4">
                 <RadzenFormField Text="Started" Variant="Variant.Outlined">
-                    <RadzenStack Gap="0.25rem">
+                    <RadzenStack Gap="0.25rem" Style="margin-top: 0.5rem;">
                         <RadzenTextBox Value="@Session.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")" ReadOnly="true" Style="width: 100%; font-family: monospace;" />
                         <RadzenText TextStyle="TextStyle.Caption" Text="@GetTimeAgo(Session.CreatedAt)" class="rz-color-secondary" />
                     </RadzenStack>
@@ -69,7 +72,7 @@
                 <RadzenFormField Text="Last Activity" Variant="Variant.Outlined">
                     @if (Session.LastActivity.HasValue)
                     {
-                        <RadzenStack Gap="0.25rem">
+                        <RadzenStack Gap="0.25rem" Style="margin-top: 0.5rem;">
                             <RadzenTextBox Value="@Session.LastActivity.Value.ToString("yyyy-MM-dd HH:mm:ss")" ReadOnly="true" Style="width: 100%; font-family: monospace;" />
                             <RadzenText TextStyle="TextStyle.Caption" Text="@GetTimeAgo(Session.LastActivity.Value)" class="rz-color-secondary" />
                         </RadzenStack>
@@ -88,7 +91,7 @@
                         var timeUntilExpiry = Session.ExpiresAt.Value - DateTime.UtcNow;
                         var isExpiringSoon = timeUntilExpiry.TotalHours <= 1;
                         
-                        <RadzenStack Gap="0.25rem">
+                        <RadzenStack Gap="0.25rem" Style="margin-top: 0.5rem;">
                             <RadzenTextBox Value="@Session.ExpiresAt.Value.ToString("yyyy-MM-dd HH:mm:ss")" 
                                           ReadOnly="true" 
                                           Style="@($"width: 100%; font-family: monospace; {(isExpiringSoon ? "color: var(--rz-danger);" : "")}")" />
@@ -104,14 +107,15 @@
                 </RadzenFormField>
             </RadzenColumn>
         </RadzenRow>
-    </RadzenFieldset>
+    </RadzenStack>
 
     <!-- Tokens & Permissions -->
-    <RadzenFieldset Text="Tokens & Permissions">
+    <RadzenStack Gap="0.75rem">
+        <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Tokens & Permissions</RadzenText>
         <RadzenRow Gap="1rem">
             <RadzenColumn Size="12" SizeMD="6">
                 <RadzenFormField Text="Token Information" Variant="Variant.Outlined">
-                    <RadzenStack Gap="0.5rem">
+                    <RadzenStack Gap="0.5rem" Style="margin-top: 0.5rem;">
                         <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
                             <RadzenIcon Icon="key" />
                             <RadzenText Text="@($"Total Tokens: {Session.TokenCount}")" />
@@ -137,7 +141,7 @@
             
             <RadzenColumn Size="12" SizeMD="6">
                 <RadzenFormField Text="Session Status" Variant="Variant.Outlined">
-                    <RadzenStack Gap="0.5rem">
+                    <RadzenStack Gap="0.5rem" Style="margin-top: 0.5rem;">
                         <RadzenBadge Text="@Session.Status" BadgeStyle="BadgeStyle.Success" Style="font-size: 1rem; padding: 0.5rem 1rem;" />
                         
                         @if (Session.ExpiresAt.HasValue)
@@ -152,10 +156,11 @@
                 </RadzenFormField>
             </RadzenColumn>
         </RadzenRow>
-    </RadzenFieldset>
+    </RadzenStack>
 
     <!-- Granted Scopes -->
-    <RadzenFieldset Text="Granted Scopes">
+    <RadzenStack Gap="0.75rem">
+        <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Granted Scopes</RadzenText>
         @if (Session.Scopes?.Any() == true)
         {
             <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" Wrap="FlexWrap.Wrap">
@@ -171,14 +176,15 @@
         {
             <RadzenText Text="No scopes granted" class="rz-color-secondary" />
         }
-    </RadzenFieldset>
+    </RadzenStack>
 
     <!-- Technical Information -->
-    <RadzenFieldset Text="Technical Information">
+    <RadzenStack Gap="0.75rem">
+        <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Technical Information</RadzenText>
         <RadzenRow Gap="1rem">
             <RadzenColumn Size="12" SizeMD="6">
                 <RadzenFormField Text="Session ID" Variant="Variant.Outlined">
-                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" Style="margin-top: 0.5rem;">
                         <RadzenTextBox Value="@Session.Id" ReadOnly="true" Style="width: 100%; font-family: monospace; font-size: 0.875rem;" />
                         <RadzenButton Icon="content_copy" 
                                      Size="ButtonSize.Small" 
@@ -191,7 +197,7 @@
             
             <RadzenColumn Size="12" SizeMD="6">
                 <RadzenFormField Text="User ID" Variant="Variant.Outlined">
-                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" Style="margin-top: 0.5rem;">
                         <RadzenTextBox Value="@Session.UserId" ReadOnly="true" Style="width: 100%; font-family: monospace; font-size: 0.875rem;" />
                         <RadzenButton Icon="content_copy" 
                                      Size="ButtonSize.Small" 
@@ -216,7 +222,7 @@
                 </RadzenFormField>
             </RadzenColumn>
         </RadzenRow>
-    </RadzenFieldset>
+    </RadzenStack>
 
     <!-- Actions -->
     <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">

@@ -15,7 +15,8 @@
 
 <RadzenCard class="rz-my-4">
     <RadzenStack Gap="2rem">
-        <RadzenFieldset Text="Token Status">
+        <RadzenStack Gap="0.75rem">
+            <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Token Status</RadzenText>
             <RadzenStack Gap="1rem">
                 <RadzenText><strong>Is Token Expired/Expiring:</strong> @isTokenExpiring</RadzenText>
                 <RadzenText><strong>Access Token Available:</strong> @hasAccessToken</RadzenText>
@@ -26,17 +27,19 @@
                     <RadzenText><strong>Time Until Expiry:</strong> @timeUntilExpiry</RadzenText>
                 }
             </RadzenStack>
-        </RadzenFieldset>
+        </RadzenStack>
 
-        <RadzenFieldset Text="Manual Token Operations">
+        <RadzenStack Gap="0.75rem">
+            <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Manual Token Operations</RadzenText>
             <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem">
                 <RadzenButton Click="@CheckTokenStatus" Text="Check Token Status" Icon="refresh" ButtonStyle="ButtonStyle.Primary" IsBusy="@isChecking" />
                 <RadzenButton Click="@ForceRefreshTokenRedirect" Text="Force Refresh Token" Icon="autorenew" ButtonStyle="ButtonStyle.Success" IsBusy="@isRefreshing" />
                 <RadzenButton Click="@TestApiCall" Text="Test API Call" Icon="api" ButtonStyle="ButtonStyle.Secondary" IsBusy="@isTestingApi" />
             </RadzenStack>
-        </RadzenFieldset>
+        </RadzenStack>
 
-        <RadzenFieldset Text="Operation Results">
+        <RadzenStack Gap="0.75rem">
+            <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Operation Results</RadzenText>
             @if (!string.IsNullOrEmpty(lastOperationResult))
             {
                 <RadzenAlert AlertStyle="@(lastOperationSuccess ? AlertStyle.Success : AlertStyle.Danger)" class="rz-mt-3">
@@ -50,33 +53,36 @@
                     <RadzenText>Token refresh completed, but there may have been an issue. Check the token status above.</RadzenText>
                 </RadzenAlert>
             }
-        </RadzenFieldset>
+        </RadzenStack>
 
-        <RadzenFieldset Text="Token Refresh Methods">
+        <RadzenStack Gap="0.75rem">
+            <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Token Refresh Methods</RadzenText>
             <RadzenStack Gap="1rem">
                 <RadzenText><strong>1. Redirect Method (Recommended):</strong> Uses standard HTTP context outside Blazor - most reliable</RadzenText>
                 <RadzenText><strong>2. Blazor Method:</strong> Attempts refresh within Blazor context - may have limitations</RadzenText>
                 <RadzenText><strong>3. Automatic:</strong> Middleware and delegating handler refresh automatically</RadzenText>
             </RadzenStack>
-        </RadzenFieldset>
+        </RadzenStack>
 
-        <RadzenFieldset Text="How Token Refresh Works">
+        <RadzenStack Gap="0.75rem">
+            <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">How Token Refresh Works</RadzenText>
             <RadzenStack Gap="1rem">
                 <RadzenText><strong>1. Automatic Refresh:</strong> Middleware checks token expiry on interactive requests and refreshes if needed</RadzenText>
                 <RadzenText><strong>2. API Call Refresh:</strong> Delegating handler ensures valid tokens before API calls</RadzenText>
                 <RadzenText><strong>3. Manual Refresh:</strong> Uses redirect to MVC controller for reliable token updates</RadzenText>
                 <RadzenText><strong>4. Fallback:</strong> If refresh fails, user will need to log in again</RadzenText>
             </RadzenStack>
-        </RadzenFieldset>
+        </RadzenStack>
 
-        <RadzenFieldset Text="Token Refresh Configuration">
+        <RadzenStack Gap="0.75rem">
+            <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Token Refresh Configuration</RadzenText>
             <RadzenStack Gap="1rem">
                 <RadzenText><strong>Refresh Before Expiry:</strong> 5 minutes</RadzenText>
                 <RadzenText><strong>Automatic Refresh:</strong> Enabled via middleware</RadzenText>
                 <RadzenText><strong>API Call Auto-Refresh:</strong> Enabled via delegating handler</RadzenText>
                 <RadzenText><strong>Manual Refresh:</strong> Uses redirect-based approach for reliable token updates</RadzenText>
             </RadzenStack>
-        </RadzenFieldset>
+        </RadzenStack>
     </RadzenStack>
 </RadzenCard>
 

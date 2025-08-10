@@ -54,40 +54,49 @@
                         <RadzenCard>
                             <RadzenStack Gap="1rem">
                                 <!-- Enabled Status -->
-                                <RadzenStack Gap="0.5rem">
-                                    <RadzenLabel Text="Enabled Status" />
-                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                        <RadzenCheckBox @bind-Value="@model.IsEnabled" />
-                                        <RadzenLabel Text="Scope is enabled" />
-                                    </RadzenStack>
-                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                        When enabled, this scope can be requested by clients
-                                    </RadzenText>
-                                </RadzenStack>
+                                <RadzenFormField Text="Enabled" Variant="Variant.Outlined">
+                                    <ChildContent>
+                                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" Style="margin-top: 0.5rem;">
+                                            <RadzenCheckBox @bind-Value="@model.IsEnabled" Name="isEnabled" />
+                                            <RadzenLabel Text="Scope is enabled" Component="isEnabled" />
+                                        </RadzenStack>
+                                    </ChildContent>
+                                    <Helper>
+                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                            When enabled, this scope can be requested by clients
+                                        </RadzenText>
+                                    </Helper>
+                                </RadzenFormField>
 
                                 <!-- Required Status -->
-                                <RadzenStack Gap="0.5rem">
-                                    <RadzenLabel Text="Required Scope" />
-                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                        <RadzenCheckBox @bind-Value="@model.IsRequired" />
-                                        <RadzenLabel Text="This scope is required" />
-                                    </RadzenStack>
-                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                        Required scopes are automatically included in token requests
-                                    </RadzenText>
-                                </RadzenStack>
+                                <RadzenFormField Text="Required" Variant="Variant.Outlined">
+                                    <ChildContent>
+                                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" Style="margin-top: 0.5rem;">
+                                            <RadzenCheckBox @bind-Value="@model.IsRequired" Name="isRequired" />
+                                            <RadzenLabel Text="This scope is required" Component="isRequired" />
+                                        </RadzenStack>
+                                    </ChildContent>
+                                    <Helper>
+                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                            Required scopes are automatically included in token requests
+                                        </RadzenText>
+                                    </Helper>
+                                </RadzenFormField>
 
                                 <!-- Discovery Document -->
-                                <RadzenStack Gap="0.5rem">
-                                    <RadzenLabel Text="Discovery Document" />
-                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                        <RadzenCheckBox @bind-Value="@model.ShowInDiscoveryDocument" />
-                                        <RadzenLabel Text="Show in discovery document" />
-                                    </RadzenStack>
-                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                        Public scopes are visible in the OpenID Connect discovery document
-                                    </RadzenText>
-                                </RadzenStack>
+                                <RadzenFormField Text="Show in Discovery" Variant="Variant.Outlined">
+                                    <ChildContent>
+                                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" Style="margin-top: 0.5rem;">
+                                            <RadzenCheckBox @bind-Value="@model.ShowInDiscoveryDocument" Name="showInDiscovery" />
+                                            <RadzenLabel Text="Show in discovery document" Component="showInDiscovery" />
+                                        </RadzenStack>
+                                    </ChildContent>
+                                    <Helper>
+                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                            Public scopes are visible in the OpenID Connect discovery document
+                                        </RadzenText>
+                                    </Helper>
+                                </RadzenFormField>
                             </RadzenStack>
                         </RadzenCard>
                     </RadzenStack>

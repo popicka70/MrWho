@@ -13,7 +13,8 @@
     <RadzenStack Gap="2rem">
         <AuthorizeView>
             <Authorized>
-                <RadzenFieldset Text="Current Display Name Logic">
+                <RadzenStack Gap="0.75rem">
+                    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Current Display Name Logic</RadzenText>
                     <RadzenStack Gap="1rem">
                         <RadzenFormField Text="Computed Display Name" Variant="Variant.Outlined">
                             <RadzenTextBox Value="@GetUserDisplayName(context.User)" ReadOnly="true" Style="width: 100%; font-weight: bold; color: green;" />
@@ -23,9 +24,10 @@
                             <RadzenTextArea Value="@GetDisplayNameSteps(context.User)" ReadOnly="true" Style="width: 100%; height: 120px;" />
                         </RadzenFormField>
                     </RadzenStack>
-                </RadzenFieldset>
+                </RadzenStack>
 
-                <RadzenFieldset Text="Raw Claims Data">
+                <RadzenStack Gap="0.75rem">
+                    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Raw Claims Data</RadzenText>
                     <RadzenText TextStyle="TextStyle.Body1" class="rz-mb-3">
                         Total Claims: <strong>@context.User.Claims.Count()</strong>
                     </RadzenText>
@@ -59,9 +61,10 @@
                             No claims found for the current user.
                         </RadzenAlert>
                     }
-                </RadzenFieldset>
+                </RadzenStack>
 
-                <RadzenFieldset Text="Key Claims Check">
+                <RadzenStack Gap="0.75rem">
+                    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Key Claims Check</RadzenText>
                     <RadzenStack Gap="1rem">
                         <RadzenRow>
                             <RadzenColumn Size="6">
@@ -88,16 +91,17 @@
                             </RadzenColumn>
                         </RadzenRow>
                     </RadzenStack>
-                </RadzenFieldset>
+                </RadzenStack>
 
-                <RadzenFieldset Text="Actions">
+                <RadzenStack Gap="0.75rem">
+                    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Actions</RadzenText>
                     <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem">
                         <RadzenButton Icon="refresh" ButtonStyle="ButtonStyle.Primary" Text="Refresh Page" 
                                      Click="@(() => Navigation.Refresh(forceReload: true))" />
                         <RadzenButton Icon="logout" ButtonStyle="ButtonStyle.Secondary" Text="Force Re-login" 
                                      Click="@(() => Navigation.NavigateTo("/logout"))" />
                     </RadzenStack>
-                </RadzenFieldset>
+                </RadzenStack>
             </Authorized>
             <NotAuthorized>
                 <RadzenAlert AlertStyle="AlertStyle.Warning">

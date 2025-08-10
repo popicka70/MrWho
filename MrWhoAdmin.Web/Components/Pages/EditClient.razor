@@ -52,7 +52,8 @@
                     <!-- Basic Information Tab -->
                     <RadzenTabsItem Text="Basic Information" Icon="info">
                         <div style="padding: 1rem; max-height: 550px; overflow-y: auto;">
-                            <RadzenFieldset Text="Basic Information">
+                            <RadzenStack Gap="0.75rem" class="rz-mb-4">
+                                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Basic Information</RadzenText>
                                 <RadzenStack Gap="1rem">
                                     <RadzenRow>
                                         <RadzenColumn Size="12" SizeMD="6">
@@ -119,14 +120,15 @@
                                         </RadzenText>
                                     </RadzenFormField>
                                 </RadzenStack>
-                            </RadzenFieldset>
+                            </RadzenStack>
                         </div>
                     </RadzenTabsItem>
 
                     <!-- Session & Cookie Configuration Tab -->
                     <RadzenTabsItem Text="Session & Cookies" Icon="schedule">
                         <div style="padding: 1rem; max-height: 550px; overflow-y: auto;">
-                            <RadzenFieldset Text="Session Configuration">
+                            <RadzenStack Gap="0.75rem" class="rz-mb-4">
+                                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Session Configuration</RadzenText>
                                 <RadzenStack Gap="1rem">
                                     <RadzenRow>
                                         <RadzenColumn Size="12" SizeMD="6">
@@ -154,7 +156,7 @@
                                     </RadzenRow>
 
                                     <RadzenFormField Text="Session Expiration Type" Variant="Variant.Outlined">
-                                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" Style="margin-top: 0.5rem;">
                                             <RadzenCheckBox @bind-Value="@model.UseSlidingSessionExpiration" TriState="true" />
                                             <RadzenLabel Text="Use sliding expiration (extends session on activity)" />
                                         </RadzenStack>
@@ -163,9 +165,10 @@
                                         </RadzenText>
                                     </RadzenFormField>
                                 </RadzenStack>
-                            </RadzenFieldset>
+                            </RadzenStack>
 
-                            <RadzenFieldset Text="Cookie Configuration" class="rz-mt-4">
+                            <RadzenStack Gap="0.75rem" class="rz-mt-4 rz-mb-4">
+                                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Cookie Configuration</RadzenText>
                                 <RadzenStack Gap="1rem">
                                     <RadzenFormField Text="Cookie SameSite Policy" Variant="Variant.Outlined">
                                         <RadzenDropDown @bind-Value="@model.CookieSameSitePolicy" 
@@ -180,7 +183,7 @@
                                     </RadzenFormField>
 
                                     <RadzenFormField Text="HTTPS Cookie Requirement" Variant="Variant.Outlined">
-                                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" Style="margin-top: 0.5rem;">
                                             <RadzenCheckBox @bind-Value="@model.RequireHttpsForCookies" TriState="true" />
                                             <RadzenLabel Text="Require HTTPS for secure cookies" />
                                         </RadzenStack>
@@ -189,14 +192,15 @@
                                         </RadzenText>
                                     </RadzenFormField>
                                 </RadzenStack>
-                            </RadzenFieldset>
+                            </RadzenStack>
                         </div>
                     </RadzenTabsItem>
 
                     <!-- Token Configuration Tab -->
                     <RadzenTabsItem Text="Token Lifecycle" Icon="token">
                         <div style="padding: 1rem; max-height: 550px; overflow-y: auto;">
-                            <RadzenFieldset Text="Token Lifetimes">
+                            <RadzenStack Gap="0.75rem" class="rz-mb-4">
+                                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Token Lifetimes</RadzenText>
                                 <RadzenStack Gap="1rem">
                                     <RadzenRow>
                                         <RadzenColumn Size="12" SizeMD="6">
@@ -241,9 +245,10 @@
                                         </RadzenColumn>
                                     </RadzenRow>
                                 </RadzenStack>
-                            </RadzenFieldset>
+                            </RadzenStack>
 
-                            <RadzenFieldset Text="Refresh Token Behavior" class="rz-mt-4">
+                            <RadzenStack Gap="0.75rem" class="rz-mt-4 rz-mb-4">
+                                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Refresh Token Behavior</RadzenText>
                                 <RadzenStack Gap="1rem">
                                     <RadzenRow>
                                         <RadzenColumn Size="12" SizeMD="6">
@@ -292,17 +297,18 @@
                                         </RadzenColumn>
                                     </RadzenRow>
                                 </RadzenStack>
-                            </RadzenFieldset>
+                            </RadzenStack>
                         </div>
                     </RadzenTabsItem>
 
                     <!-- Security & Compliance Tab -->
                     <RadzenTabsItem Text="Security & Compliance" Icon="security">
                         <div style="padding: 1rem; max-height: 550px; overflow-y: auto;">
-                            <RadzenFieldset Text="User Consent">
+                            <RadzenStack Gap="0.75rem" class="rz-mb-4">
+                                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">User Consent</RadzenText>
                                 <RadzenStack Gap="1rem">
                                     <RadzenFormField Text="Consent Requirements" Variant="Variant.Outlined">
-                                        <RadzenStack Gap="0.5rem">
+                                        <RadzenStack Gap="0.5rem" Style="margin-top: 0.5rem;">
                                             <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
                                                 <RadzenCheckBox @bind-Value="@model.RequireConsent" TriState="true" />
                                                 <RadzenLabel Text="Require user consent for authorization" />
@@ -317,12 +323,13 @@
                                         </RadzenText>
                                     </RadzenFormField>
                                 </RadzenStack>
-                            </RadzenFieldset>
+                            </RadzenStack>
 
-                            <RadzenFieldset Text="Endpoint Access" class="rz-mt-4">
+                            <RadzenStack Gap="0.75rem" class="rz-mt-4 rz-mb-4">
+                                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Endpoint Access</RadzenText>
                                 <RadzenStack Gap="1rem">
                                     <RadzenFormField Text="API Endpoint Access" Variant="Variant.Outlined">
-                                        <RadzenStack Gap="0.5rem">
+                                        <RadzenStack Gap="0.5rem" Style="margin-top: 0.5rem;">
                                             <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
                                                 <RadzenCheckBox @bind-Value="@model.AllowAccessToUserInfoEndpoint" TriState="true" />
                                                 <RadzenLabel Text="Allow access to UserInfo endpoint" />
@@ -341,12 +348,13 @@
                                         </RadzenText>
                                     </RadzenFormField>
                                 </RadzenStack>
-                            </RadzenFieldset>
+                            </RadzenStack>
 
-                            <RadzenFieldset Text="Claims Configuration" class="rz-mt-4">
+                            <RadzenStack Gap="0.75rem" class="rz-mt-4 rz-mb-4">
+                                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Claims Configuration</RadzenText>
                                 <RadzenStack Gap="1rem">
                                     <RadzenFormField Text="Client Claims Behavior" Variant="Variant.Outlined">
-                                        <RadzenStack Gap="0.5rem">
+                                        <RadzenStack Gap="0.5rem" Style="margin-top: 0.5rem;">
                                             <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
                                                 <RadzenCheckBox @bind-Value="@model.IncludeJwtId" TriState="true" />
                                                 <RadzenLabel Text="Include JWT ID in tokens" />
@@ -371,17 +379,18 @@
                                         </RadzenText>
                                     </RadzenFormField>
                                 </RadzenStack>
-                            </RadzenFieldset>
+                            </RadzenStack>
                         </div>
                     </RadzenTabsItem>
 
                     <!-- MFA Configuration Tab -->
                     <RadzenTabsItem Text="Multi-Factor Auth" Icon="verified_user">
                         <div style="padding: 1rem; max-height: 550px; overflow-y: auto;">
-                            <RadzenFieldset Text="MFA Requirements">
+                            <RadzenStack Gap="0.75rem" class="rz-mb-4">
+                                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">MFA Requirements</RadzenText>
                                 <RadzenStack Gap="1rem">
                                     <RadzenFormField Text="MFA Enforcement" Variant="Variant.Outlined">
-                                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" Style="margin-top: 0.5rem;">
                                             <RadzenCheckBox @bind-Value="@model.RequireMfa" TriState="true" />
                                             <RadzenLabel Text="Require multi-factor authentication" />
                                         </RadzenStack>
@@ -404,7 +413,7 @@
                                         </RadzenColumn>
                                         <RadzenColumn Size="12" SizeMD="6">
                                             <RadzenFormField Text="Session MFA Memory" Variant="Variant.Outlined">
-                                                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" Style="margin-top: 0.5rem;">
                                                     <RadzenCheckBox @bind-Value="@model.RememberMfaForSession" TriState="true" />
                                                     <RadzenLabel Text="Remember MFA for session duration" />
                                                 </RadzenStack>
@@ -416,7 +425,7 @@
                                     </RadzenRow>
 
                                     <RadzenFormField Text="Allowed MFA Methods" Variant="Variant.Outlined">
-                                        <RadzenStack Gap="0.5rem">
+                                        <RadzenStack Gap="0.5rem" Style="margin-top: 0.5rem;">
                                             @foreach (var method in availableMfaMethods)
                                             {
                                                 <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
@@ -431,14 +440,15 @@
                                         </RadzenText>
                                     </RadzenFormField>
                                 </RadzenStack>
-                            </RadzenFieldset>
+                            </RadzenStack>
                         </div>
                     </RadzenTabsItem>
 
                     <!-- Rate Limiting Tab -->
                     <RadzenTabsItem Text="Rate Limiting" Icon="speed">
                         <div style="padding: 1rem; max-height: 550px; overflow-y: auto;">
-                            <RadzenFieldset Text="API Rate Limits">
+                            <RadzenStack Gap="0.75rem" class="rz-mb-4">
+                                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">API Rate Limits</RadzenText>
                                 <RadzenAlert AlertStyle="AlertStyle.Info" ShowIcon="true" class="rz-mb-4">
                                     <RadzenText>Configure rate limits to prevent abuse and ensure fair usage. Leave empty to use realm defaults.</RadzenText>
                                 </RadzenAlert>
@@ -480,14 +490,15 @@
                                         </RadzenColumn>
                                     </RadzenRow>
                                 </RadzenStack>
-                            </RadzenFieldset>
+                            </RadzenStack>
                         </div>
                     </RadzenTabsItem>
 
                     <!-- Branding & Customization Tab -->
                     <RadzenTabsItem Text="Branding & UI" Icon="palette">
                         <div style="padding: 1rem; max-height: 550px; overflow-y: auto;">
-                            <RadzenFieldset Text="Visual Customization">
+                            <RadzenStack Gap="0.75rem" class="rz-mb-4">
+                                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Visual Customization</RadzenText>
                                 <RadzenStack Gap="1rem">
                                     <RadzenFormField Text="Theme Name" Variant="Variant.Outlined">
                                         <RadzenTextBox @bind-Value="@model.ThemeName" 
@@ -525,9 +536,10 @@
                                         </RadzenText>
                                     </RadzenFormField>
                                 </RadzenStack>
-                            </RadzenFieldset>
+                            </RadzenStack>
 
-                            <RadzenFieldset Text="Client Information URLs" class="rz-mt-4">
+                            <RadzenStack Gap="0.75rem" class="rz-mt-4 rz-mb-4">
+                                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Client Information URLs</RadzenText>
                                 <RadzenStack Gap="1rem">
                                     <RadzenRow>
                                         <RadzenColumn Size="12" SizeMD="6">
@@ -575,14 +587,15 @@
                                         </RadzenColumn>
                                     </RadzenRow>
                                 </RadzenStack>
-                            </RadzenFieldset>
+                            </RadzenStack>
                             </div>
                         </RadzenTabsItem>
 
                         <!-- Logout & Integration Tab -->
                         <RadzenTabsItem Text="Logout & Integration" Icon="logout">
                             <div style="padding: 1rem; max-height: 550px; overflow-y: auto;">
-                                <RadzenFieldset Text="Back-Channel Logout">
+                                <RadzenStack Gap="0.75rem" class="rz-mb-4">
+                                    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Back-Channel Logout</RadzenText>
                                     <RadzenStack Gap="1rem">
                                         <RadzenFormField Text="Back-Channel Logout URI" Variant="Variant.Outlined">
                                             <RadzenTextBox @bind-Value="@model.BackChannelLogoutUri" 
@@ -594,7 +607,7 @@
                                         </RadzenFormField>
 
                                         <RadzenFormField Text="Back-Channel Settings" Variant="Variant.Outlined">
-                                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" Style="margin-top: 0.5rem;">
                                                 <RadzenCheckBox @bind-Value="@model.BackChannelLogoutSessionRequired" TriState="true" />
                                                 <RadzenLabel Text="Include session ID in logout tokens" />
                                             </RadzenStack>
@@ -603,9 +616,10 @@
                                             </RadzenText>
                                         </RadzenFormField>
                                     </RadzenStack>
-                                </RadzenFieldset>
+                                </RadzenStack>
 
-                                <RadzenFieldset Text="Front-Channel Logout" class="rz-mt-4">
+                                <RadzenStack Gap="0.75rem" class="rz-mt-4 rz-mb-4">
+                                    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Front-Channel Logout</RadzenText>
                                     <RadzenStack Gap="1rem">
                                         <RadzenFormField Text="Front-Channel Logout URI" Variant="Variant.Outlined">
                                             <RadzenTextBox @bind-Value="@model.FrontChannelLogoutUri" 
@@ -617,15 +631,16 @@
                                         </RadzenFormField>
 
                                         <RadzenFormField Text="Front-Channel Settings" Variant="Variant.Outlined">
-                                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" Style="margin-top: 0.5rem;">
                                                 <RadzenCheckBox @bind-Value="@model.FrontChannelLogoutSessionRequired" TriState="true" />
                                                 <RadzenLabel Text="Require session ID for front-channel logout" />
                                             </RadzenStack>
                                         </RadzenFormField>
                                     </RadzenStack>
-                                </RadzenFieldset>
+                                </RadzenStack>
 
-                                <RadzenFieldset Text="External Integrations" class="rz-mt-4">
+                                <RadzenStack Gap="0.75rem" class="rz-mt-4 rz-mb-4">
+                                    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">External Integrations</RadzenText>
                                     <RadzenStack Gap="1rem">
                                         <RadzenFormField Text="Allowed CORS Origins" Variant="Variant.Outlined">
                                             <RadzenTextArea @bind-Value="@model.AllowedCorsOrigins" 
@@ -645,14 +660,15 @@
                                             </RadzenText>
                                         </RadzenFormField>
                                     </RadzenStack>
-                                </RadzenFieldset>
+                                </RadzenStack>
                             </div>
                         </RadzenTabsItem>
 
                         <!-- Advanced Configuration Tab -->
                         <RadzenTabsItem Text="Advanced" Icon="settings_applications">
                             <div style="padding: 1rem; max-height: 550px; overflow-y: auto;">
-                                <RadzenFieldset Text="Protocol Configuration">
+                                <RadzenStack Gap="0.75rem" class="rz-mb-4">
+                                    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Protocol Configuration</RadzenText>
                                     <RadzenStack Gap="1rem">
                                         <RadzenFormField Text="Protocol Type" Variant="Variant.Outlined">
                                             <RadzenTextBox @bind-Value="@model.ProtocolType" 
@@ -685,9 +701,10 @@
                                             </RadzenAlert>
                                         </RadzenFormField>
                                     </RadzenStack>
-                                </RadzenFieldset>
+                                </RadzenStack>
 
-                                <RadzenFieldset Text="Custom Page URLs" class="rz-mt-4">
+                                <RadzenStack Gap="0.75rem" class="rz-mt-4 rz-mb-4">
+                                    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Custom Page URLs</RadzenText>
                                     <RadzenStack Gap="1rem">
                                         <RadzenFormField Text="Custom Login Page" Variant="Variant.Outlined">
                                             <RadzenTextBox @bind-Value="@model.CustomLoginPageUrl" 
@@ -716,7 +733,7 @@
                                             </RadzenText>
                                         </RadzenFormField>
                                     </RadzenStack>
-                                </RadzenFieldset>
+                                </RadzenStack>
                             </div>
                         </RadzenTabsItem>
 

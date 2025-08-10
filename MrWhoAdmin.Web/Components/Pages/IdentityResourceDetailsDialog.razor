@@ -49,7 +49,8 @@
         </RadzenColumn>
     </RadzenRow>
 
-    <RadzenFieldset Text="User Claims">
+    <RadzenStack Gap="0.75rem">
+        <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">User Claims</RadzenText>
         @if (IdentityResource.UserClaims?.Any() == true)
         {
             <RadzenDataList Data="@IdentityResource.UserClaims" TItem="IdentityResourceClaimDto" WrapItems="true">
@@ -88,11 +89,12 @@
                 <RadzenText>No claims defined for this identity resource.</RadzenText>
             </RadzenAlert>
         }
-    </RadzenFieldset>
+    </RadzenStack>
 
     @if (IdentityResource.Properties?.Any() == true)
     {
-        <RadzenFieldset Text="Properties">
+        <RadzenStack Gap="0.75rem">
+            <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Properties</RadzenText>
             <RadzenDataList Data="@IdentityResource.Properties" TItem="KeyValuePair<string, string>" WrapItems="true">
                 <Template Context="property">
                     <RadzenCard class="rz-p-2" Style="margin: 4px;">
@@ -100,10 +102,11 @@
                     </RadzenCard>
                 </Template>
             </RadzenDataList>
-        </RadzenFieldset>
+        </RadzenStack>
     }
 
-    <RadzenFieldset Text="Metadata">
+    <RadzenStack Gap="0.75rem">
+        <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Metadata</RadzenText>
         <RadzenRow Gap="1rem">
             <RadzenColumn Size="6">
                 <RadzenStack Gap="0.25rem">
@@ -128,7 +131,7 @@
                 </RadzenStack>
             </RadzenColumn>
         </RadzenRow>
-    </RadzenFieldset>
+    </RadzenStack>
 
     <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" class="rz-mt-4">
         @if (!IdentityResource.IsStandard)
