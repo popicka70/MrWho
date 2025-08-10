@@ -194,3 +194,24 @@ This is the code block that represents the suggested code change:
 1. First check: Is the endpoint using hyphen or underscore?
 2. Test manually: Browse to `{authority}/.well-known/openid-configuration`
 3. Verify JSON response contains all required OIDC endpoints
+
+## Lessons learned: EF Core migrations across providers and Docker
+
+- Keep provider migrations in sync:
+    - Whenever the domain model changes, create and commit migrations for all supported providers: SqlServer, PostgreSql, MySql/MariaDb.
+    - Do not rely on EnsureCreated for dev/prod; only for tests. Containers must run migrations.
+
+- Make migrations discoverable at runtime:
+    - In each provider-specific migration file, include attributes so EF picks them up: `[DbContext(typeof(ApplicationDbContext))]` and `[Migration("<timestamp>_<Name>")]` on the migration class.
+    - Ensure the app copies provider migrations assemblies into the published image and preload them before `Database.MigrateAsync()`.
+
+- MySQL/MariaDB specifics:
+    - Long composite indexes may exceed key length; use `MySql:IndexPrefixLength` annotations on affected indexes.
+    - Large string columns can cause "Row size too large"; switch big varchars to `longtext` in MySQL/MariaDB migrations.
+    - MariaDB healthcheck: prefer `CMD-SHELL` and `mariadb-admin ping -h 127.0.0.1 -uroot -p$MARIADB_ROOT_PASSWORD`.
+
+- Container test detection pitfalls:
+    - Env var `DOTNET_RUNNING_IN_CONTAINER` can trigger test heuristics; set `DOTNET_RUNNING_IN_CONTAINER=false` in compose for app services that must use migrations.
+
+- Clean partial DB state when migrations fail:
+    - If a migration fails mid-way, bring the stack down with volumes (`down -v`) before retrying to avoid duplicate column/table errors.
