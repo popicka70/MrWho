@@ -815,13 +815,15 @@ namespace MrWho.Migrations.MySql.Migrations
                 name: "IX_ClientPostLogoutUris_ClientId_Uri",
                 table: "ClientPostLogoutUris",
                 columns: new[] { "ClientId", "Uri" },
-                unique: true);
+                unique: true)
+                .Annotation("MySql:IndexPrefixLength", new[] { 255, 512 });
 
             migrationBuilder.CreateIndex(
                 name: "IX_ClientRedirectUris_ClientId_Uri",
                 table: "ClientRedirectUris",
                 columns: new[] { "ClientId", "Uri" },
-                unique: true);
+                unique: true)
+                .Annotation("MySql:IndexPrefixLength", new[] { 255, 512 });
 
             migrationBuilder.CreateIndex(
                 name: "IX_Clients_ClientId",
@@ -878,7 +880,8 @@ namespace MrWho.Migrations.MySql.Migrations
             migrationBuilder.CreateIndex(
                 name: "IX_OpenIddictTokens_ApplicationId_Status_Subject_Type",
                 table: "OpenIddictTokens",
-                columns: new[] { "ApplicationId", "Status", "Subject", "Type" });
+                columns: new[] { "ApplicationId", "Status", "Subject", "Type" })
+                .Annotation("MySql:IndexPrefixLength", new[] { 255, 50, 191, 150 });
 
             migrationBuilder.CreateIndex(
                 name: "IX_OpenIddictTokens_AuthorizationId",

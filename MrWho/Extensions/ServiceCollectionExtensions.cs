@@ -15,6 +15,10 @@ using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Configuration;
 using Pomelo.EntityFrameworkCore.MySql.Infrastructure;
 using Npgsql.EntityFrameworkCore.PostgreSQL;
+using System.Reflection;
+using System.Runtime.Loader;
+using System.IO;
+using System.Linq;
 
 namespace MrWho.Extensions;
 
@@ -79,6 +83,34 @@ public static class ServiceCollectionExtensions
     var connectionName = config["Database:ConnectionName"] ?? "mrwhodb";
         var connectionString = config.GetConnectionString(connectionName) ?? config[$"ConnectionStrings:{connectionName}"];
     var migrationsAssembly = config["Database:MigrationsAssembly"]; // optional
+
+        // Proactively load the migrations assembly if specified and present alongside the app
+        if (!string.IsNullOrWhiteSpace(migrationsAssembly))
+        {
+            try
+            {
+                var alreadyLoaded = AppDomain.CurrentDomain.GetAssemblies()
+                    .Any(a => string.Equals(a.GetName().Name, migrationsAssembly, StringComparison.OrdinalIgnoreCase));
+                if (!alreadyLoaded)
+                {
+                    var baseDir = AppContext.BaseDirectory;
+                    var candidate = Path.Combine(baseDir, $"{migrationsAssembly}.dll");
+                    if (File.Exists(candidate))
+                    {
+                        AssemblyLoadContext.Default.LoadFromAssemblyPath(candidate);
+                    }
+                    else
+                    {
+                        // Fallback: attempt by name (may succeed if on probing paths)
+                        Assembly.Load(new AssemblyName(migrationsAssembly));
+                    }
+                }
+            }
+            catch
+            {
+                // Ignore and let EF try its default resolution which may still work locally
+            }
+        }
 
         if (string.IsNullOrWhiteSpace(connectionString))
         {

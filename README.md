@@ -323,3 +323,7 @@ Key settings used by the MariaDB compose:
 - MariaDB flavor/version: `Database:MySql:Flavor=MariaDb`, `Database:MySql:Version=11.2.0`
 - Migrations assembly: `MrWho.Migrations.MySql`
 - Connection string: `Server=mariadb;Database=MrWho;User ID=root;Password=${MARIADB_ROOT_PASSWORD};`
+
+Troubleshooting:
+- If the MariaDB container logs: "Database is uninitialized and password option is not specified", set `MARIADB_ROOT_PASSWORD`.
+- Easiest: copy `.env.example` to `.env`, set strong values, then rerun compose.
