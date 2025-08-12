@@ -36,6 +36,11 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
     public DbSet<IdentityResourceClaim> IdentityResourceClaims { get; set; }
     public DbSet<IdentityResourceProperty> IdentityResourceProperties { get; set; }
 
+    // Device management entities
+    public DbSet<UserDevice> UserDevices { get; set; }
+    public DbSet<PersistentQrSession> PersistentQrSessions { get; set; }
+    public DbSet<DeviceAuthenticationLog> DeviceAuthenticationLogs { get; set; }
+
     // Data Protection keys for antiforgery/auth cookie encryption persistence
     public DbSet<Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.DataProtectionKey> DataProtectionKeys { get; set; }
 
@@ -208,8 +213,67 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
                   .OnDelete(DeleteBehavior.Cascade);
         });
 
+        // =========================================================================
+        // DEVICE MANAGEMENT CONFIGURATION
+        // ============================================================================
+
+        // Configure UserDevice entity
+        builder.Entity<UserDevice>(entity =>
+        {
+            entity.HasKey(d => d.Id);
+            entity.HasIndex(d => new { d.UserId, d.DeviceId }).IsUnique();
+            entity.HasIndex(d => d.DeviceId);
+            entity.HasIndex(d => new { d.UserId, d.IsActive });
+            entity.HasIndex(d => new { d.UserId, d.IsTrusted });
+            
+            entity.HasOne(d => d.User)
+                  .WithMany()
+                  .HasForeignKey(d => d.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Configure PersistentQrSession entity
+        builder.Entity<PersistentQrSession>(entity =>
+        {
+            entity.HasKey(q => q.Id);
+            entity.HasIndex(q => q.Token).IsUnique();
+            entity.HasIndex(q => new { q.UserId, q.Status });
+            entity.HasIndex(q => new { q.Status, q.ExpiresAt });
+            entity.HasIndex(q => q.ClientId);
+            
+            entity.HasOne(q => q.User)
+                  .WithMany()
+                  .HasForeignKey(q => q.UserId)
+                  .OnDelete(DeleteBehavior.SetNull);
+                  
+            entity.HasOne(q => q.ApprovedByDevice)
+                  .WithMany(d => d.QrSessions)
+                  .HasForeignKey(q => q.ApprovedByDeviceId)
+                  .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // Configure DeviceAuthenticationLog entity
+        builder.Entity<DeviceAuthenticationLog>(entity =>
+        {
+            entity.HasKey(l => l.Id);
+            entity.HasIndex(l => new { l.DeviceId, l.OccurredAt });
+            entity.HasIndex(l => new { l.UserId, l.OccurredAt });
+            entity.HasIndex(l => new { l.ActivityType, l.OccurredAt });
+            entity.HasIndex(l => new { l.ClientId, l.OccurredAt });
+            
+            entity.HasOne(l => l.Device)
+                  .WithMany(d => d.AuthenticationLogs)
+                  .HasForeignKey(l => l.DeviceId)
+                  .OnDelete(DeleteBehavior.Restrict); // Changed from Cascade to Restrict to avoid multiple cascade paths
+                  
+            entity.HasOne(l => l.User)
+                  .WithMany()
+                  .HasForeignKey(l => l.UserId)
+                  .OnDelete(DeleteBehavior.Restrict); // Changed from Cascade to Restrict to avoid multiple cascade paths
+        });
+
         // Configure DataProtectionKey entity
-    builder.Entity<Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.DataProtectionKey>(entity =>
+        builder.Entity<Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.DataProtectionKey>(entity =>
         {
             entity.HasKey(k => k.Id);
             entity.Property(k => k.FriendlyName).HasMaxLength(256);

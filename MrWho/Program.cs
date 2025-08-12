@@ -19,7 +19,7 @@ builder.Services.AddDataProtection()
 
 // Use new client-specific cookie configuration instead of standard Identity
 builder.Services.AddMrWhoIdentityWithClientCookies();
-builder.Services.AddMrWhoServices();
+builder.Services.AddMrWhoServices(); // This now includes device management services
 builder.Services.AddMrWhoClientCookies(); // Add client-specific cookies
 builder.Services.AddMrWhoOpenIddict();
 builder.Services.AddMrWhoAuthorizationWithClientCookies(); // Use authorization with client cookie support
@@ -52,13 +52,8 @@ builder.Services.AddAuthorization(options =>
         policy.RequireClaim("amr", "mfa"));
 });
 
-// Business Logic Services
-// Registration is handled in AddMrWhoServices() extension method
-
-// ensure services are registered
-builder.Services.AddSingleton<IQrCodeService, QrCodeService>();
+// Register claims transformation service
 builder.Services.AddScoped<Microsoft.AspNetCore.Authentication.IClaimsTransformation, MrWho.Services.AmrClaimsTransformation>();
-builder.Services.AddSingleton<IQrLoginStore, InMemoryQrLoginStore>();
 
 var app = builder.Build();
 
@@ -72,6 +67,7 @@ logger.LogInformation("?? Web Root: {WebRoot}", app.Environment.WebRootPath);
 logger.LogInformation("?? Is Development: {IsDevelopment}", app.Environment.IsDevelopment());
 logger.LogInformation("?? Is Production: {IsProduction}", app.Environment.IsProduction());
 logger.LogInformation("?? Is Staging: {IsStaging}", app.Environment.IsStaging());
+logger.LogInformation("?? Device Management: Enhanced QR login with persistent device pairing enabled");
 
 // Configure the HTTP request pipeline using the new client-cookie-aware method
 await app.ConfigureMrWhoPipelineWithClientCookiesAsync();

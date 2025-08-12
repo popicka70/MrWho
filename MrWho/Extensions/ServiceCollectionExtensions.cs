@@ -70,6 +70,22 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IBackChannelLogoutService, BackChannelLogoutService>();
         services.AddHttpClient(); // Required for back-channel logout HTTP calls
 
+        // ============================================================================
+        // DEVICE MANAGEMENT SERVICES
+        // ============================================================================
+
+        // Register device management service
+        services.AddScoped<IDeviceManagementService, DeviceManagementService>();
+
+        // Register enhanced QR login service (supports both session-based and persistent QR)
+        services.AddScoped<IEnhancedQrLoginService, EnhancedQrLoginService>();
+
+        // Keep the original QR login store for backwards compatibility
+        services.AddSingleton<IQrLoginStore, InMemoryQrLoginStore>();
+
+        // Register QR code service (if not already registered)
+        services.AddSingleton<IQrCodeService, QrCodeService>();
+
         return services;
     }
 

@@ -1,0 +1,161 @@
+@model List<MrWho.Models.UserDevice>
+@{
+    ViewData["Title"] = "My Devices";
+}
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="bi bi-phone"></i> My Devices</h2>
+                <a href="/device-management/register" class="btn btn-primary">
+                    <i class="bi bi-plus-circle"></i> Register New Device
+                </a>
+            </div>
+
+            @if (TempData["SuccessMessage"] != null)
+            {
+                <div class="alert alert-success alert-dismissible fade show" role="alert">
+                    @TempData["SuccessMessage"]
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            }
+
+            @if (TempData["ErrorMessage"] != null)
+            {
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    @TempData["ErrorMessage"]
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            }
+
+            @if (Model.Any())
+            {
+                <div class="row">
+                    @foreach (var device in Model)
+                    {
+                        <div class="col-lg-6 col-xl-4 mb-4">
+                            <div class="card h-100 @(device.IsActive ? "" : "border-secondary")">
+                                <div class="card-header d-flex justify-content-between align-items-center @(device.IsActive ? "bg-primary text-white" : "bg-secondary text-white")">
+                                    <div class="d-flex align-items-center">
+                                        <i class="@GetDeviceIcon(device.DeviceType) me-2"></i>
+                                        <span class="fw-bold">@device.DeviceName</span>
+                                    </div>
+                                    @if (device.IsTrusted)
+                                    {
+                                        <i class="bi bi-shield-check text-success" title="Trusted Device"></i>
+                                    }
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-2">
+                                        <strong>Type:</strong> @device.DeviceType
+                                    </div>
+                                    @if (!string.IsNullOrEmpty(device.OperatingSystem))
+                                    {
+                                        <div class="mb-2">
+                                            <strong>OS:</strong> @device.OperatingSystem
+                                        </div>
+                                    }
+                                    <div class="mb-2">
+                                        <strong>Status:</strong>
+                                        <span class="badge @(device.IsActive ? "bg-success" : "bg-secondary")">
+                                            @(device.IsActive ? "Active" : "Inactive")
+                                        </span>
+                                    </div>
+                                    <div class="mb-2">
+                                        <strong>Can Approve Logins:</strong>
+                                        <span class="badge @(device.CanApproveLogins ? "bg-success" : "bg-warning")">
+                                            @(device.CanApproveLogins ? "Yes" : "No")
+                                        </span>
+                                    </div>
+                                    @if (device.LastUsedAt.HasValue)
+                                    {
+                                        <div class="mb-2">
+                                            <strong>Last Used:</strong> @device.LastUsedAt.Value.ToString("MMM dd, yyyy 'at' h:mm tt")
+                                        </div>
+                                    }
+                                    <div class="mb-2">
+                                        <strong>Registered:</strong> @device.CreatedAt.ToString("MMM dd, yyyy")
+                                    </div>
+                                    @if (!string.IsNullOrEmpty(device.LastIpAddress))
+                                    {
+                                        <div class="mb-2">
+                                            <strong>Last IP:</strong> <code>@device.LastIpAddress</code>
+                                        </div>
+                                    }
+                                </div>
+                                @if (device.IsActive)
+                                {
+                                    <div class="card-footer">
+                                        <div class="btn-group w-100" role="group">
+                                            <a href="/device-management/activity?deviceId=@device.DeviceId" class="btn btn-outline-primary btn-sm">
+                                                <i class="bi bi-activity"></i> Activity
+                                            </a>
+                                            <form method="post" action="/device-management/revoke/@device.DeviceId" class="d-inline">
+                                                @Html.AntiForgeryToken()
+                                                <button type="submit" class="btn btn-outline-danger btn-sm" 
+                                                        onclick="return confirm('Are you sure you want to revoke this device?')">
+                                                    <i class="bi bi-x-circle"></i> Revoke
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+            else
+            {
+                <div class="alert alert-info">
+                    <h4><i class="bi bi-info-circle"></i> No Devices Registered</h4>
+                    <p>You haven't registered any devices yet. Register your phone or other devices to enable seamless authentication.</p>
+                    <a href="/device-management/register" class="btn btn-primary">
+                        <i class="bi bi-plus-circle"></i> Register Your First Device
+                    </a>
+                </div>
+            }
+
+            <div class="mt-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="bi bi-info-circle"></i> About Device Registration</h5>
+                    </div>
+                    <div class="card-body">
+                        <p>Registered devices allow you to:</p>
+                        <ul>
+                            <li><strong>Approve QR Code Logins:</strong> Use your phone to approve login attempts on other devices</li>
+                            <li><strong>Passwordless Authentication:</strong> Sign in without entering your password (trusted devices only)</li>
+                            <li><strong>Security Monitoring:</strong> Track authentication activity across all your devices</li>
+                            <li><strong>Enhanced Security:</strong> Get notified of suspicious activity and easily revoke compromised devices</li>
+                        </ul>
+                        <p class="mb-0">
+                            <a href="/device-management/activity" class="btn btn-outline-secondary btn-sm">
+                                <i class="bi bi-activity"></i> View All Activity
+                            </a>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@functions {
+    private string GetDeviceIcon(MrWho.Shared.DeviceType deviceType)
+    {
+        return deviceType switch
+        {
+            MrWho.Shared.DeviceType.Phone => "bi bi-phone",
+            MrWho.Shared.DeviceType.Tablet => "bi bi-tablet",
+            MrWho.Shared.DeviceType.Desktop => "bi bi-pc-display",
+            MrWho.Shared.DeviceType.Laptop => "bi bi-laptop",
+            MrWho.Shared.DeviceType.SmartWatch => "bi bi-smartwatch",
+            MrWho.Shared.DeviceType.SmartTv => "bi bi-tv",
+            MrWho.Shared.DeviceType.GameConsole => "bi bi-controller",
+            MrWho.Shared.DeviceType.WebBrowser => "bi bi-globe",
+            _ => "bi bi-device-hdd"
+        };
+    }
+}

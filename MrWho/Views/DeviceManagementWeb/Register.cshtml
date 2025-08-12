@@ -1,0 +1,88 @@
+@{
+    ViewData["Title"] = "Register Device";
+}
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="bi bi-plus-circle"></i> Register New Device</h3>
+                </div>
+                <div class="card-body">
+                    @if (TempData["ErrorMessage"] != null)
+                    {
+                        <div class="alert alert-danger">
+                            @TempData["ErrorMessage"]
+                        </div>
+                    }
+
+                    <form method="post" action="/device-management/register">
+                        @Html.AntiForgeryToken()
+                        
+                        <div class="mb-3">
+                            <label for="deviceName" class="form-label">Device Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="deviceName" name="deviceName" 
+                                   placeholder="e.g., John's iPhone, My Work Laptop" required>
+                            <div class="form-text">Choose a descriptive name to identify this device.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="deviceId" class="form-label">Device ID</label>
+                            <input type="text" class="form-control" id="deviceId" name="deviceId" 
+                                   value="@Guid.NewGuid().ToString("N")[..16]" readonly>
+                            <div class="form-text">Auto-generated unique identifier for this device.</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="isTrusted" name="isTrusted">
+                                <label class="form-check-label" for="isTrusted">
+                                    <strong>Mark as Trusted Device</strong>
+                                </label>
+                                <div class="form-text">
+                                    Trusted devices can be used for passwordless authentication and have enhanced privileges.
+                                    Only mark devices you personally control and that are secure.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-info">
+                            <h6><i class="bi bi-info-circle"></i> What happens next?</h6>
+                            <ul class="mb-0">
+                                <li>Your device will be registered and can approve QR code logins</li>
+                                <li>You'll be able to monitor authentication activity</li>
+                                <li>If marked as trusted, you can use it for passwordless sign-in</li>
+                                <li>You can revoke this device at any time from your device list</li>
+                            </ul>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="/device-management" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left"></i> Back to Devices
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-plus-circle"></i> Register Device
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5><i class="bi bi-shield-check"></i> Security Best Practices</h5>
+                </div>
+                <div class="card-body">
+                    <ul>
+                        <li><strong>Only register devices you personally control</strong> - Don't register shared or public computers</li>
+                        <li><strong>Use descriptive names</strong> - This helps you identify devices in your security logs</li>
+                        <li><strong>Mark trusted carefully</strong> - Only mark devices as trusted if they're secure and password-protected</li>
+                        <li><strong>Review regularly</strong> - Check your device list periodically and revoke unused devices</li>
+                        <li><strong>Revoke if compromised</strong> - Immediately revoke any device you suspect has been compromised</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
