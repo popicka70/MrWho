@@ -1,0 +1,123 @@
+@model dynamic
+@{
+    ViewData["Title"] = "Approve Login";
+    var token = ViewData["Token"] as string;
+    var sessionInfo = ViewData["SessionInfo"] as MrWho.Services.QrSessionInfo;
+    var availableDevices = ViewData["AvailableDevices"] as List<MrWho.Models.UserDevice>;
+}
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card">
+                <div class="card-header bg-primary text-white text-center">
+                    <h3><i class="bi bi-qr-code"></i> Approve Login Request</h3>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <h5><i class="bi bi-info-circle"></i> Login Request Details</h5>
+                        <ul class="mb-0">
+                            @if (!string.IsNullOrEmpty(sessionInfo?.ClientId))
+                            {
+                                <li><strong>Application:</strong> @sessionInfo.ClientId</li>
+                            }
+                            @if (!string.IsNullOrEmpty(sessionInfo?.ReturnUrl))
+                            {
+                                <li><strong>Return URL:</strong> <code>@sessionInfo.ReturnUrl</code></li>
+                            }
+                            <li><strong>Expires:</strong> @sessionInfo?.ExpiresAt.ToString("MMM dd, yyyy 'at' h:mm tt")</li>
+                        </ul>
+                    </div>
+
+                    @if (availableDevices?.Any() == true)
+                    {
+                        <form method="post" action="/device-management/approve-persistent/@token">
+                            @Html.AntiForgeryToken()
+                            
+                            <div class="mb-4">
+                                <label class="form-label">
+                                    <strong>Select the device you're using to approve this login:</strong>
+                                </label>
+                                @foreach (var device in availableDevices)
+                                {
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="deviceId" value="@device.DeviceId" 
+                                               id="device_@device.Id" @(availableDevices.First() == device ? "checked" : "")>
+                                        <label class="form-check-label" for="device_@device.Id">
+                                            <div class="d-flex align-items-center">
+                                                <i class="@GetDeviceIcon(device.DeviceType) me-2"></i>
+                                                <div>
+                                                    <div class="fw-bold">@device.DeviceName</div>
+                                                    <small class="text-muted">@device.DeviceType • Registered @device.CreatedAt.ToString("MMM yyyy")</small>
+                                                    @if (device.IsTrusted)
+                                                    {
+                                                        <span class="badge bg-success ms-2">Trusted</span>
+                                                    }
+                                                </div>
+                                            </div>
+                                        </label>
+                                    </div>
+                                }
+                            </div>
+
+                            <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                                <button type="submit" name="action" value="approve" class="btn btn-success btn-lg">
+                                    <i class="bi bi-check-circle"></i> Approve Login
+                                </button>
+                                <button type="submit" name="action" value="reject" class="btn btn-danger btn-lg">
+                                    <i class="bi bi-x-circle"></i> Reject Login
+                                </button>
+                            </div>
+                        </form>
+                    }
+                    else
+                    {
+                        <div class="alert alert-warning">
+                            <h5><i class="bi bi-exclamation-triangle"></i> No Devices Available</h5>
+                            <p>You don't have any devices registered that can approve logins. To use QR code authentication, you need to:</p>
+                            <ol>
+                                <li>Register a device that can approve logins</li>
+                                <li>Ensure the device is active and not revoked</li>
+                            </ol>
+                            <a href="/device-management/register" class="btn btn-primary">
+                                <i class="bi bi-plus-circle"></i> Register a Device
+                            </a>
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h5><i class="bi bi-shield-check"></i> Security Information</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="mb-0">
+                        <li><strong>Only approve if you initiated this login</strong> - If you didn't try to log in, click "Reject"</li>
+                        <li><strong>Check the application name</strong> - Make sure it's the service you're trying to access</li>
+                        <li><strong>Verify the timing</strong> - This request should be recent if you just scanned a QR code</li>
+                        <li><strong>Your choice is logged</strong> - All approval/rejection decisions are recorded for security monitoring</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@functions {
+    private string GetDeviceIcon(MrWho.Shared.DeviceType deviceType)
+    {
+        return deviceType switch
+        {
+            MrWho.Shared.DeviceType.Phone => "bi bi-phone",
+            MrWho.Shared.DeviceType.Tablet => "bi bi-tablet",
+            MrWho.Shared.DeviceType.Desktop => "bi bi-pc-display",
+            MrWho.Shared.DeviceType.Laptop => "bi bi-laptop",
+            MrWho.Shared.DeviceType.SmartWatch => "bi bi-smartwatch",
+            MrWho.Shared.DeviceType.SmartTv => "bi bi-tv",
+            MrWho.Shared.DeviceType.GameConsole => "bi bi-controller",
+            MrWho.Shared.DeviceType.WebBrowser => "bi bi-globe",
+            _ => "bi bi-device-hdd"
+        };
+    }
+}

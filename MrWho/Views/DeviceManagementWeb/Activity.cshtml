@@ -1,0 +1,184 @@
+@model List<MrWho.Models.DeviceAuthenticationLog>
+@{
+    ViewData["Title"] = "Device Activity";
+}
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="bi bi-activity"></i> Device Activity</h2>
+                <a href="/device-management" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left"></i> Back to Devices
+                </a>
+            </div>
+
+            @if (Model.Any())
+            {
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="bi bi-list-ul"></i> Recent Activity (Last 50 events)</h5>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Activity</th>
+                                    <th>Client</th>
+                                    <th>Status</th>
+                                    <th>Location</th>
+                                    <th>Details</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var log in Model)
+                                {
+                                    <tr class="@(log.IsSuccessful ? "" : "table-warning")">
+                                        <td>
+                                            <div class="fw-bold">@log.OccurredAt.ToString("MMM dd")</div>
+                                            <small class="text-muted">@log.OccurredAt.ToString("h:mm tt")</small>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <i class="@GetActivityIcon(log.ActivityType) me-2"></i>
+                                                <div>
+                                                    <div class="fw-bold">@GetActivityTitle(log.ActivityType)</div>
+                                                    @if (!string.IsNullOrEmpty(log.ErrorMessage))
+                                                    {
+                                                        <small class="text-danger">@log.ErrorMessage</small>
+                                                    }
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            @if (!string.IsNullOrEmpty(log.ClientId))
+                                            {
+                                                <code>@log.ClientId</code>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">-</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            <span class="badge @(log.IsSuccessful ? "bg-success" : "bg-danger")">
+                                                @(log.IsSuccessful ? "Success" : "Failed")
+                                            </span>
+                                        </td>
+                                        <td>
+                                            @if (!string.IsNullOrEmpty(log.IpAddress))
+                                            {
+                                                <code>@log.IpAddress</code>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">-</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (!string.IsNullOrEmpty(log.UserAgent))
+                                            {
+                                                <small class="text-muted" title="@log.UserAgent">
+                                                    @(log.UserAgent.Length > 50 ? log.UserAgent.Substring(0, 50) + "..." : log.UserAgent)
+                                                </small>
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted">-</span>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="alert alert-info">
+                    <h4><i class="bi bi-info-circle"></i> No Activity Yet</h4>
+                    <p>No authentication activity has been recorded for your devices yet. Activity will appear here when you:</p>
+                    <ul>
+                        <li>Register new devices</li>
+                        <li>Approve QR code logins</li>
+                        <li>Use passwordless authentication</li>
+                        <li>Update device settings</li>
+                    </ul>
+                </div>
+            }
+
+            <div class="mt-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="bi bi-shield-exclamation"></i> Security Monitoring</h5>
+                    </div>
+                    <div class="card-body">
+                        <p>This activity log helps you monitor the security of your account. Look out for:</p>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h6 class="text-danger">?? Suspicious Activity</h6>
+                                <ul class="small">
+                                    <li>Logins from unfamiliar locations</li>
+                                    <li>Failed authentication attempts</li>
+                                    <li>Unexpected QR code approvals</li>
+                                    <li>Device registrations you didn't make</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <h6 class="text-success">? Normal Activity</h6>
+                                <ul class="small">
+                                    <li>QR code approvals you made</li>
+                                    <li>Successful logins from known devices</li>
+                                    <li>Device updates you performed</li>
+                                    <li>Expected passwordless authentications</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="alert alert-warning mt-3 mb-0">
+                            <strong>Found suspicious activity?</strong> 
+                            Immediately revoke the affected device and consider changing your password.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@functions {
+    private string GetActivityIcon(MrWho.Shared.DeviceAuthActivity activityType)
+    {
+        return activityType switch
+        {
+            MrWho.Shared.DeviceAuthActivity.DeviceRegistered => "bi bi-plus-circle text-success",
+            MrWho.Shared.DeviceAuthActivity.QrLoginApproved => "bi bi-check-circle text-success",
+            MrWho.Shared.DeviceAuthActivity.QrLoginRejected => "bi bi-x-circle text-warning",
+            MrWho.Shared.DeviceAuthActivity.PasswordlessLogin => "bi bi-unlock text-primary",
+            MrWho.Shared.DeviceAuthActivity.DeviceRevoked => "bi bi-trash text-danger",
+            MrWho.Shared.DeviceAuthActivity.DeviceUpdated => "bi bi-pencil text-info",
+            MrWho.Shared.DeviceAuthActivity.SecurityAlert => "bi bi-exclamation-triangle text-warning",
+            MrWho.Shared.DeviceAuthActivity.DeviceCompromised => "bi bi-shield-exclamation text-danger",
+            _ => "bi bi-circle text-muted"
+        };
+    }
+
+    private string GetActivityTitle(MrWho.Shared.DeviceAuthActivity activityType)
+    {
+        return activityType switch
+        {
+            MrWho.Shared.DeviceAuthActivity.DeviceRegistered => "Device Registered",
+            MrWho.Shared.DeviceAuthActivity.QrLoginApproved => "QR Login Approved",
+            MrWho.Shared.DeviceAuthActivity.QrLoginRejected => "QR Login Rejected",
+            MrWho.Shared.DeviceAuthActivity.PasswordlessLogin => "Passwordless Login",
+            MrWho.Shared.DeviceAuthActivity.DeviceRevoked => "Device Revoked",
+            MrWho.Shared.DeviceAuthActivity.DeviceUpdated => "Device Updated",
+            MrWho.Shared.DeviceAuthActivity.SecurityAlert => "Security Alert",
+            MrWho.Shared.DeviceAuthActivity.PushNotificationSent => "Push Notification Sent",
+            MrWho.Shared.DeviceAuthActivity.PushNotificationFailed => "Push Notification Failed",
+            MrWho.Shared.DeviceAuthActivity.DeviceCompromised => "Device Compromised",
+            _ => activityType.ToString()
+        };
+    }
+}

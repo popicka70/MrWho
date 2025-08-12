@@ -706,6 +706,61 @@ namespace MrWho.Migrations.SqlServer.Migrations
                     b.ToTable("ClientScopes");
                 });
 
+            modelBuilder.Entity("MrWho.Models.DeviceAuthenticationLog", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<int>("ActivityType")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ClientId")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("DeviceId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<bool>("IsSuccessful")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Metadata")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime>("OccurredAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UserAgent")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActivityType", "OccurredAt");
+
+                    b.HasIndex("ClientId", "OccurredAt");
+
+                    b.HasIndex("DeviceId", "OccurredAt");
+
+                    b.HasIndex("UserId", "OccurredAt");
+
+                    b.ToTable("DeviceAuthenticationLogs");
+                });
+
             modelBuilder.Entity("MrWho.Models.IdentityResource", b =>
                 {
                     b.Property<string>("Id")
@@ -806,6 +861,73 @@ namespace MrWho.Migrations.SqlServer.Migrations
                         .IsUnique();
 
                     b.ToTable("IdentityResourceProperties");
+                });
+
+            modelBuilder.Entity("MrWho.Models.PersistentQrSession", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime?>("ApprovedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ApprovedByDeviceId")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("ApproverIpAddress")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("ClientId")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("InitiatorIpAddress")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("Metadata")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<string>("ReturnUrl")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("UserId")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApprovedByDeviceId");
+
+                    b.HasIndex("ClientId");
+
+                    b.HasIndex("Token")
+                        .IsUnique();
+
+                    b.HasIndex("Status", "ExpiresAt");
+
+                    b.HasIndex("UserId", "Status");
+
+                    b.ToTable("PersistentQrSessions");
                 });
 
             modelBuilder.Entity("MrWho.Models.Realm", b =>
@@ -1021,6 +1143,91 @@ namespace MrWho.Migrations.SqlServer.Migrations
                         .IsUnique();
 
                     b.ToTable("ScopeClaims");
+                });
+
+            modelBuilder.Entity("MrWho.Models.UserDevice", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<bool>("CanApproveLogins")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DeviceId")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("DeviceName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("DeviceType")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("ExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsTrusted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("LastIpAddress")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("LastLocation")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime?>("LastUsedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Metadata")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("OperatingSystem")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("PublicKey")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("PushToken")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("UserAgent")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DeviceId");
+
+                    b.HasIndex("UserId", "DeviceId")
+                        .IsUnique();
+
+                    b.HasIndex("UserId", "IsActive");
+
+                    b.HasIndex("UserId", "IsTrusted");
+
+                    b.ToTable("UserDevices");
                 });
 
             modelBuilder.Entity("OpenIddict.EntityFrameworkCore.Models.OpenIddictEntityFrameworkCoreApplication", b =>
@@ -1373,6 +1580,25 @@ namespace MrWho.Migrations.SqlServer.Migrations
                     b.Navigation("Client");
                 });
 
+            modelBuilder.Entity("MrWho.Models.DeviceAuthenticationLog", b =>
+                {
+                    b.HasOne("MrWho.Models.UserDevice", "Device")
+                        .WithMany("AuthenticationLogs")
+                        .HasForeignKey("DeviceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Microsoft.AspNetCore.Identity.IdentityUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Device");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("MrWho.Models.IdentityResourceClaim", b =>
                 {
                     b.HasOne("MrWho.Models.IdentityResource", "IdentityResource")
@@ -1395,6 +1621,23 @@ namespace MrWho.Migrations.SqlServer.Migrations
                     b.Navigation("IdentityResource");
                 });
 
+            modelBuilder.Entity("MrWho.Models.PersistentQrSession", b =>
+                {
+                    b.HasOne("MrWho.Models.UserDevice", "ApprovedByDevice")
+                        .WithMany("QrSessions")
+                        .HasForeignKey("ApprovedByDeviceId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Microsoft.AspNetCore.Identity.IdentityUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("ApprovedByDevice");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("MrWho.Models.ScopeClaim", b =>
                 {
                     b.HasOne("MrWho.Models.Scope", "Scope")
@@ -1404,6 +1647,17 @@ namespace MrWho.Migrations.SqlServer.Migrations
                         .IsRequired();
 
                     b.Navigation("Scope");
+                });
+
+            modelBuilder.Entity("MrWho.Models.UserDevice", b =>
+                {
+                    b.HasOne("Microsoft.AspNetCore.Identity.IdentityUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("OpenIddict.EntityFrameworkCore.Models.OpenIddictEntityFrameworkCoreAuthorization", b =>
@@ -1465,6 +1719,13 @@ namespace MrWho.Migrations.SqlServer.Migrations
             modelBuilder.Entity("MrWho.Models.Scope", b =>
                 {
                     b.Navigation("Claims");
+                });
+
+            modelBuilder.Entity("MrWho.Models.UserDevice", b =>
+                {
+                    b.Navigation("AuthenticationLogs");
+
+                    b.Navigation("QrSessions");
                 });
 
             modelBuilder.Entity("OpenIddict.EntityFrameworkCore.Models.OpenIddictEntityFrameworkCoreApplication", b =>

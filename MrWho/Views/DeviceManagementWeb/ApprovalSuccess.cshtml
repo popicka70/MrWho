@@ -1,0 +1,30 @@
+@model string
+@{
+    ViewData["Title"] = "Login Approved";
+}
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card border-success">
+                <div class="card-header bg-success text-white text-center">
+                    <h3><i class="bi bi-check-circle"></i> Success!</h3>
+                </div>
+                <div class="card-body text-center">
+                    <div class="alert alert-success">
+                        <h4>@Model</h4>
+                    </div>
+                    <p>You can now return to your other device. The login should complete automatically.</p>
+                    <div class="mt-4">
+                        <a href="/device-management" class="btn btn-primary">
+                            <i class="bi bi-arrow-left"></i> Back to My Devices
+                        </a>
+                        <a href="/" class="btn btn-outline-secondary">
+                            <i class="bi bi-house"></i> Home
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

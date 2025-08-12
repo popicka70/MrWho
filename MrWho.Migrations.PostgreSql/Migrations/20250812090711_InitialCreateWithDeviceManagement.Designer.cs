@@ -12,18 +12,38 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace MrWho.Migrations.PostgreSql.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250809160003_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20250812090711_InitialCreateWithDeviceManagement")]
+    partial class InitialCreateWithDeviceManagement
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.7")
+                .HasAnnotation("ProductVersion", "9.0.8")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
+
+            modelBuilder.Entity("Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.DataProtectionKey", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("FriendlyName")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("Xml")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("DataProtectionKeys");
+                });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
                 {
@@ -345,6 +365,19 @@ namespace MrWho.Migrations.PostgreSql.Migrations
                     b.Property<double?>("AccessTokenLifetime")
                         .HasColumnType("double precision");
 
+                    b.Property<string>("AccessTokenType")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<bool?>("AllowAccessToIntrospectionEndpoint")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool?>("AllowAccessToRevocationEndpoint")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool?>("AllowAccessToUserInfoEndpoint")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("AllowAuthorizationCodeFlow")
                         .HasColumnType("boolean");
 
@@ -357,8 +390,40 @@ namespace MrWho.Migrations.PostgreSql.Migrations
                     b.Property<bool>("AllowRefreshTokenFlow")
                         .HasColumnType("boolean");
 
+                    b.Property<bool?>("AllowRememberConsent")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("AllowedCorsOrigins")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<string>("AllowedIdentityProviders")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("AllowedMfaMethods")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<bool?>("AlwaysIncludeUserClaimsInIdToken")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool?>("AlwaysSendClientClaims")
+                        .HasColumnType("boolean");
+
                     b.Property<double?>("AuthorizationCodeLifetime")
                         .HasColumnType("double precision");
+
+                    b.Property<bool?>("BackChannelLogoutSessionRequired")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("BackChannelLogoutUri")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("ClientClaimsPrefix")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("ClientId")
                         .IsRequired()
@@ -372,23 +437,116 @@ namespace MrWho.Migrations.PostgreSql.Migrations
                     b.Property<int>("ClientType")
                         .HasColumnType("integer");
 
+                    b.Property<string>("ClientUri")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("CookieSameSitePolicy")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("CreatedBy")
                         .HasColumnType("text");
 
+                    b.Property<string>("CustomCssUrl")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("CustomErrorPageUrl")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("CustomJavaScriptUrl")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("CustomLoginPageUrl")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("CustomLogoutPageUrl")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
                     b.Property<string>("Description")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<int?>("DeviceCodeLifetimeMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("DeviceCodePollingIntervalSeconds")
+                        .HasColumnType("integer");
+
+                    b.Property<bool?>("EnableDetailedErrors")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool?>("EnableLocalLogin")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool?>("FrontChannelLogoutSessionRequired")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("FrontChannelLogoutUri")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<bool?>("HashAccessTokens")
+                        .HasColumnType("boolean");
+
+                    b.Property<int?>("IdTokenLifetimeMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<bool?>("IncludeJwtId")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("IsEnabled")
                         .HasColumnType("boolean");
+
+                    b.Property<bool?>("LogSensitiveData")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("LogoUri")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<int?>("MaxRefreshTokensPerUser")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("MfaGracePeriodMinutes")
+                        .HasColumnType("integer");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
+
+                    b.Property<string>("PageTitlePrefix")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<bool?>("PairWiseSubjectSalt")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("PolicyUri")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("ProtocolType")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<int?>("RateLimitRequestsPerDay")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("RateLimitRequestsPerHour")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("RateLimitRequestsPerMinute")
+                        .HasColumnType("integer");
 
                     b.Property<string>("RealmId")
                         .IsRequired()
@@ -397,10 +555,42 @@ namespace MrWho.Migrations.PostgreSql.Migrations
                     b.Property<double?>("RefreshTokenLifetime")
                         .HasColumnType("double precision");
 
+                    b.Property<int?>("RememberMeDurationDays")
+                        .HasColumnType("integer");
+
+                    b.Property<bool?>("RememberMfaForSession")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("RequireClientSecret")
                         .HasColumnType("boolean");
 
+                    b.Property<bool?>("RequireConsent")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool?>("RequireHttpsForCookies")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool?>("RequireMfa")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("RequirePkce")
+                        .HasColumnType("boolean");
+
+                    b.Property<int?>("SessionTimeoutHours")
+                        .HasColumnType("integer");
+
+                    b.Property<bool?>("ShowClientLogo")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("ThemeName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("TosUri")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<bool?>("UpdateAccessTokenClaimsOnRefresh")
                         .HasColumnType("boolean");
 
                     b.Property<DateTime>("UpdatedAt")
@@ -408,6 +598,16 @@ namespace MrWho.Migrations.PostgreSql.Migrations
 
                     b.Property<string>("UpdatedBy")
                         .HasColumnType("text");
+
+                    b.Property<bool?>("UseOneTimeRefreshTokens")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool?>("UseSlidingSessionExpiration")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("UserCodeType")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.HasKey("Id");
 
@@ -505,6 +705,61 @@ namespace MrWho.Migrations.PostgreSql.Migrations
                         .IsUnique();
 
                     b.ToTable("ClientScopes");
+                });
+
+            modelBuilder.Entity("MrWho.Models.DeviceAuthenticationLog", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("text");
+
+                    b.Property<int>("ActivityType")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ClientId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("DeviceId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ErrorMessage")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<bool>("IsSuccessful")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Metadata")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime>("OccurredAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UserAgent")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActivityType", "OccurredAt");
+
+                    b.HasIndex("ClientId", "OccurredAt");
+
+                    b.HasIndex("DeviceId", "OccurredAt");
+
+                    b.HasIndex("UserId", "OccurredAt");
+
+                    b.ToTable("DeviceAuthenticationLogs");
                 });
 
             modelBuilder.Entity("MrWho.Models.IdentityResource", b =>
@@ -609,6 +864,73 @@ namespace MrWho.Migrations.PostgreSql.Migrations
                     b.ToTable("IdentityResourceProperties");
                 });
 
+            modelBuilder.Entity("MrWho.Models.PersistentQrSession", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("ApprovedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ApprovedByDeviceId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ApproverIpAddress")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("ClientId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("InitiatorIpAddress")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Metadata")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("ReturnUrl")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("UserId")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApprovedByDeviceId");
+
+                    b.HasIndex("ClientId");
+
+                    b.HasIndex("Token")
+                        .IsUnique();
+
+                    b.HasIndex("Status", "ExpiresAt");
+
+                    b.HasIndex("UserId", "Status");
+
+                    b.ToTable("PersistentQrSessions");
+                });
+
             modelBuilder.Entity("MrWho.Models.Realm", b =>
                 {
                     b.Property<string>("Id")
@@ -626,13 +948,83 @@ namespace MrWho.Migrations.PostgreSql.Migrations
                     b.Property<string>("CreatedBy")
                         .HasColumnType("text");
 
+                    b.Property<bool>("DefaultAllowRememberConsent")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("DefaultAllowedMfaMethods")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<string>("DefaultCookieSameSitePolicy")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<bool>("DefaultEnableDetailedErrors")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("DefaultIncludeJwtId")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("DefaultLogSensitiveData")
+                        .HasColumnType("boolean");
+
+                    b.Property<int?>("DefaultMaxRefreshTokensPerUser")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("DefaultMfaGracePeriodMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("DefaultRateLimitRequestsPerDay")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("DefaultRateLimitRequestsPerHour")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("DefaultRateLimitRequestsPerMinute")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("DefaultRememberMeDurationDays")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("DefaultRememberMfaForSession")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("DefaultRequireConsent")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("DefaultRequireHttpsForCookies")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("DefaultRequireMfa")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("DefaultSessionTimeoutHours")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("DefaultThemeName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<bool>("DefaultUseOneTimeRefreshTokens")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("DefaultUseSlidingSessionExpiration")
+                        .HasColumnType("boolean");
+
                     b.Property<string>("Description")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
 
+                    b.Property<TimeSpan>("DeviceCodeLifetime")
+                        .HasColumnType("interval");
+
                     b.Property<string>("DisplayName")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
+
+                    b.Property<TimeSpan>("IdTokenLifetime")
+                        .HasColumnType("interval");
 
                     b.Property<bool>("IsEnabled")
                         .HasColumnType("boolean");
@@ -641,6 +1033,26 @@ namespace MrWho.Migrations.PostgreSql.Migrations
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
+
+                    b.Property<string>("RealmCustomCssUrl")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("RealmLogoUri")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("RealmPolicyUri")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("RealmTosUri")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("RealmUri")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
 
                     b.Property<double>("RefreshTokenLifetime")
                         .HasColumnType("double precision");
@@ -732,6 +1144,91 @@ namespace MrWho.Migrations.PostgreSql.Migrations
                         .IsUnique();
 
                     b.ToTable("ScopeClaims");
+                });
+
+            modelBuilder.Entity("MrWho.Models.UserDevice", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("CanApproveLogins")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DeviceId")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("DeviceName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("DeviceType")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsTrusted")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("LastIpAddress")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("LastLocation")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime?>("LastUsedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Metadata")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("OperatingSystem")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("PublicKey")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<string>("PushToken")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UserAgent")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DeviceId");
+
+                    b.HasIndex("UserId", "DeviceId")
+                        .IsUnique();
+
+                    b.HasIndex("UserId", "IsActive");
+
+                    b.HasIndex("UserId", "IsTrusted");
+
+                    b.ToTable("UserDevices");
                 });
 
             modelBuilder.Entity("OpenIddict.EntityFrameworkCore.Models.OpenIddictEntityFrameworkCoreApplication", b =>
@@ -1081,6 +1578,25 @@ namespace MrWho.Migrations.PostgreSql.Migrations
                     b.Navigation("Client");
                 });
 
+            modelBuilder.Entity("MrWho.Models.DeviceAuthenticationLog", b =>
+                {
+                    b.HasOne("MrWho.Models.UserDevice", "Device")
+                        .WithMany("AuthenticationLogs")
+                        .HasForeignKey("DeviceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Microsoft.AspNetCore.Identity.IdentityUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Device");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("MrWho.Models.IdentityResourceClaim", b =>
                 {
                     b.HasOne("MrWho.Models.IdentityResource", "IdentityResource")
@@ -1103,6 +1619,23 @@ namespace MrWho.Migrations.PostgreSql.Migrations
                     b.Navigation("IdentityResource");
                 });
 
+            modelBuilder.Entity("MrWho.Models.PersistentQrSession", b =>
+                {
+                    b.HasOne("MrWho.Models.UserDevice", "ApprovedByDevice")
+                        .WithMany("QrSessions")
+                        .HasForeignKey("ApprovedByDeviceId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Microsoft.AspNetCore.Identity.IdentityUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("ApprovedByDevice");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("MrWho.Models.ScopeClaim", b =>
                 {
                     b.HasOne("MrWho.Models.Scope", "Scope")
@@ -1112,6 +1645,17 @@ namespace MrWho.Migrations.PostgreSql.Migrations
                         .IsRequired();
 
                     b.Navigation("Scope");
+                });
+
+            modelBuilder.Entity("MrWho.Models.UserDevice", b =>
+                {
+                    b.HasOne("Microsoft.AspNetCore.Identity.IdentityUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("OpenIddict.EntityFrameworkCore.Models.OpenIddictEntityFrameworkCoreAuthorization", b =>
@@ -1173,6 +1717,13 @@ namespace MrWho.Migrations.PostgreSql.Migrations
             modelBuilder.Entity("MrWho.Models.Scope", b =>
                 {
                     b.Navigation("Claims");
+                });
+
+            modelBuilder.Entity("MrWho.Models.UserDevice", b =>
+                {
+                    b.Navigation("AuthenticationLogs");
+
+                    b.Navigation("QrSessions");
                 });
 
             modelBuilder.Entity("OpenIddict.EntityFrameworkCore.Models.OpenIddictEntityFrameworkCoreApplication", b =>
