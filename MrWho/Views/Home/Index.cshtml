@@ -1,9 +1,42 @@
 @{
     ViewData["Title"] = "Home";
+    var logoutSuccess = Context.Request.Query.ContainsKey("logout") && Context.Request.Query["logout"] == "success";
 }
 
 <div class="row">
     <div class="col-md-8">
+        @if (logoutSuccess)
+        {
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <h4><i class="bi bi-check-circle"></i> Successfully Logged Out!</h4>
+                <p class="mb-2">Your MrWho session has been securely terminated and all authentication cookies have been cleared.</p>
+                <hr>
+                <div class="row">
+                    <div class="col-6 mb-2">
+                        <i class="bi bi-check-circle text-success"></i> <small>Session Cleared</small>
+                    </div>
+                    <div class="col-6 mb-2">
+                        <i class="bi bi-check-circle text-success"></i> <small>Cookies Removed</small>
+                    </div>
+                    <div class="col-6 mb-2">
+                        <i class="bi bi-check-circle text-success"></i> <small>Secure Logout</small>
+                    </div>
+                    <div class="col-6 mb-2">
+                        <i class="bi bi-check-circle text-success"></i> <small>Privacy Protected</small>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <a href="/connect/login" class="btn btn-primary btn-sm me-2">
+                        <i class="bi bi-box-arrow-in-right"></i> Sign In Again
+                    </a>
+                    <a href="/device-management" class="btn btn-outline-secondary btn-sm">
+                        <i class="bi bi-phone"></i> Manage Devices
+                    </a>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+        
         <div class="jumbotron bg-primary text-white p-5 rounded mb-4">
             <div class="text-center mb-3">
                 <img src="~/images/AuthMrWho.jpeg" alt="MrWho Identity Server" class="mrwho-logo" style="max-width: 120px;" />
@@ -23,11 +56,34 @@
                         <a href="@Url.Action("Login", "Auth")" class="btn btn-primary">Login</a>
                         @if (User.Identity?.IsAuthenticated == true)
                         {
-                            <a href="@Url.Action("Logout", "Auth")" class="btn btn-outline-secondary">Logout</a>
+                            <a href="/connect/logout" class="btn btn-outline-secondary">Logout</a>
+                        }
+                        else if (!logoutSuccess)
+                        {
+                            <p class="text-muted mt-2 mb-0"><small>You are not currently signed in.</small></p>
                         }
                     </div>
                 </div>
             </div>
+            
+            @if (logoutSuccess)
+            {
+                <div class="col-md-6 mb-3">
+                    <div class="card">
+                        <div class="card-header bg-info text-white">
+                            <h5>What's Next?</h5>
+                        </div>
+                        <div class="card-body">
+                            <p>You have successfully logged out. You can:</p>
+                            <ul class="list-unstyled">
+                                <li><i class="bi bi-arrow-right text-primary"></i> <a href="/connect/login">Sign in again</a></li>
+                                <li><i class="bi bi-arrow-right text-primary"></i> <a href="/device-management">Manage your devices</a></li>
+                                <li><i class="bi bi-arrow-right text-primary"></i> <a href="/qr-login/start">Try QR login</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            }
         </div>
     </div>
 </div>

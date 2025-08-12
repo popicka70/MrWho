@@ -250,48 +250,124 @@ public class AuthController : Controller
     }
 
     [HttpGet("logout")]
-    public async Task<IActionResult> Logout(string? clientId = null)
+    public async Task<IActionResult> Logout(string? clientId = null, string? post_logout_redirect_uri = null)
+    {
+        _logger.LogInformation("GET /connect/logout accessed directly. ClientId: {ClientId}, PostLogoutUri: {PostLogoutUri}", clientId, post_logout_redirect_uri);
+        
+        var request = HttpContext.GetOpenIddictServerRequest();
+        
+        // Check if this is a proper OIDC logout request by verifying OIDC-specific parameters
+        bool isOidcLogoutRequest = request != null && (
+            !string.IsNullOrEmpty(request.IdTokenHint) || 
+            !string.IsNullOrEmpty(request.PostLogoutRedirectUri) ||
+            !string.IsNullOrEmpty(request.ClientId) ||
+            !string.IsNullOrEmpty(request.State)
+        );
+        
+        if (isOidcLogoutRequest)
+        {
+            _logger.LogInformation("OIDC logout request detected with proper parameters, processing normally");
+            return await ProcessLogout(clientId, post_logout_redirect_uri);
+        }
+        
+        // For direct browser access without OIDC parameters, perform logout and redirect to home
+        _logger.LogInformation("Direct browser logout access detected (no OIDC parameters)");
+        
+        // Perform logout
+        await _signInManager.SignOutAsync();
+        
+        // Clear any client-specific cookies if we can detect the client
+        string? detectedClientId = clientId ?? await TryGetClientIdFromRequest();
+        if (!string.IsNullOrEmpty(detectedClientId))
+        {
+            try
+            {
+                await _dynamicCookieService.SignOutFromClientAsync(detectedClientId);
+                _logger.LogDebug("Signed out from client-specific cookie for client {ClientId}", detectedClientId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to sign out from client-specific cookie for client {ClientId}", detectedClientId);
+            }
+        }
+        
+        // Redirect to home with success message
+        return RedirectToAction("Index", "Home", new { logout = "success" });
+    }
+
+    [HttpPost("logout")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> LogoutPost(string? clientId = null, string? post_logout_redirect_uri = null)
+    {
+        _logger.LogInformation("POST /connect/logout accessed. ClientId: {ClientId}, PostLogoutUri: {PostLogoutUri}", clientId, post_logout_redirect_uri);
+        
+        var request = HttpContext.GetOpenIddictServerRequest();
+        
+        // Check if this is a proper OIDC logout request by verifying OIDC-specific parameters
+        bool isOidcLogoutRequest = request != null && (
+            !string.IsNullOrEmpty(request.IdTokenHint) || 
+            !string.IsNullOrEmpty(request.PostLogoutRedirectUri) ||
+            !string.IsNullOrEmpty(request.ClientId) ||
+            !string.IsNullOrEmpty(request.State)
+        );
+        
+        if (isOidcLogoutRequest)
+        {
+            _logger.LogInformation("OIDC logout request detected with proper parameters, processing normally");
+            return await ProcessLogout(clientId, post_logout_redirect_uri);
+        }
+        
+        // For regular UI POST requests (like from our logout buttons)
+        _logger.LogInformation("UI logout POST request detected (no OIDC parameters)");
+        
+        // Perform logout
+        await _signInManager.SignOutAsync();
+        
+        // Clear any client-specific cookies if we can detect the client
+        string? detectedClientId = clientId ?? await TryGetClientIdFromRequest();
+        if (!string.IsNullOrEmpty(detectedClientId))
+        {
+            try
+            {
+                await _dynamicCookieService.SignOutFromClientAsync(detectedClientId);
+                _logger.LogDebug("Signed out from client-specific cookie for client {ClientId}", detectedClientId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to sign out from client-specific cookie for client {ClientId}", detectedClientId);
+            }
+        }
+        
+        // Redirect to home with success message
+        return RedirectToAction("Index", "Home", new { logout = "success" });
+    }
+
+    private async Task<IActionResult> ProcessLogout(string? clientId, string? post_logout_redirect_uri)
     {
         var request = HttpContext.GetOpenIddictServerRequest();
         
         // Try to get clientId from multiple sources
         string? detectedClientId = clientId ?? await TryGetClientIdFromRequest();
         
-        _logger.LogDebug("Logout requested. ClientId parameter: {ClientId}, Detected ClientId: {DetectedClientId}", 
-            clientId, detectedClientId);
+        _logger.LogDebug("Processing OIDC logout. Method: {Method}, ClientId parameter: {ClientId}, Detected ClientId: {DetectedClientId}, Post logout URI: {PostLogoutUri}", 
+            HttpContext.Request.Method, clientId, detectedClientId, post_logout_redirect_uri ?? request?.PostLogoutRedirectUri);
 
         // CRITICAL FIX: Sign out from all possible authentication schemes
         await SignOutFromAllSchemesAsync(detectedClientId);
         
+        // This should only be called for OIDC logout requests now
         if (request != null)
         {
-            // This is an OIDC logout request
             _logger.LogDebug("Processing OIDC logout request with post_logout_redirect_uri: {PostLogoutRedirectUri}", 
                 request.PostLogoutRedirectUri);
             
             // Return a SignOut result to complete the OIDC logout flow
             return SignOut(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
         }
-
-        // Regular logout
-        _logger.LogDebug("Processing regular logout, redirecting to Home");
-        return RedirectToAction("Index", "Home");
-    }
-
-    [HttpPost("logout")]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> LogoutPost(string? clientId = null)
-    {
-        // Try to get clientId from multiple sources
-        string? detectedClientId = clientId ?? await TryGetClientIdFromRequest();
         
-        _logger.LogDebug("Logout POST requested. ClientId parameter: {ClientId}, Detected ClientId: {DetectedClientId}", 
-            clientId, detectedClientId);
-
-        // CRITICAL FIX: Sign out from all possible authentication schemes
-        await SignOutFromAllSchemesAsync(detectedClientId);
-
-        return RedirectToAction("Index", "Home");
+        // Fallback - this shouldn't happen anymore since UI requests now redirect directly
+        _logger.LogWarning("ProcessLogout called without OIDC request - redirecting to home");
+        return RedirectToAction("Index", "Home", new { logout = "success" });
     }
 
     /// <summary>
@@ -396,83 +472,6 @@ public class AuthController : Controller
         {
             _logger.LogError(ex, "Error during logout process");
         }
-    }
-
-    /// <summary>
-    /// Get user's display name with fallback logic
-    /// </summary>
-    private async Task<string> GetUserDisplayNameAsync(IdentityUser user)
-    {
-        try
-        {
-            var claims = await _userManager.GetClaimsAsync(user);
-            var nameClaim = claims.FirstOrDefault(c => c.Type == "name")?.Value;
-            
-            if (!string.IsNullOrEmpty(nameClaim))
-            {
-                return nameClaim;
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving name claim for user {UserId}", user.Id);
-        }
-
-        // Fallback to converting username to friendly display name
-        return ConvertToFriendlyName(user.UserName ?? "Unknown User");
-    }
-
-    /// <summary>
-    /// Add user claims to the identity
-    /// </summary>
-    private async Task AddUserClaimsToIdentity(ClaimsIdentity identity, IdentityUser user)
-    {
-        try
-        {
-            var claims = await _userManager.GetClaimsAsync(user);
-            
-            // Add profile claims
-            var givenName = claims.FirstOrDefault(c => c.Type == "given_name")?.Value;
-            if (!string.IsNullOrEmpty(givenName))
-            {
-                identity.AddClaim(Claims.GivenName, givenName);
-            }
-
-            var familyName = claims.FirstOrDefault(c => c.Type == "family_name")?.Value;
-            if (!string.IsNullOrEmpty(familyName))
-            {
-                identity.AddClaim(Claims.FamilyName, familyName);
-            }
-
-            var preferredUsername = claims.FirstOrDefault(c => c.Type == "preferred_username")?.Value;
-            if (!string.IsNullOrEmpty(preferredUsername))
-            {
-                identity.AddClaim(Claims.PreferredUsername, preferredUsername);
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error adding user claims to identity for user {UserId}", user.Id);
-        }
-    }
-
-    /// <summary>
-    /// Convert a username to a friendly display name
-    /// </summary>
-    private string ConvertToFriendlyName(string input)
-    {
-        if (string.IsNullOrEmpty(input))
-            return "Unknown User";
-
-        // If username is an email, extract the local part and convert to friendly name
-        if (input.Contains('@'))
-        {
-            var localPart = input.Split('@')[0];
-            return ConvertToDisplayName(localPart);
-        }
-
-        // Otherwise just convert the username to friendly name
-        return ConvertToDisplayName(input);
     }
 
     /// <summary>

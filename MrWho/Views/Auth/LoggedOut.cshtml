@@ -1,0 +1,93 @@
+@{
+    ViewData["Title"] = "Logged Out";
+    Layout = "_Layout";
+    var clientName = ViewData["ClientName"] as string;
+    var returnUrl = ViewData["ReturnUrl"] as string;
+}
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-5">
+            <div class="card">
+                <div class="card-header text-center bg-success text-white">
+                    <h3><i class="bi bi-check-circle"></i> Successfully Logged Out</h3>
+                </div>
+                <div class="card-body text-center">
+                    <div class="mb-4">
+                        <i class="bi bi-shield-check text-success" style="font-size: 3rem;"></i>
+                    </div>
+                    
+                    <h5 class="mb-3">You have been securely logged out</h5>
+                    
+                    @if (!string.IsNullOrEmpty(clientName))
+                    {
+                        <p class="text-muted mb-3">
+                            Your session with <strong>@clientName</strong> has been terminated.
+                        </p>
+                    }
+                    else
+                    {
+                        <p class="text-muted mb-3">
+                            Your MrWho session has been terminated and all authentication cookies have been cleared.
+                        </p>
+                    }
+                    
+                    <div class="alert alert-info text-start">
+                        <h6><i class="bi bi-info-circle"></i> What happened?</h6>
+                        <ul class="mb-0 small">
+                            <li>Your authentication session has been ended</li>
+                            <li>All related cookies have been cleared</li>
+                            <li>You'll need to sign in again to access protected resources</li>
+                            @if (!string.IsNullOrEmpty(clientName))
+                            {
+                                <li>You may also be logged out of other connected applications</li>
+                            }
+                        </ul>
+                    </div>
+
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-center mt-4">
+                        @if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
+                        {
+                            <a href="@returnUrl" class="btn btn-primary">
+                                <i class="bi bi-arrow-return-left"></i> Return to Application
+                            </a>
+                        }
+                        
+                        <a href="/connect/login" class="btn btn-outline-primary">
+                            <i class="bi bi-box-arrow-in-right"></i> Sign In Again
+                        </a>
+                        
+                        <a href="/" class="btn btn-outline-secondary">
+                            <i class="bi bi-house"></i> Go to Home
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mt-4">
+                <div class="card-header">
+                    <h6><i class="bi bi-shield-lock"></i> Security & Privacy</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-6 mb-2">
+                            <i class="bi bi-check-circle text-success"></i> <small>Session Cleared</small>
+                        </div>
+                        <div class="col-6 mb-2">
+                            <i class="bi bi-check-circle text-success"></i> <small>Cookies Removed</small>
+                        </div>
+                        <div class="col-6 mb-2">
+                            <i class="bi bi-check-circle text-success"></i> <small>Secure Logout</small>
+                        </div>
+                        <div class="col-6 mb-2">
+                            <i class="bi bi-check-circle text-success"></i> <small>Privacy Protected</small>
+                        </div>
+                    </div>
+                    <small class="text-muted">
+                        For maximum security, close all browser windows when using shared computers.
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

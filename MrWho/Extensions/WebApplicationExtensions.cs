@@ -143,11 +143,9 @@ public static class WebApplicationExtensions
             return await mediator.Send(new OidcTokenRequest(context));
         });
 
-        // Logout endpoint via mediator
-        app.MapPost("/connect/logout", async (HttpContext context, IMediator mediator) =>
-        {
-            return await mediator.Send(new OidcLogoutRequest(context));
-        });
+        // NOTE: Logout endpoint removed from minimal API to avoid conflict with AuthController
+        // The AuthController.Logout method handles both GET and POST /connect/logout
+        // This provides better UI integration and proper logout confirmation pages
 
         // UserInfo endpoint via mediator
         app.MapGet("/connect/userinfo", async (HttpContext context, IMediator mediator) =>
