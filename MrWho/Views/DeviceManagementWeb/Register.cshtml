@@ -8,6 +8,7 @@
             <div class="card">
                 <div class="card-header">
                     <h3><i class="bi bi-plus-circle"></i> Register New Device</h3>
+                    <small class="text-muted d-block mt-1" id="detectedDevice"></small>
                 </div>
                 <div class="card-body">
                     @if (TempData["ErrorMessage"] != null)
@@ -86,3 +87,57 @@
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Auto-detect device type and suggest name
+    const userAgent = navigator.userAgent;
+    const platform = navigator.platform;
+    let deviceType = 'Device';
+    let suggestedName = '';
+    
+    // Detect mobile devices
+    if (/iPhone/.test(userAgent)) {
+        deviceType = 'iPhone';
+        suggestedName = "My iPhone";
+    } else if (/iPad/.test(userAgent)) {
+        deviceType = 'iPad';
+        suggestedName = "My iPad";
+    } else if (/Android/.test(userAgent)) {
+        if (/Mobile/.test(userAgent)) {
+            deviceType = 'Android Phone';
+            suggestedName = "My Android Phone";
+        } else {
+            deviceType = 'Android Tablet';
+            suggestedName = "My Android Tablet";
+        }
+    } else if (/Windows/.test(platform)) {
+        deviceType = 'Windows PC';
+        suggestedName = "My Windows PC";
+    } else if (/Mac/.test(platform)) {
+        deviceType = 'Mac';
+        suggestedName = "My Mac";
+    } else if (/Linux/.test(platform)) {
+        deviceType = 'Linux PC';
+        suggestedName = "My Linux PC";
+    }
+    
+    // Update the detected device info
+    const detectedElement = document.getElementById('detectedDevice');
+    detectedElement.textContent = `Detected: ${deviceType}`;
+    
+    // Suggest device name if field is empty
+    const deviceNameField = document.getElementById('deviceName');
+    if (!deviceNameField.value) {
+        deviceNameField.placeholder = suggestedName;
+        deviceNameField.value = suggestedName;
+    }
+    
+    // Auto-check trusted for personal mobile devices
+    const isMobile = /iPhone|iPad|Android.*Mobile/.test(userAgent);
+    const trustedCheckbox = document.getElementById('isTrusted');
+    if (isMobile) {
+        trustedCheckbox.checked = true;
+    }
+});
+</script>

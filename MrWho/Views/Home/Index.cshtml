@@ -28,42 +28,6 @@
                     </div>
                 </div>
             </div>
-
-            <div class="col-md-6 mb-3">
-                <div class="card">
-            <div class="col-md-6 mb-3">
-                <div class="card">
-                    <div class="card-header">
-                        <h5>OIDC Endpoints</h5>
-                    </div>
-                    <div class="card-body">
-                        <p>OpenID Connect protocol endpoints.</p>
-                        <a href="/connect/authorize" class="btn btn-outline-primary btn-sm">Authorization Endpoint</a>
-                        <a href="/.well-known/openid-configuration" class="btn btn-outline-primary btn-sm">Discovery Document</a>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-6 mb-3">
-                <div class="card">
-                    <div class="card-header">
-                        <h5>User Info</h5>
-                    </div>
-                    <div class="card-body">
-                        @if (User.Identity?.IsAuthenticated == true)
-                        {
-                            <p class="card-text">Welcome back, <strong>@User.Identity.Name</strong>!</p>
-                            <a href="/connect/userinfo" class="btn btn-success">View User Info</a>
-                        }
-                        else
-                        {
-                            <p class="card-text">Please log in to access user information.</p>
-                            <a href="@Url.Action("Login", "Auth")" class="btn btn-primary">Login</a>
-                        }
-                    </div>
-                </div>
-            </div>
         </div>
     </div>
-
 </div>

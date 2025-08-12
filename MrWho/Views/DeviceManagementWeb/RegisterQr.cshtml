@@ -1,0 +1,74 @@
+@{
+    ViewData["Title"] = "Register Mobile Device";
+    var registrationUrl = (string)ViewData["RegistrationUrl"]!;
+}
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-5">
+            <div class="card">
+                <div class="card-header text-center">
+                    <h4><i class="bi bi-qr-code"></i> Register Your Mobile Device</h4>
+                    <small class="text-muted">Scan with your phone to register it</small>
+                </div>
+                <div class="card-body text-center">
+                    <img src="@Url.Action("RegisterQrPng")" alt="Device Registration QR Code" class="img-fluid mb-3" style="max-width: 300px;" />
+                    
+                    <div class="alert alert-info text-start">
+                        <h6><i class="bi bi-info-circle"></i> How to use this QR Code</h6>
+                        <ol class="mb-0 small">
+                            <li>Open your phone's camera or QR code scanner</li>
+                            <li>Point it at the QR code above</li>
+                            <li>Tap the notification to open the registration page</li>
+                            <li>Fill in your device details and submit</li>
+                        </ol>
+                    </div>
+
+                    <p class="text-muted">Or manually visit this URL on your mobile device:</p>
+                    <div class="mb-3">
+                        <input type="text" class="form-control text-center" value="@registrationUrl" readonly onclick="this.select()" />
+                        <small class="text-muted">Tap to select and copy</small>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <a href="@Url.Action("Index")" class="btn btn-secondary">
+                            <i class="bi bi-arrow-left"></i> Back to Device Management
+                        </a>
+                        <a href="@Url.Action("Register")" class="btn btn-primary">
+                            <i class="bi bi-plus-circle"></i> Register Device Manually
+                        </a>
+                    </div>
+                </div>
+                <div class="card-footer text-center">
+                    <small class="text-muted">
+                        <i class="bi bi-shield-check"></i> Secure device registration with MrWho
+                    </small>
+                </div>
+            </div>
+
+            <div class="mt-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h6><i class="bi bi-lightbulb"></i> Benefits of Device Registration</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-6 mb-2">
+                                <i class="bi bi-qr-code text-primary"></i> <small>QR Login Approval</small>
+                            </div>
+                            <div class="col-6 mb-2">
+                                <i class="bi bi-shield text-success"></i> <small>Enhanced Security</small>
+                            </div>
+                            <div class="col-6 mb-2">
+                                <i class="bi bi-activity text-info"></i> <small>Activity Tracking</small>
+                            </div>
+                            <div class="col-6 mb-2">
+                                <i class="bi bi-phone text-warning"></i> <small>Mobile Friendly</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using MrWho.Services;
+using QRCoder;
 
 namespace MrWho.Controllers;
 
@@ -222,5 +223,31 @@ public class DeviceManagementWebController : Controller
         }
 
         return RedirectToAction("Index");
+    }
+
+    /// <summary>
+    /// Generate QR code for device registration
+    /// </summary>
+    [HttpGet("register-qr.png")]
+    public IActionResult RegisterQrPng()
+    {
+        // Generate the URL for device registration
+        var registrationUrl = Url.Action("Register", "DeviceManagementWeb", null, Request.Scheme, Request.Host.ToString())!;
+
+        using var generator = new QRCodeGenerator();
+        var data = generator.CreateQrCode(registrationUrl, QRCodeGenerator.ECCLevel.Q);
+        var png = new PngByteQRCode(data).GetGraphic(8);
+        return File(png, "image/png");
+    }
+
+    /// <summary>
+    /// Show QR code for mobile device registration
+    /// </summary>
+    [HttpGet("register-qr")]
+    public IActionResult RegisterQr()
+    {
+        var registrationUrl = Url.Action("Register", "DeviceManagementWeb", null, Request.Scheme, Request.Host.ToString())!;
+        ViewData["RegistrationUrl"] = registrationUrl;
+        return View();
     }
 }
