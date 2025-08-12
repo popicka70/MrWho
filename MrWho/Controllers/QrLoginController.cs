@@ -135,14 +135,12 @@ public class QrLoginController : Controller
             if (user == null) 
                 return Challenge();
 
-            var success = await _enhancedQrService.ApproveQrAsync(token, user.Id);
-            if (!success)
-            {
-                return View("Approve", model: "expired");
-            }
-
-            _logger.LogInformation("QR session {Token} approved by user {UserId}", token, user.Id);
-            return View("Approve", model: "approved");
+            // Instead of auto-approving, show the approval form
+            ViewData["Token"] = token;
+            ViewData["SessionInfo"] = sessionInfo;
+            ViewData["UserName"] = user.UserName;
+            
+            return View("Approve", model: "pending");
         }
         catch (ArgumentException)
         {
@@ -150,7 +148,54 @@ public class QrLoginController : Controller
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error approving QR session {Token}", token);
+            _logger.LogError(ex, "Error loading QR approval page for token {Token}", token);
+            return View("Approve", model: "error");
+        }
+    }
+
+    /// <summary>
+    /// Process QR approval for session-based QR codes
+    /// </summary>
+    [HttpPost("approve")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ApprovePost([FromForm] string token, [FromForm] string action)
+    {
+        var user = await _userManager.GetUserAsync(User);
+        if (user == null)
+            return Challenge();
+
+        try
+        {
+            if (action == "approve")
+            {
+                var success = await _enhancedQrService.ApproveQrAsync(token, user.Id);
+                if (!success)
+                {
+                    return View("Approve", model: "expired");
+                }
+
+                _logger.LogInformation("QR session {Token} approved by user {UserId}", token, user.Id);
+                return View("Approve", model: "approved");
+            }
+            else if (action == "reject")
+            {
+                // For session-based QR, we don't have a formal reject mechanism,
+                // but we can just show a rejection message
+                _logger.LogInformation("QR session {Token} rejected by user {UserId}", token, user.Id);
+                return View("Approve", model: "rejected");
+            }
+            else
+            {
+                return BadRequest("Invalid action.");
+            }
+        }
+        catch (ArgumentException)
+        {
+            return View("Approve", model: "expired");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error processing QR approval for token {Token}", token);
             return View("Approve", model: "error");
         }
     }

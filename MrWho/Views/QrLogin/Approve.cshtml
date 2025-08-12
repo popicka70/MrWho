@@ -1,28 +1,85 @@
 @model string
 @{
     ViewData["Title"] = "Approve sign-in";
+    var token = ViewData["Token"] as string;
+    var sessionInfo = ViewData["SessionInfo"] as MrWho.Services.QrSessionInfo;
+    var userName = ViewData["UserName"] as string;
 }
 
 <div class="row justify-content-center">
-  <div class="col-md-6 col-lg-5">
-    <div class="card">
-      <div class="card-header text-center">
-        <h4>Approve sign-in</h4>
-      </div>
-      <div class="card-body text-center">
-        @if (Model == "expired")
-        {
-          <div class="alert alert-warning">This QR session has expired. Please start again on your computer.</div>
-        }
-        else
-        {
-          <div class="alert alert-info">This will sign you in on the device that displayed the QR.</div>
-          <p>Confirm to continue.</p>
-          <form method="get" action="/">
-            <button type="submit" class="btn btn-success">Approve</button>
-          </form>
-        }
-      </div>
+    <div class="col-md-6 col-lg-5">
+        <div class="card">
+            <div class="card-header text-center">
+                <h4><i class="bi bi-qr-code"></i> Approve sign-in</h4>
+            </div>
+            <div class="card-body text-center">
+                @if (Model == "expired")
+                {
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle"></i> This QR session has expired. Please start again on your computer.
+                    </div>
+                }
+                else if (Model == "approved")
+                {
+                    <div class="alert alert-success">
+                        <i class="bi bi-check-circle"></i> <strong>Login Approved!</strong><br/>
+                        You can now continue on your computer.
+                    </div>
+                }
+                else if (Model == "rejected")
+                {
+                    <div class="alert alert-info">
+                        <i class="bi bi-x-circle"></i> <strong>Login Rejected</strong><br/>
+                        The login attempt has been declined.
+                    </div>
+                }
+                else if (Model == "error")
+                {
+                    <div class="alert alert-danger">
+                        <i class="bi bi-exclamation-triangle"></i> An error occurred while processing your request. Please try again.
+                    </div>
+                }
+                else if (Model == "pending")
+                {
+                    <div class="alert alert-info">
+                        <h5><i class="bi bi-info-circle"></i> Login Request</h5>
+                        <p class="mb-2">Do you want to sign in as <strong>@userName</strong>?</p>
+                        @if (!string.IsNullOrEmpty(sessionInfo?.ClientId))
+                        {
+                            <p class="mb-0"><small><strong>Application:</strong> @sessionInfo.ClientId</small></p>
+                        }
+                    </div>
+                    
+                    <p>This will sign you in on the device that displayed the QR code.</p>
+                    
+                    <form method="post" action="/qr-login/approve">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="token" value="@token" />
+                        
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                            <button type="submit" name="action" value="approve" class="btn btn-success">
+                                <i class="bi bi-check-circle"></i> Approve
+                            </button>
+                            <button type="submit" name="action" value="reject" class="btn btn-danger">
+                                <i class="bi bi-x-circle"></i> Reject
+                            </button>
+                        </div>
+                    </form>
+                    
+                    <div class="mt-4">
+                        <div class="card">
+                            <div class="card-body">
+                                <h6><i class="bi bi-shield-check"></i> Security Tips</h6>
+                                <ul class="small text-start mb-0">
+                                    <li>Only approve if you initiated this login</li>
+                                    <li>Check that you're trying to access the right application</li>
+                                    <li>If you didn't scan a QR code, click "Reject"</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
     </div>
-  </div>
 </div>
