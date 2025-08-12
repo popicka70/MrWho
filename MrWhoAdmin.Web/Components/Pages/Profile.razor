@@ -1,6 +1,7 @@
 @page "/profile"
 @attribute [Authorize]
 @rendermode InteractiveServer
+@inherits AuthenticatedComponentBase
 @inject IJSRuntime JSRuntime
 
 <PageTitle>User Profile - MrWho Admin</PageTitle>
@@ -62,19 +63,24 @@
                             No claims found for the current user.
                         </RadzenAlert>
                     }
+                    <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem">
+                        @* <RadzenButton Icon="key" ButtonStyle="ButtonStyle.Primary" Text="Set up Authenticator" Click="@MafSetup" /> *@
+                        <RadzenLink Path="@OidcMfaSetupUrl">Set up MFA</RadzenLink>
+                        <RadzenButton Icon="refresh" ButtonStyle="ButtonStyle.Secondary" Text="Refresh" Click="@RefreshPage" />
+                        <RadzenButton Icon="logout" ButtonStyle="ButtonStyle.Danger" Text="Logout" Click="@Logout" />
+                    </RadzenStack>
                 </Authorized>
             </AuthorizeView>
         </RadzenStack>
         
-        <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem">
-            <RadzenButton Icon="refresh" ButtonStyle="ButtonStyle.Secondary" Text="Refresh" Click="@RefreshPage" />
-            <RadzenButton Icon="logout" ButtonStyle="ButtonStyle.Danger" Text="Logout" Click="@Logout" />
-        </RadzenStack>
     </RadzenStack>
 </RadzenCard>
 
 @code {
     [Inject] private NavigationManager Navigation { get; set; } = default!;
+    [Inject] private IConfiguration Configuration { get; set; } = default!;
+
+    private string OidcMfaSetupUrl => Configuration["Authentication:MfaSetupUrl"] ?? string.Empty;
 
     private string GetUserDisplayName(System.Security.Claims.ClaimsPrincipal user)
     {
@@ -103,6 +109,19 @@
     private async Task RefreshPage()
     {
         await JSRuntime.InvokeVoidAsync("location.reload");
+    }
+
+    private void MafSetup()
+    {
+        if (!string.IsNullOrEmpty(OidcMfaSetupUrl))
+        {
+            Navigation.NavigateTo(OidcMfaSetupUrl, true);
+        }
+        else
+        {
+            // Handle case where MFA setup URL is not configured
+            Navigation.NavigateTo("/error?message=MFA setup URL is not configured.");
+        }
     }
 
     private void Logout()
