@@ -21,6 +21,7 @@ public class MfaController : Controller
     private readonly SignInManager<IdentityUser> _signInManager;
     private readonly UrlEncoder _urlEncoder;
     private readonly IQrCodeService _qr;
+    private readonly IDynamicCookieService _dynamicCookieService;
     private readonly ILogger<MfaController> _logger;
 
     private const string AuthenticatorUriFormat = "otpauth://totp/{0}:{1}?secret={2}&issuer={0}&digits=6";
@@ -29,12 +30,14 @@ public class MfaController : Controller
                          SignInManager<IdentityUser> signInManager,
                          UrlEncoder urlEncoder,
                          IQrCodeService qr,
+                         IDynamicCookieService dynamicCookieService,
                          ILogger<MfaController> logger)
     {
         _userManager = userManager;
         _signInManager = signInManager;
         _urlEncoder = urlEncoder;
         _qr = qr;
+        _dynamicCookieService = dynamicCookieService;
         _logger = logger;
     }
 
@@ -162,6 +165,34 @@ public class MfaController : Controller
         if (twoFactorUser is not null)
         {
             await _signInManager.SignInAsync(twoFactorUser, isPersistent: input.RememberMe, authenticationMethod: "mfa");
+            
+            // CRITICAL FIX: Extract client ID from return URL and sign in with client-specific scheme
+            string? clientId = null;
+            if (!string.IsNullOrEmpty(input.ReturnUrl) && input.ReturnUrl.Contains("/connect/authorize"))
+            {
+                try
+                {
+                    var uri = new Uri(input.ReturnUrl);
+                    var queryParams = System.Web.HttpUtility.ParseQueryString(uri.Query);
+                    clientId = queryParams["client_id"];
+                    
+                    if (!string.IsNullOrEmpty(clientId))
+                    {
+                        _logger.LogDebug("MFA completed for client {ClientId}, signing in with client-specific authentication", clientId);
+                        await _dynamicCookieService.SignInWithClientCookieAsync(clientId, twoFactorUser, input.RememberMe);
+                        _logger.LogDebug("Successfully signed in user {UserName} with client-specific authentication for client {ClientId}", 
+                            twoFactorUser.UserName, clientId);
+                    }
+                    else
+                    {
+                        _logger.LogWarning("No client_id found in return URL: {ReturnUrl}", input.ReturnUrl);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to extract client_id from return URL or sign in with client-specific authentication: {ReturnUrl}", input.ReturnUrl);
+                }
+            }
         }
 
         if (input.RememberMachine && twoFactorUser is not null)
