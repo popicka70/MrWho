@@ -192,6 +192,17 @@ builder.Services.AddAuthentication(options =>
 
 var app = builder.Build();
 
+// Log current environment information
+var logger = app.Services.GetRequiredService<ILogger<Program>>();
+logger.LogInformation("?? MrWho Demo1 Application starting up...");
+logger.LogInformation("?? Environment: {Environment}", app.Environment.EnvironmentName);
+logger.LogInformation("?? Application Name: {ApplicationName}", app.Environment.ApplicationName);
+logger.LogInformation("?? Content Root: {ContentRoot}", app.Environment.ContentRootPath);
+logger.LogInformation("?? Web Root: {WebRoot}", app.Environment.WebRootPath);
+logger.LogInformation("?? Is Development: {IsDevelopment}", app.Environment.IsDevelopment());
+logger.LogInformation("?? Is Production: {IsProduction}", app.Environment.IsProduction());
+logger.LogInformation("?? Is Staging: {IsStaging}", app.Environment.IsStaging());
+
 app.MapDefaultEndpoints();
 
 // Configure the HTTP request pipeline.

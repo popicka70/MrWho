@@ -50,6 +50,17 @@ builder.Services.AddSingleton<Microsoft.AspNetCore.Components.Server.Circuits.Ci
 
 var app = builder.Build();
 
+// Log current environment information
+var logger = app.Services.GetRequiredService<ILogger<Program>>();
+logger.LogInformation("?? MrWho Admin Web starting up...");
+logger.LogInformation("?? Environment: {Environment}", app.Environment.EnvironmentName);
+logger.LogInformation("?? Application Name: {ApplicationName}", app.Environment.ApplicationName);
+logger.LogInformation("?? Content Root: {ContentRoot}", app.Environment.ContentRootPath);
+logger.LogInformation("?? Web Root: {WebRoot}", app.Environment.WebRootPath);
+logger.LogInformation("?? Is Development: {IsDevelopment}", app.Environment.IsDevelopment());
+logger.LogInformation("?? Is Production: {IsProduction}", app.Environment.IsProduction());
+logger.LogInformation("?? Is Staging: {IsStaging}", app.Environment.IsStaging());
+
 // Configure middleware pipeline using extension methods
 app.ConfigureMiddlewarePipeline();
 app.ConfigureAuthenticationEndpoints();

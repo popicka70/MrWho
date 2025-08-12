@@ -62,6 +62,17 @@ builder.Services.AddSingleton<IQrLoginStore, InMemoryQrLoginStore>();
 
 var app = builder.Build();
 
+// Log current environment information
+var logger = app.Services.GetRequiredService<ILogger<Program>>();
+logger.LogInformation("?? MrWho OIDC Server starting up...");
+logger.LogInformation("?? Environment: {Environment}", app.Environment.EnvironmentName);
+logger.LogInformation("?? Application Name: {ApplicationName}", app.Environment.ApplicationName);
+logger.LogInformation("?? Content Root: {ContentRoot}", app.Environment.ContentRootPath);
+logger.LogInformation("?? Web Root: {WebRoot}", app.Environment.WebRootPath);
+logger.LogInformation("?? Is Development: {IsDevelopment}", app.Environment.IsDevelopment());
+logger.LogInformation("?? Is Production: {IsProduction}", app.Environment.IsProduction());
+logger.LogInformation("?? Is Staging: {IsStaging}", app.Environment.IsStaging());
+
 // Configure the HTTP request pipeline using the new client-cookie-aware method
 await app.ConfigureMrWhoPipelineWithClientCookiesAsync();
 app.AddMrWhoEndpoints();
