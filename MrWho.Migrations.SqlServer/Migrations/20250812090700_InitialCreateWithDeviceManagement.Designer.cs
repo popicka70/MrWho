@@ -9,11 +9,11 @@ using MrWho.Data;
 
 #nullable disable
 
-namespace MrWho.Migrations
+namespace MrWho.Migrations.SqlServer.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250812071903_FixDeviceLogConstraints")]
-    partial class FixDeviceLogConstraints
+    [Migration("20250812090700_InitialCreateWithDeviceManagement")]
+    partial class InitialCreateWithDeviceManagement
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -1657,7 +1657,7 @@ namespace MrWho.Migrations
                     b.HasOne("Microsoft.AspNetCore.Identity.IdentityUser", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("User");

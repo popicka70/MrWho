@@ -12,8 +12,8 @@ using MrWho.Data;
 namespace MrWho.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250812070920_AddDeviceManagement")]
-    partial class AddDeviceManagement
+    [Migration("20250812090648_InitialCreateWithDeviceManagement")]
+    partial class InitialCreateWithDeviceManagement
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -1588,13 +1588,13 @@ namespace MrWho.Migrations
                     b.HasOne("MrWho.Models.UserDevice", "Device")
                         .WithMany("AuthenticationLogs")
                         .HasForeignKey("DeviceId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("Microsoft.AspNetCore.Identity.IdentityUser", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Device");
@@ -1657,7 +1657,7 @@ namespace MrWho.Migrations
                     b.HasOne("Microsoft.AspNetCore.Identity.IdentityUser", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("User");

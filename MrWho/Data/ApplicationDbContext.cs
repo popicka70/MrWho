@@ -221,15 +221,15 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
         builder.Entity<UserDevice>(entity =>
         {
             entity.HasKey(d => d.Id);
-            entity.HasIndex(d => new { d.UserId, d.DeviceId }).IsUnique();
             entity.HasIndex(d => d.DeviceId);
+            entity.HasIndex(d => new { d.UserId, d.DeviceId }).IsUnique();
             entity.HasIndex(d => new { d.UserId, d.IsActive });
             entity.HasIndex(d => new { d.UserId, d.IsTrusted });
             
             entity.HasOne(d => d.User)
                   .WithMany()
                   .HasForeignKey(d => d.UserId)
-                  .OnDelete(DeleteBehavior.Cascade);
+                  .OnDelete(DeleteBehavior.Restrict); // Changed from Cascade to Restrict - no hard deletes anyway
         });
 
         // Configure PersistentQrSession entity
@@ -244,12 +244,12 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
             entity.HasOne(q => q.User)
                   .WithMany()
                   .HasForeignKey(q => q.UserId)
-                  .OnDelete(DeleteBehavior.SetNull);
+                  .OnDelete(DeleteBehavior.SetNull); // SetNull is fine since UserId is nullable
                   
             entity.HasOne(q => q.ApprovedByDevice)
                   .WithMany(d => d.QrSessions)
                   .HasForeignKey(q => q.ApprovedByDeviceId)
-                  .OnDelete(DeleteBehavior.SetNull);
+                  .OnDelete(DeleteBehavior.SetNull); // SetNull is fine since ApprovedByDeviceId is nullable
         });
 
         // Configure DeviceAuthenticationLog entity
@@ -264,12 +264,12 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
             entity.HasOne(l => l.Device)
                   .WithMany(d => d.AuthenticationLogs)
                   .HasForeignKey(l => l.DeviceId)
-                  .OnDelete(DeleteBehavior.Restrict); // Changed from Cascade to Restrict to avoid multiple cascade paths
+                  .OnDelete(DeleteBehavior.Restrict); // No cascade - logs are audit data, keep them
                   
             entity.HasOne(l => l.User)
                   .WithMany()
                   .HasForeignKey(l => l.UserId)
-                  .OnDelete(DeleteBehavior.Restrict); // Changed from Cascade to Restrict to avoid multiple cascade paths
+                  .OnDelete(DeleteBehavior.Restrict); // No cascade - logs are audit data, keep them
         });
 
         // Configure DataProtectionKey entity

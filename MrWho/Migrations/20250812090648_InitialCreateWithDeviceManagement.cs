@@ -3,10 +3,10 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace MrWho.Migrations.SqlServer.Migrations
+namespace MrWho.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialCreate : Migration
+    public partial class InitialCreateWithDeviceManagement : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -68,6 +68,20 @@ namespace MrWho.Migrations.SqlServer.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_AspNetUsers", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "DataProtectionKeys",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    FriendlyName = table.Column<string>(type: "nvarchar(256)", maxLength: 256, nullable: true),
+                    Xml = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_DataProtectionKeys", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -150,6 +164,33 @@ namespace MrWho.Migrations.SqlServer.Migrations
                     AccessTokenLifetime = table.Column<double>(type: "float", nullable: false),
                     RefreshTokenLifetime = table.Column<double>(type: "float", nullable: false),
                     AuthorizationCodeLifetime = table.Column<double>(type: "float", nullable: false),
+                    IdTokenLifetime = table.Column<TimeSpan>(type: "time", nullable: false),
+                    DeviceCodeLifetime = table.Column<TimeSpan>(type: "time", nullable: false),
+                    DefaultSessionTimeoutHours = table.Column<int>(type: "int", nullable: false),
+                    DefaultUseSlidingSessionExpiration = table.Column<bool>(type: "bit", nullable: false),
+                    DefaultRememberMeDurationDays = table.Column<int>(type: "int", nullable: false),
+                    DefaultRequireHttpsForCookies = table.Column<bool>(type: "bit", nullable: false),
+                    DefaultCookieSameSitePolicy = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false),
+                    DefaultRequireConsent = table.Column<bool>(type: "bit", nullable: false),
+                    DefaultAllowRememberConsent = table.Column<bool>(type: "bit", nullable: false),
+                    DefaultMaxRefreshTokensPerUser = table.Column<int>(type: "int", nullable: true),
+                    DefaultUseOneTimeRefreshTokens = table.Column<bool>(type: "bit", nullable: false),
+                    DefaultIncludeJwtId = table.Column<bool>(type: "bit", nullable: false),
+                    DefaultRequireMfa = table.Column<bool>(type: "bit", nullable: false),
+                    DefaultMfaGracePeriodMinutes = table.Column<int>(type: "int", nullable: true),
+                    DefaultAllowedMfaMethods = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: true),
+                    DefaultRememberMfaForSession = table.Column<bool>(type: "bit", nullable: false),
+                    DefaultRateLimitRequestsPerMinute = table.Column<int>(type: "int", nullable: true),
+                    DefaultRateLimitRequestsPerHour = table.Column<int>(type: "int", nullable: true),
+                    DefaultRateLimitRequestsPerDay = table.Column<int>(type: "int", nullable: true),
+                    DefaultEnableDetailedErrors = table.Column<bool>(type: "bit", nullable: false),
+                    DefaultLogSensitiveData = table.Column<bool>(type: "bit", nullable: false),
+                    DefaultThemeName = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
+                    RealmLogoUri = table.Column<string>(type: "nvarchar(2000)", maxLength: 2000, nullable: true),
+                    RealmUri = table.Column<string>(type: "nvarchar(2000)", maxLength: 2000, nullable: true),
+                    RealmPolicyUri = table.Column<string>(type: "nvarchar(2000)", maxLength: 2000, nullable: true),
+                    RealmTosUri = table.Column<string>(type: "nvarchar(2000)", maxLength: 2000, nullable: true),
+                    RealmCustomCssUrl = table.Column<string>(type: "nvarchar(2000)", maxLength: 2000, nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     CreatedBy = table.Column<string>(type: "nvarchar(max)", nullable: true),
@@ -351,6 +392,41 @@ namespace MrWho.Migrations.SqlServer.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "UserDevices",
+                columns: table => new
+                {
+                    Id = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    UserId = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    DeviceId = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: false),
+                    DeviceName = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
+                    DeviceType = table.Column<int>(type: "int", nullable: false),
+                    OperatingSystem = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
+                    UserAgent = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: true),
+                    IsTrusted = table.Column<bool>(type: "bit", nullable: false),
+                    CanApproveLogins = table.Column<bool>(type: "bit", nullable: false),
+                    IsActive = table.Column<bool>(type: "bit", nullable: false),
+                    PushToken = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: true),
+                    PublicKey = table.Column<string>(type: "nvarchar(2000)", maxLength: 2000, nullable: true),
+                    LastUsedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    LastIpAddress = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true),
+                    LastLocation = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    ExpiresAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    Metadata = table.Column<string>(type: "nvarchar(2000)", maxLength: 2000, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_UserDevices", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_UserDevices_AspNetUsers_UserId",
+                        column: x => x.UserId,
+                        principalTable: "AspNetUsers",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "IdentityResourceClaims",
                 columns: table => new
                 {
@@ -433,6 +509,59 @@ namespace MrWho.Migrations.SqlServer.Migrations
                     AccessTokenLifetime = table.Column<double>(type: "float", nullable: true),
                     RefreshTokenLifetime = table.Column<double>(type: "float", nullable: true),
                     AuthorizationCodeLifetime = table.Column<double>(type: "float", nullable: true),
+                    IdTokenLifetimeMinutes = table.Column<int>(type: "int", nullable: true),
+                    DeviceCodeLifetimeMinutes = table.Column<int>(type: "int", nullable: true),
+                    SessionTimeoutHours = table.Column<int>(type: "int", nullable: true),
+                    UseSlidingSessionExpiration = table.Column<bool>(type: "bit", nullable: true),
+                    RememberMeDurationDays = table.Column<int>(type: "int", nullable: true),
+                    RequireHttpsForCookies = table.Column<bool>(type: "bit", nullable: true),
+                    CookieSameSitePolicy = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
+                    RequireConsent = table.Column<bool>(type: "bit", nullable: true),
+                    AllowRememberConsent = table.Column<bool>(type: "bit", nullable: true),
+                    MaxRefreshTokensPerUser = table.Column<int>(type: "int", nullable: true),
+                    UseOneTimeRefreshTokens = table.Column<bool>(type: "bit", nullable: true),
+                    IncludeJwtId = table.Column<bool>(type: "bit", nullable: true),
+                    AlwaysSendClientClaims = table.Column<bool>(type: "bit", nullable: true),
+                    AlwaysIncludeUserClaimsInIdToken = table.Column<bool>(type: "bit", nullable: true),
+                    UserCodeType = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true),
+                    DeviceCodePollingIntervalSeconds = table.Column<int>(type: "int", nullable: true),
+                    BackChannelLogoutSessionRequired = table.Column<bool>(type: "bit", nullable: true),
+                    BackChannelLogoutUri = table.Column<string>(type: "nvarchar(2000)", maxLength: 2000, nullable: true),
+                    FrontChannelLogoutSessionRequired = table.Column<bool>(type: "bit", nullable: true),
+                    FrontChannelLogoutUri = table.Column<string>(type: "nvarchar(2000)", maxLength: 2000, nullable: true),
+                    AccessTokenType = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: true),
+                    HashAccessTokens = table.Column<bool>(type: "bit", nullable: true),
+                    UpdateAccessTokenClaimsOnRefresh = table.Column<bool>(type: "bit", nullable: true),
+                    AllowedCorsOrigins = table.Column<string>(type: "nvarchar(4000)", maxLength: 4000, nullable: true),
+                    ClientClaimsPrefix = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
+                    PairWiseSubjectSalt = table.Column<bool>(type: "bit", nullable: true),
+                    RateLimitRequestsPerMinute = table.Column<int>(type: "int", nullable: true),
+                    RateLimitRequestsPerHour = table.Column<int>(type: "int", nullable: true),
+                    RateLimitRequestsPerDay = table.Column<int>(type: "int", nullable: true),
+                    AllowAccessToUserInfoEndpoint = table.Column<bool>(type: "bit", nullable: true),
+                    AllowAccessToIntrospectionEndpoint = table.Column<bool>(type: "bit", nullable: true),
+                    AllowAccessToRevocationEndpoint = table.Column<bool>(type: "bit", nullable: true),
+                    ProtocolType = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true),
+                    EnableLocalLogin = table.Column<bool>(type: "bit", nullable: true),
+                    AllowedIdentityProviders = table.Column<string>(type: "nvarchar(2000)", maxLength: 2000, nullable: true),
+                    ShowClientLogo = table.Column<bool>(type: "bit", nullable: true),
+                    LogoUri = table.Column<string>(type: "nvarchar(2000)", maxLength: 2000, nullable: true),
+                    ClientUri = table.Column<string>(type: "nvarchar(2000)", maxLength: 2000, nullable: true),
+                    PolicyUri = table.Column<string>(type: "nvarchar(2000)", maxLength: 2000, nullable: true),
+                    TosUri = table.Column<string>(type: "nvarchar(2000)", maxLength: 2000, nullable: true),
+                    EnableDetailedErrors = table.Column<bool>(type: "bit", nullable: true),
+                    LogSensitiveData = table.Column<bool>(type: "bit", nullable: true),
+                    CustomErrorPageUrl = table.Column<string>(type: "nvarchar(2000)", maxLength: 2000, nullable: true),
+                    CustomLoginPageUrl = table.Column<string>(type: "nvarchar(2000)", maxLength: 2000, nullable: true),
+                    CustomLogoutPageUrl = table.Column<string>(type: "nvarchar(2000)", maxLength: 2000, nullable: true),
+                    RequireMfa = table.Column<bool>(type: "bit", nullable: true),
+                    MfaGracePeriodMinutes = table.Column<int>(type: "int", nullable: true),
+                    AllowedMfaMethods = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: true),
+                    RememberMfaForSession = table.Column<bool>(type: "bit", nullable: true),
+                    CustomCssUrl = table.Column<string>(type: "nvarchar(2000)", maxLength: 2000, nullable: true),
+                    CustomJavaScriptUrl = table.Column<string>(type: "nvarchar(2000)", maxLength: 2000, nullable: true),
+                    ThemeName = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: true),
+                    PageTitlePrefix = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     CreatedBy = table.Column<string>(type: "nvarchar(max)", nullable: true),
@@ -467,6 +596,75 @@ namespace MrWho.Migrations.SqlServer.Migrations
                         principalTable: "Scopes",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "DeviceAuthenticationLogs",
+                columns: table => new
+                {
+                    Id = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    DeviceId = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    UserId = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    ActivityType = table.Column<int>(type: "int", nullable: false),
+                    ClientId = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: true),
+                    IsSuccessful = table.Column<bool>(type: "bit", nullable: false),
+                    ErrorMessage = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
+                    IpAddress = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true),
+                    UserAgent = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: true),
+                    OccurredAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    Metadata = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_DeviceAuthenticationLogs", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_DeviceAuthenticationLogs_AspNetUsers_UserId",
+                        column: x => x.UserId,
+                        principalTable: "AspNetUsers",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_DeviceAuthenticationLogs_UserDevices_DeviceId",
+                        column: x => x.DeviceId,
+                        principalTable: "UserDevices",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "PersistentQrSessions",
+                columns: table => new
+                {
+                    Id = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    Token = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: false),
+                    UserId = table.Column<string>(type: "nvarchar(450)", nullable: true),
+                    ApprovedByDeviceId = table.Column<string>(type: "nvarchar(450)", nullable: true),
+                    ClientId = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: true),
+                    ReturnUrl = table.Column<string>(type: "nvarchar(2000)", maxLength: 2000, nullable: true),
+                    Status = table.Column<int>(type: "int", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    ExpiresAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    ApprovedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    CompletedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    InitiatorIpAddress = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true),
+                    ApproverIpAddress = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true),
+                    Metadata = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_PersistentQrSessions", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_PersistentQrSessions_AspNetUsers_UserId",
+                        column: x => x.UserId,
+                        principalTable: "AspNetUsers",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
+                    table.ForeignKey(
+                        name: "FK_PersistentQrSessions_UserDevices_ApprovedByDeviceId",
+                        column: x => x.ApprovedByDeviceId,
+                        principalTable: "UserDevices",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
                 });
 
             migrationBuilder.CreateTable(
@@ -676,6 +874,26 @@ namespace MrWho.Migrations.SqlServer.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_DeviceAuthenticationLogs_ActivityType_OccurredAt",
+                table: "DeviceAuthenticationLogs",
+                columns: new[] { "ActivityType", "OccurredAt" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_DeviceAuthenticationLogs_ClientId_OccurredAt",
+                table: "DeviceAuthenticationLogs",
+                columns: new[] { "ClientId", "OccurredAt" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_DeviceAuthenticationLogs_DeviceId_OccurredAt",
+                table: "DeviceAuthenticationLogs",
+                columns: new[] { "DeviceId", "OccurredAt" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_DeviceAuthenticationLogs_UserId_OccurredAt",
+                table: "DeviceAuthenticationLogs",
+                columns: new[] { "UserId", "OccurredAt" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_IdentityResourceClaims_IdentityResourceId_ClaimType",
                 table: "IdentityResourceClaims",
                 columns: new[] { "IdentityResourceId", "ClaimType" },
@@ -730,6 +948,32 @@ namespace MrWho.Migrations.SqlServer.Migrations
                 filter: "[ReferenceId] IS NOT NULL");
 
             migrationBuilder.CreateIndex(
+                name: "IX_PersistentQrSessions_ApprovedByDeviceId",
+                table: "PersistentQrSessions",
+                column: "ApprovedByDeviceId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_PersistentQrSessions_ClientId",
+                table: "PersistentQrSessions",
+                column: "ClientId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_PersistentQrSessions_Status_ExpiresAt",
+                table: "PersistentQrSessions",
+                columns: new[] { "Status", "ExpiresAt" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_PersistentQrSessions_Token",
+                table: "PersistentQrSessions",
+                column: "Token",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_PersistentQrSessions_UserId_Status",
+                table: "PersistentQrSessions",
+                columns: new[] { "UserId", "Status" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Realms_Name",
                 table: "Realms",
                 column: "Name",
@@ -746,6 +990,27 @@ namespace MrWho.Migrations.SqlServer.Migrations
                 table: "Scopes",
                 column: "Name",
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_UserDevices_DeviceId",
+                table: "UserDevices",
+                column: "DeviceId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_UserDevices_UserId_DeviceId",
+                table: "UserDevices",
+                columns: new[] { "UserId", "DeviceId" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_UserDevices_UserId_IsActive",
+                table: "UserDevices",
+                columns: new[] { "UserId", "IsActive" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_UserDevices_UserId_IsTrusted",
+                table: "UserDevices",
+                columns: new[] { "UserId", "IsTrusted" });
         }
 
         /// <inheritdoc />
@@ -788,6 +1053,12 @@ namespace MrWho.Migrations.SqlServer.Migrations
                 name: "ClientScopes");
 
             migrationBuilder.DropTable(
+                name: "DataProtectionKeys");
+
+            migrationBuilder.DropTable(
+                name: "DeviceAuthenticationLogs");
+
+            migrationBuilder.DropTable(
                 name: "IdentityResourceClaims");
 
             migrationBuilder.DropTable(
@@ -800,6 +1071,9 @@ namespace MrWho.Migrations.SqlServer.Migrations
                 name: "OpenIddictTokens");
 
             migrationBuilder.DropTable(
+                name: "PersistentQrSessions");
+
+            migrationBuilder.DropTable(
                 name: "ScopeClaims");
 
             migrationBuilder.DropTable(
@@ -807,9 +1081,6 @@ namespace MrWho.Migrations.SqlServer.Migrations
 
             migrationBuilder.DropTable(
                 name: "AspNetRoles");
-
-            migrationBuilder.DropTable(
-                name: "AspNetUsers");
 
             migrationBuilder.DropTable(
                 name: "Clients");
@@ -821,6 +1092,9 @@ namespace MrWho.Migrations.SqlServer.Migrations
                 name: "OpenIddictAuthorizations");
 
             migrationBuilder.DropTable(
+                name: "UserDevices");
+
+            migrationBuilder.DropTable(
                 name: "Scopes");
 
             migrationBuilder.DropTable(
@@ -828,6 +1102,9 @@ namespace MrWho.Migrations.SqlServer.Migrations
 
             migrationBuilder.DropTable(
                 name: "OpenIddictApplications");
+
+            migrationBuilder.DropTable(
+                name: "AspNetUsers");
         }
     }
 }
