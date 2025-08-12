@@ -134,9 +134,9 @@ public class MfaController : Controller
 
     [AllowAnonymous]
     [HttpGet("challenge")]
-    public IActionResult ChallengeMfa(string? returnUrl = null, bool rememberMe = false)
+    public IActionResult ChallengeMfa(string? returnUrl = null, bool RememberMe = false)
     {
-        return View("Challenge", new VerifyMfaInput { ReturnUrl = returnUrl, RememberMe = rememberMe });
+        return View("Challenge", new VerifyMfaInput { ReturnUrl = returnUrl, RememberMe = RememberMe });
     }
 
     [AllowAnonymous]

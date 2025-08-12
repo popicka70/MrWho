@@ -185,7 +185,7 @@ public class AuthController : Controller
             {
                 var redirect = "/mfa/challenge" +
                                 (!string.IsNullOrEmpty(returnUrl) ? ($"?returnUrl={Uri.EscapeDataString(returnUrl)}") : string.Empty) +
-                                (model.RememberMe ? (string.IsNullOrEmpty(returnUrl) ? "?" : "&") + "rememberMe=true" : string.Empty);
+                                (model.RememberMe ? (string.IsNullOrEmpty(returnUrl) ? "?" : "&") + "RememberMe=true" : string.Empty);
                 _logger.LogDebug("Login requires 2FA, redirecting to {Redirect}", redirect);
                 return Redirect(redirect);
             }
