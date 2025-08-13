@@ -52,6 +52,9 @@ public class RealmExportDto
     public string? RealmPolicyUri { get; set; }
     public string? RealmTosUri { get; set; }
 
+    // Exported clients belonging to this realm (optional)
+    public List<ClientExportDto> Clients { get; set; } = new();
+
     // Metadata
     public string ExportedBy { get; set; } = "System";
     public DateTime ExportedAtUtc { get; set; } = DateTime.UtcNow;
