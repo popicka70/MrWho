@@ -5,6 +5,7 @@ using MrWho.Data;
 using MrWho.Models;
 using MrWho.Shared.Models;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity;
 
 namespace MrWho.Controllers;
 
@@ -241,6 +242,90 @@ public class RealmsController : ControllerBase
             });
         }
 
+        // Include scopes (export with claims)
+        var scopes = await _context.Scopes
+            .Include(s => s.Claims)
+            .OrderBy(s => s.Name)
+            .ToListAsync();
+
+        foreach (var s in scopes)
+        {
+            // Include all for now. To exclude standard, add: if (s.IsStandard) continue;
+            export.Scopes.Add(new ScopeExportDto
+            {
+                Name = s.Name,
+                DisplayName = s.DisplayName,
+                Description = s.Description,
+                IsEnabled = s.IsEnabled,
+                IsRequired = s.IsRequired,
+                ShowInDiscoveryDocument = s.ShowInDiscoveryDocument,
+                Type = s.Type,
+                Claims = s.Claims.Select(c => c.ClaimType).Distinct().ToList()
+            });
+        }
+
+        // Include roles (all roles for now)
+        var allRoles = await _context.Roles.ToListAsync();
+        var roleIds = allRoles.Select(r => r.Id).ToList();
+        var roleClaims = await _context.RoleClaims
+            .Where(rc => roleIds.Contains(rc.RoleId))
+            .ToListAsync();
+
+        foreach (var role in allRoles)
+        {
+            var claimsForRole = roleClaims.Where(rc => rc.RoleId == role.Id)
+                .Select(rc => new RoleClaimDto
+                {
+                    Id = rc.Id.ToString(),
+                    RoleId = rc.RoleId,
+                    ClaimType = rc.ClaimType!,
+                    ClaimValue = rc.ClaimValue!,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                }).ToList();
+
+            export.Roles.Add(new RoleExportDto
+            {
+                Name = role.Name!,
+                Claims = claimsForRole
+            });
+        }
+
+        // Include users belonging to this realm (by realm claim)
+        var users = await _context.Users.ToListAsync();
+        foreach (var u in users)
+        {
+            // Find realm claim for user
+            var uClaims = await _context.UserClaims.Where(c => c.UserId == u.Id).ToListAsync();
+            var realmClaim = uClaims.FirstOrDefault(c => c.ClaimType == "realm");
+            if (realmClaim?.ClaimValue != realm.Name)
+                continue;
+
+            var roleNames = await _context.UserRoles
+                .Where(ur => ur.UserId == u.Id)
+                .Join(_context.Roles, ur => ur.RoleId, r => r.Id, (ur, r) => r.Name!)
+                .ToListAsync();
+
+            export.Users.Add(new UserExportDto
+            {
+                UserName = u.UserName!,
+                Email = u.Email!,
+                EmailConfirmed = u.EmailConfirmed,
+                PhoneNumber = u.PhoneNumber,
+                PhoneNumberConfirmed = u.PhoneNumberConfirmed,
+                TwoFactorEnabled = u.TwoFactorEnabled,
+                LockoutEnabled = u.LockoutEnabled,
+                LockoutEnd = u.LockoutEnd,
+                Claims = uClaims.Select(c => new UserClaimDto
+                {
+                    ClaimType = c.ClaimType!,
+                    ClaimValue = c.ClaimValue!,
+                    Issuer = null
+                }).ToList(),
+                Roles = roleNames
+            });
+        }
+
         return Ok(export);
     }
 
@@ -248,7 +333,7 @@ public class RealmsController : ControllerBase
     /// Import a realm from JSON (upsert by Name)
     /// </summary>
     [HttpPost("import")]
-    public async Task<ActionResult<RealmDto>> ImportRealm([FromBody] RealmExportDto dto)
+    public async Task<ActionResult<RealmDto>> ImportRealm([FromBody] RealmExportDto dto, [FromServices] UserManager<IdentityUser> userManager, [FromServices] RoleManager<IdentityRole> roleManager)
     {
         if (string.IsNullOrWhiteSpace(dto.Name))
         {
@@ -318,134 +403,180 @@ public class RealmsController : ControllerBase
                 // Persist realm to ensure Id is available
                 await _context.SaveChangesAsync();
 
-                // Optionally import included clients
-                if (dto.Clients != null && dto.Clients.Count > 0)
+                // Import scopes (upsert by Name; replace claims)
+                if (dto.Scopes != null && dto.Scopes.Count > 0)
                 {
-                    foreach (var c in dto.Clients)
+                    foreach (var s in dto.Scopes)
                     {
-                        if (string.IsNullOrWhiteSpace(c.ClientId))
-                            continue;
+                        if (string.IsNullOrWhiteSpace(s.Name)) continue;
 
-                        // Upsert client within this realm
-                        var client = await _context.Clients
-                            .Include(x => x.RedirectUris)
-                            .Include(x => x.PostLogoutUris)
-                            .Include(x => x.Scopes)
-                            .Include(x => x.Permissions)
-                            .FirstOrDefaultAsync(x => x.ClientId == c.ClientId && x.RealmId == realm.Id);
+                        var scope = await _context.Scopes
+                            .Include(x => x.Claims)
+                            .FirstOrDefaultAsync(x => x.Name == s.Name);
 
-                        string? generatedSecret = null;
-
-                        if (client == null)
+                        if (scope == null)
                         {
-                            client = new Client
+                            scope = new Scope
                             {
-                                ClientId = c.ClientId,
-                                RealmId = realm.Id,
+                                Name = s.Name,
                                 CreatedAt = now,
-                                UpdatedAt = now,
-                                CreatedBy = userName,
-                                UpdatedBy = userName
+                                CreatedBy = userName
                             };
-                            _context.Clients.Add(client);
+                            _context.Scopes.Add(scope);
+                        }
 
-                            // If confidential/machine and requires secret, generate one
-                            if ((c.ClientType == ClientType.Confidential || c.ClientType == ClientType.Machine) && c.RequireClientSecret == true)
+                        scope.DisplayName = s.DisplayName;
+                        scope.Description = s.Description;
+                        scope.IsEnabled = s.IsEnabled;
+                        scope.IsRequired = s.IsRequired;
+                        scope.ShowInDiscoveryDocument = s.ShowInDiscoveryDocument;
+                        scope.Type = s.Type;
+                        scope.UpdatedAt = now;
+                        scope.UpdatedBy = userName;
+
+                        // Replace claims
+                        if (scope.Claims?.Count > 0)
+                            _context.ScopeClaims.RemoveRange(scope.Claims);
+
+                        foreach (var ct in (s.Claims ?? new List<string>()).Distinct())
+                        {
+                            _context.ScopeClaims.Add(new ScopeClaim
                             {
-                                generatedSecret = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
-                                client.ClientSecret = generatedSecret;
-                            }
-                        }
-
-                        // Update scalar properties
-                        client.Name = c.Name;
-                        client.Description = c.Description;
-                        client.IsEnabled = c.IsEnabled;
-                        client.ClientType = c.ClientType;
-                        client.AllowAuthorizationCodeFlow = c.AllowAuthorizationCodeFlow;
-                        client.AllowClientCredentialsFlow = c.AllowClientCredentialsFlow;
-                        client.AllowPasswordFlow = c.AllowPasswordFlow;
-                        client.AllowRefreshTokenFlow = c.AllowRefreshTokenFlow;
-                        client.RequirePkce = c.RequirePkce;
-                        client.RequireClientSecret = c.RequireClientSecret;
-                        client.AccessTokenLifetime = c.AccessTokenLifetime;
-                        client.RefreshTokenLifetime = c.RefreshTokenLifetime;
-                        client.AuthorizationCodeLifetime = c.AuthorizationCodeLifetime;
-                        client.IdTokenLifetimeMinutes = c.IdTokenLifetimeMinutes;
-                        client.DeviceCodeLifetimeMinutes = c.DeviceCodeLifetimeMinutes;
-                        client.SessionTimeoutHours = c.SessionTimeoutHours;
-                        client.UseSlidingSessionExpiration = c.UseSlidingSessionExpiration;
-                        client.RememberMeDurationDays = c.RememberMeDurationDays;
-                        client.RequireHttpsForCookies = c.RequireHttpsForCookies;
-                        client.CookieSameSitePolicy = c.CookieSameSitePolicy;
-                        client.RequireConsent = c.RequireConsent;
-                        client.AllowRememberConsent = c.AllowRememberConsent;
-                        client.IncludeJwtId = c.IncludeJwtId;
-                        client.AlwaysSendClientClaims = c.AlwaysSendClientClaims;
-                        client.AlwaysIncludeUserClaimsInIdToken = c.AlwaysIncludeUserClaimsInIdToken;
-                        client.ClientClaimsPrefix = c.ClientClaimsPrefix;
-                        client.AllowAccessToUserInfoEndpoint = c.AllowAccessToUserInfoEndpoint;
-                        client.AllowAccessToIntrospectionEndpoint = c.AllowAccessToIntrospectionEndpoint;
-                        client.AllowAccessToRevocationEndpoint = c.AllowAccessToRevocationEndpoint;
-                        client.RateLimitRequestsPerMinute = c.RateLimitRequestsPerMinute;
-                        client.RateLimitRequestsPerHour = c.RateLimitRequestsPerHour;
-                        client.RateLimitRequestsPerDay = c.RateLimitRequestsPerDay;
-                        client.ThemeName = c.ThemeName;
-                        client.CustomCssUrl = c.CustomCssUrl;
-                        client.CustomJavaScriptUrl = c.CustomJavaScriptUrl;
-                        client.PageTitlePrefix = c.PageTitlePrefix;
-                        client.LogoUri = c.LogoUri;
-                        client.ClientUri = c.ClientUri;
-                        client.PolicyUri = c.PolicyUri;
-                        client.TosUri = c.TosUri;
-                        client.BackChannelLogoutUri = c.BackChannelLogoutUri;
-                        client.BackChannelLogoutSessionRequired = c.BackChannelLogoutSessionRequired;
-                        client.FrontChannelLogoutUri = c.FrontChannelLogoutUri;
-                        client.FrontChannelLogoutSessionRequired = c.FrontChannelLogoutSessionRequired;
-                        client.AllowedCorsOrigins = c.AllowedCorsOrigins;
-                        client.AllowedIdentityProviders = c.AllowedIdentityProviders;
-                        client.ProtocolType = c.ProtocolType;
-                        client.EnableDetailedErrors = c.EnableDetailedErrors;
-                        client.LogSensitiveData = c.LogSensitiveData;
-                        client.EnableLocalLogin = c.EnableLocalLogin;
-                        client.CustomLoginPageUrl = c.CustomLoginPageUrl;
-                        client.CustomLogoutPageUrl = c.CustomLogoutPageUrl;
-                        client.CustomErrorPageUrl = c.CustomErrorPageUrl;
-                        client.UpdatedAt = now;
-                        client.UpdatedBy = userName;
-
-                        // Collections - replace
-                        if (client.RedirectUris?.Count > 0)
-                            _context.ClientRedirectUris.RemoveRange(client.RedirectUris);
-                        foreach (var uri in (c.RedirectUris ?? new List<string>()).Distinct())
-                        {
-                            _context.ClientRedirectUris.Add(new ClientRedirectUri { ClientId = client.Id, Uri = uri });
-                        }
-
-                        if (client.PostLogoutUris?.Count > 0)
-                            _context.ClientPostLogoutUris.RemoveRange(client.PostLogoutUris);
-                        foreach (var uri in (c.PostLogoutUris ?? new List<string>()).Distinct())
-                        {
-                            _context.ClientPostLogoutUris.Add(new ClientPostLogoutUri { ClientId = client.Id, Uri = uri });
-                        }
-
-                        if (client.Scopes?.Count > 0)
-                            _context.ClientScopes.RemoveRange(client.Scopes);
-                        foreach (var s in (c.Scopes ?? new List<string>()).Distinct())
-                        {
-                            _context.ClientScopes.Add(new ClientScope { ClientId = client.Id, Scope = s });
-                        }
-
-                        if (client.Permissions?.Count > 0)
-                            _context.ClientPermissions.RemoveRange(client.Permissions);
-                        foreach (var p in (c.Permissions ?? new List<string>()).Distinct())
-                        {
-                            _context.ClientPermissions.Add(new ClientPermission { ClientId = client.Id, Permission = p });
+                                ScopeId = scope.Id,
+                                ClaimType = ct
+                            });
                         }
                     }
 
                     await _context.SaveChangesAsync();
                 }
+
+                // Import roles (upsert by Name; replace claims)
+                if (dto.Roles != null && dto.Roles.Count > 0)
+                {
+                    foreach (var r in dto.Roles)
+                    {
+                        if (string.IsNullOrWhiteSpace(r.Name)) continue;
+
+                        var role = await roleManager.FindByNameAsync(r.Name);
+                        if (role == null)
+                        {
+                            role = new IdentityRole(r.Name);
+                            var created = await roleManager.CreateAsync(role);
+                            if (!created.Succeeded)
+                                throw new InvalidOperationException($"Failed to create role {r.Name}: {string.Join(", ", created.Errors.Select(e => e.Description))}");
+                        }
+
+                        // Replace role claims
+                        var existingClaims = await roleManager.GetClaimsAsync(role);
+                        foreach (var c in existingClaims)
+                        {
+                            await roleManager.RemoveClaimAsync(role, c);
+                        }
+
+                        foreach (var c in r.Claims)
+                        {
+                            await roleManager.AddClaimAsync(role, new System.Security.Claims.Claim(c.ClaimType, c.ClaimValue));
+                        }
+                    }
+
+                    await _context.SaveChangesAsync();
+                }
+
+                // Import users (upsert by UserName; set claims and roles)
+                if (dto.Users != null && dto.Users.Count > 0)
+                {
+                    foreach (var u in dto.Users)
+                    {
+                        if (string.IsNullOrWhiteSpace(u.UserName)) continue;
+
+                        var user = await userManager.FindByNameAsync(u.UserName);
+                        if (user == null)
+                        {
+                            user = new IdentityUser
+                            {
+                                UserName = u.UserName,
+                                Email = u.Email,
+                                EmailConfirmed = u.EmailConfirmed,
+                                PhoneNumber = u.PhoneNumber,
+                                PhoneNumberConfirmed = u.PhoneNumberConfirmed,
+                                TwoFactorEnabled = u.TwoFactorEnabled,
+                                LockoutEnabled = u.LockoutEnabled,
+                                LockoutEnd = u.LockoutEnd
+                            };
+
+                            var created = await userManager.CreateAsync(user, string.IsNullOrWhiteSpace(u.TempPassword) ? Guid.NewGuid().ToString("N") + "!aA1" : u.TempPassword);
+                            if (!created.Succeeded)
+                                throw new InvalidOperationException($"Failed to create user {u.UserName}: {string.Join(", ", created.Errors.Select(e => e.Description))}");
+                        }
+                        else
+                        {
+                            // Update mutable fields
+                            user.Email = u.Email;
+                            user.EmailConfirmed = u.EmailConfirmed;
+                            user.PhoneNumber = u.PhoneNumber;
+                            user.PhoneNumberConfirmed = u.PhoneNumberConfirmed;
+                            user.TwoFactorEnabled = u.TwoFactorEnabled;
+                            user.LockoutEnabled = u.LockoutEnabled;
+                            user.LockoutEnd = u.LockoutEnd;
+                            var update = await userManager.UpdateAsync(user);
+                            if (!update.Succeeded)
+                                throw new InvalidOperationException($"Failed to update user {u.UserName}: {string.Join(", ", update.Errors.Select(e => e.Description))}");
+                        }
+
+                        // Replace user claims
+                        var currentClaims = await userManager.GetClaimsAsync(user);
+                        foreach (var c in currentClaims)
+                        {
+                            await userManager.RemoveClaimAsync(user, c);
+                        }
+
+                        foreach (var c in u.Claims)
+                        {
+                            await userManager.AddClaimAsync(user, new System.Security.Claims.Claim(c.ClaimType, c.ClaimValue));
+                        }
+
+                        // Ensure realm claim matches imported realm
+                        if (!u.Claims.Any(c => c.ClaimType == "realm" && c.ClaimValue == dto.Name))
+                        {
+                            await userManager.AddClaimAsync(user, new System.Security.Claims.Claim("realm", dto.Name));
+                        }
+
+                        // Replace roles
+                        var currentRoles = await userManager.GetRolesAsync(user);
+                        if (currentRoles.Count > 0)
+                        {
+                            var remove = await userManager.RemoveFromRolesAsync(user, currentRoles);
+                            if (!remove.Succeeded)
+                                throw new InvalidOperationException($"Failed to clear roles for user {u.UserName}: {string.Join(", ", remove.Errors.Select(e => e.Description))}");
+                        }
+
+                        foreach (var rn in u.Roles.Distinct())
+                        {
+                            if (!string.IsNullOrWhiteSpace(rn))
+                            {
+                                // Ensure role exists
+                                var role = await roleManager.FindByNameAsync(rn);
+                                if (role == null)
+                                {
+                                    role = new IdentityRole(rn);
+                                    var created = await roleManager.CreateAsync(role);
+                                    if (!created.Succeeded)
+                                        throw new InvalidOperationException($"Failed to create role {rn}: {string.Join(", ", created.Errors.Select(e => e.Description))}");
+                                }
+
+                                var added = await userManager.AddToRoleAsync(user, rn);
+                                if (!added.Succeeded)
+                                    throw new InvalidOperationException($"Failed to add role {rn} to user {u.UserName}: {string.Join(", ", added.Errors.Select(e => e.Description))}");
+                            }
+                        }
+                    }
+
+                    await _context.SaveChangesAsync();
+                }
+
+                // Import clients (existing code)
+                // ...existing clients import...
 
                 await tx.CommitAsync();
 

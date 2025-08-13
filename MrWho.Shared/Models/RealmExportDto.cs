@@ -55,6 +55,13 @@ public class RealmExportDto
     // Exported clients belonging to this realm (optional)
     public List<ClientExportDto> Clients { get; set; } = new();
 
+    // Exported scopes belonging to this system (realm-agnostic but included for convenience)
+    public List<ScopeExportDto> Scopes { get; set; } = new();
+
+    // Exported roles and users (portable)
+    public List<RoleExportDto> Roles { get; set; } = new();
+    public List<UserExportDto> Users { get; set; } = new();
+
     // Metadata
     public string ExportedBy { get; set; } = "System";
     public DateTime ExportedAtUtc { get; set; } = DateTime.UtcNow;
