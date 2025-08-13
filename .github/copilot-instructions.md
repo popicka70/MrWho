@@ -99,10 +99,7 @@ Without this component, Radzen UI components (dialogs, notifications, etc.) will
 **✅ CORRECT - Controls wrapped in RadzenFormField:**
 ```razor
 <RadzenFormField Text="Status" Variant="Variant.Outlined">
-    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-        <RadzenCheckBox @bind-Value="@model.IsEnabled" />
-        <RadzenLabel Text="Client is enabled" />
-    </RadzenStack>
+    <RadzenTextBox @bind-Value="@model.Status" Style="width: 100%;" />
 </RadzenFormField>
 
 <RadzenFormField Text="Name" Variant="Variant.Outlined">
@@ -111,11 +108,65 @@ Without this component, Radzen UI components (dialogs, notifications, etc.) will
 ```
 
 **Key Rules:**
-1. **RadzenFormField provides consistent styling and layout**
-2. **Multiple controls can be placed in a single RadzenFormField when logically related**
-3. **Use RadzenStack inside RadzenFormField to properly organize multiple controls**
-4. **RadzenFormField handles proper spacing, borders, and visual hierarchy**
-5. **Only exclude RadzenFormField when you need special layout handling**
+1. RadzenFormField provides consistent styling and layout
+2. Multiple controls can be placed in a single RadzenFormField when logically related
+3. Use RadzenStack inside RadzenFormField only when you must organize multiple controls; avoid unnecessary wrappers
+4. RadzenFormField handles proper spacing, borders, and visual hierarchy
+5. Only exclude RadzenFormField when you need special layout handling
+
+#### Standard pattern for boolean inputs (RadzenCheckBox and RadzenSwitch)
+To maintain consistent spacing and alignment (40px row height, 7px vertical padding, 7px separation between control and text):
+
+- Place the boolean control in the `Start` slot
+- Place the text/label in `ChildContent` as a `RadzenLabel` linked via the `Component` attribute
+- Do NOT add manual margins between the control and label; global CSS handles spacing
+- Do NOT add extra top margins to align the control; global CSS aligns it
+- Use this same pattern for both CheckBox and Switch
+
+**✅ CORRECT - Checkbox with label:**
+```razor
+<RadzenFormField Text="Consent Requirements" Variant="Variant.Outlined">
+    <Start>
+        <RadzenCheckBox @bind-Value="@model.RequireConsent" TriState="true" Name="requireConsent" />
+    </Start>
+    <ChildContent>
+        <RadzenLabel Text="Require user consent for authorization" Component="requireConsent" />
+    </ChildContent>
+    <Helper>
+        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+            Controls when users must explicitly approve authorization
+        </RadzenText>
+    </Helper>
+</RadzenFormField>
+```
+
+**✅ CORRECT - Switch with label:**
+```razor
+<RadzenFormField Text="Status" Variant="Variant.Outlined">
+    <Start>
+        <RadzenSwitch @bind-Value="@model.IsEnabled" OnLabel="Enabled" OffLabel="Disabled" />
+    </Start>
+    <ChildContent>
+        <RadzenLabel Text="Client is enabled" />
+    </ChildContent>
+</RadzenFormField>
+```
+
+**❌ AVOID - Extra wrapper and manual spacing:**
+```razor
+<RadzenFormField Text="Consent Requirements" Variant="Variant.Outlined">
+    <ChildContent>
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" Style="margin-top: 0.5rem;">
+            <RadzenCheckBox @bind-Value="@model.RequireConsent" Name="requireConsent" />
+            <RadzenLabel Text="Require user consent for authorization" Component="requireConsent" />
+        </RadzenStack>
+    </ChildContent>
+</RadzenFormField>
+```
+
+Notes:
+- The global CSS adds: 40px min-height and 7px top/bottom padding to the content, 7px right padding to Start when it contains a checkbox/switch, and 7px top padding on the Start control. No inline spacing is needed.
+- If `Start` is empty, no extra spacing is applied (selectors are conditional via `:has(...)`).
 
 ### CRITICAL: Async Methods in Event Handlers
 When using async methods in Blazor event handlers, especially in lambda expressions, **ALWAYS** use `async` and `await`:
@@ -131,10 +182,10 @@ When using async methods in Blazor event handlers, especially in lambda expressi
 ```
 
 **Key Rules:**
-1. **Any async method call in a lambda must be awaited**
-2. **The lambda must be marked as async**
-3. **This applies to all event handlers: Click, Change, Submit, etc.**
-4. **Failure to follow this pattern results in methods not being called at all**
+1. Any async method call in a lambda must be awaited
+2. The lambda must be marked as async
+3. This applies to all event handlers: Click, Change, Submit, etc.
+4. Failure to follow this pattern results in methods not being called at all
 
 ### Common Async Patterns in Blazor
 ```razor
