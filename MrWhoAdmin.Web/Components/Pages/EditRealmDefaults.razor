@@ -51,34 +51,46 @@
                                     <RadzenRow>
                                         <RadzenColumn Size="12" SizeMD="6">
                                             <RadzenFormField Text="Default Session Timeout (Hours)" Variant="Variant.Outlined">
-                                                <RadzenNumeric @bind-Value="@model.DefaultSessionTimeoutHours" 
+                                                <ChildContent>
+                                                    <RadzenNumeric @bind-Value="@model.DefaultSessionTimeoutHours" 
                                                               Min="1" Max="168" 
                                                               Style="width: 100%;" />
-                                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                    Default session duration for clients in this realm (1-168 hours)
-                                                </RadzenText>
+                                                </ChildContent>
+                                                <Helper>
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                        Default session duration for clients in this realm (1-168 hours)
+                                                    </RadzenText>
+                                                </Helper>
                                             </RadzenFormField>
                                         </RadzenColumn>
                                         <RadzenColumn Size="12" SizeMD="6">
                                             <RadzenFormField Text="Default Remember Me Duration (Days)" Variant="Variant.Outlined">
-                                                <RadzenNumeric @bind-Value="@model.DefaultRememberMeDurationDays" 
+                                                <ChildContent>
+                                                    <RadzenNumeric @bind-Value="@model.DefaultRememberMeDurationDays" 
                                                               Min="1" Max="365" 
                                                               Style="width: 100%;" />
-                                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                    Default "Remember Me" duration (1-365 days)
-                                                </RadzenText>
+                                                </ChildContent>
+                                                <Helper>
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                        Default "Remember Me" duration (1-365 days)
+                                                    </RadzenText>
+                                                </Helper>
                                             </RadzenFormField>
                                         </RadzenColumn>
                                     </RadzenRow>
 
                                     <RadzenFormField Text="Default Session Behavior" Variant="Variant.Outlined">
-                                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem" Style="margin-top: 0.5rem;">
-                                            <RadzenCheckBox @bind-Value="@model.DefaultUseSlidingSessionExpiration" />
-                                            <RadzenLabel Text="Use sliding expiration by default" />
-                                        </RadzenStack>
-                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                            When enabled, session timeout resets on user activity for all clients
-                                        </RadzenText>
+                                        <Start>
+                                            <RadzenCheckBox @bind-Value="@model.DefaultUseSlidingSessionExpiration" Name="defaultUseSliding" />
+                                        </Start>
+                                        <ChildContent>
+                                            <RadzenLabel Text="Use sliding expiration by default (extend session on user activity)" Component="defaultUseSliding" />
+                                        </ChildContent>
+                                        <Helper>
+                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                When enabled, session timeout resets on user activity for all clients
+                                            </RadzenText>
+                                        </Helper>
                                     </RadzenFormField>
                                 </RadzenStack>
                             </RadzenStack>
@@ -87,24 +99,32 @@
                                 <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Default Cookie Configuration</RadzenText>
                                 <RadzenStack Gap="1rem">
                                     <RadzenFormField Text="Default Cookie SameSite Policy" Variant="Variant.Outlined">
-                                        <RadzenDropDown @bind-Value="@model.DefaultCookieSameSitePolicy" 
+                                        <ChildContent>
+                                            <RadzenDropDown @bind-Value="@model.DefaultCookieSameSitePolicy" 
                                                        Data="@sameSitePolicies" 
                                                        TextProperty="Text" 
                                                        ValueProperty="Value" 
                                                        Style="width: 100%;" />
-                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                            Default SameSite policy for client cookies
-                                        </RadzenText>
+                                        </ChildContent>
+                                        <Helper>
+                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                Default SameSite policy for client cookies
+                                            </RadzenText>
+                                        </Helper>
                                     </RadzenFormField>
 
                                     <RadzenFormField Text="Default HTTPS Requirement" Variant="Variant.Outlined">
-                                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem" Style="margin-top: 0.5rem;">
-                                            <RadzenCheckBox @bind-Value="@model.DefaultRequireHttpsForCookies" />
-                                            <RadzenLabel Text="Require HTTPS for cookies by default" />
-                                        </RadzenStack>
-                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                            Default HTTPS requirement for client cookies
-                                        </RadzenText>
+                                        <Start>
+                                            <RadzenCheckBox @bind-Value="@model.DefaultRequireHttpsForCookies" Name="defaultRequireHttpsCookies" />
+                                        </Start>
+                                        <ChildContent>
+                                            <RadzenLabel Text="Require HTTPS for cookies by default (secure flag)" Component="defaultRequireHttpsCookies" />
+                                        </ChildContent>
+                                        <Helper>
+                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                Default HTTPS requirement for client cookies
+                                            </RadzenText>
+                                        </Helper>
                                     </RadzenFormField>
                                 </RadzenStack>
                             </RadzenStack>
@@ -117,17 +137,21 @@
                             <RadzenStack Gap="0.75rem" class="rz-mb-4">
                                 <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Default Consent Settings</RadzenText>
                                 <RadzenStack Gap="1rem">
-                                    <RadzenFormField Text="Default Consent Requirements" Variant="Variant.Outlined">
-                                        <RadzenStack Gap="0.5rem" Style="margin-top: 0.5rem;">
-                                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                                <RadzenCheckBox @bind-Value="@model.DefaultRequireConsent" />
-                                                <RadzenLabel Text="Require user consent by default" />
-                                            </RadzenStack>
-                                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                                <RadzenCheckBox @bind-Value="@model.DefaultAllowRememberConsent" />
-                                                <RadzenLabel Text="Allow remembering consent by default" />
-                                            </RadzenStack>
-                                        </RadzenStack>
+                                    <RadzenFormField Text="Default Consent Requirement" Variant="Variant.Outlined">
+                                        <Start>
+                                            <RadzenCheckBox @bind-Value="@model.DefaultRequireConsent" Name="defaultRequireConsent" />
+                                        </Start>
+                                        <ChildContent>
+                                            <RadzenLabel Text="Require user consent by default" Component="defaultRequireConsent" />
+                                        </ChildContent>
+                                    </RadzenFormField>
+                                    <RadzenFormField Text="Remember Consent Option" Variant="Variant.Outlined">
+                                        <Start>
+                                            <RadzenCheckBox @bind-Value="@model.DefaultAllowRememberConsent" Name="defaultAllowRememberConsent" />
+                                        </Start>
+                                        <ChildContent>
+                                            <RadzenLabel Text="Allow remembering consent by default" Component="defaultAllowRememberConsent" />
+                                        </ChildContent>
                                     </RadzenFormField>
                                 </RadzenStack>
                             </RadzenStack>
@@ -138,27 +162,38 @@
                                     <RadzenRow>
                                         <RadzenColumn Size="12" SizeMD="6">
                                             <RadzenFormField Text="Max Refresh Tokens Per User" Variant="Variant.Outlined">
-                                                <RadzenNumeric @bind-Value="@model.DefaultMaxRefreshTokensPerUser" 
+                                                <ChildContent>
+                                                    <RadzenNumeric @bind-Value="@model.DefaultMaxRefreshTokensPerUser" 
                                                               Min="0" Max="100" 
                                                               Style="width: 100%;" 
                                                               Placeholder="Leave empty for unlimited" />
-                                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                    Default limit for concurrent refresh tokens per user
-                                                </RadzenText>
+                                                </ChildContent>
+                                                <Helper>
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                        Default limit for concurrent refresh tokens per user
+                                                    </RadzenText>
+                                                </Helper>
                                             </RadzenFormField>
                                         </RadzenColumn>
                                         <RadzenColumn Size="12" SizeMD="6">
-                                            <RadzenFormField Text="Default Token Behavior" Variant="Variant.Outlined">
-                                                <RadzenStack Gap="0.5rem" Style="margin-top: 0.5rem;">
-                                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                                        <RadzenCheckBox @bind-Value="@model.DefaultUseOneTimeRefreshTokens" />
-                                                        <RadzenLabel Text="One-time refresh tokens" />
-                                                    </RadzenStack>
-                                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                                        <RadzenCheckBox @bind-Value="@model.DefaultIncludeJwtId" />
-                                                        <RadzenLabel Text="Include JWT ID in tokens" />
-                                                    </RadzenStack>
-                                                </RadzenStack>
+                                            <RadzenFormField Text="Token Behavior Defaults" Variant="Variant.Outlined">
+                                                <Start>
+                                                    <RadzenCheckBox @bind-Value="@model.DefaultUseOneTimeRefreshTokens" Name="defaultUseOneTimeRefreshTokens" />
+                                                </Start>
+                                                <ChildContent>
+                                                    <RadzenLabel Text="Use one-time refresh tokens by default (rotation)" Component="defaultUseOneTimeRefreshTokens" />
+                                                </ChildContent>
+                                                <Helper>
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                        Enforce refresh token rotation to improve security
+                                                    </RadzenText>
+                                                </Helper>
+                                                <Start>
+                                                    <RadzenCheckBox @bind-Value="@model.DefaultIncludeJwtId" Name="defaultIncludeJwtId" />
+                                                </Start>
+                                                <ChildContent>
+                                                    <RadzenLabel Text="Include JWT ID (jti) in tokens by default" Component="defaultIncludeJwtId" />
+                                                </ChildContent>
                                             </RadzenFormField>
                                         </RadzenColumn>
                                     </RadzenRow>
@@ -168,61 +203,76 @@
                     </RadzenTabsItem>
 
                     <!-- MFA Defaults -->
-            <RadzenTabsItem Text="MFA Defaults" Icon="verified_user">
+                    <RadzenTabsItem Text="MFA Defaults" Icon="verified_user">
                         <div style="padding: 1rem; max-height: 550px; overflow-y: auto;">
-                <RadzenStack Gap="0.75rem" class="rz-mb-4">
-                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Default MFA Configuration</RadzenText>
-                <RadzenStack Gap="1rem">
-                                    <RadzenFormField Text="Default MFA Enforcement" Variant="Variant.Outlined">
-                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem" Style="margin-top: 0.5rem;">
-                                            <RadzenCheckBox @bind-Value="@model.DefaultRequireMfa" />
-                                            <RadzenLabel Text="Require MFA by default for all clients" />
-                                        </RadzenStack>
-                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                            When enabled, all clients in this realm will require MFA unless overridden
-                                        </RadzenText>
+                            <RadzenStack Gap="0.75rem" class="rz-mb-4">
+                                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Default MFA Configuration</RadzenText>
+                                <RadzenStack Gap="1rem">
+                                    <RadzenFormField Text="MFA Enforcement Default" Variant="Variant.Outlined">
+                                        <Start>
+                                            <RadzenCheckBox @bind-Value="@model.DefaultRequireMfa" Name="defaultRequireMfa" />
+                                        </Start>
+                                        <ChildContent>
+                                            <RadzenLabel Text="Require MFA by default for all clients" Component="defaultRequireMfa" />
+                                        </ChildContent>
+                                        <Helper>
+                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                When enabled, all clients in this realm will require MFA unless overridden
+                                            </RadzenText>
+                                        </Helper>
                                     </RadzenFormField>
 
                                     <RadzenRow>
                                         <RadzenColumn Size="12" SizeMD="6">
-                                            <RadzenFormField Text="Default MFA Grace Period (Minutes)" Variant="Variant.Outlined">
-                                                <RadzenNumeric @bind-Value="@model.DefaultMfaGracePeriodMinutes" 
+                                            <RadzenFormField Text="MFA Grace Period (Minutes)" Variant="Variant.Outlined">
+                                                <ChildContent>
+                                                    <RadzenNumeric @bind-Value="@model.DefaultMfaGracePeriodMinutes" 
                                                               Min="0" Max="1440" 
                                                               Style="width: 100%;" 
                                                               Placeholder="Leave empty for no grace period" />
-                                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                    Default time before requiring MFA again (0-1440 minutes)
-                                                </RadzenText>
+                                                </ChildContent>
+                                                <Helper>
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                        Default time before requiring MFA again (0-1440 minutes)
+                                                    </RadzenText>
+                                                </Helper>
                                             </RadzenFormField>
                                         </RadzenColumn>
                                         <RadzenColumn Size="12" SizeMD="6">
-                                            <RadzenFormField Text="Default MFA Session Memory" Variant="Variant.Outlined">
-                                                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="1rem" Style="margin-top: 0.5rem;">
-                                                    <RadzenCheckBox @bind-Value="@model.DefaultRememberMfaForSession" />
-                                                    <RadzenLabel Text="Remember MFA for session by default" />
-                                                </RadzenStack>
-                                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                    Skip MFA if already completed this session
-                                                </RadzenText>
+                                            <RadzenFormField Text="Session MFA Memory" Variant="Variant.Outlined">
+                                                <Start>
+                                                    <RadzenCheckBox @bind-Value="@model.DefaultRememberMfaForSession" Name="defaultRememberMfaForSession" />
+                                                </Start>
+                                                <ChildContent>
+                                                    <RadzenLabel Text="Remember MFA for session by default" Component="defaultRememberMfaForSession" />
+                                                </ChildContent>
+                                                <Helper>
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                        Skip MFA if already completed this session
+                                                    </RadzenText>
+                                                </Helper>
                                             </RadzenFormField>
                                         </RadzenColumn>
                                     </RadzenRow>
 
-                                    <RadzenFormField Text="Default Allowed MFA Methods" Variant="Variant.Outlined">
-                                        <RadzenStack Gap="0.5rem" Style="margin-top: 0.5rem;">
-                                            @foreach (var method in availableMfaMethods)
-                                            {
-                                                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                                    <RadzenCheckBox Value="@IsMethodSelected(method.Value)" 
-                                                                   ValueChanged="@((bool selected) => ToggleMfaMethod(method.Value, selected))" />
-                                                    <RadzenLabel Text="@method.Text" />
-                                                </RadzenStack>
-                                            }
-                                        </RadzenStack>
-                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                            Select default MFA methods available to clients in this realm
-                                        </RadzenText>
-                                    </RadzenFormField>
+                                    <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-font-weight-600">Default Allowed MFA Methods</RadzenText>
+                                    @foreach (var method in availableMfaMethods)
+                                    {
+                                        var name = $"mfa_default_{method.Value}";
+                                        <RadzenFormField Variant="Variant.Outlined">
+                                            <Start>
+                                                <RadzenCheckBox Value="@IsMethodSelected(method.Value)" 
+                                                               ValueChanged="@((bool selected) => ToggleMfaMethod(method.Value, selected))"
+                                                               Name="@name" />
+                                            </Start>
+                                            <ChildContent>
+                                                <RadzenLabel Text="@method.Text" Component="@name" />
+                                            </ChildContent>
+                                        </RadzenFormField>
+                                    }
+                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                        Select default MFA methods available to clients in this realm
+                                    </RadzenText>
                                 </RadzenStack>
                             </RadzenStack>
                         </div>
@@ -241,35 +291,47 @@
                                     <RadzenRow>
                                         <RadzenColumn Size="12" SizeMD="4">
                                             <RadzenFormField Text="Default Per Minute Limit" Variant="Variant.Outlined">
-                                                <RadzenNumeric @bind-Value="@model.DefaultRateLimitRequestsPerMinute" 
+                                                <ChildContent>
+                                                    <RadzenNumeric @bind-Value="@model.DefaultRateLimitRequestsPerMinute" 
                                                               Min="0" Max="10000" 
                                                               Style="width: 100%;" 
                                                               Placeholder="Requests per minute" />
-                                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                    Default requests per minute (0 = unlimited)
-                                                </RadzenText>
+                                                </ChildContent>
+                                                <Helper>
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                        Default requests per minute (0 = unlimited)
+                                                    </RadzenText>
+                                                </Helper>
                                             </RadzenFormField>
                                         </RadzenColumn>
                                         <RadzenColumn Size="12" SizeMD="4">
                                             <RadzenFormField Text="Default Per Hour Limit" Variant="Variant.Outlined">
-                                                <RadzenNumeric @bind-Value="@model.DefaultRateLimitRequestsPerHour" 
+                                                <ChildContent>
+                                                    <RadzenNumeric @bind-Value="@model.DefaultRateLimitRequestsPerHour" 
                                                               Min="0" Max="1000000" 
                                                               Style="width: 100%;" 
                                                               Placeholder="Requests per hour" />
-                                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                    Default requests per hour (0 = unlimited)
-                                                </RadzenText>
+                                                </ChildContent>
+                                                <Helper>
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                        Default requests per hour (0 = unlimited)
+                                                    </RadzenText>
+                                                </Helper>
                                             </RadzenFormField>
                                         </RadzenColumn>
                                         <RadzenColumn Size="12" SizeMD="4">
                                             <RadzenFormField Text="Default Per Day Limit" Variant="Variant.Outlined">
-                                                <RadzenNumeric @bind-Value="@model.DefaultRateLimitRequestsPerDay" 
+                                                <ChildContent>
+                                                    <RadzenNumeric @bind-Value="@model.DefaultRateLimitRequestsPerDay" 
                                                               Min="0" Max="10000000" 
                                                               Style="width: 100%;" 
                                                               Placeholder="Requests per day" />
-                                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                    Default requests per day (0 = unlimited)
-                                                </RadzenText>
+                                                </ChildContent>
+                                                <Helper>
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                        Default requests per day (0 = unlimited)
+                                                    </RadzenText>
+                                                </Helper>
                                             </RadzenFormField>
                                         </RadzenColumn>
                                     </RadzenRow>
@@ -285,21 +347,25 @@
                                 <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Default Error Handling</RadzenText>
                                 <RadzenStack Gap="1rem">
                                     <RadzenFormField Text="Default Error Response Settings" Variant="Variant.Outlined">
-                                        <RadzenStack Gap="0.5rem" Style="margin-top: 0.5rem;">
-                                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                                <RadzenCheckBox @bind-Value="@model.DefaultEnableDetailedErrors" />
-                                                <RadzenLabel Text="Enable detailed error responses by default" />
-                                            </RadzenStack>
-                                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                                <RadzenCheckBox @bind-Value="@model.DefaultLogSensitiveData" />
-                                                <RadzenLabel Text="Log sensitive data by default (development only)" />
-                                            </RadzenStack>
-                                        </RadzenStack>
-                                        <RadzenAlert AlertStyle="AlertStyle.Warning" ShowIcon="true" class="rz-mt-2">
-                                            <RadzenText TextStyle="TextStyle.Caption">
-                                                Warning: Detailed errors and sensitive data logging should not be enabled in production environments.
-                                            </RadzenText>
-                                        </RadzenAlert>
+                                        <Start>
+                                            <RadzenCheckBox @bind-Value="@model.DefaultEnableDetailedErrors" Name="defaultEnableDetailedErrors" />
+                                        </Start>
+                                        <ChildContent>
+                                            <RadzenLabel Text="Enable detailed error responses by default" Component="defaultEnableDetailedErrors" />
+                                        </ChildContent>
+                                        <Start>
+                                            <RadzenCheckBox @bind-Value="@model.DefaultLogSensitiveData" Name="defaultLogSensitiveData" />
+                                        </Start>
+                                        <ChildContent>
+                                            <RadzenLabel Text="Log sensitive data by default (development only)" Component="defaultLogSensitiveData" />
+                                        </ChildContent>
+                                        <Helper>
+                                            <RadzenAlert AlertStyle="AlertStyle.Warning" ShowIcon="true" class="rz-mt-2">
+                                                <RadzenText TextStyle="TextStyle.Caption">
+                                                    Warning: Detailed errors and sensitive data logging should not be enabled in production environments.
+                                                </RadzenText>
+                                            </RadzenAlert>
+                                        </Helper>
                                     </RadzenFormField>
                                 </RadzenStack>
                             </RadzenStack>
@@ -308,21 +374,29 @@
                                 <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Default Branding Configuration</RadzenText>
                                 <RadzenStack Gap="1rem">
                                     <RadzenFormField Text="Default Theme" Variant="Variant.Outlined">
-                                        <RadzenTextBox @bind-Value="@model.DefaultThemeName" 
+                                        <ChildContent>
+                                            <RadzenTextBox @bind-Value="@model.DefaultThemeName" 
                                                       Style="width: 100%;" 
                                                       Placeholder="e.g., dark, light, corporate" />
-                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                            Default UI theme for clients in this realm
-                                        </RadzenText>
+                                        </ChildContent>
+                                        <Helper>
+                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                Default UI theme for clients in this realm
+                                            </RadzenText>
+                                        </Helper>
                                     </RadzenFormField>
 
                                     <RadzenFormField Text="Realm Custom CSS URL" Variant="Variant.Outlined">
-                                        <RadzenTextBox @bind-Value="@model.RealmCustomCssUrl" 
+                                        <ChildContent>
+                                            <RadzenTextBox @bind-Value="@model.RealmCustomCssUrl" 
                                                       Style="width: 100%;" 
                                                       Placeholder="https://cdn.example.com/realm-theme.css" />
-                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                            Realm-wide custom CSS that applies to all clients unless overridden
-                                        </RadzenText>
+                                        </ChildContent>
+                                        <Helper>
+                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                Realm-wide custom CSS that applies to all clients unless overridden
+                                            </RadzenText>
+                                        </Helper>
                                     </RadzenFormField>
                                 </RadzenStack>
                             </RadzenStack>
@@ -333,22 +407,30 @@
                                     <RadzenRow>
                                         <RadzenColumn Size="12" SizeMD="6">
                                             <RadzenFormField Text="Realm Logo URI" Variant="Variant.Outlined">
-                                                <RadzenTextBox @bind-Value="@model.RealmLogoUri" 
+                                                <ChildContent>
+                                                    <RadzenTextBox @bind-Value="@model.RealmLogoUri" 
                                                               Style="width: 100%;" 
                                                               Placeholder="https://example.com/realm-logo.png" />
-                                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                    Default logo for the realm
-                                                </RadzenText>
+                                                </ChildContent>
+                                                <Helper>
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                        Default logo for the realm
+                                                    </RadzenText>
+                                                </Helper>
                                             </RadzenFormField>
                                         </RadzenColumn>
                                         <RadzenColumn Size="12" SizeMD="6">
                                             <RadzenFormField Text="Realm Homepage URI" Variant="Variant.Outlined">
-                                                <RadzenTextBox @bind-Value="@model.RealmUri" 
+                                                <ChildContent>
+                                                    <RadzenTextBox @bind-Value="@model.RealmUri" 
                                                               Style="width: 100%;" 
                                                               Placeholder="https://example.com" />
-                                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                    Default homepage for the realm
-                                                </RadzenText>
+                                                </ChildContent>
+                                                <Helper>
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                        Default homepage for the realm
+                                                    </RadzenText>
+                                                </Helper>
                                             </RadzenFormField>
                                         </RadzenColumn>
                                     </RadzenRow>
@@ -356,22 +438,30 @@
                                     <RadzenRow>
                                         <RadzenColumn Size="12" SizeMD="6">
                                             <RadzenFormField Text="Realm Privacy Policy URI" Variant="Variant.Outlined">
-                                                <RadzenTextBox @bind-Value="@model.RealmPolicyUri" 
+                                                <ChildContent>
+                                                    <RadzenTextBox @bind-Value="@model.RealmPolicyUri" 
                                                               Style="width: 100%;" 
                                                               Placeholder="https://example.com/privacy" />
-                                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                    Default privacy policy URL
-                                                </RadzenText>
+                                                </ChildContent>
+                                                <Helper>
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                        Default privacy policy URL
+                                                    </RadzenText>
+                                                </Helper>
                                             </RadzenFormField>
                                         </RadzenColumn>
                                         <RadzenColumn Size="12" SizeMD="6">
                                             <RadzenFormField Text="Realm Terms of Service URI" Variant="Variant.Outlined">
-                                                <RadzenTextBox @bind-Value="@model.RealmTosUri" 
+                                                <ChildContent>
+                                                    <RadzenTextBox @bind-Value="@model.RealmTosUri" 
                                                               Style="width: 100%;" 
                                                               Placeholder="https://example.com/terms" />
-                                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                    Default terms of service URL
-                                                </RadzenText>
+                                                </ChildContent>
+                                                <Helper>
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                        Default terms of service URL
+                                                    </RadzenText>
+                                                </Helper>
                                             </RadzenFormField>
                                         </RadzenColumn>
                                     </RadzenRow>

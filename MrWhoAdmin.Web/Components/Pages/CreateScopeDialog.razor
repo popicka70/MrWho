@@ -39,32 +39,32 @@
         <RadzenRow>
             <RadzenColumn Size="6">
                 <RadzenFormField Text="Enabled" Variant="Variant.Outlined">
+                    <Start>
+                        <RadzenCheckBox @bind-Value="@model.IsEnabled" Name="isEnabled" />
+                    </Start>
                     <ChildContent>
-                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" Style="margin-top: 0.5rem;">
-                            <RadzenCheckBox @bind-Value="@model.IsEnabled" Name="isEnabled" />
-                            <RadzenLabel Text="Enabled" Component="isEnabled" />
-                        </RadzenStack>
+                        <RadzenLabel Text="Scope is enabled and can be requested by clients" Component="isEnabled" />
                     </ChildContent>
                 </RadzenFormField>
             </RadzenColumn>
             <RadzenColumn Size="6">
                 <RadzenFormField Text="Required" Variant="Variant.Outlined">
+                    <Start>
+                        <RadzenCheckBox @bind-Value="@model.IsRequired" Name="isRequired" />
+                    </Start>
                     <ChildContent>
-                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" Style="margin-top: 0.5rem;">
-                            <RadzenCheckBox @bind-Value="@model.IsRequired" Name="isRequired" />
-                            <RadzenLabel Text="Required" Component="isRequired" />
-                        </RadzenStack>
+                        <RadzenLabel Text="This scope is required and always included when relevant" Component="isRequired" />
                     </ChildContent>
                 </RadzenFormField>
             </RadzenColumn>
         </RadzenRow>
 
         <RadzenFormField Text="Show in Discovery Document" Variant="Variant.Outlined">
+            <Start>
+                <RadzenCheckBox @bind-Value="@model.ShowInDiscoveryDocument" Name="showInDiscovery" />
+            </Start>
             <ChildContent>
-                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" Style="margin-top: 0.5rem;">
-                    <RadzenCheckBox @bind-Value="@model.ShowInDiscoveryDocument" Name="showInDiscovery" />
-                    <RadzenLabel Text="Show in Discovery Document" Component="showInDiscovery" />
-                </RadzenStack>
+                <RadzenLabel Text="Include this scope in the OpenID Connect discovery document" Component="showInDiscovery" />
             </ChildContent>
         </RadzenFormField>
 

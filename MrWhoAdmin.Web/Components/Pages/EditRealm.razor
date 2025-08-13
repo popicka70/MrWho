@@ -55,38 +55,50 @@ else
                             <RadzenRow>
                                 <RadzenColumn Size="12" SizeMD="6">
                                     <RadzenFormField Text="Realm Name" Variant="Variant.Outlined">
-                                        <RadzenTextBox @bind-Value="@model.Name" 
-                                                      Placeholder="Enter realm name (e.g., 'company-prod')" 
-                                                      Style="width: 100%;" 
-                                                      Disabled="@IsEdit" />
-                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                            @(IsEdit ? "Realm name cannot be changed after creation" : "Use lowercase letters, numbers, and hyphens only")
-                                        </RadzenText>
+                                        <ChildContent>
+                                            <RadzenTextBox @bind-Value="@model.Name" 
+                                                          Placeholder="Enter realm name (e.g., 'company-prod')" 
+                                                          Style="width: 100%;" 
+                                                          Disabled="@IsEdit" />
+                                        </ChildContent>
+                                        <Helper>
+                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                @(IsEdit ? "Realm name cannot be changed after creation" : "Use lowercase letters, numbers, and hyphens only")
+                                            </RadzenText>
+                                        </Helper>
                                     </RadzenFormField>
                                 </RadzenColumn>
                                 <RadzenColumn Size="12" SizeMD="6">
                                     <RadzenFormField Text="Display Name" Variant="Variant.Outlined">
-                                        <RadzenTextBox @bind-Value="@model.DisplayName" 
-                                                      Placeholder="Enter display name (e.g., 'Company Production')" 
-                                                      Style="width: 100%;" />
+                                        <ChildContent>
+                                            <RadzenTextBox @bind-Value="@model.DisplayName" 
+                                                          Placeholder="Enter display name (e.g., 'Company Production')" 
+                                                          Style="width: 100%;" />
+                                        </ChildContent>
                                     </RadzenFormField>
                                 </RadzenColumn>
                             </RadzenRow>
                             
                             <RadzenFormField Text="Description" Variant="Variant.Outlined">
-                                <RadzenTextArea @bind-Value="@model.Description" 
-                                               Placeholder="Enter realm description..." 
-                                               Rows="3" Style="width: 100%;" />
+                                <ChildContent>
+                                    <RadzenTextArea @bind-Value="@model.Description" 
+                                                   Placeholder="Enter realm description..." 
+                                                   Rows="3" Style="width: 100%;" />
+                                </ChildContent>
                             </RadzenFormField>
                             
                             <RadzenFormField Text="Status" Variant="Variant.Outlined">
-                                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" Style="margin-top: 0.5rem;">
-                                    <RadzenCheckBox @bind-Value="@model.IsEnabled" />
-                                    <RadzenLabel Text="Realm is enabled" />
-                                </RadzenStack>
-                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary rz-mt-1">
-                                    Disabled realms cannot be used for authentication
-                                </RadzenText>
+                                <Start>
+                                    <RadzenCheckBox @bind-Value="@model.IsEnabled" Name="realmEnabled" />
+                                </Start>
+                                <ChildContent>
+                                    <RadzenLabel Text="Realm is enabled" Component="realmEnabled" />
+                                </ChildContent>
+                                <Helper>
+                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary rz-mt-1">
+                                        Disabled realms cannot be used for authentication
+                                    </RadzenText>
+                                </Helper>
                             </RadzenFormField>
                         </RadzenStack>
                     </RadzenStack>
@@ -102,32 +114,44 @@ else
                             <RadzenRow>
                                 <RadzenColumn Size="12" SizeMD="4">
                                     <RadzenFormField Text="Access Token Lifetime (minutes)" Variant="Variant.Outlined">
-                                        <RadzenNumeric @bind-Value="@accessTokenMinutes" 
-                                                      Min="1" Max="1440" 
-                                                      Style="width: 100%;" />
-                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                            Recommended: 15-60 minutes
-                                        </RadzenText>
+                                        <ChildContent>
+                                            <RadzenNumeric @bind-Value="@accessTokenMinutes" 
+                                                          Min="1" Max="1440" 
+                                                          Style="width: 100%;" />
+                                        </ChildContent>
+                                        <Helper>
+                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                Recommended: 15-60 minutes
+                                            </RadzenText>
+                                        </Helper>
                                     </RadzenFormField>
                                 </RadzenColumn>
                                 <RadzenColumn Size="12" SizeMD="4">
                                     <RadzenFormField Text="Refresh Token Lifetime (days)" Variant="Variant.Outlined">
-                                        <RadzenNumeric @bind-Value="@refreshTokenDays" 
-                                                      Min="1" Max="365" 
-                                                      Style="width: 100%;" />
-                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                            Recommended: 7-30 days
-                                        </RadzenText>
+                                        <ChildContent>
+                                            <RadzenNumeric @bind-Value="@refreshTokenDays" 
+                                                          Min="1" Max="365" 
+                                                          Style="width: 100%;" />
+                                        </ChildContent>
+                                        <Helper>
+                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                Recommended: 7-30 days
+                                            </RadzenText>
+                                        </Helper>
                                     </RadzenFormField>
                                 </RadzenColumn>
                                 <RadzenColumn Size="12" SizeMD="4">
                                     <RadzenFormField Text="Authorization Code Lifetime (minutes)" Variant="Variant.Outlined">
-                                        <RadzenNumeric @bind-Value="@authCodeMinutes" 
-                                                      Min="1" Max="60" 
-                                                      Style="width: 100%;" />
-                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                            Recommended: 5-10 minutes
-                                        </RadzenText>
+                                        <ChildContent>
+                                            <RadzenNumeric @bind-Value="@authCodeMinutes" 
+                                                          Min="1" Max="60" 
+                                                          Style="width: 100%;" />
+                                        </ChildContent>
+                                        <Helper>
+                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                Recommended: 5-10 minutes
+                                            </RadzenText>
+                                        </Helper>
                                     </RadzenFormField>
                                 </RadzenColumn>
                             </RadzenRow>
@@ -318,4 +342,4 @@ else
     {
         Navigation.NavigateTo("/realms");
     }
-}}
+}

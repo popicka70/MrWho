@@ -22,34 +22,42 @@
     <RadzenRow Gap="1rem">
         <RadzenColumn Size="12" SizeMD="3">
             <RadzenFormField Text="Enabled" Variant="Variant.Outlined">
-                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" Style="margin-top: 0.5rem;">
+                <Start>
                     <RadzenCheckBox @bind-Value="@request.IsEnabled" Name="isEnabled" />
-                    <RadzenLabel Text="Enabled" Component="isEnabled" />
-                </RadzenStack>
+                </Start>
+                <ChildContent>
+                    <RadzenLabel Text="Identity resource is enabled and will be available to clients" Component="isEnabled" />
+                </ChildContent>
             </RadzenFormField>
         </RadzenColumn>
         <RadzenColumn Size="12" SizeMD="3">
             <RadzenFormField Text="Required" Variant="Variant.Outlined">
-                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" Style="margin-top: 0.5rem;">
+                <Start>
                     <RadzenCheckBox @bind-Value="@request.IsRequired" Name="isRequired" />
-                    <RadzenLabel Text="Required" Component="isRequired" />
-                </RadzenStack>
+                </Start>
+                <ChildContent>
+                    <RadzenLabel Text="Always include in tokens and consent when applicable" Component="isRequired" />
+                </ChildContent>
             </RadzenFormField>
         </RadzenColumn>
         <RadzenColumn Size="12" SizeMD="3">
             <RadzenFormField Text="Show in Discovery" Variant="Variant.Outlined">
-                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" Style="margin-top: 0.5rem;">
+                <Start>
                     <RadzenCheckBox @bind-Value="@request.ShowInDiscoveryDocument" Name="showInDiscovery" />
-                    <RadzenLabel Text="Show in Discovery" Component="showInDiscovery" />
-                </RadzenStack>
+                </Start>
+                <ChildContent>
+                    <RadzenLabel Text="List in the OpenID Connect discovery document" Component="showInDiscovery" />
+                </ChildContent>
             </RadzenFormField>
         </RadzenColumn>
         <RadzenColumn Size="12" SizeMD="3">
             <RadzenFormField Text="Emphasize" Variant="Variant.Outlined">
-                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" Style="margin-top: 0.5rem;">
+                <Start>
                     <RadzenCheckBox @bind-Value="@request.Emphasize" Name="emphasize" />
-                    <RadzenLabel Text="Emphasize" Component="emphasize" />
-                </RadzenStack>
+                </Start>
+                <ChildContent>
+                    <RadzenLabel Text="Highlight this resource on the consent screen" Component="emphasize" />
+                </ChildContent>
             </RadzenFormField>
         </RadzenColumn>
     </RadzenRow>
