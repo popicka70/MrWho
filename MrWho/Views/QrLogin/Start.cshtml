@@ -9,15 +9,20 @@
 <div class="row justify-content-center">
   <div class="col-md-6 col-lg-5">
     <div class="card">
-      <div class="card-header text-center">
-        <h4>Scan with your phone</h4>
+      <div class="card-header text-center @(isPersistent ? "qr-mode-header secure" : "qr-mode-header quick")">
         @if (isPersistent)
         {
-          <small class="text-muted">Enhanced QR Login with Device Management</small>
+          <h4><i class="bi bi-qr-code-scan text-success"></i> Secure QR Login</h4>
+          <div class="badge bg-success">
+            <i class="bi bi-shield-check"></i> Enhanced Security • Device Management
+          </div>
         }
         else
         {
-          <small class="text-muted">Quick Session-Based Login</small>
+          <h4><i class="bi bi-qr-code text-primary"></i> Quick QR Login</h4>
+          <div class="badge bg-primary">
+            <i class="bi bi-lightning-fill"></i> Session-Based • Fast & Simple
+          </div>
         }
       </div>
       <div class="card-body text-center">
@@ -25,36 +30,79 @@
         
         @if (isPersistent)
         {
-          <div class="alert alert-info text-start">
-            <h6><i class="bi bi-info-circle"></i> Enhanced QR Login</h6>
+          <div class="alert alert-success text-start">
+            <h6><i class="bi bi-shield-check"></i> Secure QR Login Features</h6>
             <ul class="mb-0 small">
-              <li>Use any of your registered devices to approve</li>
-              <li>More secure with device tracking</li>
-              <li>Activity is logged for security monitoring</li>
-              <li>Can reject unwanted login attempts</li>
+              <li><strong>Device Selection:</strong> Choose from your registered devices to approve</li>
+              <li><strong>Security Monitoring:</strong> All activity is logged and tracked</li>
+              <li><strong>Rejection Support:</strong> Can reject suspicious login attempts</li>
+              <li><strong>Audit Trail:</strong> Complete history of who approved what and when</li>
             </ul>
           </div>
-          <p class="text-muted">Open MrWho on your registered device and scan this QR code, or visit the approval link if prompted.</p>
+          <p class="text-muted">
+            <strong>Instructions:</strong> Open MrWho on one of your registered devices, scan this QR code, 
+            then select which device you're using to approve the login.
+          </p>
+          
+          <div class="alert alert-warning">
+            <small><i class="bi bi-exclamation-triangle"></i> 
+            <strong>Requires registered devices.</strong> If you haven't registered any devices yet, 
+            <a href="/device-management/register" target="_blank">register a device first</a> or 
+            use Quick QR Login instead.</small>
+          </div>
         }
         else
         {
-          <p class="text-muted">Open MrWho on your phone and scan this QR.</p>
+          <div class="alert alert-info text-start">
+            <h6><i class="bi bi-lightning"></i> Quick QR Login Features</h6>
+            <ul class="mb-0 small">
+              <li><strong>Fast & Simple:</strong> Works with any device that's already logged in</li>
+              <li><strong>Session-Based:</strong> Temporary approval for immediate access</li>
+              <li><strong>No Setup Required:</strong> No need to register devices first</li>
+              <li><strong>3-Minute Expiration:</strong> Quick and secure for immediate use</li>
+            </ul>
+          </div>
+          <p class="text-muted">
+            <strong>Instructions:</strong> Open MrWho on any device where you're already logged in and scan this QR code.
+          </p>
         }
         
         <form method="post" action="@Url.Action("Complete")">
           @Html.AntiForgeryToken()
           <input type="hidden" name="token" value="@token" />
-          <button class="btn btn-primary" type="submit">I approved on my phone</button>
+          <button class="btn btn-primary" type="submit">I approved on my device</button>
         </form>
+        
         <div class="mt-3">
-          <a class="btn btn-link" href="/connect/login@(string.IsNullOrEmpty(returnUrl) && string.IsNullOrEmpty(clientId) ? string.Empty : $"?{string.Join("&", new[]{ string.IsNullOrEmpty(returnUrl) ? null : $"returnUrl={Uri.EscapeDataString(returnUrl)}", string.IsNullOrEmpty(clientId) ? null : $"clientId={Uri.EscapeDataString(clientId)}" }.Where(s => s != null))}")">Back to login</a>
+          <a class="btn btn-link" href="/connect/login@(string.IsNullOrEmpty(returnUrl) && string.IsNullOrEmpty(clientId) ? string.Empty : $"?{string.Join("&", new[]{ string.IsNullOrEmpty(returnUrl) ? null : $"returnUrl={Uri.EscapeDataString(returnUrl)}", string.IsNullOrEmpty(clientId) ? null : $"clientId={Uri.EscapeDataString(clientId)}" }.Where(s => s != null))}")">
+            <i class="bi bi-arrow-left"></i> Back to login options
+          </a>
         </div>
         
+        <!-- Option to switch between QR types -->
         @if (!isPersistent)
         {
-          <div class="mt-3">
-            <a href="@Url.Action("Start", new { returnUrl, clientId, persistent = true })" class="btn btn-outline-secondary btn-sm">
-              <i class="bi bi-shield-check"></i> Use Enhanced QR Login
+          <div class="mt-3 p-3 bg-light rounded qr-switch-card">
+            <h6><i class="bi bi-shield-plus text-success"></i> Want Enhanced Security?</h6>
+            <p class="small mb-2">
+              Try our <strong>Secure QR Login</strong> with device management, activity logging, 
+              and the ability to reject suspicious requests.
+            </p>
+            <a href="@Url.Action("Start", new { returnUrl, clientId, persistent = true })" class="btn btn-success btn-sm">
+              <i class="bi bi-qr-code-scan"></i> Switch to Secure QR Login
+            </a>
+          </div>
+        }
+        else
+        {
+          <div class="mt-3 p-3 bg-light rounded qr-switch-card">
+            <h6><i class="bi bi-lightning text-primary"></i> Need Something Faster?</h6>
+            <p class="small mb-2">
+              If you don't have registered devices or want a quicker option, 
+              try our <strong>Quick QR Login</strong>.
+            </p>
+            <a href="@Url.Action("Start", new { returnUrl, clientId, persistent = false })" class="btn btn-primary btn-sm">
+              <i class="bi bi-qr-code"></i> Switch to Quick QR Login
             </a>
           </div>
         }
@@ -80,7 +128,7 @@
         if (j.deviceName) {
           const statusElement = document.getElementById('approval-status');
           if (statusElement) {
-            statusElement.innerHTML = `<small class="text-success">Approved by: ${j.deviceName}</small>`;
+            statusElement.innerHTML = `<small class="text-success"><i class="bi bi-check-circle"></i> Approved by: ${j.deviceName}</small>`;
           }
         }
       });

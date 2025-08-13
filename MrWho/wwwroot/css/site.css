@@ -29,6 +29,7 @@ body {
     align-items: center;
     justify-content: center;
     border: 2px solid transparent;
+    position: relative;
 }
 
 .auth-button:hover {
@@ -48,6 +49,64 @@ body {
     color: white;
 }
 
+.auth-button.btn-outline-success:hover {
+    background-color: #198754;
+    border-color: #198754;
+    color: white;
+}
+
+/* QR Login Button Specific Styles */
+.qr-login-quick {
+    border-color: #0d6efd;
+    color: #0d6efd;
+    background: linear-gradient(45deg, rgba(13, 110, 253, 0.05), rgba(13, 110, 253, 0.1));
+}
+
+.qr-login-secure {
+    border-color: #198754;
+    color: #198754;
+    background: linear-gradient(45deg, rgba(25, 135, 84, 0.05), rgba(25, 135, 84, 0.1));
+}
+
+.qr-login-quick:hover {
+    background: #0d6efd;
+    border-color: #0d6efd;
+    color: white;
+    box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
+}
+
+.qr-login-secure:hover {
+    background: #198754;
+    border-color: #198754;
+    color: white;
+    box-shadow: 0 4px 12px rgba(25, 135, 84, 0.3);
+}
+
+/* QR Badge Icons */
+.qr-mode-badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    border: 2px solid white;
+}
+
+.qr-mode-badge.quick {
+    background: #0d6efd;
+    color: white;
+}
+
+.qr-mode-badge.secure {
+    background: #198754;
+    color: white;
+}
+
 /* Enhanced primary button styling */
 .btn-primary.btn-lg {
     font-weight: 600;
@@ -64,6 +123,27 @@ body {
 /* Icon spacing improvements */
 .btn i.bi {
     font-size: 1.1em;
+}
+
+/* QR Login Page Specific Styles */
+.qr-mode-header.quick {
+    border-left: 4px solid #0d6efd;
+    background: linear-gradient(90deg, rgba(13, 110, 253, 0.1), transparent);
+}
+
+.qr-mode-header.secure {
+    border-left: 4px solid #198754;
+    background: linear-gradient(90deg, rgba(25, 135, 84, 0.1), transparent);
+}
+
+.qr-switch-card {
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+}
+
+.qr-switch-card:hover {
+    border-color: #dee2e6;
+    transform: translateY(-1px);
 }
 
 /* Token Inspector Specific Styles */

@@ -1,17 +1,26 @@
 @model dynamic
 @{
-    ViewData["Title"] = "Approve Login";
+    ViewData["Title"] = "Secure QR Login - Approve";
     var token = ViewData["Token"] as string;
     var sessionInfo = ViewData["SessionInfo"] as MrWho.Services.QrSessionInfo;
     var availableDevices = ViewData["AvailableDevices"] as List<MrWho.Models.UserDevice>;
+    
+    // Build query string for fallback QR login
+    var queryParams = new List<string>();
+    if (!string.IsNullOrEmpty(sessionInfo?.ReturnUrl))
+        queryParams.Add($"returnUrl={Uri.EscapeDataString(sessionInfo.ReturnUrl)}");
+    if (!string.IsNullOrEmpty(sessionInfo?.ClientId))
+        queryParams.Add($"clientId={Uri.EscapeDataString(sessionInfo.ClientId)}");
+    var fallbackQuery = queryParams.Count > 0 ? "?" + string.Join("&", queryParams) : "";
 }
 
 <div class="container mt-4">
     <div class="row justify-content-center">
         <div class="col-md-8 col-lg-6">
             <div class="card">
-                <div class="card-header bg-primary text-white text-center">
-                    <h3><i class="bi bi-qr-code"></i> Approve Login Request</h3>
+                <div class="card-header bg-success text-white text-center">
+                    <h3><i class="bi bi-qr-code-scan"></i> Secure QR Login</h3>
+                    <div class="badge bg-light text-success">Enhanced Security • Device Management</div>
                 </div>
                 <div class="card-body">
                     <div class="alert alert-info">
@@ -26,6 +35,7 @@
                                 <li><strong>Return URL:</strong> <code>@sessionInfo.ReturnUrl</code></li>
                             }
                             <li><strong>Expires:</strong> @sessionInfo?.ExpiresAt.ToString("MMM dd, yyyy 'at' h:mm tt")</li>
+                            <li><strong>Login Type:</strong> <span class="badge bg-success">Secure QR Login</span></li>
                         </ul>
                     </div>
 
@@ -36,22 +46,36 @@
                             
                             <div class="mb-4">
                                 <label class="form-label">
-                                    <strong>Select the device you're using to approve this login:</strong>
+                                    <strong><i class="bi bi-device-hdd"></i> Select the device you're currently using:</strong>
                                 </label>
+                                <div class="alert alert-light">
+                                    <small class="text-muted">
+                                        <i class="bi bi-shield-check"></i> 
+                                        This is part of our enhanced security system. Your choice will be logged for security monitoring.
+                                    </small>
+                                </div>
                                 @foreach (var device in availableDevices)
                                 {
-                                    <div class="form-check">
+                                    <div class="form-check p-3 border rounded mb-2">
                                         <input class="form-check-input" type="radio" name="deviceId" value="@device.DeviceId" 
                                                id="device_@device.Id" @(availableDevices.First() == device ? "checked" : "")>
-                                        <label class="form-check-label" for="device_@device.Id">
+                                        <label class="form-check-label w-100" for="device_@device.Id">
                                             <div class="d-flex align-items-center">
-                                                <i class="@GetDeviceIcon(device.DeviceType) me-2"></i>
-                                                <div>
+                                                <i class="@GetDeviceIcon(device.DeviceType) me-3 fs-4"></i>
+                                                <div class="flex-grow-1">
                                                     <div class="fw-bold">@device.DeviceName</div>
-                                                    <small class="text-muted">@device.DeviceType • Registered @device.CreatedAt.ToString("MMM yyyy")</small>
+                                                    <div class="text-muted small">
+                                                        @device.DeviceType • Registered @device.CreatedAt.ToString("MMM yyyy")
+                                                        @if (!string.IsNullOrEmpty(device.OperatingSystem))
+                                                        {
+                                                            <span> • @device.OperatingSystem</span>
+                                                        }
+                                                    </div>
                                                     @if (device.IsTrusted)
                                                     {
-                                                        <span class="badge bg-success ms-2">Trusted</span>
+                                                        <span class="badge bg-success mt-1">
+                                                            <i class="bi bi-shield-check"></i> Trusted Device
+                                                        </span>
                                                     }
                                                 </div>
                                             </div>
@@ -73,31 +97,51 @@
                     else
                     {
                         <div class="alert alert-warning">
-                            <h5><i class="bi bi-exclamation-triangle"></i> No Devices Available</h5>
-                            <p>You don't have any devices registered that can approve logins. To use QR code authentication, you need to:</p>
+                            <h5><i class="bi bi-exclamation-triangle"></i> No Registered Devices</h5>
+                            <p>To use <strong>Secure QR Login</strong>, you need to have registered devices. This enhanced authentication method requires:</p>
                             <ol>
-                                <li>Register a device that can approve logins</li>
-                                <li>Ensure the device is active and not revoked</li>
+                                <li>At least one registered device that can approve logins</li>
+                                <li>The device must be active and not revoked</li>
+                                <li>Device must have approval permissions enabled</li>
                             </ol>
-                            <a href="/device-management/register" class="btn btn-primary">
-                                <i class="bi bi-plus-circle"></i> Register a Device
-                            </a>
+                            <div class="d-grid gap-2 d-md-flex">
+                                <a href="/device-management/register" class="btn btn-primary">
+                                    <i class="bi bi-plus-circle"></i> Register This Device
+                                </a>
+                                <a href="/qr-login/start@(fallbackQuery)" class="btn btn-outline-secondary">
+                                    <i class="bi bi-qr-code"></i> Use Quick QR Login Instead
+                                </a>
+                            </div>
                         </div>
                     }
                 </div>
             </div>
 
             <div class="card mt-4">
-                <div class="card-header">
+                <div class="card-header bg-light">
                     <h5><i class="bi bi-shield-check"></i> Security Information</h5>
                 </div>
                 <div class="card-body">
-                    <ul class="mb-0">
-                        <li><strong>Only approve if you initiated this login</strong> - If you didn't try to log in, click "Reject"</li>
-                        <li><strong>Check the application name</strong> - Make sure it's the service you're trying to access</li>
-                        <li><strong>Verify the timing</strong> - This request should be recent if you just scanned a QR code</li>
-                        <li><strong>Your choice is logged</strong> - All approval/rejection decisions are recorded for security monitoring</li>
-                    </ul>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6><i class="bi bi-exclamation-triangle text-warning"></i> Before You Approve</h6>
+                            <ul class="small">
+                                <li>Only approve if you initiated this login</li>
+                                <li>Verify the application name is correct</li>
+                                <li>Check that the timing makes sense</li>
+                                <li>If suspicious, click "Reject" instead</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h6><i class="bi bi-graph-up text-success"></i> Enhanced Security Features</h6>
+                            <ul class="small">
+                                <li>Your decision is logged for auditing</li>
+                                <li>Device information is recorded</li>
+                                <li>Activity tracking for security monitoring</li>
+                                <li>Can review login history later</li>
+                            </ul>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -109,15 +153,15 @@
     {
         return deviceType switch
         {
-            MrWho.Shared.DeviceType.Phone => "bi bi-phone",
-            MrWho.Shared.DeviceType.Tablet => "bi bi-tablet",
-            MrWho.Shared.DeviceType.Desktop => "bi bi-pc-display",
-            MrWho.Shared.DeviceType.Laptop => "bi bi-laptop",
-            MrWho.Shared.DeviceType.SmartWatch => "bi bi-smartwatch",
-            MrWho.Shared.DeviceType.SmartTv => "bi bi-tv",
-            MrWho.Shared.DeviceType.GameConsole => "bi bi-controller",
-            MrWho.Shared.DeviceType.WebBrowser => "bi bi-globe",
-            _ => "bi bi-device-hdd"
+            MrWho.Shared.DeviceType.Phone => "bi bi-phone text-primary",
+            MrWho.Shared.DeviceType.Tablet => "bi bi-tablet text-info",
+            MrWho.Shared.DeviceType.Desktop => "bi bi-pc-display text-secondary",
+            MrWho.Shared.DeviceType.Laptop => "bi bi-laptop text-success",
+            MrWho.Shared.DeviceType.SmartWatch => "bi bi-smartwatch text-warning",
+            MrWho.Shared.DeviceType.SmartTv => "bi bi-tv text-dark",
+            MrWho.Shared.DeviceType.GameConsole => "bi bi-controller text-purple",
+            MrWho.Shared.DeviceType.WebBrowser => "bi bi-globe text-primary",
+            _ => "bi bi-device-hdd text-muted"
         };
     }
 }
