@@ -704,6 +704,35 @@ namespace MrWho.Migrations.MySql.Migrations
                     b.ToTable("ClientScopes");
                 });
 
+            modelBuilder.Entity("MrWho.Models.ClientUser", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<string>("ClientId")
+                        .IsRequired()
+                        .HasColumnType("varchar(255)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime(6)");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("longtext");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("varchar(255)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("ClientId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("ClientUsers");
+                });
+
             modelBuilder.Entity("MrWho.Models.DeviceAuthenticationLog", b =>
                 {
                     b.Property<string>("Id")
@@ -1573,6 +1602,25 @@ namespace MrWho.Migrations.MySql.Migrations
                         .IsRequired();
 
                     b.Navigation("Client");
+                });
+
+            modelBuilder.Entity("MrWho.Models.ClientUser", b =>
+                {
+                    b.HasOne("MrWho.Models.Client", "Client")
+                        .WithMany()
+                        .HasForeignKey("ClientId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Microsoft.AspNetCore.Identity.IdentityUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Client");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("MrWho.Models.DeviceAuthenticationLog", b =>

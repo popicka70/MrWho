@@ -83,6 +83,21 @@ public class UserRealmValidationService : IUserRealmValidationService
                 };
             }
 
+            // NEW: Enforce assigned users to clients
+            var assigned = await _context.ClientUsers.AnyAsync(cu => cu.ClientId == client.Id && cu.UserId == user.Id);
+            if (!assigned)
+            {
+                _logger.LogWarning("User {UserName} is not assigned to client {ClientId}", user.UserName, clientId);
+                return new UserRealmValidationResult
+                {
+                    IsValid = false,
+                    Reason = "User not assigned to this client",
+                    UserRealm = userRealm,
+                    ClientRealm = client.Realm.Name,
+                    ErrorCode = "CLIENT_USER_NOT_ASSIGNED"
+                };
+            }
+
             _logger.LogDebug("User {UserName} successfully validated for client {ClientId} in realm '{Realm}'",
                 user.UserName, clientId, client.Realm.Name);
 
