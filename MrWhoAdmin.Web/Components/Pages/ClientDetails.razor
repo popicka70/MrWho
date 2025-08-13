@@ -1,0 +1,601 @@
+@page "/clients/details/{Id}"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using MrWho.Shared
+@using MrWho.Shared.Models
+@inject NavigationManager Navigation
+@inject NotificationService NotificationService
+@inject ILogger<ClientDetails> Logger
+@inject IClientsApiService ClientsApi
+
+<PageTitle>Client Details - MrWho Admin</PageTitle>
+
+<RadzenStack>
+    <RadzenBreadCrumb>
+        <RadzenBreadCrumbItem Path="/clients" Text="Clients" />
+        <RadzenBreadCrumbItem Text="Details" />
+    </RadzenBreadCrumb>
+
+    <RadzenText TextStyle="TextStyle.H3" TagName="TagName.H1" class="rz-pt-4">
+        <RadzenIcon Icon="visibility" class="rz-me-1" />
+        Client Details
+    </RadzenText>
+</RadzenStack>
+
+<RadzenCard class="rz-my-4">
+    @if (isLoading)
+    {
+        <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+        <RadzenText class="rz-mt-3">Loading client...</RadzenText>
+    }
+    else if (client == null)
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Danger" ShowIcon="true">
+            <RadzenText>Client not found.</RadzenText>
+        </RadzenAlert>
+        <RadzenButton Text="Back to list" Icon="arrow_back" ButtonStyle="ButtonStyle.Primary" Click="@GoBack" class="rz-mt-2" />
+    }
+    else
+    {
+        <RadzenStack Gap="1.25rem">
+            <!-- Action bar -->
+            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                <RadzenButton Text="Back" Icon="arrow_back" ButtonStyle="ButtonStyle.Light" Click="@GoBack" />
+                <RadzenButton Text="Edit" Icon="edit" ButtonStyle="ButtonStyle.Primary" Click="@(() => Navigation.NavigateTo($"/clients/edit/{client.Id}"))" />
+                <RadzenButton Text="@(client.IsEnabled ? "Disable" : "Enable")"
+                              Icon="@(client.IsEnabled ? "toggle_off" : "toggle_on")"
+                              ButtonStyle="ButtonStyle.Warning"
+                              IsBusy="@isToggling"
+                              Disabled="@isToggling"
+                              Click="@(async () => await Toggle())" />
+            </RadzenStack>
+
+            <!-- Basic info -->
+            <RadzenStack Gap="0.75rem">
+                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Basic Information</RadzenText>
+                <RadzenRow>
+                    <RadzenColumn Size="12" SizeMD="6">
+                        <RadzenStack Gap="0.25rem">
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Client ID</RadzenText>
+                            <RadzenText>@client.ClientId</RadzenText>
+                        </RadzenStack>
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="6">
+                        <RadzenStack Gap="0.25rem">
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Name</RadzenText>
+                            <RadzenText>@client.Name</RadzenText>
+                        </RadzenStack>
+                    </RadzenColumn>
+                </RadzenRow>
+                <RadzenRow>
+                    <RadzenColumn Size="12" SizeMD="6">
+                        <RadzenStack Gap="0.25rem">
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Realm</RadzenText>
+                            <RadzenBadge BadgeStyle="BadgeStyle.Secondary" Text="@client.RealmName" />
+                        </RadzenStack>
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="6">
+                        <RadzenStack Gap="0.25rem">
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Status</RadzenText>
+                            <RadzenBadge BadgeStyle="@(client.IsEnabled ? BadgeStyle.Success : BadgeStyle.Danger)" Text="@(client.IsEnabled ? "Enabled" : "Disabled")" />
+                        </RadzenStack>
+                    </RadzenColumn>
+                </RadzenRow>
+                <RadzenRow>
+                    <RadzenColumn Size="12" SizeMD="6">
+                        <RadzenStack Gap="0.25rem">
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Type</RadzenText>
+                            <RadzenBadge BadgeStyle="@GetClientTypeBadgeStyle(client.ClientType)" Text="@GetClientTypeText(client.ClientType)" />
+                        </RadzenStack>
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="6">
+                        <RadzenStack Gap="0.25rem">
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Description</RadzenText>
+                            <RadzenText>@(client.Description ?? "-")</RadzenText>
+                        </RadzenStack>
+                    </RadzenColumn>
+                </RadzenRow>
+            </RadzenStack>
+
+            <!-- Flows -->
+            <RadzenStack Gap="0.5rem">
+                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Allowed Flows</RadzenText>
+                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" Wrap="FlexWrap.Wrap">
+                    @if (client.AllowAuthorizationCodeFlow)
+                    {
+                        <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="Auth Code" />
+                    }
+                    @if (client.AllowClientCredentialsFlow)
+                    {
+                        <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="Client Credentials" />
+                    }
+                    @if (client.AllowPasswordFlow)
+                    {
+                        <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text="Password" />
+                    }
+                    @if (client.AllowRefreshTokenFlow)
+                    {
+                        <RadzenBadge BadgeStyle="BadgeStyle.Primary" Text="Refresh Token" />
+                    }
+                </RadzenStack>
+            </RadzenStack>
+
+            <!-- Token lifetimes -->
+            <RadzenStack Gap="0.75rem">
+                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Token Lifetimes</RadzenText>
+                <RadzenRow>
+                    <RadzenColumn Size="12" SizeMD="4">
+                        <RadzenStack Gap="0.25rem">
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Access Token</RadzenText>
+                            <RadzenText>@(FormatTimeSpan(client.AccessTokenLifetime))</RadzenText>
+                        </RadzenStack>
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="4">
+                        <RadzenStack Gap="0.25rem">
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Refresh Token</RadzenText>
+                            <RadzenText>@(FormatTimeSpan(client.RefreshTokenLifetime))</RadzenText>
+                        </RadzenStack>
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="4">
+                        <RadzenStack Gap="0.25rem">
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Authorization Code</RadzenText>
+                            <RadzenText>@(FormatTimeSpan(client.AuthorizationCodeLifetime))</RadzenText>
+                        </RadzenStack>
+                    </RadzenColumn>
+                </RadzenRow>
+            </RadzenStack>
+
+            <!-- Session & Cookies -->
+            <RadzenStack Gap="0.75rem">
+                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Session & Cookies</RadzenText>
+                <RadzenRow>
+                    <RadzenColumn Size="12" SizeMD="4">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Session Timeout</RadzenText>
+                        <RadzenText>@FormatNullableHours(client.SessionTimeoutHours)</RadzenText>
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="4">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Remember Me Duration</RadzenText>
+                        <RadzenText>@FormatNullableDays(client.RememberMeDurationDays)</RadzenText>
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="4">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Sliding Expiration</RadzenText>
+                        <RadzenBadge BadgeStyle="@GetBoolBadge(client.UseSlidingSessionExpiration)" Text="@FormatBool(client.UseSlidingSessionExpiration)" />
+                    </RadzenColumn>
+                </RadzenRow>
+                <RadzenRow>
+                    <RadzenColumn Size="12" SizeMD="4">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Require HTTPS for Cookies</RadzenText>
+                        <RadzenBadge BadgeStyle="@GetBoolBadge(client.RequireHttpsForCookies)" Text="@FormatBool(client.RequireHttpsForCookies)" />
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="4">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Cookie SameSite</RadzenText>
+                        <RadzenText>@(client.CookieSameSitePolicy ?? "Default")</RadzenText>
+                    </RadzenColumn>
+                </RadzenRow>
+            </RadzenStack>
+
+            <!-- Token settings -->
+            <RadzenStack Gap="0.75rem">
+                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Additional Token Settings</RadzenText>
+                <RadzenRow>
+                    <RadzenColumn Size="12" SizeMD="3">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">ID Token Lifetime</RadzenText>
+                        <RadzenText>@FormatNullableMinutes(client.IdTokenLifetimeMinutes)</RadzenText>
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="3">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Device Code Lifetime</RadzenText>
+                        <RadzenText>@FormatNullableMinutes(client.DeviceCodeLifetimeMinutes)</RadzenText>
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="3">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Access Token Type</RadzenText>
+                        <RadzenText>@(client.AccessTokenType ?? "Default")</RadzenText>
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="3">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Max Refresh Tokens/User</RadzenText>
+                        <RadzenText>@(client.MaxRefreshTokensPerUser?.ToString() ?? "Unlimited")</RadzenText>
+                    </RadzenColumn>
+                </RadzenRow>
+                <RadzenRow>
+                    <RadzenColumn Size="12" SizeMD="4">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">One-time Refresh Tokens</RadzenText>
+                        <RadzenBadge BadgeStyle="@GetBoolBadge(client.UseOneTimeRefreshTokens)" Text="@FormatBool(client.UseOneTimeRefreshTokens)" />
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="4">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Hash Access Tokens</RadzenText>
+                        <RadzenBadge BadgeStyle="@GetBoolBadge(client.HashAccessTokens)" Text="@FormatBool(client.HashAccessTokens)" />
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="4">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Update Claims On Refresh</RadzenText>
+                        <RadzenBadge BadgeStyle="@GetBoolBadge(client.UpdateAccessTokenClaimsOnRefresh)" Text="@FormatBool(client.UpdateAccessTokenClaimsOnRefresh)" />
+                    </RadzenColumn>
+                </RadzenRow>
+            </RadzenStack>
+
+            <!-- Security & Compliance -->
+            <RadzenStack Gap="0.75rem">
+                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Security & Compliance</RadzenText>
+                <RadzenRow>
+                    <RadzenColumn Size="12" SizeMD="3">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Require Consent</RadzenText>
+                        <RadzenBadge BadgeStyle="@GetBoolBadge(client.RequireConsent)" Text="@FormatBool(client.RequireConsent)" />
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="3">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Remember Consent</RadzenText>
+                        <RadzenBadge BadgeStyle="@GetBoolBadge(client.AllowRememberConsent)" Text="@FormatBool(client.AllowRememberConsent)" />
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="3">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Include JWT ID</RadzenText>
+                        <RadzenBadge BadgeStyle="@GetBoolBadge(client.IncludeJwtId)" Text="@FormatBool(client.IncludeJwtId)" />
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="3">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Always Send Client Claims</RadzenText>
+                        <RadzenBadge BadgeStyle="@GetBoolBadge(client.AlwaysSendClientClaims)" Text="@FormatBool(client.AlwaysSendClientClaims)" />
+                    </RadzenColumn>
+                </RadzenRow>
+                <RadzenRow>
+                    <RadzenColumn Size="12" SizeMD="4">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Always Include User Claims in ID Token</RadzenText>
+                        <RadzenBadge BadgeStyle="@GetBoolBadge(client.AlwaysIncludeUserClaimsInIdToken)" Text="@FormatBool(client.AlwaysIncludeUserClaimsInIdToken)" />
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="4">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Require PKCE</RadzenText>
+                        <RadzenBadge BadgeStyle="@(client.RequirePkce ? BadgeStyle.Success : BadgeStyle.Secondary)" Text="@(client.RequirePkce ? "Yes" : "No")" />
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="4">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Require Client Secret</RadzenText>
+                        <RadzenBadge BadgeStyle="@(client.RequireClientSecret ? BadgeStyle.Success : BadgeStyle.Secondary)" Text="@(client.RequireClientSecret ? "Yes" : "No")" />
+                    </RadzenColumn>
+                </RadzenRow>
+                <RadzenRow>
+                    <RadzenColumn Size="12" SizeMD="4">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">UserInfo Endpoint</RadzenText>
+                        <RadzenBadge BadgeStyle="@GetBoolBadge(client.AllowAccessToUserInfoEndpoint)" Text="@FormatBool(client.AllowAccessToUserInfoEndpoint)" />
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="4">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Introspection Endpoint</RadzenText>
+                        <RadzenBadge BadgeStyle="@GetBoolBadge(client.AllowAccessToIntrospectionEndpoint)" Text="@FormatBool(client.AllowAccessToIntrospectionEndpoint)" />
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="4">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Revocation Endpoint</RadzenText>
+                        <RadzenBadge BadgeStyle="@GetBoolBadge(client.AllowAccessToRevocationEndpoint)" Text="@FormatBool(client.AllowAccessToRevocationEndpoint)" />
+                    </RadzenColumn>
+                </RadzenRow>
+            </RadzenStack>
+
+            <!-- MFA -->
+            <RadzenStack Gap="0.75rem">
+                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Multi-Factor Authentication</RadzenText>
+                <RadzenRow>
+                    <RadzenColumn Size="12" SizeMD="3">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Require MFA</RadzenText>
+                        <RadzenBadge BadgeStyle="@GetBoolBadge(client.RequireMfa)" Text="@FormatBool(client.RequireMfa)" />
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="3">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">MFA Grace Period</RadzenText>
+                        <RadzenText>@FormatNullableMinutes(client.MfaGracePeriodMinutes)</RadzenText>
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="3">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Remember MFA For Session</RadzenText>
+                        <RadzenBadge BadgeStyle="@GetBoolBadge(client.RememberMfaForSession)" Text="@FormatBool(client.RememberMfaForSession)" />
+                    </RadzenColumn>
+                </RadzenRow>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Allowed Methods</RadzenText>
+                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.35rem" Wrap="FlexWrap.Wrap">
+                    @foreach (var method in ParseMfaMethods(client.AllowedMfaMethods))
+                    {
+                        <RadzenBadge BadgeStyle="BadgeStyle.Secondary" Text="@method" />
+                    }
+                    @if (!ParseMfaMethods(client.AllowedMfaMethods).Any())
+                    {
+                        <RadzenText class="rz-color-secondary">Default</RadzenText>
+                    }
+                </RadzenStack>
+            </RadzenStack>
+
+            <!-- Rate limiting -->
+            <RadzenStack Gap="0.75rem">
+                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Rate Limiting</RadzenText>
+                <RadzenRow>
+                    <RadzenColumn Size="12" SizeMD="4">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Per Minute</RadzenText>
+                        <RadzenText>@(client.RateLimitRequestsPerMinute?.ToString() ?? "Unlimited")</RadzenText>
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="4">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Per Hour</RadzenText>
+                        <RadzenText>@(client.RateLimitRequestsPerHour?.ToString() ?? "Unlimited")</RadzenText>
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="4">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Per Day</RadzenText>
+                        <RadzenText>@(client.RateLimitRequestsPerDay?.ToString() ?? "Unlimited")</RadzenText>
+                    </RadzenColumn>
+                </RadzenRow>
+            </RadzenStack>
+
+            <!-- Branding & UI -->
+            <RadzenStack Gap="0.75rem">
+                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Branding & UI</RadzenText>
+                <RadzenRow>
+                    <RadzenColumn Size="12" SizeMD="4">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Theme</RadzenText>
+                        <RadzenText>@(client.ThemeName ?? "Default")</RadzenText>
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="4">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Custom CSS</RadzenText>
+                        @if (!string.IsNullOrWhiteSpace(client.CustomCssUrl))
+                        {
+                            <a href="@client.CustomCssUrl" target="_blank">@client.CustomCssUrl</a>
+                        }
+                        else { <RadzenText>None</RadzenText> }
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="4">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Custom JavaScript</RadzenText>
+                        @if (!string.IsNullOrWhiteSpace(client.CustomJavaScriptUrl))
+                        {
+                            <a href="@client.CustomJavaScriptUrl" target="_blank">@client.CustomJavaScriptUrl</a>
+                        }
+                        else { <RadzenText>None</RadzenText> }
+                    </RadzenColumn>
+                </RadzenRow>
+                <RadzenRow>
+                    <RadzenColumn Size="12" SizeMD="6">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Page Title Prefix</RadzenText>
+                        <RadzenText>@(client.PageTitlePrefix ?? "-")</RadzenText>
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="6">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Logo URI</RadzenText>
+                        @if (!string.IsNullOrWhiteSpace(client.LogoUri))
+                        {
+                            <a href="@client.LogoUri" target="_blank">@client.LogoUri</a>
+                        }
+                        else { <RadzenText>None</RadzenText> }
+                    </RadzenColumn>
+                </RadzenRow>
+            </RadzenStack>
+
+            <!-- Endpoints & Integration -->
+            <RadzenStack Gap="0.75rem">
+                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Endpoints & Integration</RadzenText>
+                <RadzenRow>
+                    <RadzenColumn Size="12" SizeMD="6">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Client URI</RadzenText>
+                        @if (!string.IsNullOrWhiteSpace(client.ClientUri))
+                        {
+                            <a href="@client.ClientUri" target="_blank">@client.ClientUri</a>
+                        }
+                        else { <RadzenText>None</RadzenText> }
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="6">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Privacy Policy</RadzenText>
+                        @if (!string.IsNullOrWhiteSpace(client.PolicyUri))
+                        {
+                            <a href="@client.PolicyUri" target="_blank">@client.PolicyUri</a>
+                        }
+                        else { <RadzenText>None</RadzenText> }
+                    </RadzenColumn>
+                </RadzenRow>
+                <RadzenRow>
+                    <RadzenColumn Size="12" SizeMD="6">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Terms of Service</RadzenText>
+                        @if (!string.IsNullOrWhiteSpace(client.TosUri))
+                        {
+                            <a href="@client.TosUri" target="_blank">@client.TosUri</a>
+                        }
+                        else { <RadzenText>None</RadzenText> }
+                    </RadzenColumn>
+                </RadzenRow>
+
+                <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-font-weight-600 rz-mt-2">Logout</RadzenText>
+                <RadzenRow>
+                    <RadzenColumn Size="12" SizeMD="6">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Back-Channel Logout URI</RadzenText>
+                        <RadzenText>@(client.BackChannelLogoutUri ?? "-")</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Session Required: @FormatBool(client.BackChannelLogoutSessionRequired)</RadzenText>
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="6">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Front-Channel Logout URI</RadzenText>
+                        <RadzenText>@(client.FrontChannelLogoutUri ?? "-")</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Session Required: @FormatBool(client.FrontChannelLogoutSessionRequired)</RadzenText>
+                    </RadzenColumn>
+                </RadzenRow>
+
+                <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-font-weight-600 rz-mt-2">CORS & Identity Providers</RadzenText>
+                <RadzenRow>
+                    <RadzenColumn Size="12" SizeMD="6">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Allowed CORS Origins</RadzenText>
+                        @if (SplitLines(client.AllowedCorsOrigins).Any())
+                        {
+                            <RadzenStack Gap="0.25rem">
+                                @foreach (var o in SplitLines(client.AllowedCorsOrigins))
+                                {
+                                    <RadzenText class="font-monospace">@o</RadzenText>
+                                }
+                            </RadzenStack>
+                        }
+                        else { <RadzenText>Default</RadzenText> }
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="6">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Allowed Identity Providers</RadzenText>
+                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.35rem" Wrap="FlexWrap.Wrap">
+                            @foreach (var idp in SplitTokens(client.AllowedIdentityProviders))
+                            {
+                                <RadzenBadge BadgeStyle="BadgeStyle.Primary" Text="@idp" />
+                            }
+                            @if (!SplitTokens(client.AllowedIdentityProviders).Any())
+                            {
+                                <RadzenText class="rz-color-secondary">Default</RadzenText>
+                            }
+                        </RadzenStack>
+                    </RadzenColumn>
+                </RadzenRow>
+            </RadzenStack>
+
+            <!-- Audit -->
+            <RadzenStack Gap="0.75rem">
+                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Audit</RadzenText>
+                <RadzenRow>
+                    <RadzenColumn Size="12" SizeMD="6">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Created</RadzenText>
+                        <RadzenText>@client.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">By @((client.CreatedBy ?? "System"))</RadzenText>
+                    </RadzenColumn>
+                    <RadzenColumn Size="12" SizeMD="6">
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Last Updated</RadzenText>
+                        <RadzenText>@(client.UpdatedAt == default ? "Never" : client.UpdatedAt.ToString("yyyy-MM-dd HH:mm:ss"))</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">By @((client.UpdatedBy ?? (client.UpdatedAt == default ? "-" : "System")))</RadzenText>
+                    </RadzenColumn>
+                </RadzenRow>
+            </RadzenStack>
+        </RadzenStack>
+    }
+</RadzenCard>
+
+@code {
+    [Parameter] public string? Id { get; set; }
+
+    private ClientDto? client;
+    private bool isLoading = false;
+    private bool isToggling = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadClient();
+    }
+
+    private async Task LoadClient()
+    {
+        if (string.IsNullOrWhiteSpace(Id))
+        {
+            client = null;
+            return;
+        }
+
+        isLoading = true;
+        try
+        {
+            client = await ClientsApi.GetClientAsync(Id);
+            if (client == null)
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Client not found or not accessible");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading client {ClientId}", Id);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to load client");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task Toggle()
+    {
+        if (client == null) return;
+        isToggling = true;
+        try
+        {
+            var updated = await ClientsApi.ToggleClientAsync(client.Id);
+            if (updated != null)
+            {
+                client.IsEnabled = updated.IsEnabled;
+                client.UpdatedAt = updated.UpdatedAt;
+                var status = client.IsEnabled ? "enabled" : "disabled";
+                NotificationService.Notify(NotificationSeverity.Success, "Client Updated", $"Client '{client.Name}' has been {status}");
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to toggle client status");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error toggling client {ClientId}", client.Id);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to toggle client status");
+        }
+        finally
+        {
+            isToggling = false;
+        }
+    }
+
+    private void GoBack()
+    {
+        Navigation.NavigateTo("/clients");
+    }
+
+    private string FormatTimeSpan(TimeSpan? value)
+    {
+        if (value == null) return "-";
+        var ts = value.Value;
+        if (ts.TotalDays >= 1)
+        {
+            return $"{(int)ts.TotalDays}d {ts.Hours}h";
+        }
+        if (ts.TotalHours >= 1)
+        {
+            return $"{(int)ts.TotalHours}h {ts.Minutes}m";
+        }
+        return $"{(int)ts.TotalMinutes}m";
+    }
+
+    private string FormatNullableMinutes(int? minutes) => minutes.HasValue ? $"{minutes}m" : "Default";
+    private string FormatNullableHours(int? hours) => hours.HasValue ? $"{hours}h" : "Default";
+    private string FormatNullableDays(int? days) => days.HasValue ? $"{days}d" : "Default";
+
+    private IEnumerable<string> SplitLines(string? multi)
+    {
+        if (string.IsNullOrWhiteSpace(multi)) yield break;
+        var parts = multi.Replace("\r", "").Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        foreach (var p in parts) yield return p;
+    }
+
+    private IEnumerable<string> SplitTokens(string? multi)
+    {
+        if (string.IsNullOrWhiteSpace(multi)) yield break;
+        foreach (var token in multi.Split(new[] { '\n', '\r', ';', ',' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var t = token.Trim();
+            if (!string.IsNullOrEmpty(t)) yield return t;
+        }
+    }
+
+    private IEnumerable<string> ParseMfaMethods(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return Enumerable.Empty<string>();
+        try
+        {
+            var arr = System.Text.Json.JsonSerializer.Deserialize<string[]>(json);
+            return arr ?? Enumerable.Empty<string>();
+        }
+        catch
+        {
+            return SplitTokens(json);
+        }
+    }
+
+    private string FormatBool(bool? value) => value.HasValue ? (value.Value ? "Yes" : "No") : "Default";
+    private BadgeStyle GetBoolBadge(bool? value) => value.HasValue ? (value.Value ? BadgeStyle.Success : BadgeStyle.Secondary) : BadgeStyle.Info;
+
+    private BadgeStyle GetClientTypeBadgeStyle(ClientType clientType)
+    {
+        return clientType switch
+        {
+            ClientType.Confidential => BadgeStyle.Success,
+            ClientType.Public => BadgeStyle.Info,
+            ClientType.Machine => BadgeStyle.Warning,
+            _ => BadgeStyle.Secondary
+        };
+    }
+
+    private string GetClientTypeText(ClientType clientType)
+    {
+        return clientType switch
+        {
+            ClientType.Confidential => "Confidential",
+            ClientType.Public => "Public",
+            ClientType.Machine => "M2M",
+            _ => "Unknown"
+        };
+    }
+}
