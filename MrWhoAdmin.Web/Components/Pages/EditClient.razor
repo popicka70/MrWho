@@ -58,23 +58,31 @@
                                     <RadzenRow>
                                         <RadzenColumn Size="12" SizeMD="6">
                                             <RadzenFormField Text="Client ID" Variant="Variant.Outlined">
-                                                <RadzenTextBox @bind-Value="@model.ClientId" 
-                                                              Placeholder="Enter unique client ID" 
-                                                              Style="width: 100%;" 
-                                                              Disabled="@IsEdit" />
-                                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                    @(IsEdit ? "Client ID cannot be changed after creation" : "Must be unique across all realms")
-                                                </RadzenText>
+                                                <ChildContent>
+                                                    <RadzenTextBox @bind-Value="@model.ClientId" 
+                                                                  Placeholder="Enter unique client ID" 
+                                                                  Style="width: 100%;" 
+                                                                  Disabled="@IsEdit" />
+                                                </ChildContent>
+                                                <Helper>
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                        @(IsEdit ? "Client ID cannot be changed after creation" : "Must be unique across all realms")
+                                                    </RadzenText>
+                                                </Helper>
                                             </RadzenFormField>
                                         </RadzenColumn>
                                         <RadzenColumn Size="12" SizeMD="6">
                                             <RadzenFormField Text="Name" Variant="Variant.Outlined">
-                                                <RadzenTextBox @bind-Value="@model.Name" 
-                                                              Placeholder="Enter client display name" 
-                                                              Style="width: 100%;" />
-                                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                    Human-readable name for administration
-                                                </RadzenText>
+                                                <ChildContent>
+                                                    <RadzenTextBox @bind-Value="@model.Name" 
+                                                                  Placeholder="Enter client display name" 
+                                                                  Style="width: 100%;" />
+                                                </ChildContent>
+                                                <Helper>
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                        Human-readable name for administration
+                                                    </RadzenText>
+                                                </Helper>
                                             </RadzenFormField>
                                         </RadzenColumn>
                                     </RadzenRow>
@@ -82,42 +90,56 @@
                                     <RadzenRow>
                                         <RadzenColumn Size="12" SizeMD="6">
                                             <RadzenFormField Text="Realm" Variant="Variant.Outlined">
-                                                <RadzenDropDown @bind-Value="@model.RealmId" 
-                                                               Data="@realms" 
-                                                               TextProperty="Name" 
-                                                               ValueProperty="Id" 
-                                                               Style="width: 100%;" 
-                                                               Placeholder="Select realm..." />
-                                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                    Realm provides default configuration values
-                                                </RadzenText>
+                                                <ChildContent>
+                                                    <RadzenDropDown @bind-Value="@model.RealmId" 
+                                                                   Data="@realms" 
+                                                                   TextProperty="Name" 
+                                                                   ValueProperty="Id" 
+                                                                   Style="width: 100%;" 
+                                                                   Placeholder="Select realm..." />
+                                                </ChildContent>
+                                                <Helper>
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                        Realm provides default configuration values
+                                                    </RadzenText>
+                                                </Helper>
                                             </RadzenFormField>
                                         </RadzenColumn>
                                         <RadzenColumn Size="12" SizeMD="6">
                                             <RadzenFormField Text="Client Type" Variant="Variant.Outlined">
-                                                <RadzenDropDown @bind-Value="@model.ClientType" 
-                                                               Data="@clientTypes" 
-                                                               TextProperty="Text" 
-                                                               ValueProperty="Value" 
-                                                               Style="width: 100%;" />
-                                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                    Determines security requirements and available flows
-                                                </RadzenText>
+                                                <ChildContent>
+                                                    <RadzenDropDown @bind-Value="@model.ClientType" 
+                                                                   Data="@clientTypes" 
+                                                                   TextProperty="Text" 
+                                                                   ValueProperty="Value" 
+                                                                   Style="width: 100%;" />
+                                                </ChildContent>
+                                                <Helper>
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                        Determines security requirements and available flows
+                                                    </RadzenText>
+                                                </Helper>
                                             </RadzenFormField>
                                         </RadzenColumn>
                                     </RadzenRow>
 
                                     <RadzenFormField Text="Description" Variant="Variant.Outlined">
-                                        <RadzenTextArea @bind-Value="@model.Description" 
-                                                       Placeholder="Brief description of the client application" 
-                                                       Style="width: 100%; height: 80px;" />
+                                        <ChildContent>
+                                            <RadzenTextArea @bind-Value="@model.Description" 
+                                                           Placeholder="Brief description of the client application" 
+                                                           Style="width: 100%; height: 80px;" />
+                                        </ChildContent>
                                     </RadzenFormField>
 
                                     <RadzenFormField Text="Status" Variant="Variant.Outlined">
-                                        <RadzenSwitch @bind-Value="@model.IsEnabled" OnLabel="Enabled" OffLabel="Disabled" />
-                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                            Toggle to enable or disable this client
-                                        </RadzenText>
+                                        <Start>
+                                            <RadzenSwitch @bind-Value="@model.IsEnabled" OnLabel="Enabled" OffLabel="Disabled" />
+                                        </Start>
+                                        <Helper>
+                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                Toggle to enable or disable this client
+                                            </RadzenText>
+                                        </Helper>
                                     </RadzenFormField>
                                 </RadzenStack>
                             </RadzenStack>
@@ -133,37 +155,53 @@
                                     <RadzenRow>
                                         <RadzenColumn Size="12" SizeMD="6">
                                             <RadzenFormField Text="Session Timeout (Hours)" Variant="Variant.Outlined">
-                                                <RadzenNumeric @bind-Value="@model.SessionTimeoutHours" 
-                                                              Min="0" Max="168" 
-                                                              Style="width: 100%;" 
-                                                              Placeholder="Leave empty to use realm default" />
-                                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                    How long user sessions remain active (0-168 hours)
-                                                </RadzenText>
+                                                <ChildContent>
+                                                    <RadzenNumeric @bind-Value="@model.SessionTimeoutHours" 
+                                                                  Min="0" Max="168" 
+                                                                  Style="width: 100%;" 
+                                                                  Placeholder="Leave empty to use realm default" />
+                                                </ChildContent>
+                                                <Helper>
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                        How long user sessions remain active (0-168 hours)
+                                                    </RadzenText>
+                                                </Helper>
                                             </RadzenFormField>
                                         </RadzenColumn>
                                         <RadzenColumn Size="12" SizeMD="6">
                                             <RadzenFormField Text="Remember Me Duration (Days)" Variant="Variant.Outlined">
-                                                <RadzenNumeric @bind-Value="@model.RememberMeDurationDays" 
-                                                              Min="0" Max="365" 
-                                                              Style="width: 100%;" 
-                                                              Placeholder="Leave empty to use realm default" />
-                                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                    Duration for "Remember Me" functionality (0-365 days)
-                                                </RadzenText>
+                                                <ChildContent>
+                                                    <RadzenNumeric @bind-Value="@model.RememberMeDurationDays" 
+                                                                  Min="0" Max="365" 
+                                                                  Style="width: 100%;" 
+                                                                  Placeholder="Leave empty to use realm default" />
+                                                </ChildContent>
+                                                <Helper>
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                        Duration for "Remember Me" functionality (0-365 days)
+                                                    </RadzenText>
+                                                </Helper>
                                             </RadzenFormField>
                                         </RadzenColumn>
                                     </RadzenRow>
 
-                                    <RadzenFormField Text="Session Expiration Type" Variant="Variant.Outlined">
-                                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" Style="margin-top: 0.5rem;">
-                                            <RadzenCheckBox @bind-Value="@model.UseSlidingSessionExpiration" TriState="true" />
-                                            <RadzenLabel Text="Use sliding expiration (extends session on activity)" />
-                                        </RadzenStack>
-                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                            When enabled, session timeout resets on user activity (leave unset to use default)
-                                        </RadzenText>
-                                    </RadzenFormField>
+                                    <RadzenRow>
+                                        <RadzenColumn Size="4">
+                                            <RadzenFormField Text="Session Expiration Type" Variant="Variant.Outlined">
+                                                <Start>
+                                                    <RadzenCheckBox @bind-Value="@model.UseSlidingSessionExpiration" TriState="true" Name="useSliding" />
+                                                </Start>
+                                                <ChildContent>
+                                                    <RadzenLabel Text="Use sliding expiration (extends session on activity)" Component="useSliding" />
+                                                </ChildContent>
+                                                <Helper>
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                        When enabled, session timeout resets on user activity (leave unset to use default)
+                                                    </RadzenText>
+                                                </Helper>
+                                            </RadzenFormField>
+                                        </RadzenColumn>
+                                    </RadzenRow>
                                 </RadzenStack>
                             </RadzenStack>
 
@@ -171,25 +209,33 @@
                                 <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Cookie Configuration</RadzenText>
                                 <RadzenStack Gap="1rem">
                                     <RadzenFormField Text="Cookie SameSite Policy" Variant="Variant.Outlined">
-                                        <RadzenDropDown @bind-Value="@model.CookieSameSitePolicy" 
-                                                       Data="@sameSitePolicies" 
-                                                       TextProperty="Text" 
-                                                       ValueProperty="Value" 
-                                                       Style="width: 100%;" 
-                                                       Placeholder="Select policy..." />
-                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                            Controls when cookies are sent with cross-site requests
-                                        </RadzenText>
+                                        <ChildContent>
+                                            <RadzenDropDown @bind-Value="@model.CookieSameSitePolicy" 
+                                                           Data="@sameSitePolicies" 
+                                                           TextProperty="Text" 
+                                                           ValueProperty="Value" 
+                                                           Style="width: 100%;" 
+                                                           Placeholder="Select policy..." />
+                                        </ChildContent>
+                                        <Helper>
+                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                Controls when cookies are sent with cross-site requests
+                                            </RadzenText>
+                                        </Helper>
                                     </RadzenFormField>
 
                                     <RadzenFormField Text="HTTPS Cookie Requirement" Variant="Variant.Outlined">
-                                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" Style="margin-top: 0.5rem;">
-                                            <RadzenCheckBox @bind-Value="@model.RequireHttpsForCookies" TriState="true" />
-                                            <RadzenLabel Text="Require HTTPS for secure cookies" />
-                                        </RadzenStack>
-                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                            Force secure flag on cookies (recommended for production; leave unset to use default)
-                                        </RadzenText>
+                                        <Start>
+                                            <RadzenCheckBox @bind-Value="@model.RequireHttpsForCookies" TriState="true" Name="requireHttpsCookies" />
+                                        </Start>
+                                        <ChildContent>
+                                            <RadzenLabel Text="Require HTTPS for secure cookies" Component="requireHttpsCookies" />
+                                        </ChildContent>
+                                        <Helper>
+                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                Force secure flag on cookies (recommended for production; leave unset to use default)
+                                            </RadzenText>
+                                        </Helper>
                                     </RadzenFormField>
                                 </RadzenStack>
                             </RadzenStack>
@@ -205,24 +251,32 @@
                                     <RadzenRow>
                                         <RadzenColumn Size="12" SizeMD="6">
                                             <RadzenFormField Text="ID Token Lifetime (Minutes)" Variant="Variant.Outlined">
-                                                <RadzenNumeric @bind-Value="@model.IdTokenLifetimeMinutes" 
-                                                              Min="1" Max="1440" 
-                                                              Style="width: 100%;" 
-                                                              Placeholder="Leave empty to use default" />
-                                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                    How long ID tokens remain valid (1-1440 minutes)
-                                                </RadzenText>
+                                                <ChildContent>
+                                                    <RadzenNumeric @bind-Value="@model.IdTokenLifetimeMinutes" 
+                                                                  Min="1" Max="1440" 
+                                                                  Style="width: 100%;" 
+                                                                  Placeholder="Leave empty to use default" />
+                                                </ChildContent>
+                                                <Helper>
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                        How long ID tokens remain valid (1-1440 minutes)
+                                                    </RadzenText>
+                                                </Helper>
                                             </RadzenFormField>
                                         </RadzenColumn>
                                         <RadzenColumn Size="12" SizeMD="6">
                                             <RadzenFormField Text="Device Code Lifetime (Minutes)" Variant="Variant.Outlined">
-                                                <RadzenNumeric @bind-Value="@model.DeviceCodeLifetimeMinutes" 
-                                                              Min="1" Max="60" 
-                                                              Style="width: 100%;" 
-                                                              Placeholder="Leave empty to use default" />
-                                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                    Device flow code validity period (1-60 minutes)
-                                                </RadzenText>
+                                                <ChildContent>
+                                                    <RadzenNumeric @bind-Value="@model.DeviceCodeLifetimeMinutes" 
+                                                                  Min="1" Max="60" 
+                                                                  Style="width: 100%;" 
+                                                                  Placeholder="Leave empty to use default" />
+                                                </ChildContent>
+                                                <Helper>
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                        Device flow code validity period (1-60 minutes)
+                                                    </RadzenText>
+                                                </Helper>
                                             </RadzenFormField>
                                         </RadzenColumn>
                                     </RadzenRow>
@@ -230,15 +284,19 @@
                                     <RadzenRow>
                                         <RadzenColumn Size="12" SizeMD="6">
                                             <RadzenFormField Text="Access Token Type" Variant="Variant.Outlined">
-                                                <RadzenDropDown @bind-Value="@model.AccessTokenType" 
-                                                               Data="@accessTokenTypes" 
-                                                               TextProperty="Text" 
-                                                               ValueProperty="Value" 
-                                                               Style="width: 100%;" 
-                                                               Placeholder="Select token type..." />
-                                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                    JWT (self-contained) vs Reference (database lookup)
-                                                </RadzenText>
+                                                <ChildContent>
+                                                    <RadzenDropDown @bind-Value="@model.AccessTokenType" 
+                                                                   Data="@accessTokenTypes" 
+                                                                   TextProperty="Text" 
+                                                                   ValueProperty="Value" 
+                                                                   Style="width: 100%;" 
+                                                                   Placeholder="Select token type..." />
+                                                </ChildContent>
+                                                <Helper>
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                        JWT (self-contained) vs Reference (database lookup)
+                                                    </RadzenText>
+                                                </Helper>
                                             </RadzenFormField>
                                         </RadzenColumn>
                                         <RadzenColumn Size="12" SizeMD="6">
@@ -253,46 +311,50 @@
                                     <RadzenRow>
                                         <RadzenColumn Size="12" SizeMD="6">
                                             <RadzenFormField Text="Max Refresh Tokens Per User" Variant="Variant.Outlined">
-                                                <RadzenNumeric @bind-Value="@model.MaxRefreshTokensPerUser" 
-                                                              Min="0" Max="100" 
-                                                              Style="width: 100%;" 
-                                                              Placeholder="Leave empty for unlimited" />
-                                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                    Limit concurrent refresh tokens per user (0 = unlimited)
-                                                </RadzenText>
+                                                <ChildContent>
+                                                    <RadzenNumeric @bind-Value="@model.MaxRefreshTokensPerUser" 
+                                                                  Min="0" Max="100" 
+                                                                  Style="width: 100%;" 
+                                                                  Placeholder="Leave empty for unlimited" />
+                                                </ChildContent>
+                                                <Helper>
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                        Limit concurrent refresh tokens per user (0 = unlimited)
+                                                    </RadzenText>
+                                                </Helper>
                                             </RadzenFormField>
                                         </RadzenColumn>
                                         <RadzenColumn Size="12" SizeMD="6">
-                                            <RadzenFormField Text="Token Security" Variant="Variant.Outlined">
-                                                <RadzenStack Gap="0.75rem" Style="max-width: 480px;">
-                                                    <RadzenStack Gap="0.25rem">
-                                                        <RadzenLabel Text="One-time refresh tokens (rotation)" />
-                                                        <RadzenDropDown @bind-Value="@model.UseOneTimeRefreshTokens"
-                                                                       Data="@triStateOptions"
-                                                                       TextProperty="Text"
-                                                                       ValueProperty="Value"
-                                                                       Style="width: 100%;"
-                                                                       Placeholder="Use realm default" />
-                                                    </RadzenStack>
-                                                    <RadzenStack Gap="0.25rem">
-                                                        <RadzenLabel Text="Hash access tokens in database" />
-                                                        <RadzenDropDown @bind-Value="@model.HashAccessTokens"
-                                                                       Data="@triStateOptions"
-                                                                       TextProperty="Text"
-                                                                       ValueProperty="Value"
-                                                                       Style="width: 100%;"
-                                                                       Placeholder="Use realm default" />
-                                                    </RadzenStack>
-                                                    <RadzenStack Gap="0.25rem">
-                                                        <RadzenLabel Text="Update claims on token refresh" />
-                                                        <RadzenDropDown @bind-Value="@model.UpdateAccessTokenClaimsOnRefresh"
-                                                                       Data="@triStateOptions"
-                                                                       TextProperty="Text"
-                                                                       ValueProperty="Value"
-                                                                       Style="width: 100%;"
-                                                                       Placeholder="Use realm default" />
-                                                    </RadzenStack>
-                                                </RadzenStack>
+                                            <!-- Split Token Security into separate form fields -->
+                                            <RadzenFormField Text="One-time refresh tokens (rotation)" Variant="Variant.Outlined">
+                                                <ChildContent>
+                                                    <RadzenDropDown @bind-Value="@model.UseOneTimeRefreshTokens"
+                                                                   Data="@triStateOptions"
+                                                                   TextProperty="Text"
+                                                                   ValueProperty="Value"
+                                                                   Style="width: 100%;"
+                                                                   Placeholder="Use realm default" />
+                                                </ChildContent>
+                                            </RadzenFormField>
+                                            <RadzenFormField Text="Hash access tokens in database" Variant="Variant.Outlined">
+                                                <ChildContent>
+                                                    <RadzenDropDown @bind-Value="@model.HashAccessTokens"
+                                                                   Data="@triStateOptions"
+                                                                   TextProperty="Text"
+                                                                   ValueProperty="Value"
+                                                                   Style="width: 100%;"
+                                                                   Placeholder="Use realm default" />
+                                                </ChildContent>
+                                            </RadzenFormField>
+                                            <RadzenFormField Text="Update claims on token refresh" Variant="Variant.Outlined">
+                                                <ChildContent>
+                                                    <RadzenDropDown @bind-Value="@model.UpdateAccessTokenClaimsOnRefresh"
+                                                                   Data="@triStateOptions"
+                                                                   TextProperty="Text"
+                                                                   ValueProperty="Value"
+                                                                   Style="width: 100%;"
+                                                                   Placeholder="Use realm default" />
+                                                </ChildContent>
                                             </RadzenFormField>
                                         </RadzenColumn>
                                     </RadzenRow>
@@ -308,19 +370,25 @@
                                 <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">User Consent</RadzenText>
                                 <RadzenStack Gap="1rem">
                                     <RadzenFormField Text="Consent Requirements" Variant="Variant.Outlined">
-                                        <RadzenStack Gap="0.5rem" Style="margin-top: 0.5rem;">
-                                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                                <RadzenCheckBox @bind-Value="@model.RequireConsent" TriState="true" />
-                                                <RadzenLabel Text="Require user consent for authorization" />
-                                            </RadzenStack>
-                                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                                <RadzenCheckBox @bind-Value="@model.AllowRememberConsent" TriState="true" />
-                                                <RadzenLabel Text="Allow users to remember consent" />
-                                            </RadzenStack>
-                                        </RadzenStack>
-                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                            Controls when users must explicitly approve authorization
-                                        </RadzenText>
+                                        <Start>
+                                            <RadzenCheckBox @bind-Value="@model.RequireConsent" TriState="true" Name="requireConsent" />
+                                        </Start>
+                                        <ChildContent>
+                                            <RadzenLabel Text="Require user consent for authorization" Component="requireConsent" />
+                                        </ChildContent>
+                                        <Helper>
+                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                Controls when users must explicitly approve authorization
+                                            </RadzenText>
+                                        </Helper>
+                                    </RadzenFormField>
+                                    <RadzenFormField Variant="Variant.Outlined">
+                                        <Start>
+                                            <RadzenCheckBox @bind-Value="@model.AllowRememberConsent" TriState="true" Name="rememberConsent" />
+                                        </Start>
+                                        <ChildContent>
+                                            <RadzenLabel Text="Allow users to remember consent" Component="rememberConsent" />
+                                        </ChildContent>
                                     </RadzenFormField>
                                 </RadzenStack>
                             </RadzenStack>
@@ -329,54 +397,81 @@
                                 <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Endpoint Access</RadzenText>
                                 <RadzenStack Gap="1rem">
                                     <RadzenFormField Text="API Endpoint Access" Variant="Variant.Outlined">
-                                        <RadzenStack Gap="0.5rem" Style="margin-top: 0.5rem;">
-                                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                                <RadzenCheckBox @bind-Value="@model.AllowAccessToUserInfoEndpoint" TriState="true" />
-                                                <RadzenLabel Text="Allow access to UserInfo endpoint" />
-                                            </RadzenStack>
-                                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                                <RadzenCheckBox @bind-Value="@model.AllowAccessToIntrospectionEndpoint" TriState="true" />
-                                                <RadzenLabel Text="Allow token introspection" />
-                                            </RadzenStack>
-                                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                                <RadzenCheckBox @bind-Value="@model.AllowAccessToRevocationEndpoint" TriState="true" />
-                                                <RadzenLabel Text="Allow token revocation" />
-                                            </RadzenStack>
-                                        </RadzenStack>
-                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                            Controls access to OIDC standard endpoints
-                                        </RadzenText>
+                                        <Start>
+                                            <RadzenCheckBox @bind-Value="@model.AllowAccessToUserInfoEndpoint" TriState="true" Name="allowUserInfo" />
+                                        </Start>
+                                        <ChildContent>
+                                            <RadzenLabel Text="Allow access to UserInfo endpoint" Component="allowUserInfo" />
+                                        </ChildContent>
+                                        <Helper>
+                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                Controls access to OIDC standard endpoints
+                                            </RadzenText>
+                                        </Helper>
+                                    </RadzenFormField>
+                                    <RadzenFormField Variant="Variant.Outlined">
+                                        <Start>
+                                            <RadzenCheckBox @bind-Value="@model.AllowAccessToIntrospectionEndpoint" TriState="true" Name="allowIntrospection" />
+                                        </Start>
+                                        <ChildContent>
+                                            <RadzenLabel Text="Allow token introspection" Component="allowIntrospection" />
+                                        </ChildContent>
+                                    </RadzenFormField>
+                                    <RadzenFormField Variant="Variant.Outlined">
+                                        <Start>
+                                            <RadzenCheckBox @bind-Value="@model.AllowAccessToRevocationEndpoint" TriState="true" Name="allowRevocation" />
+                                        </Start>
+                                        <ChildContent>
+                                            <RadzenLabel Text="Allow token revocation" Component="allowRevocation" />
+                                        </ChildContent>
                                     </RadzenFormField>
                                 </RadzenStack>
                             </RadzenStack>
+                        </div>
+                    </RadzenTabsItem>
 
-                            <RadzenStack Gap="0.75rem" class="rz-mt-4 rz-mb-4">
-                                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Claims Configuration</RadzenText>
+                    <!-- Claims Configuration Tab -->
+                    <RadzenTabsItem Text="Claims Configuration" Icon="verified_user">
+                        <div style="padding: 1rem; max-height: 550px; overflow-y: auto;">
+                            <RadzenStack Gap="0.75rem" class="rz-mb-4">
+                                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Token Claims</RadzenText>
                                 <RadzenStack Gap="1rem">
-                                    <RadzenFormField Text="Client Claims Behavior" Variant="Variant.Outlined">
-                                        <RadzenStack Gap="0.5rem" Style="margin-top: 0.5rem;">
-                                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                                <RadzenCheckBox @bind-Value="@model.IncludeJwtId" TriState="true" />
-                                                <RadzenLabel Text="Include JWT ID in tokens" />
-                                            </RadzenStack>
-                                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                                <RadzenCheckBox @bind-Value="@model.AlwaysSendClientClaims" TriState="true" />
-                                                <RadzenLabel Text="Always send client claims" />
-                                            </RadzenStack>
-                                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                                <RadzenCheckBox @bind-Value="@model.AlwaysIncludeUserClaimsInIdToken" TriState="true" />
-                                                <RadzenLabel Text="Always include user claims in ID token" />
-                                            </RadzenStack>
-                                        </RadzenStack>
+                                    <RadzenFormField Variant="Variant.Outlined">
+                                        <Start>
+                                            <RadzenCheckBox @bind-Value="@model.IncludeJwtId" TriState="true" Name="includeJti" />
+                                        </Start>
+                                        <ChildContent>
+                                            <RadzenLabel Text="Include JWT ID in tokens" Component="includeJti" />
+                                        </ChildContent>
+                                    </RadzenFormField>
+                                    <RadzenFormField Variant="Variant.Outlined">
+                                        <Start>
+                                            <RadzenCheckBox @bind-Value="@model.AlwaysSendClientClaims" TriState="true" Name="alwaysSendClientClaims" />
+                                        </Start>
+                                        <ChildContent>
+                                            <RadzenLabel Text="Always send client claims" Component="alwaysSendClientClaims" />
+                                        </ChildContent>
+                                    </RadzenFormField>
+                                    <RadzenFormField Variant="Variant.Outlined">
+                                        <Start>
+                                            <RadzenCheckBox @bind-Value="@model.AlwaysIncludeUserClaimsInIdToken" TriState="true" Name="alwaysIncludeUserClaims" />
+                                        </Start>
+                                        <ChildContent>
+                                            <RadzenLabel Text="Always include user claims in ID token" Component="alwaysIncludeUserClaims" />
+                                        </ChildContent>
                                     </RadzenFormField>
 
                                     <RadzenFormField Text="Client Claims Prefix" Variant="Variant.Outlined">
-                                        <RadzenTextBox @bind-Value="@model.ClientClaimsPrefix" 
-                                                      Style="width: 100%;" 
-                                                      Placeholder="e.g., client_" />
-                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                            Prefix for client-specific claims (optional)
-                                        </RadzenText>
+                                        <ChildContent>
+                                            <RadzenTextBox @bind-Value="@model.ClientClaimsPrefix" 
+                                                          Style="width: 100%;" 
+                                                          Placeholder="e.g., client_" />
+                                        </ChildContent>
+                                        <Helper>
+                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                Prefix for client-specific claims (optional)
+                                            </RadzenText>
+                                        </Helper>
                                     </RadzenFormField>
                                 </RadzenStack>
                             </RadzenStack>
@@ -390,55 +485,70 @@
                                 <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">MFA Requirements</RadzenText>
                                 <RadzenStack Gap="1rem">
                                     <RadzenFormField Text="MFA Enforcement" Variant="Variant.Outlined">
-                                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" Style="margin-top: 0.5rem;">
-                                            <RadzenCheckBox @bind-Value="@model.RequireMfa" TriState="true" />
-                                            <RadzenLabel Text="Require multi-factor authentication" />
-                                        </RadzenStack>
-                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                            When enabled, users must complete MFA to access this client
-                                        </RadzenText>
+                                        <Start>
+                                            <RadzenCheckBox @bind-Value="@model.RequireMfa" TriState="true" Name="requireMfa" />
+                                        </Start>
+                                        <ChildContent>
+                                            <RadzenLabel Text="Require multi-factor authentication" Component="requireMfa" />
+                                        </ChildContent>
+                                        <Helper>
+                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                When enabled, users must complete MFA to access this client
+                                            </RadzenText>
+                                        </Helper>
                                     </RadzenFormField>
 
                                     <RadzenRow>
                                         <RadzenColumn Size="12" SizeMD="6">
                                             <RadzenFormField Text="MFA Grace Period (Minutes)" Variant="Variant.Outlined">
-                                                <RadzenNumeric @bind-Value="@model.MfaGracePeriodMinutes" 
-                                                              Min="0" Max="1440" 
-                                                              Style="width: 100%;" 
-                                                              Placeholder="Leave empty to use default" />
-                                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                    Time before requiring MFA again (0-1440 minutes)
-                                                </RadzenText>
+                                                <ChildContent>
+                                                    <RadzenNumeric @bind-Value="@model.MfaGracePeriodMinutes" 
+                                                                  Min="0" Max="1440" 
+                                                                  Style="width: 100%;" 
+                                                                  Placeholder="Leave empty to use default" />
+                                                </ChildContent>
+                                                <Helper>
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                        Time before requiring MFA again (0-1440 minutes)
+                                                    </RadzenText>
+                                                </Helper>
                                             </RadzenFormField>
                                         </RadzenColumn>
                                         <RadzenColumn Size="12" SizeMD="6">
                                             <RadzenFormField Text="Session MFA Memory" Variant="Variant.Outlined">
-                                                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" Style="margin-top: 0.5rem;">
-                                                    <RadzenCheckBox @bind-Value="@model.RememberMfaForSession" TriState="true" />
-                                                    <RadzenLabel Text="Remember MFA for session duration" />
-                                                </RadzenStack>
-                                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                    Skip MFA if already completed this session
-                                                </RadzenText>
+                                                <Start>
+                                                    <RadzenCheckBox @bind-Value="@model.RememberMfaForSession" TriState="true" Name="rememberMfa" />
+                                                </Start>
+                                                <ChildContent>
+                                                    <RadzenLabel Text="Remember MFA for session duration" Component="rememberMfa" />
+                                                </ChildContent>
+                                                <Helper>
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                        Skip MFA if already completed this session
+                                                    </RadzenText>
+                                                </Helper>
                                             </RadzenFormField>
                                         </RadzenColumn>
                                     </RadzenRow>
 
-                                    <RadzenFormField Text="Allowed MFA Methods" Variant="Variant.Outlined">
-                                        <RadzenStack Gap="0.5rem" Style="margin-top: 0.5rem;">
-                                            @foreach (var method in availableMfaMethods)
-                                            {
-                                                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                                    <RadzenCheckBox Value="@IsMethodSelected(method.Value)" 
-                                                                   ValueChanged="@((bool selected) => ToggleMfaMethod(method.Value, selected))" />
-                                                    <RadzenLabel Text="@method.Text" />
-                                                </RadzenStack>
-                                            }
-                                        </RadzenStack>
-                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                            Select which MFA methods users can use for this client
-                                        </RadzenText>
-                                    </RadzenFormField>
+                                    <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-font-weight-600">Allowed MFA Methods</RadzenText>
+                                    @foreach (var method in availableMfaMethods)
+                                    {
+                                        var name = $"mfa_{method.Value}";
+                                        <RadzenFormField Variant="Variant.Outlined">
+                                            <Start>
+                                                <RadzenCheckBox Value="@IsMethodSelected(method.Value)" 
+                                                               ValueChanged="@((bool selected) => ToggleMfaMethod(method.Value, selected))"
+                                                               Name="@name" />
+                                            </Start>
+                                            <ChildContent>
+                                                <RadzenLabel Text="@method.Text" Component="@name" />
+                                            </ChildContent>
+                                        </RadzenFormField>
+                                    }
+                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                        Select which MFA methods users can use for this client
+                                    </RadzenText>
                                 </RadzenStack>
                             </RadzenStack>
                         </div>
@@ -457,35 +567,47 @@
                                     <RadzenRow>
                                         <RadzenColumn Size="12" SizeMD="4">
                                             <RadzenFormField Text="Per Minute Limit" Variant="Variant.Outlined">
-                                                <RadzenNumeric @bind-Value="@model.RateLimitRequestsPerMinute" 
-                                                              Min="0" Max="10000" 
-                                                              Style="width: 100%;" 
-                                                              Placeholder="Requests per minute" />
-                                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                    Maximum requests per minute (0 = unlimited)
-                                                </RadzenText>
+                                                <ChildContent>
+                                                    <RadzenNumeric @bind-Value="@model.RateLimitRequestsPerMinute" 
+                                                                  Min="0" Max="10000" 
+                                                                  Style="width: 100%;" 
+                                                                  Placeholder="Requests per minute" />
+                                                </ChildContent>
+                                                <Helper>
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                        Maximum requests per minute (0 = unlimited)
+                                                    </RadzenText>
+                                                </Helper>
                                             </RadzenFormField>
                                         </RadzenColumn>
                                         <RadzenColumn Size="12" SizeMD="4">
                                             <RadzenFormField Text="Per Hour Limit" Variant="Variant.Outlined">
-                                                <RadzenNumeric @bind-Value="@model.RateLimitRequestsPerHour" 
-                                                              Min="0" Max="1000000" 
-                                                              Style="width: 100%;" 
-                                                              Placeholder="Requests per hour" />
-                                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                    Maximum requests per hour (0 = unlimited)
-                                                </RadzenText>
+                                                <ChildContent>
+                                                    <RadzenNumeric @bind-Value="@model.RateLimitRequestsPerHour" 
+                                                                  Min="0" Max="1000000" 
+                                                                  Style="width: 100%;" 
+                                                                  Placeholder="Requests per hour" />
+                                                </ChildContent>
+                                                <Helper>
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                        Maximum requests per hour (0 = unlimited)
+                                                    </RadzenText>
+                                                </Helper>
                                             </RadzenFormField>
                                         </RadzenColumn>
                                         <RadzenColumn Size="12" SizeMD="4">
                                             <RadzenFormField Text="Per Day Limit" Variant="Variant.Outlined">
-                                                <RadzenNumeric @bind-Value="@model.RateLimitRequestsPerDay" 
-                                                              Min="0" Max="10000000" 
-                                                              Style="width: 100%;" 
-                                                              Placeholder="Requests per day" />
-                                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                    Maximum requests per day (0 = unlimited)
-                                                </RadzenText>
+                                                <ChildContent>
+                                                    <RadzenNumeric @bind-Value="@model.RateLimitRequestsPerDay" 
+                                                                  Min="0" Max="10000000" 
+                                                                  Style="width: 100%;" 
+                                                                  Placeholder="Requests per day" />
+                                                </ChildContent>
+                                                <Helper>
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                        Maximum requests per day (0 = unlimited)
+                                                    </RadzenText>
+                                                </Helper>
                                             </RadzenFormField>
                                         </RadzenColumn>
                                     </RadzenRow>
@@ -501,39 +623,55 @@
                                 <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Visual Customization</RadzenText>
                                 <RadzenStack Gap="1rem">
                                     <RadzenFormField Text="Theme Name" Variant="Variant.Outlined">
-                                        <RadzenTextBox @bind-Value="@model.ThemeName" 
-                                                      Style="width: 100%;" 
-                                                      Placeholder="e.g., dark, light, corporate" />
-                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                            Name of the UI theme to use for this client
-                                        </RadzenText>
+                                        <ChildContent>
+                                            <RadzenTextBox @bind-Value="@model.ThemeName" 
+                                                          Style="width: 100%;" 
+                                                          Placeholder="e.g., dark, light, corporate" />
+                                        </ChildContent>
+                                        <Helper>
+                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                Name of the UI theme to use for this client
+                                            </RadzenText>
+                                        </Helper>
                                     </RadzenFormField>
 
                                     <RadzenFormField Text="Custom CSS URL" Variant="Variant.Outlined">
-                                        <RadzenTextBox @bind-Value="@model.CustomCssUrl" 
-                                                      Style="width: 100%;" 
-                                                      Placeholder="https://cdn.example.com/client-theme.css" />
-                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                            URL to custom CSS stylesheet for client-specific styling
-                                        </RadzenText>
+                                        <ChildContent>
+                                            <RadzenTextBox @bind-Value="@model.CustomCssUrl" 
+                                                          Style="width: 100%;" 
+                                                          Placeholder="https://cdn.example.com/client-theme.css" />
+                                        </ChildContent>
+                                        <Helper>
+                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                URL to custom CSS stylesheet for client-specific styling
+                                            </RadzenText>
+                                        </Helper>
                                     </RadzenFormField>
 
                                     <RadzenFormField Text="Custom JavaScript URL" Variant="Variant.Outlined">
-                                        <RadzenTextBox @bind-Value="@model.CustomJavaScriptUrl" 
-                                                      Style="width: 100%;" 
-                                                      Placeholder="https://cdn.example.com/client-scripts.js" />
-                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                            URL to custom JavaScript file for client-specific functionality
-                                        </RadzenText>
+                                        <ChildContent>
+                                            <RadzenTextBox @bind-Value="@model.CustomJavaScriptUrl" 
+                                                          Style="width: 100%;" 
+                                                          Placeholder="https://cdn.example.com/client-scripts.js" />
+                                        </ChildContent>
+                                        <Helper>
+                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                URL to custom JavaScript file for client-specific functionality
+                                            </RadzenText>
+                                        </Helper>
                                     </RadzenFormField>
 
                                     <RadzenFormField Text="Page Title Prefix" Variant="Variant.Outlined">
-                                        <RadzenTextBox @bind-Value="@model.PageTitlePrefix" 
-                                                      Style="width: 100%;" 
-                                                      Placeholder="e.g., Company Name - " />
-                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                            Text to prepend to page titles for this client
-                                        </RadzenText>
+                                        <ChildContent>
+                                            <RadzenTextBox @bind-Value="@model.PageTitlePrefix" 
+                                                          Style="width: 100%;" 
+                                                          Placeholder="e.g., Company Name - " />
+                                        </ChildContent>
+                                        <Helper>
+                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                Text to prepend to page titles for this client
+                                            </RadzenText>
+                                        </Helper>
                                     </RadzenFormField>
                                 </RadzenStack>
                             </RadzenStack>
@@ -544,22 +682,30 @@
                                     <RadzenRow>
                                         <RadzenColumn Size="12" SizeMD="6">
                                             <RadzenFormField Text="Logo URI" Variant="Variant.Outlined">
-                                                <RadzenTextBox @bind-Value="@model.LogoUri" 
-                                                              Style="width: 100%;" 
-                                                              Placeholder="https://example.com/logo.png" />
-                                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                    URL to client logo image
-                                                </RadzenText>
+                                                <ChildContent>
+                                                    <RadzenTextBox @bind-Value="@model.LogoUri" 
+                                                                  Style="width: 100%;" 
+                                                                  Placeholder="https://example.com/logo.png" />
+                                                </ChildContent>
+                                                <Helper>
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                        URL to client logo image
+                                                    </RadzenText>
+                                                </Helper>
                                             </RadzenFormField>
                                         </RadzenColumn>
                                         <RadzenColumn Size="12" SizeMD="6">
                                             <RadzenFormField Text="Client URI" Variant="Variant.Outlined">
-                                                <RadzenTextBox @bind-Value="@model.ClientUri" 
-                                                              Style="width: 100%;" 
-                                                              Placeholder="https://example.com" />
-                                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                    URL to client homepage
-                                                </RadzenText>
+                                                <ChildContent>
+                                                    <RadzenTextBox @bind-Value="@model.ClientUri" 
+                                                                  Style="width: 100%;" 
+                                                                  Placeholder="https://example.com" />
+                                                </ChildContent>
+                                                <Helper>
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                        URL to client homepage
+                                                    </RadzenText>
+                                                </Helper>
                                             </RadzenFormField>
                                         </RadzenColumn>
                                     </RadzenRow>
@@ -567,523 +713,577 @@
                                     <RadzenRow>
                                         <RadzenColumn Size="12" SizeMD="6">
                                             <RadzenFormField Text="Privacy Policy URI" Variant="Variant.Outlined">
-                                                <RadzenTextBox @bind-Value="@model.PolicyUri" 
-                                                              Style="width: 100%;" 
-                                                              Placeholder="https://example.com/privacy" />
-                                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                    URL to privacy policy
-                                                </RadzenText>
+                                                <ChildContent>
+                                                    <RadzenTextBox @bind-Value="@model.PolicyUri" 
+                                                                  Style="width: 100%;" 
+                                                                  Placeholder="https://example.com/privacy" />
+                                                </ChildContent>
+                                                <Helper>
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                        URL to privacy policy
+                                                    </RadzenText>
+                                                </Helper>
                                             </RadzenFormField>
                                         </RadzenColumn>
                                         <RadzenColumn Size="12" SizeMD="6">
                                             <RadzenFormField Text="Terms of Service URI" Variant="Variant.Outlined">
-                                                <RadzenTextBox @bind-Value="@model.TosUri" 
-                                                              Style="width: 100%;" 
-                                                              Placeholder="https://example.com/terms" />
-                                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                    URL to terms of service
-                                                </RadzenText>
+                                                <ChildContent>
+                                                    <RadzenTextBox @bind-Value="@model.TosUri" 
+                                                                  Style="width: 100%;" 
+                                                                  Placeholder="https://example.com/terms" />
+                                                </ChildContent>
+                                                <Helper>
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                        URL to terms of service
+                                                    </RadzenText>
+                                                </Helper>
                                             </RadzenFormField>
                                         </RadzenColumn>
                                     </RadzenRow>
                                 </RadzenStack>
                             </RadzenStack>
-                            </div>
-                        </RadzenTabsItem>
+                        </div>
+                    </RadzenTabsItem>
 
-                        <!-- Logout & Integration Tab -->
-                        <RadzenTabsItem Text="Logout & Integration" Icon="logout">
-                            <div style="padding: 1rem; max-height: 550px; overflow-y: auto;">
-                                <RadzenStack Gap="0.75rem" class="rz-mb-4">
-                                    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Back-Channel Logout</RadzenText>
-                                    <RadzenStack Gap="1rem">
-                                        <RadzenFormField Text="Back-Channel Logout URI" Variant="Variant.Outlined">
+                    <!-- Logout & Integration Tab -->
+                    <RadzenTabsItem Text="Logout & Integration" Icon="logout">
+                        <div style="padding: 1rem; max-height: 550px; overflow-y: auto;">
+                            <RadzenStack Gap="0.75rem" class="rz-mb-4">
+                                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Back-Channel Logout</RadzenText>
+                                <RadzenStack Gap="1rem">
+                                    <RadzenFormField Text="Back-Channel Logout URI" Variant="Variant.Outlined">
+                                        <ChildContent>
                                             <RadzenTextBox @bind-Value="@model.BackChannelLogoutUri" 
                                                           Style="width: 100%;" 
                                                           Placeholder="https://client.example.com/logout" />
+                                        </ChildContent>
+                                        <Helper>
                                             <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
                                                 Server-to-server logout notification endpoint
                                             </RadzenText>
-                                        </RadzenFormField>
+                                        </Helper>
+                                    </RadzenFormField>
 
-                                        <RadzenFormField Text="Back-Channel Settings" Variant="Variant.Outlined">
-                                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" Style="margin-top: 0.5rem;">
-                                                <RadzenCheckBox @bind-Value="@model.BackChannelLogoutSessionRequired" TriState="true" />
-                                                <RadzenLabel Text="Include session ID in logout tokens" />
-                                            </RadzenStack>
+                                    <RadzenFormField Text="Back-Channel Settings" Variant="Variant.Outlined">
+                                        <Start>
+                                            <RadzenCheckBox @bind-Value="@model.BackChannelLogoutSessionRequired" TriState="true" Name="bclSessionRequired" />
+                                        </Start>
+                                        <ChildContent>
+                                            <RadzenLabel Text="Include session ID in logout tokens" Component="bclSessionRequired" />
+                                        </ChildContent>
+                                        <Helper>
                                             <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
                                                 Whether to include session_id in logout tokens
                                             </RadzenText>
-                                        </RadzenFormField>
-                                    </RadzenStack>
+                                        </Helper>
+                                    </RadzenFormField>
                                 </RadzenStack>
+                            </RadzenStack>
 
-                                <RadzenStack Gap="0.75rem" class="rz-mt-4 rz-mb-4">
-                                    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Front-Channel Logout</RadzenText>
-                                    <RadzenStack Gap="1rem">
-                                        <RadzenFormField Text="Front-Channel Logout URI" Variant="Variant.Outlined">
+                            <RadzenStack Gap="0.75rem" class="rz-mt-4 rz-mb-4">
+                                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Front-Channel Logout</RadzenText>
+                                <RadzenStack Gap="1rem">
+                                    <RadzenFormField Text="Front-Channel Logout URI" Variant="Variant.Outlined">
+                                        <ChildContent>
                                             <RadzenTextBox @bind-Value="@model.FrontChannelLogoutUri" 
                                                           Style="width: 100%;" 
                                                           Placeholder="https://client.example.com/logout-iframe" />
+                                        </ChildContent>
+                                        <Helper>
                                             <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
                                                 Browser-based logout notification endpoint
                                             </RadzenText>
-                                        </RadzenFormField>
+                                        </Helper>
+                                    </RadzenFormField>
 
-                                        <RadzenFormField Text="Front-Channel Settings" Variant="Variant.Outlined">
-                                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" Style="margin-top: 0.5rem;">
-                                                <RadzenCheckBox @bind-Value="@model.FrontChannelLogoutSessionRequired" TriState="true" />
-                                                <RadzenLabel Text="Require session ID for front-channel logout" />
-                                            </RadzenStack>
-                                        </RadzenFormField>
-                                    </RadzenStack>
+                                    <RadzenFormField Text="Front-Channel Settings" Variant="Variant.Outlined">
+                                        <Start>
+                                            <RadzenCheckBox @bind-Value="@model.FrontChannelLogoutSessionRequired" TriState="true" Name="fclSessionRequired" />
+                                        </Start>
+                                        <ChildContent>
+                                            <RadzenLabel Text="Require session ID for front-channel logout" Component="fclSessionRequired" />
+                                        </ChildContent>
+                                    </RadzenFormField>
                                 </RadzenStack>
+                            </RadzenStack>
 
-                                <RadzenStack Gap="0.75rem" class="rz-mt-4 rz-mb-4">
-                                    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">External Integrations</RadzenText>
-                                    <RadzenStack Gap="1rem">
-                                        <RadzenFormField Text="Allowed CORS Origins" Variant="Variant.Outlined">
+                            <RadzenStack Gap="0.75rem" class="rz-mt-4 rz-mb-4">
+                                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">External Integrations</RadzenText>
+                                <RadzenStack Gap="1rem">
+                                    <RadzenFormField Text="Allowed CORS Origins" Variant="Variant.Outlined">
+                                        <ChildContent>
                                             <RadzenTextArea @bind-Value="@model.AllowedCorsOrigins" 
                                                            Style="width: 100%; height: 80px;" 
                                                            Placeholder="https://app1.example.com&#10;https://app2.example.com" />
+                                        </ChildContent>
+                                        <Helper>
                                             <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
                                                 One origin per line. Required for browser-based applications.
                                             </RadzenText>
-                                        </RadzenFormField>
+                                        </Helper>
+                                    </RadzenFormField>
 
-                                        <RadzenFormField Text="Allowed Identity Providers" Variant="Variant.Outlined">
+                                    <RadzenFormField Text="Allowed Identity Providers" Variant="Variant.Outlined">
+                                        <ChildContent>
                                             <RadzenTextArea @bind-Value="@model.AllowedIdentityProviders" 
                                                            Style="width: 100%; height: 60px;" 
                                                            Placeholder="google&#10;azure&#10;facebook" />
+                                        </ChildContent>
+                                        <Helper>
                                             <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
                                                 Restrict which external IdPs this client can use (one per line)
                                             </RadzenText>
-                                        </RadzenFormField>
-                                    </RadzenStack>
+                                        </Helper>
+                                    </RadzenFormField>
                                 </RadzenStack>
-                            </div>
-                        </RadzenTabsItem>
+                            </RadzenStack>
+                        </div>
+                    </RadzenTabsItem>
 
-                        <!-- Advanced Configuration Tab -->
-                        <RadzenTabsItem Text="Advanced" Icon="settings_applications">
-                            <div style="padding: 1rem; max-height: 550px; overflow-y: auto;">
-                                <RadzenStack Gap="0.75rem" class="rz-mb-4">
-                                    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Protocol Configuration</RadzenText>
-                                    <RadzenStack Gap="1rem">
-                                        <RadzenFormField Text="Protocol Type" Variant="Variant.Outlined">
+                    <!-- Advanced Configuration Tab -->
+                    <RadzenTabsItem Text="Advanced" Icon="settings_applications">
+                        <div style="padding: 1rem; max-height: 550px; overflow-y: auto;">
+                            <RadzenStack Gap="0.75rem" class="rz-mb-4">
+                                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Protocol Configuration</RadzenText>
+                                <RadzenStack Gap="1rem">
+                                    <RadzenFormField Text="Protocol Type" Variant="Variant.Outlined">
+                                        <ChildContent>
                                             <RadzenTextBox @bind-Value="@model.ProtocolType" 
                                                           Style="width: 100%;" 
                                                           Disabled="true" />
+                                        </ChildContent>
+                                        <Helper>
                                             <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
                                                 Protocol type (currently only OIDC is supported)
                                             </RadzenText>
-                                        </RadzenFormField>
+                                        </Helper>
+                                    </RadzenFormField>
 
-                                        <RadzenFormField Text="Development Settings" Variant="Variant.Outlined">
-                                            <RadzenStack Gap="0.5rem">
-                                                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                                    <RadzenCheckBox @bind-Value="@model.EnableDetailedErrors" TriState="true" />
-                                                    <RadzenLabel Text="Enable detailed error responses" />
-                                                </RadzenStack>
-                                                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                                    <RadzenCheckBox @bind-Value="@model.LogSensitiveData" TriState="true" />
-                                                    <RadzenLabel Text="Log sensitive data (development only)" />
-                                                </RadzenStack>
-                                                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
-                                                    <RadzenCheckBox @bind-Value="@model.EnableLocalLogin" TriState="true" />
-                                                    <RadzenLabel Text="Enable local login (username/password)" />
-                                                </RadzenStack>
-                                            </RadzenStack>
-                                            <RadzenAlert AlertStyle="AlertStyle.Warning" ShowIcon="true" class="rz-mt-2">
-                                                <RadzenText TextStyle="TextStyle.Caption">
-                                                    Warning: Detailed errors and sensitive data logging should not be enabled in production.
-                                                </RadzenText>
-                                            </RadzenAlert>
-                                        </RadzenFormField>
-                                    </RadzenStack>
+                                    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Development Settings</RadzenText>
+
+                                    <RadzenFormField Variant="Variant.Outlined">
+                                        <Start>
+                                            <RadzenCheckBox @bind-Value="@model.EnableDetailedErrors" TriState="true" Name="enableDetailedErrors" />
+                                        </Start>
+                                        <ChildContent>
+                                            <RadzenLabel Text="Enable detailed error responses" Component="enableDetailedErrors" />
+                                        </ChildContent>
+                                    </RadzenFormField>
+                                    <RadzenFormField Variant="Variant.Outlined">
+                                        <Start>
+                                            <RadzenCheckBox @bind-Value="@model.LogSensitiveData" TriState="true" Name="logSensitiveData" />
+                                        </Start>
+                                        <ChildContent>
+                                            <RadzenLabel Text="Log sensitive data (development only)" Component="logSensitiveData" />
+                                        </ChildContent>
+                                    </RadzenFormField>
+                                    <RadzenFormField Variant="Variant.Outlined">
+                                        <Start>
+                                            <RadzenCheckBox @bind-Value="@model.EnableLocalLogin" TriState="true" Name="enableLocalLogin" />
+                                        </Start>
+                                        <ChildContent>
+                                            <RadzenLabel Text="Enable local login (username/password)" Component="enableLocalLogin" />
+                                        </ChildContent>
+                                    </RadzenFormField>
+
+                                    <RadzenAlert AlertStyle="AlertStyle.Warning" ShowIcon="true" class="rz-mt-2">
+                                        <RadzenText TextStyle="TextStyle.Caption">
+                                            Warning: Detailed errors and sensitive data logging should not be enabled in production.
+                                        </RadzenText>
+                                    </RadzenAlert>
                                 </RadzenStack>
+                            </RadzenStack>
 
-                                <RadzenStack Gap="0.75rem" class="rz-mt-4 rz-mb-4">
-                                    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Custom Page URLs</RadzenText>
-                                    <RadzenStack Gap="1rem">
-                                        <RadzenFormField Text="Custom Login Page" Variant="Variant.Outlined">
+                            <RadzenStack Gap="0.75rem" class="rz-mt-4 rz-mb-4">
+                                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Custom Page URLs</RadzenText>
+                                <RadzenStack Gap="1rem">
+                                    <RadzenFormField Text="Custom Login Page" Variant="Variant.Outlined">
+                                        <ChildContent>
                                             <RadzenTextBox @bind-Value="@model.CustomLoginPageUrl" 
                                                           Style="width: 100%;" 
                                                           Placeholder="https://custom.example.com/login" />
+                                        </ChildContent>
+                                        <Helper>
                                             <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
                                                 Override default login page for this client
                                             </RadzenText>
-                                        </RadzenFormField>
+                                        </Helper>
+                                    </RadzenFormField>
 
-                                        <RadzenFormField Text="Custom Logout Page" Variant="Variant.Outlined">
+                                    <RadzenFormField Text="Custom Logout Page" Variant="Variant.Outlined">
+                                        <ChildContent>
                                             <RadzenTextBox @bind-Value="@model.CustomLogoutPageUrl" 
                                                           Style="width: 100%;" 
                                                           Placeholder="https://custom.example.com/logout" />
+                                        </ChildContent>
+                                        <Helper>
                                             <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
                                                 Override default logout page for this client
                                             </RadzenText>
-                                        </RadzenFormField>
+                                        </Helper>
+                                    </RadzenFormField>
 
-                                        <RadzenFormField Text="Custom Error Page" Variant="Variant.Outlined">
+                                    <RadzenFormField Text="Custom Error Page" Variant="Variant.Outlined">
+                                        <ChildContent>
                                             <RadzenTextBox @bind-Value="@model.CustomErrorPageUrl" 
                                                           Style="width: 100%;" 
                                                           Placeholder="https://custom.example.com/error" />
+                                        </ChildContent>
+                                        <Helper>
                                             <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
                                                 Override default error page for this client
                                             </RadzenText>
-                                        </RadzenFormField>
-                                    </RadzenStack>
+                                        </Helper>
+                                    </RadzenFormField>
                                 </RadzenStack>
-                            </div>
-                        </RadzenTabsItem>
+                            </RadzenStack>
+                        </div>
+                    </RadzenTabsItem>
+                </Tabs>
+            </RadzenTabs>
 
-                        <!-- Existing OAuth Flows and Scopes tabs remain the same -->
-                        <!-- ... (keep existing OAuth flows and scopes tabs) ... -->
-                    </Tabs>
-                </RadzenTabs>
+            <!-- Sticky Action Bar with Validation Summary -->
+            <div class="rz-mt-4" style="position: sticky; bottom: 0; background: var(--rz-base-background); border-top: 1px solid var(--rz-panel-border); padding: 0.75rem 1rem; z-index: 10;">
+                <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                    <ValidationSummary />
 
-                <!-- Sticky Action Bar with Validation Summary -->
-                <div class="rz-mt-4" style="position: sticky; bottom: 0; background: var(--rz-base-background); border-top: 1px solid var(--rz-panel-border); padding: 0.75rem 1rem; z-index: 10;">
-                    <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
-                        <ValidationSummary />
-
-                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
-                            <RadzenButton Text="Cancel" Icon="cancel" ButtonStyle="ButtonStyle.Light" 
-                                          Click="@CancelEdit" />
-                            @if (IsEdit)
-                            {
-                                <RadzenButton Text="Reset to Defaults" Icon="restore" ButtonStyle="ButtonStyle.Warning" 
-                                              Click="@(async () => await ResetToDefaults())" />
-                            }
-                            <RadzenButton Text="@(IsEdit ? "Update Client" : "Create Client")" 
-                                          Icon="@(IsEdit ? "save" : "add_circle")" 
-                                          ButtonStyle="ButtonStyle.Primary" 
-                                          ButtonType="ButtonType.Submit" />
-                        </RadzenStack>
+                    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                        <RadzenButton Text="Cancel" Icon="cancel" ButtonStyle="ButtonStyle.Light" 
+                                      Click="@CancelEdit" />
+                        @if (IsEdit)
+                        {
+                            <RadzenButton Text="Reset to Defaults" Icon="restore" ButtonStyle="ButtonStyle.Warning" 
+                                          Click="@(async () => await ResetToDefaults())" />
+                        }
+                        <RadzenButton Text="@(IsEdit ? "Update Client" : "Create Client")" 
+                                      Icon="@(IsEdit ? "save" : "add_circle")" 
+                                      ButtonStyle="ButtonStyle.Primary" 
+                                      ButtonType="ButtonType.Submit" />
                     </RadzenStack>
-                </div>
-            </RadzenTemplateForm>
-        }
-    </RadzenCard>
+                </RadzenStack>
+            </div>
+        </RadzenTemplateForm>
+    }
+</RadzenCard>
 
-    @code {
-        [Parameter] public string? Id { get; set; }
+@code {
+    [Parameter] public string? Id { get; set; }
 
-        private CreateClientRequest model = new();
-        private List<RealmDto> realms = new();
-        private List<ScopeDto> availableScopes = new();
-        private bool isLoading = false;
-        private int selectedTabIndex = 0;
-        
-        // Dropdown data
-        private List<DropdownItem<ClientType>> clientTypes = new();
-        private List<DropdownItem<string>> sameSitePolicies = new();
-        private List<DropdownItem<string>> accessTokenTypes = new();
-        private List<DropdownItem<string>> availableMfaMethods = new();
+    private CreateClientRequest model = new();
+    private List<RealmDto> realms = new();
+    private List<ScopeDto> availableScopes = new();
+    private bool isLoading = false;
+    private int selectedTabIndex = 0;
+    
+    // Dropdown data
+    private List<DropdownItem<ClientType>> clientTypes = new();
+    private List<DropdownItem<string>> sameSitePolicies = new();
+    private List<DropdownItem<string>> accessTokenTypes = new();
+    private List<DropdownItem<string>> availableMfaMethods = new();
     private List<DropdownItem<bool?>> triStateOptions = new();
 
-        private bool IsEdit => !string.IsNullOrEmpty(Id);
+    private bool IsEdit => !string.IsNullOrEmpty(Id);
 
-        protected override async Task OnInitializedAsync()
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRealms();
+        await LoadScopes();
+        InitializeDropdownData();
+        
+        if (IsEdit && !string.IsNullOrEmpty(Id))
         {
-            await LoadRealms();
-            await LoadScopes();
-            InitializeDropdownData();
-            
-            if (IsEdit && !string.IsNullOrEmpty(Id))
-            {
-                await LoadClient();
-            }
-            else
-            {
-                // Set defaults for new client
-                model.IsEnabled = true;
-                model.UseSlidingSessionExpiration = true;
-                model.AllowAccessToUserInfoEndpoint = true;
-                model.AllowAccessToRevocationEndpoint = true;
-                model.RememberMfaForSession = true;
-                model.EnableLocalLogin = true;
-            }
+            await LoadClient();
         }
-
-        private void InitializeDropdownData()
+        else
         {
-            clientTypes = new()
-            {
-                new("Confidential", ClientType.Confidential),
-                new("Public", ClientType.Public),
-                new("Machine", ClientType.Machine)
-            };
-
-            sameSitePolicies = new()
-            {
-                new("None (Cross-site requests allowed)", "None"),
-                new("Lax (Some cross-site requests)", "Lax"),
-                new("Strict (No cross-site requests)", "Strict")
-            };
-
-            accessTokenTypes = new()
-            {
-                new("JWT (Self-contained)", "JWT"),
-                new("Reference (Database lookup)", "Reference")
-            };
-
-            availableMfaMethods = new()
-            {
-                new("Time-based OTP (TOTP)", "totp"),
-                new("SMS Verification", "sms"),
-                new("Email Verification", "email"),
-                new("Push Notifications", "push"),
-                new("Hardware Token", "hardware"),
-                new("Biometric", "biometric")
-            };
-
-            triStateOptions = new()
-            {
-                new("Use realm default", null),
-                new("Enabled", true),
-                new("Disabled", false)
-            };
+            // Set defaults for new client
+            model.IsEnabled = true;
+            model.UseSlidingSessionExpiration = true;
+            model.AllowAccessToUserInfoEndpoint = true;
+            model.AllowAccessToRevocationEndpoint = true;
+            model.RememberMfaForSession = true;
+            model.EnableLocalLogin = true;
         }
-
-        private async Task LoadRealms()
-        {
-            try
-            {
-                var result = await RealmsApiService.GetRealmsAsync(1, 100);
-                realms = result?.Items ?? new List<RealmDto>();
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Error loading realms");
-                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to load realms");
-            }
-        }
-
-        private async Task LoadScopes()
-        {
-            try
-            {
-                var result = await ScopesApiService.GetScopesAsync(1, 100);
-                availableScopes = result?.Items ?? new List<ScopeDto>();
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Error loading scopes");
-                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to load scopes");
-            }
-        }
-
-        private async Task LoadClient()
-        {
-            isLoading = true;
-            try
-            {
-                var client = await ClientsApiService.GetClientAsync(Id!);
-                if (client != null)
-                {
-                    // Map from ClientDto to CreateClientRequest with all new dynamic parameters
-                    model = MapClientToRequest(client);
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Error loading client {ClientId}", Id);
-                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to load client");
-            }
-            finally
-            {
-                isLoading = false;
-            }
-        }
-
-        private CreateClientRequest MapClientToRequest(ClientDto client)
-        {
-            return new CreateClientRequest
-            {
-                ClientId = client.ClientId,
-                Name = client.Name,
-                Description = client.Description,
-                IsEnabled = client.IsEnabled,
-                RealmId = client.RealmId,
-                ClientType = client.ClientType,
-                
-                // Dynamic Configuration Parameters
-                SessionTimeoutHours = client.SessionTimeoutHours,
-                UseSlidingSessionExpiration = client.UseSlidingSessionExpiration,
-                RememberMeDurationDays = client.RememberMeDurationDays,
-                RequireHttpsForCookies = client.RequireHttpsForCookies,
-                CookieSameSitePolicy = client.CookieSameSitePolicy,
-                
-                IdTokenLifetimeMinutes = client.IdTokenLifetimeMinutes,
-                DeviceCodeLifetimeMinutes = client.DeviceCodeLifetimeMinutes,
-                AccessTokenType = client.AccessTokenType,
-                UseOneTimeRefreshTokens = client.UseOneTimeRefreshTokens,
-                MaxRefreshTokensPerUser = client.MaxRefreshTokensPerUser,
-                HashAccessTokens = client.HashAccessTokens,
-                UpdateAccessTokenClaimsOnRefresh = client.UpdateAccessTokenClaimsOnRefresh,
-                
-                RequireConsent = client.RequireConsent,
-                AllowRememberConsent = client.AllowRememberConsent,
-                AllowAccessToUserInfoEndpoint = client.AllowAccessToUserInfoEndpoint,
-                AllowAccessToIntrospectionEndpoint = client.AllowAccessToIntrospectionEndpoint,
-                AllowAccessToRevocationEndpoint = client.AllowAccessToRevocationEndpoint,
-                IncludeJwtId = client.IncludeJwtId,
-                AlwaysSendClientClaims = client.AlwaysSendClientClaims,
-                AlwaysIncludeUserClaimsInIdToken = client.AlwaysIncludeUserClaimsInIdToken,
-                ClientClaimsPrefix = client.ClientClaimsPrefix,
-                
-                RequireMfa = client.RequireMfa,
-                MfaGracePeriodMinutes = client.MfaGracePeriodMinutes,
-                AllowedMfaMethods = client.AllowedMfaMethods,
-                RememberMfaForSession = client.RememberMfaForSession,
-                
-                RateLimitRequestsPerMinute = client.RateLimitRequestsPerMinute,
-                RateLimitRequestsPerHour = client.RateLimitRequestsPerHour,
-                RateLimitRequestsPerDay = client.RateLimitRequestsPerDay,
-                
-                ThemeName = client.ThemeName,
-                CustomCssUrl = client.CustomCssUrl,
-                CustomJavaScriptUrl = client.CustomJavaScriptUrl,
-                PageTitlePrefix = client.PageTitlePrefix,
-                LogoUri = client.LogoUri,
-                ClientUri = client.ClientUri,
-                PolicyUri = client.PolicyUri,
-                TosUri = client.TosUri,
-                
-                BackChannelLogoutUri = client.BackChannelLogoutUri,
-                BackChannelLogoutSessionRequired = client.BackChannelLogoutSessionRequired,
-                FrontChannelLogoutUri = client.FrontChannelLogoutUri,
-                FrontChannelLogoutSessionRequired = client.FrontChannelLogoutSessionRequired,
-                AllowedCorsOrigins = client.AllowedCorsOrigins,
-                AllowedIdentityProviders = client.AllowedIdentityProviders,
-                
-                ProtocolType = client.ProtocolType,
-                EnableDetailedErrors = client.EnableDetailedErrors,
-                LogSensitiveData = client.LogSensitiveData,
-                EnableLocalLogin = client.EnableLocalLogin,
-                CustomLoginPageUrl = client.CustomLoginPageUrl,
-                CustomLogoutPageUrl = client.CustomLogoutPageUrl,
-                CustomErrorPageUrl = client.CustomErrorPageUrl
-            };
-        }
-
-        private bool IsMethodSelected(string method)
-        {
-            if (string.IsNullOrEmpty(model.AllowedMfaMethods))
-                return false;
-                
-            try
-            {
-                var methods = System.Text.Json.JsonSerializer.Deserialize<string[]>(model.AllowedMfaMethods);
-                return methods?.Contains(method) == true;
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
-        private void ToggleMfaMethod(string method, bool selected)
-        {
-            var methods = new List<string>();
-            
-            if (!string.IsNullOrEmpty(model.AllowedMfaMethods))
-            {
-                try
-                {
-                    var existing = System.Text.Json.JsonSerializer.Deserialize<string[]>(model.AllowedMfaMethods);
-                    if (existing != null)
-                        methods.AddRange(existing);
-                }
-                catch { }
-            }
-
-            if (selected)
-            {
-                if (!methods.Contains(method))
-                    methods.Add(method);
-            }
-            else
-            {
-                methods.Remove(method);
-            }
-
-            model.AllowedMfaMethods = methods.Any() ? 
-                System.Text.Json.JsonSerializer.Serialize(methods.ToArray()) : 
-                null;
-        }
-
-        private async Task OnSave(CreateClientRequest formModel)
-        {
-            try
-            {
-                if (IsEdit)
-                {
-                    // For updates, use the CreateClientRequest directly since UpdateClientAsync should accept it
-                    var result = await ClientsApiService.UpdateClientAsync(Id!, formModel);
-                    if (result != null)
-                    {
-                        NotificationService.Notify(NotificationSeverity.Success, "Success", "Client updated successfully");
-                        Navigation.NavigateTo("/clients");
-                    }
-                }
-                else
-                {
-                    var result = await ClientsApiService.CreateClientAsync(formModel);
-                    if (result != null)
-                    {
-                        NotificationService.Notify(NotificationSeverity.Success, "Success", "Client created successfully");
-                        Navigation.NavigateTo("/clients");
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, "Error saving client");
-                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to save client");
-            }
-        }
-
-        private async Task ResetToDefaults()
-        {
-            var result = await DialogService.Confirm("Reset all dynamic configuration to realm/system defaults?", 
-                "Reset Configuration", 
-                new ConfirmOptions() { OkButtonText = "Reset", CancelButtonText = "Cancel" });
-            
-            if (result == true)
-            {
-                // Reset nullable dynamic parameters to null (will use defaults)
-                model.SessionTimeoutHours = null;
-                model.RememberMeDurationDays = null;
-                model.IdTokenLifetimeMinutes = null;
-                model.DeviceCodeLifetimeMinutes = null;
-                model.MaxRefreshTokensPerUser = null;
-                model.MfaGracePeriodMinutes = null;
-                model.RateLimitRequestsPerMinute = null;
-                model.RateLimitRequestsPerHour = null;
-                model.RateLimitRequestsPerDay = null;
-                
-                // Reset strings to null
-                model.CookieSameSitePolicy = null;
-                model.AccessTokenType = null;
-                model.AllowedMfaMethods = null;
-                model.ThemeName = null;
-                model.CustomCssUrl = null;
-                model.CustomJavaScriptUrl = null;
-                model.PageTitlePrefix = null;
-                model.ClientClaimsPrefix = null;
-                
-                NotificationService.Notify(NotificationSeverity.Info, "Reset", "Configuration reset to defaults");
-                StateHasChanged();
-            }
-        }
-
-        private void CancelEdit()
-        {
-            Navigation.NavigateTo("/clients");
-        }
-
-        // Helper class for dropdown items
-        private record DropdownItem<T>(string Text, T Value);
     }
+
+    private void InitializeDropdownData()
+    {
+        clientTypes = new()
+        {
+            new("Confidential", ClientType.Confidential),
+            new("Public", ClientType.Public),
+            new("Machine", ClientType.Machine)
+        };
+
+        sameSitePolicies = new()
+        {
+            new("None (Cross-site requests allowed)", "None"),
+            new("Lax (Some cross-site requests)", "Lax"),
+            new("Strict (No cross-site requests)", "Strict")
+        };
+
+        accessTokenTypes = new()
+        {
+            new("JWT (Self-contained)", "JWT"),
+            new("Reference (Database lookup)", "Reference")
+        };
+
+        availableMfaMethods = new()
+        {
+            new("Time-based OTP (TOTP)", "totp"),
+            new("SMS Verification", "sms"),
+            new("Email Verification", "email"),
+            new("Push Notifications", "push"),
+            new("Hardware Token", "hardware"),
+            new("Biometric", "biometric")
+        };
+
+        triStateOptions = new()
+        {
+            new("Use realm default", null),
+            new("Enabled", true),
+            new("Disabled", false)
+        };
+    }
+
+    private async Task LoadRealms()
+    {
+        try
+        {
+            var result = await RealmsApiService.GetRealmsAsync(1, 100);
+            realms = result?.Items ?? new List<RealmDto>();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading realms");
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to load realms");
+        }
+    }
+
+    private async Task LoadScopes()
+    {
+        try
+        {
+            var result = await ScopesApiService.GetScopesAsync(1, 100);
+            availableScopes = result?.Items ?? new List<ScopeDto>();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading scopes");
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to load scopes");
+        }
+    }
+
+    private async Task LoadClient()
+    {
+        isLoading = true;
+        try
+        {
+            var client = await ClientsApiService.GetClientAsync(Id!);
+            if (client != null)
+            {
+                // Map from ClientDto to CreateClientRequest with all new dynamic parameters
+                model = MapClientToRequest(client);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading client {ClientId}", Id);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to load client");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private CreateClientRequest MapClientToRequest(ClientDto client)
+    {
+        return new CreateClientRequest
+        {
+            ClientId = client.ClientId,
+            Name = client.Name,
+            Description = client.Description,
+            IsEnabled = client.IsEnabled,
+            RealmId = client.RealmId,
+            ClientType = client.ClientType,
+            
+            // Dynamic Configuration Parameters
+            SessionTimeoutHours = client.SessionTimeoutHours,
+            UseSlidingSessionExpiration = client.UseSlidingSessionExpiration,
+            RememberMeDurationDays = client.RememberMeDurationDays,
+            RequireHttpsForCookies = client.RequireHttpsForCookies,
+            CookieSameSitePolicy = client.CookieSameSitePolicy,
+            
+            IdTokenLifetimeMinutes = client.IdTokenLifetimeMinutes,
+            DeviceCodeLifetimeMinutes = client.DeviceCodeLifetimeMinutes,
+            AccessTokenType = client.AccessTokenType,
+            UseOneTimeRefreshTokens = client.UseOneTimeRefreshTokens,
+            MaxRefreshTokensPerUser = client.MaxRefreshTokensPerUser,
+            HashAccessTokens = client.HashAccessTokens,
+            UpdateAccessTokenClaimsOnRefresh = client.UpdateAccessTokenClaimsOnRefresh,
+            
+            RequireConsent = client.RequireConsent,
+            AllowRememberConsent = client.AllowRememberConsent,
+            AllowAccessToUserInfoEndpoint = client.AllowAccessToUserInfoEndpoint,
+            AllowAccessToIntrospectionEndpoint = client.AllowAccessToIntrospectionEndpoint,
+            AllowAccessToRevocationEndpoint = client.AllowAccessToRevocationEndpoint,
+            IncludeJwtId = client.IncludeJwtId,
+            AlwaysSendClientClaims = client.AlwaysSendClientClaims,
+            AlwaysIncludeUserClaimsInIdToken = client.AlwaysIncludeUserClaimsInIdToken,
+            ClientClaimsPrefix = client.ClientClaimsPrefix,
+            
+            RequireMfa = client.RequireMfa,
+            MfaGracePeriodMinutes = client.MfaGracePeriodMinutes,
+            AllowedMfaMethods = client.AllowedMfaMethods,
+            RememberMfaForSession = client.RememberMfaForSession,
+            
+            RateLimitRequestsPerMinute = client.RateLimitRequestsPerMinute,
+            RateLimitRequestsPerHour = client.RateLimitRequestsPerHour,
+            RateLimitRequestsPerDay = client.RateLimitRequestsPerDay,
+            
+            ThemeName = client.ThemeName,
+            CustomCssUrl = client.CustomCssUrl,
+            CustomJavaScriptUrl = client.CustomJavaScriptUrl,
+            PageTitlePrefix = client.PageTitlePrefix,
+            LogoUri = client.LogoUri,
+            ClientUri = client.ClientUri,
+            PolicyUri = client.PolicyUri,
+            TosUri = client.TosUri,
+            
+            BackChannelLogoutUri = client.BackChannelLogoutUri,
+            BackChannelLogoutSessionRequired = client.BackChannelLogoutSessionRequired,
+            FrontChannelLogoutUri = client.FrontChannelLogoutUri,
+            FrontChannelLogoutSessionRequired = client.FrontChannelLogoutSessionRequired,
+            AllowedCorsOrigins = client.AllowedCorsOrigins,
+            AllowedIdentityProviders = client.AllowedIdentityProviders,
+            
+            ProtocolType = client.ProtocolType,
+            EnableDetailedErrors = client.EnableDetailedErrors,
+            LogSensitiveData = client.LogSensitiveData,
+            EnableLocalLogin = client.EnableLocalLogin,
+            CustomLoginPageUrl = client.CustomLoginPageUrl,
+            CustomLogoutPageUrl = client.CustomLogoutPageUrl,
+            CustomErrorPageUrl = client.CustomErrorPageUrl
+        };
+    }
+
+    private bool IsMethodSelected(string method)
+    {
+        if (string.IsNullOrEmpty(model.AllowedMfaMethods))
+            return false;
+            
+        try
+        {
+            var methods = System.Text.Json.JsonSerializer.Deserialize<string[]>(model.AllowedMfaMethods);
+            return methods?.Contains(method) == true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private void ToggleMfaMethod(string method, bool selected)
+    {
+        var methods = new List<string>();
+        
+        if (!string.IsNullOrEmpty(model.AllowedMfaMethods))
+        {
+            try
+            {
+                var existing = System.Text.Json.JsonSerializer.Deserialize<string[]>(model.AllowedMfaMethods);
+                if (existing != null)
+                    methods.AddRange(existing);
+            }
+            catch { }
+        }
+
+        if (selected)
+        {
+            if (!methods.Contains(method))
+                methods.Add(method);
+        }
+        else
+        {
+            methods.Remove(method);
+        }
+
+        model.AllowedMfaMethods = methods.Any() ? 
+            System.Text.Json.JsonSerializer.Serialize(methods.ToArray()) : 
+            null;
+    }
+
+    private async Task OnSave(CreateClientRequest formModel)
+    {
+        try
+        {
+            if (IsEdit)
+            {
+                // For updates, use the CreateClientRequest directly since UpdateClientAsync should accept it
+                var result = await ClientsApiService.UpdateClientAsync(Id!, formModel);
+                if (result != null)
+                {
+                    NotificationService.Notify(NotificationSeverity.Success, "Success", "Client updated successfully");
+                    Navigation.NavigateTo("/clients");
+                }
+            }
+            else
+            {
+                var result = await ClientsApiService.CreateClientAsync(formModel);
+                if (result != null)
+                {
+                    NotificationService.Notify(NotificationSeverity.Success, "Success", "Client created successfully");
+                    Navigation.NavigateTo("/clients");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error saving client");
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to save client");
+        }
+    }
+
+    private async Task ResetToDefaults()
+    {
+        var result = await DialogService.Confirm("Reset all dynamic configuration to realm/system defaults?", 
+            "Reset Configuration", 
+            new ConfirmOptions() { OkButtonText = "Reset", CancelButtonText = "Cancel" });
+        
+        if (result == true)
+        {
+            // Reset nullable dynamic parameters to null (will use defaults)
+            model.SessionTimeoutHours = null;
+            model.RememberMeDurationDays = null;
+            model.IdTokenLifetimeMinutes = null;
+            model.DeviceCodeLifetimeMinutes = null;
+            model.MaxRefreshTokensPerUser = null;
+            model.MfaGracePeriodMinutes = null;
+            model.RateLimitRequestsPerMinute = null;
+            model.RateLimitRequestsPerHour = null;
+            model.RateLimitRequestsPerDay = null;
+            
+            // Reset strings to null
+            model.CookieSameSitePolicy = null;
+            model.AccessTokenType = null;
+            model.AllowedMfaMethods = null;
+            model.ThemeName = null;
+            model.CustomCssUrl = null;
+            model.CustomJavaScriptUrl = null;
+            model.PageTitlePrefix = null;
+            model.ClientClaimsPrefix = null;
+            
+            NotificationService.Notify(NotificationSeverity.Info, "Reset", "Configuration reset to defaults");
+            StateHasChanged();
+        }
+    }
+
+    private void CancelEdit()
+    {
+        Navigation.NavigateTo("/clients");
+    }
+
+    // Helper class for dropdown items
+    private record DropdownItem<T>(string Text, T Value);
+}
