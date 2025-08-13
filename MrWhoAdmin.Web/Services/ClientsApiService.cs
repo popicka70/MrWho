@@ -66,22 +66,11 @@ public class ClientsApiService : IClientsApiService
             
             var result = JsonSerializer.Deserialize<PagedResult<ClientDto>>(json, _jsonOptions);
             _logger.LogInformation("Successfully deserialized {ItemCount} clients", result?.Items.Count ?? 0);
-            
             return result;
-        }
-        catch (HttpRequestException httpEx)
-        {
-            _logger.LogError(httpEx, "HTTP request exception getting clients. BaseAddress: {BaseAddress}", _httpClient.BaseAddress);
-            return null;
-        }
-        catch (TaskCanceledException tcEx)
-        {
-            _logger.LogError(tcEx, "Request timeout getting clients. BaseAddress: {BaseAddress}", _httpClient.BaseAddress);
-            return null;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting clients. BaseAddress: {BaseAddress}", _httpClient.BaseAddress);
+            _logger.LogError(ex, "Error getting clients");
             return null;
         }
     }
@@ -90,20 +79,8 @@ public class ClientsApiService : IClientsApiService
     {
         try
         {
-            var requestUri = $"api/clients/{id}";
-            var fullUri = new Uri(_httpClient.BaseAddress!, requestUri);
-            
-            _logger.LogInformation("Getting client {ClientId} from: {FullUri}", id, fullUri);
-            
-            var response = await _httpClient.GetAsync(requestUri);
-            
-            if (!response.IsSuccessStatusCode)
-            {
-                var errorContent = await response.Content.ReadAsStringAsync();
-                _logger.LogError("API Error getting client {ClientId} - Status: {StatusCode}, Content: {ErrorContent}", 
-                    id, response.StatusCode, errorContent);
-                return null;
-            }
+            var response = await _httpClient.GetAsync($"api/clients/{id}");
+            response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
             return JsonSerializer.Deserialize<ClientDto>(json, _jsonOptions);
@@ -119,49 +96,13 @@ public class ClientsApiService : IClientsApiService
     {
         try
         {
-            // Convert the request to match the API's expectations (enum as integer)
-            var apiCompatibleRequest = new
-            {
-                clientId = request.ClientId,
-                clientSecret = request.ClientSecret,
-                name = request.Name,
-                description = request.Description,
-                realmId = request.RealmId,
-                isEnabled = request.IsEnabled,
-                clientType = (int)request.ClientType, // Convert enum to integer
-                allowAuthorizationCodeFlow = request.AllowAuthorizationCodeFlow,
-                allowClientCredentialsFlow = request.AllowClientCredentialsFlow,
-                allowPasswordFlow = request.AllowPasswordFlow,
-                allowRefreshTokenFlow = request.AllowRefreshTokenFlow,
-                requirePkce = request.RequirePkce,
-                requireClientSecret = request.RequireClientSecret,
-                accessTokenLifetime = request.AccessTokenLifetime,
-                refreshTokenLifetime = request.RefreshTokenLifetime,
-                authorizationCodeLifetime = request.AuthorizationCodeLifetime,
-                redirectUris = request.RedirectUris,
-                postLogoutUris = request.PostLogoutUris,
-                scopes = request.Scopes,
-                permissions = request.Permissions
-            };
-
-            var json = JsonSerializer.Serialize(apiCompatibleRequest, _jsonOptions);
+            var json = JsonSerializer.Serialize(request, _jsonOptions);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            _logger.LogInformation("Creating client {ClientId}", request.ClientId);
-            _logger.LogInformation("Request payload for debugging: {Payload}", json);
-
             var response = await _httpClient.PostAsync("api/clients", content);
-            
-            if (!response.IsSuccessStatusCode)
-            {
-                var errorContent = await response.Content.ReadAsStringAsync();
-                _logger.LogError("API Error creating client - Status: {StatusCode}, Content: {ErrorContent}", 
-                    response.StatusCode, errorContent);
-                return null;
-            }
+            response.EnsureSuccessStatusCode();
 
             var responseJson = await response.Content.ReadAsStringAsync();
-            _logger.LogInformation("Successful client creation response: {Response}", responseJson);
             return JsonSerializer.Deserialize<ClientDto>(responseJson, _jsonOptions);
         }
         catch (Exception ex)
@@ -175,44 +116,11 @@ public class ClientsApiService : IClientsApiService
     {
         try
         {
-            // Convert CreateClientRequest to UpdateClientRequest for the API with integer enum
-            var updateRequest = new
-            {
-                clientSecret = request.ClientSecret,
-                name = request.Name,
-                description = request.Description,
-                isEnabled = request.IsEnabled,
-                clientType = (int?)request.ClientType, // Convert enum to integer
-                allowAuthorizationCodeFlow = request.AllowAuthorizationCodeFlow,
-                allowClientCredentialsFlow = request.AllowClientCredentialsFlow,
-                allowPasswordFlow = request.AllowPasswordFlow,
-                allowRefreshTokenFlow = request.AllowRefreshTokenFlow,
-                requirePkce = request.RequirePkce,
-                requireClientSecret = request.RequireClientSecret,
-                accessTokenLifetime = request.AccessTokenLifetime,
-                refreshTokenLifetime = request.RefreshTokenLifetime,
-                authorizationCodeLifetime = request.AuthorizationCodeLifetime,
-                redirectUris = request.RedirectUris,
-                postLogoutUris = request.PostLogoutUris,
-                scopes = request.Scopes,
-                permissions = request.Permissions
-            };
-
-            var json = JsonSerializer.Serialize(updateRequest, _jsonOptions);
+            var json = JsonSerializer.Serialize(request, _jsonOptions);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            _logger.LogInformation("Updating client {ClientId}", id);
-            _logger.LogDebug("Request payload: {Payload}", json);
-
             var response = await _httpClient.PutAsync($"api/clients/{id}", content);
-            
-            if (!response.IsSuccessStatusCode)
-            {
-                var errorContent = await response.Content.ReadAsStringAsync();
-                _logger.LogError("API Error updating client {ClientId} - Status: {StatusCode}, Content: {ErrorContent}", 
-                    id, response.StatusCode, errorContent);
-                return null;
-            }
+            response.EnsureSuccessStatusCode();
 
             var responseJson = await response.Content.ReadAsStringAsync();
             return JsonSerializer.Deserialize<ClientDto>(responseJson, _jsonOptions);
@@ -228,17 +136,7 @@ public class ClientsApiService : IClientsApiService
     {
         try
         {
-            _logger.LogInformation("Deleting client {ClientId}", id);
-            
             var response = await _httpClient.DeleteAsync($"api/clients/{id}");
-            
-            if (!response.IsSuccessStatusCode)
-            {
-                var errorContent = await response.Content.ReadAsStringAsync();
-                _logger.LogError("API Error deleting client {ClientId} - Status: {StatusCode}, Content: {ErrorContent}", 
-                    id, response.StatusCode, errorContent);
-            }
-            
             return response.IsSuccessStatusCode;
         }
         catch (Exception ex)
@@ -252,24 +150,49 @@ public class ClientsApiService : IClientsApiService
     {
         try
         {
-            _logger.LogInformation("Toggling client {ClientId}", id);
-            
-            var response = await _httpClient.PostAsync($"api/clients/{id}/toggle", null);
-            
-            if (!response.IsSuccessStatusCode)
-            {
-                var errorContent = await response.Content.ReadAsStringAsync();
-                _logger.LogError("API Error toggling client {ClientId} - Status: {StatusCode}, Content: {ErrorContent}", 
-                    id, response.StatusCode, errorContent);
-                return null;
-            }
+            var response = await _httpClient.PostAsync($"api/clients/{id}/toggle", new StringContent(string.Empty));
+            response.EnsureSuccessStatusCode();
 
-            var responseJson = await response.Content.ReadAsStringAsync();
-            return JsonSerializer.Deserialize<ClientDto>(responseJson, _jsonOptions);
+            var json = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<ClientDto>(json, _jsonOptions);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error toggling client {ClientId}", id);
+            return null;
+        }
+    }
+
+    public async Task<ClientExportDto?> ExportClientAsync(string id)
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync($"api/clients/{id}/export");
+            response.EnsureSuccessStatusCode();
+            var json = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<ClientExportDto>(json, _jsonOptions);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error exporting client {ClientId}", id);
+            return null;
+        }
+    }
+
+    public async Task<ClientImportResult?> ImportClientAsync(ClientExportDto dto)
+    {
+        try
+        {
+            var json = JsonSerializer.Serialize(dto, _jsonOptions);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var response = await _httpClient.PostAsync("api/clients/import", content);
+            response.EnsureSuccessStatusCode();
+            var responseJson = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<ClientImportResult>(responseJson, _jsonOptions);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error importing client {ClientId}", dto.ClientId);
             return null;
         }
     }

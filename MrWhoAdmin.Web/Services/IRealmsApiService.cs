@@ -13,4 +13,8 @@ public interface IRealmsApiService
     Task<RealmDto?> UpdateRealmAsync(string id, CreateRealmRequest request);
     Task<bool> DeleteRealmAsync(string id);
     Task<RealmDto?> ToggleRealmAsync(string id);
+
+    // New export/import
+    Task<RealmExportDto?> ExportRealmAsync(string id);
+    Task<RealmDto?> ImportRealmAsync(RealmExportDto dto);
 }

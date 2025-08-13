@@ -13,4 +13,8 @@ public interface IClientsApiService
     Task<ClientDto?> UpdateClientAsync(string id, CreateClientRequest request);
     Task<bool> DeleteClientAsync(string id);
     Task<ClientDto?> ToggleClientAsync(string id);
+
+    // New export/import
+    Task<ClientExportDto?> ExportClientAsync(string id);
+    Task<ClientImportResult?> ImportClientAsync(ClientExportDto dto);
 }

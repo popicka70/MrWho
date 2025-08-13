@@ -7,6 +7,8 @@
 @inject NotificationService NotificationService
 @inject ILogger<ClientDetails> Logger
 @inject IClientsApiService ClientsApi
+@inject DialogService DialogService
+@inject IJSRuntime JS
 
 <PageTitle>Client Details - MrWho Admin</PageTitle>
 
@@ -48,6 +50,8 @@
                               IsBusy="@isToggling"
                               Disabled="@isToggling"
                               Click="@(async () => await Toggle())" />
+                <RadzenButton Text="Export" Icon="file_download" ButtonStyle="ButtonStyle.Secondary" Click="@(async () => await ExportClient())" />
+                <RadzenButton Text="Import" Icon="file_upload" ButtonStyle="ButtonStyle.Light" Click="@(async () => await OpenImportClientDialog())" />
             </RadzenStack>
 
             <!-- Basic info -->
@@ -516,6 +520,39 @@
         finally
         {
             isToggling = false;
+        }
+    }
+
+    private async Task ExportClient()
+    {
+        if (client == null) return;
+        try
+        {
+            var export = await ClientsApi.ExportClientAsync(client.Id);
+            if (export == null)
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to export client");
+                return;
+            }
+            var json = System.Text.Json.JsonSerializer.Serialize(export, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+            var b64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(json));
+            var fileName = $"client-{client.ClientId}.json";
+            await JS.InvokeVoidAsync("mrwho.downloadFile", fileName, "application/json", b64);
+            NotificationService.Notify(NotificationSeverity.Success, "Export", $"Exported {fileName}");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error exporting client {ClientId}", client?.ClientId);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to export client");
+        }
+    }
+
+    private async Task OpenImportClientDialog()
+    {
+        var result = await DialogService.OpenAsync<ImportClientDialog>("Import Client", new Dictionary<string, object?>(), new DialogOptions { Width = "700px", Height = "500px" });
+        if (result is bool ok && ok)
+        {
+            await LoadClient();
         }
     }
 

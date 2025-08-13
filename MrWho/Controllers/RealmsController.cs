@@ -111,6 +111,166 @@ public class RealmsController : ControllerBase
     }
 
     /// <summary>
+    /// Export a realm to JSON (no database IDs)
+    /// </summary>
+    [HttpGet("{id}/export")]
+    public async Task<ActionResult<RealmExportDto>> ExportRealm(string id)
+    {
+        var realm = await _context.Realms.FirstOrDefaultAsync(r => r.Id == id);
+        if (realm == null)
+        {
+            return NotFound();
+        }
+
+        var export = new RealmExportDto
+        {
+            Name = realm.Name,
+            DisplayName = realm.DisplayName,
+            Description = realm.Description,
+            IsEnabled = realm.IsEnabled,
+            AccessTokenLifetime = realm.AccessTokenLifetime,
+            RefreshTokenLifetime = realm.RefreshTokenLifetime,
+            AuthorizationCodeLifetime = realm.AuthorizationCodeLifetime,
+            IdTokenLifetime = realm.IdTokenLifetime,
+            DeviceCodeLifetime = realm.DeviceCodeLifetime,
+            DefaultSessionTimeoutHours = realm.DefaultSessionTimeoutHours,
+            DefaultUseSlidingSessionExpiration = realm.DefaultUseSlidingSessionExpiration,
+            DefaultRememberMeDurationDays = realm.DefaultRememberMeDurationDays,
+            DefaultRequireHttpsForCookies = realm.DefaultRequireHttpsForCookies,
+            DefaultCookieSameSitePolicy = realm.DefaultCookieSameSitePolicy,
+            DefaultRequireConsent = realm.DefaultRequireConsent,
+            DefaultAllowRememberConsent = realm.DefaultAllowRememberConsent,
+            DefaultMaxRefreshTokensPerUser = realm.DefaultMaxRefreshTokensPerUser,
+            DefaultUseOneTimeRefreshTokens = realm.DefaultUseOneTimeRefreshTokens,
+            DefaultIncludeJwtId = realm.DefaultIncludeJwtId,
+            DefaultRequireMfa = realm.DefaultRequireMfa,
+            DefaultMfaGracePeriodMinutes = realm.DefaultMfaGracePeriodMinutes,
+            DefaultAllowedMfaMethods = realm.DefaultAllowedMfaMethods,
+            DefaultRememberMfaForSession = realm.DefaultRememberMfaForSession,
+            DefaultRateLimitRequestsPerMinute = realm.DefaultRateLimitRequestsPerMinute,
+            DefaultRateLimitRequestsPerHour = realm.DefaultRateLimitRequestsPerHour,
+            DefaultRateLimitRequestsPerDay = realm.DefaultRateLimitRequestsPerDay,
+            DefaultEnableDetailedErrors = realm.DefaultEnableDetailedErrors,
+            DefaultLogSensitiveData = realm.DefaultLogSensitiveData,
+            DefaultThemeName = realm.DefaultThemeName,
+            RealmCustomCssUrl = realm.RealmCustomCssUrl,
+            RealmLogoUri = realm.RealmLogoUri,
+            RealmUri = realm.RealmUri,
+            RealmPolicyUri = realm.RealmPolicyUri,
+            RealmTosUri = realm.RealmTosUri,
+            ExportedBy = User?.Identity?.Name ?? "System",
+            ExportedAtUtc = DateTime.UtcNow,
+            FormatVersion = "1.0"
+        };
+
+        return Ok(export);
+    }
+
+    /// <summary>
+    /// Import a realm from JSON (upsert by Name)
+    /// </summary>
+    [HttpPost("import")]
+    public async Task<ActionResult<RealmDto>> ImportRealm([FromBody] RealmExportDto dto)
+    {
+        if (string.IsNullOrWhiteSpace(dto.Name))
+        {
+            return ValidationProblem("Realm name is required");
+        }
+
+        var strategy = _context.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
+        {
+            using var tx = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                var realm = await _context.Realms.FirstOrDefaultAsync(r => r.Name == dto.Name);
+                var now = DateTime.UtcNow;
+                var userName = User?.Identity?.Name;
+
+                if (realm == null)
+                {
+                    realm = new Realm
+                    {
+                        Name = dto.Name,
+                        CreatedAt = now,
+                        UpdatedAt = now,
+                        CreatedBy = userName,
+                        UpdatedBy = userName
+                    };
+                    _context.Realms.Add(realm);
+                }
+
+                // Update fields
+                realm.DisplayName = dto.DisplayName;
+                realm.Description = dto.Description;
+                realm.IsEnabled = dto.IsEnabled;
+                realm.AccessTokenLifetime = dto.AccessTokenLifetime;
+                realm.RefreshTokenLifetime = dto.RefreshTokenLifetime;
+                realm.AuthorizationCodeLifetime = dto.AuthorizationCodeLifetime;
+                realm.IdTokenLifetime = dto.IdTokenLifetime;
+                realm.DeviceCodeLifetime = dto.DeviceCodeLifetime;
+                realm.DefaultSessionTimeoutHours = dto.DefaultSessionTimeoutHours;
+                realm.DefaultUseSlidingSessionExpiration = dto.DefaultUseSlidingSessionExpiration;
+                realm.DefaultRememberMeDurationDays = dto.DefaultRememberMeDurationDays;
+                realm.DefaultRequireHttpsForCookies = dto.DefaultRequireHttpsForCookies;
+                realm.DefaultCookieSameSitePolicy = dto.DefaultCookieSameSitePolicy;
+                realm.DefaultRequireConsent = dto.DefaultRequireConsent;
+                realm.DefaultAllowRememberConsent = dto.DefaultAllowRememberConsent;
+                realm.DefaultMaxRefreshTokensPerUser = dto.DefaultMaxRefreshTokensPerUser;
+                realm.DefaultUseOneTimeRefreshTokens = dto.DefaultUseOneTimeRefreshTokens;
+                realm.DefaultIncludeJwtId = dto.DefaultIncludeJwtId;
+                realm.DefaultRequireMfa = dto.DefaultRequireMfa;
+                realm.DefaultMfaGracePeriodMinutes = dto.DefaultMfaGracePeriodMinutes;
+                realm.DefaultAllowedMfaMethods = dto.DefaultAllowedMfaMethods;
+                realm.DefaultRememberMfaForSession = dto.DefaultRememberMfaForSession;
+                realm.DefaultRateLimitRequestsPerMinute = dto.DefaultRateLimitRequestsPerMinute;
+                realm.DefaultRateLimitRequestsPerHour = dto.DefaultRateLimitRequestsPerHour;
+                realm.DefaultRateLimitRequestsPerDay = dto.DefaultRateLimitRequestsPerDay;
+                realm.DefaultEnableDetailedErrors = dto.DefaultEnableDetailedErrors;
+                realm.DefaultLogSensitiveData = dto.DefaultLogSensitiveData;
+                realm.DefaultThemeName = dto.DefaultThemeName;
+                realm.RealmCustomCssUrl = dto.RealmCustomCssUrl;
+                realm.RealmLogoUri = dto.RealmLogoUri;
+                realm.RealmUri = dto.RealmUri;
+                realm.RealmPolicyUri = dto.RealmPolicyUri;
+                realm.RealmTosUri = dto.RealmTosUri;
+                realm.UpdatedAt = now;
+                realm.UpdatedBy = userName;
+
+                await _context.SaveChangesAsync();
+                await tx.CommitAsync();
+
+                var result = new RealmDto
+                {
+                    Id = realm.Id,
+                    Name = realm.Name,
+                    Description = realm.Description,
+                    DisplayName = realm.DisplayName,
+                    IsEnabled = realm.IsEnabled,
+                    AccessTokenLifetime = realm.AccessTokenLifetime,
+                    RefreshTokenLifetime = realm.RefreshTokenLifetime,
+                    AuthorizationCodeLifetime = realm.AuthorizationCodeLifetime,
+                    IdTokenLifetime = realm.IdTokenLifetime,
+                    DeviceCodeLifetime = realm.DeviceCodeLifetime,
+                    CreatedAt = realm.CreatedAt,
+                    UpdatedAt = realm.UpdatedAt,
+                    CreatedBy = realm.CreatedBy,
+                    UpdatedBy = realm.UpdatedBy,
+                    ClientCount = await _context.Clients.CountAsync(c => c.RealmId == realm.Id)
+                };
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                await tx.RollbackAsync();
+                _logger.LogError(ex, "Failed to import realm {RealmName}", dto.Name);
+                return Problem(title: "Failed to import realm", detail: ex.Message);
+            }
+        });
+    }
+
+    /// <summary>
     /// Create a new realm
     /// </summary>
     [HttpPost]

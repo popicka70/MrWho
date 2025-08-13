@@ -119,15 +119,49 @@ public class RealmsApiService : IRealmsApiService
     {
         try
         {
-            var response = await _httpClient.PostAsync($"api/realms/{id}/toggle", null);
+            var response = await _httpClient.PostAsync($"api/realms/{id}/toggle", new StringContent(string.Empty));
             response.EnsureSuccessStatusCode();
 
+            var json = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<RealmDto>(json, _jsonOptions);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error toggling realm {RealmId}", id);
+            return null;
+        }
+    }
+
+    public async Task<RealmExportDto?> ExportRealmAsync(string id)
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync($"api/realms/{id}/export");
+            response.EnsureSuccessStatusCode();
+            var json = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<RealmExportDto>(json, _jsonOptions);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error exporting realm {RealmId}", id);
+            return null;
+        }
+    }
+
+    public async Task<RealmDto?> ImportRealmAsync(RealmExportDto dto)
+    {
+        try
+        {
+            var json = JsonSerializer.Serialize(dto, _jsonOptions);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var response = await _httpClient.PostAsync("api/realms/import", content);
+            response.EnsureSuccessStatusCode();
             var responseJson = await response.Content.ReadAsStringAsync();
             return JsonSerializer.Deserialize<RealmDto>(responseJson, _jsonOptions);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error toggling realm {RealmId}", id);
+            _logger.LogError(ex, "Error importing realm {RealmName}", dto.Name);
             return null;
         }
     }
