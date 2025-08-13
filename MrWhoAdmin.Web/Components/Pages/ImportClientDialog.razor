@@ -1,0 +1,83 @@
+@using Radzen
+@using Microsoft.AspNetCore.Components.Forms
+@using MrWho.Shared.Models
+@inject IClientsApiService ClientsApi
+@inject NotificationService NotificationService
+@inject DialogService DialogService
+
+<RadzenStack Gap="0.75rem" Style="padding: 1rem;">
+    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Import Client from JSON</RadzenText>
+    <RadzenAlert AlertStyle="AlertStyle.Info">Select a JSON file previously exported from this system.</RadzenAlert>
+    <InputFile OnChange="@OnFileChange" accept=".json" />
+    @if (!string.IsNullOrEmpty(previewName))
+    {
+        <RadzenText>Selected file: @previewName</RadzenText>
+    }
+    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" JustifyContent="JustifyContent.End">
+        <RadzenButton ButtonStyle="ButtonStyle.Light" Text="Cancel" Click="@(args => DialogService.Close(false))" />
+        <RadzenButton ButtonStyle="ButtonStyle.Primary" Text="Import" Click="@OnImport" Disabled="@disableImport" IsBusy="@isBusy" />
+    </RadzenStack>
+</RadzenStack>
+
+@code {
+    private ClientExportDto? exportDto;
+    private bool isBusy;
+    private bool disableImport => isBusy || exportDto == null;
+    private string? previewName;
+
+    private async Task OnFileChange(InputFileChangeEventArgs args)
+    {
+        var file = args.File;
+        if (file == null)
+        {
+            exportDto = null;
+            previewName = null;
+            return;
+        }
+
+        previewName = file.Name;
+        using var ms = new MemoryStream();
+        await file.OpenReadStream(maxAllowedSize: 5 * 1024 * 1024).CopyToAsync(ms);
+        var json = System.Text.Encoding.UTF8.GetString(ms.ToArray());
+        try
+        {
+            exportDto = System.Text.Json.JsonSerializer.Deserialize<ClientExportDto>(json, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Invalid File", $"Failed to parse JSON: {ex.Message}");
+            exportDto = null;
+        }
+    }
+
+    private async Task OnImport()
+    {
+        if (exportDto == null) return;
+        isBusy = true;
+        try
+        {
+            var result = await ClientsApi.ImportClientAsync(exportDto);
+            if (result != null)
+            {
+                if (!string.IsNullOrEmpty(result.GeneratedClientSecret))
+                {
+                    NotificationService.Notify(NotificationSeverity.Warning, "Client Secret Generated", $"New secret: {result.GeneratedClientSecret}");
+                }
+                NotificationService.Notify(NotificationSeverity.Success, "Imported", $"Client '{result.Client.Name}' imported");
+                DialogService.Close(true);
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to import client");
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", ex.Message);
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+}

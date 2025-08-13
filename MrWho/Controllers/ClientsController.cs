@@ -69,7 +69,7 @@ public class ClientsController : ControllerBase
                 Name = c.Name,
                 Description = c.Description,
                 IsEnabled = c.IsEnabled,
-                ClientType = c.ClientType, // Remove cast since now using shared enum
+                ClientType = c.ClientType,
                 AllowAuthorizationCodeFlow = c.AllowAuthorizationCodeFlow,
                 AllowClientCredentialsFlow = c.AllowClientCredentialsFlow,
                 AllowPasswordFlow = c.AllowPasswordFlow,
@@ -88,7 +88,58 @@ public class ClientsController : ControllerBase
                 RedirectUris = c.RedirectUris.Select(ru => ru.Uri).ToList(),
                 PostLogoutUris = c.PostLogoutUris.Select(plu => plu.Uri).ToList(),
                 Scopes = c.Scopes.Select(s => s.Scope).ToList(),
-                Permissions = c.Permissions.Select(p => p.Permission).ToList()
+                Permissions = c.Permissions.Select(p => p.Permission).ToList(),
+
+                // dynamic fields
+                SessionTimeoutHours = c.SessionTimeoutHours,
+                UseSlidingSessionExpiration = c.UseSlidingSessionExpiration,
+                RememberMeDurationDays = c.RememberMeDurationDays,
+                RequireHttpsForCookies = c.RequireHttpsForCookies,
+                CookieSameSitePolicy = c.CookieSameSitePolicy,
+                IdTokenLifetimeMinutes = c.IdTokenLifetimeMinutes,
+                DeviceCodeLifetimeMinutes = c.DeviceCodeLifetimeMinutes,
+                AccessTokenType = c.AccessTokenType,
+                UseOneTimeRefreshTokens = c.UseOneTimeRefreshTokens,
+                MaxRefreshTokensPerUser = c.MaxRefreshTokensPerUser,
+                HashAccessTokens = c.HashAccessTokens,
+                UpdateAccessTokenClaimsOnRefresh = c.UpdateAccessTokenClaimsOnRefresh,
+                RequireConsent = c.RequireConsent,
+                AllowRememberConsent = c.AllowRememberConsent,
+                AllowAccessToUserInfoEndpoint = c.AllowAccessToUserInfoEndpoint,
+                AllowAccessToIntrospectionEndpoint = c.AllowAccessToIntrospectionEndpoint,
+                AllowAccessToRevocationEndpoint = c.AllowAccessToRevocationEndpoint,
+                IncludeJwtId = c.IncludeJwtId,
+                AlwaysSendClientClaims = c.AlwaysSendClientClaims,
+                AlwaysIncludeUserClaimsInIdToken = c.AlwaysIncludeUserClaimsInIdToken,
+                ClientClaimsPrefix = c.ClientClaimsPrefix,
+                RequireMfa = c.RequireMfa,
+                MfaGracePeriodMinutes = c.MfaGracePeriodMinutes,
+                AllowedMfaMethods = c.AllowedMfaMethods,
+                RememberMfaForSession = c.RememberMfaForSession,
+                RateLimitRequestsPerMinute = c.RateLimitRequestsPerMinute,
+                RateLimitRequestsPerHour = c.RateLimitRequestsPerHour,
+                RateLimitRequestsPerDay = c.RateLimitRequestsPerDay,
+                ThemeName = c.ThemeName,
+                CustomCssUrl = c.CustomCssUrl,
+                CustomJavaScriptUrl = c.CustomJavaScriptUrl,
+                PageTitlePrefix = c.PageTitlePrefix,
+                LogoUri = c.LogoUri,
+                ClientUri = c.ClientUri,
+                PolicyUri = c.PolicyUri,
+                TosUri = c.TosUri,
+                BackChannelLogoutUri = c.BackChannelLogoutUri,
+                BackChannelLogoutSessionRequired = c.BackChannelLogoutSessionRequired,
+                FrontChannelLogoutUri = c.FrontChannelLogoutUri,
+                FrontChannelLogoutSessionRequired = c.FrontChannelLogoutSessionRequired,
+                AllowedCorsOrigins = c.AllowedCorsOrigins,
+                AllowedIdentityProviders = c.AllowedIdentityProviders,
+                ProtocolType = c.ProtocolType,
+                EnableDetailedErrors = c.EnableDetailedErrors,
+                LogSensitiveData = c.LogSensitiveData,
+                EnableLocalLogin = c.EnableLocalLogin,
+                CustomLoginPageUrl = c.CustomLoginPageUrl,
+                CustomLogoutPageUrl = c.CustomLogoutPageUrl,
+                CustomErrorPageUrl = c.CustomErrorPageUrl
             })
             .ToListAsync();
 
@@ -146,10 +197,396 @@ public class ClientsController : ControllerBase
             RedirectUris = client.RedirectUris.Select(ru => ru.Uri).ToList(),
             PostLogoutUris = client.PostLogoutUris.Select(plu => plu.Uri).ToList(),
             Scopes = client.Scopes.Select(s => s.Scope).ToList(),
-            Permissions = client.Permissions.Select(p => p.Permission).ToList()
+            Permissions = client.Permissions.Select(p => p.Permission).ToList(),
+
+            // dynamic fields
+            SessionTimeoutHours = client.SessionTimeoutHours,
+            UseSlidingSessionExpiration = client.UseSlidingSessionExpiration,
+            RememberMeDurationDays = client.RememberMeDurationDays,
+            RequireHttpsForCookies = client.RequireHttpsForCookies,
+            CookieSameSitePolicy = client.CookieSameSitePolicy,
+            IdTokenLifetimeMinutes = client.IdTokenLifetimeMinutes,
+            DeviceCodeLifetimeMinutes = client.DeviceCodeLifetimeMinutes,
+            AccessTokenType = client.AccessTokenType,
+            UseOneTimeRefreshTokens = client.UseOneTimeRefreshTokens,
+            MaxRefreshTokensPerUser = client.MaxRefreshTokensPerUser,
+            HashAccessTokens = client.HashAccessTokens,
+            UpdateAccessTokenClaimsOnRefresh = client.UpdateAccessTokenClaimsOnRefresh,
+            RequireConsent = client.RequireConsent,
+            AllowRememberConsent = client.AllowRememberConsent,
+            AllowAccessToUserInfoEndpoint = client.AllowAccessToUserInfoEndpoint,
+            AllowAccessToIntrospectionEndpoint = client.AllowAccessToIntrospectionEndpoint,
+            AllowAccessToRevocationEndpoint = client.AllowAccessToRevocationEndpoint,
+            IncludeJwtId = client.IncludeJwtId,
+            AlwaysSendClientClaims = client.AlwaysSendClientClaims,
+            AlwaysIncludeUserClaimsInIdToken = client.AlwaysIncludeUserClaimsInIdToken,
+            ClientClaimsPrefix = client.ClientClaimsPrefix,
+            RequireMfa = client.RequireMfa,
+            MfaGracePeriodMinutes = client.MfaGracePeriodMinutes,
+            AllowedMfaMethods = client.AllowedMfaMethods,
+            RememberMfaForSession = client.RememberMfaForSession,
+            RateLimitRequestsPerMinute = client.RateLimitRequestsPerMinute,
+            RateLimitRequestsPerHour = client.RateLimitRequestsPerHour,
+            RateLimitRequestsPerDay = client.RateLimitRequestsPerDay,
+            ThemeName = client.ThemeName,
+            CustomCssUrl = client.CustomCssUrl,
+            CustomJavaScriptUrl = client.CustomJavaScriptUrl,
+            PageTitlePrefix = client.PageTitlePrefix,
+            LogoUri = client.LogoUri,
+            ClientUri = client.ClientUri,
+            PolicyUri = client.PolicyUri,
+            TosUri = client.TosUri,
+            BackChannelLogoutUri = client.BackChannelLogoutUri,
+            BackChannelLogoutSessionRequired = client.BackChannelLogoutSessionRequired,
+            FrontChannelLogoutUri = client.FrontChannelLogoutUri,
+            FrontChannelLogoutSessionRequired = client.FrontChannelLogoutSessionRequired,
+            AllowedCorsOrigins = client.AllowedCorsOrigins,
+            AllowedIdentityProviders = client.AllowedIdentityProviders,
+            ProtocolType = client.ProtocolType,
+            EnableDetailedErrors = client.EnableDetailedErrors,
+            LogSensitiveData = client.LogSensitiveData,
+            EnableLocalLogin = client.EnableLocalLogin,
+            CustomLoginPageUrl = client.CustomLoginPageUrl,
+            CustomLogoutPageUrl = client.CustomLogoutPageUrl,
+            CustomErrorPageUrl = client.CustomErrorPageUrl
         };
 
         return Ok(clientDto);
+    }
+
+    /// <summary>
+    /// Export a client to JSON (no secrets/IDs). Uses realm name to make it portable.
+    /// </summary>
+    [HttpGet("{id}/export")]
+    public async Task<ActionResult<ClientExportDto>> ExportClient(string id)
+    {
+        var client = await _context.Clients
+            .Include(c => c.Realm)
+            .Include(c => c.RedirectUris)
+            .Include(c => c.PostLogoutUris)
+            .Include(c => c.Scopes)
+            .Include(c => c.Permissions)
+            .FirstOrDefaultAsync(c => c.Id == id);
+
+        if (client == null) return NotFound();
+
+        var export = new ClientExportDto
+        {
+            ClientId = client.ClientId,
+            Name = client.Name,
+            Description = client.Description,
+            IsEnabled = client.IsEnabled,
+            ClientType = client.ClientType,
+            RealmName = client.Realm.Name,
+            AllowAuthorizationCodeFlow = client.AllowAuthorizationCodeFlow,
+            AllowClientCredentialsFlow = client.AllowClientCredentialsFlow,
+            AllowPasswordFlow = client.AllowPasswordFlow,
+            AllowRefreshTokenFlow = client.AllowRefreshTokenFlow,
+            RequirePkce = client.RequirePkce,
+            RequireClientSecret = client.RequireClientSecret,
+            AccessTokenLifetime = client.AccessTokenLifetime,
+            RefreshTokenLifetime = client.RefreshTokenLifetime,
+            AuthorizationCodeLifetime = client.AuthorizationCodeLifetime,
+            IdTokenLifetimeMinutes = client.IdTokenLifetimeMinutes,
+            DeviceCodeLifetimeMinutes = client.DeviceCodeLifetimeMinutes,
+            SessionTimeoutHours = client.SessionTimeoutHours,
+            UseSlidingSessionExpiration = client.UseSlidingSessionExpiration,
+            RememberMeDurationDays = client.RememberMeDurationDays,
+            RequireHttpsForCookies = client.RequireHttpsForCookies,
+            CookieSameSitePolicy = client.CookieSameSitePolicy,
+            RequireConsent = client.RequireConsent,
+            AllowRememberConsent = client.AllowRememberConsent,
+            IncludeJwtId = client.IncludeJwtId,
+            AlwaysSendClientClaims = client.AlwaysSendClientClaims,
+            AlwaysIncludeUserClaimsInIdToken = client.AlwaysIncludeUserClaimsInIdToken,
+            ClientClaimsPrefix = client.ClientClaimsPrefix,
+            AllowAccessToUserInfoEndpoint = client.AllowAccessToUserInfoEndpoint,
+            AllowAccessToIntrospectionEndpoint = client.AllowAccessToIntrospectionEndpoint,
+            AllowAccessToRevocationEndpoint = client.AllowAccessToRevocationEndpoint,
+            RateLimitRequestsPerMinute = client.RateLimitRequestsPerMinute,
+            RateLimitRequestsPerHour = client.RateLimitRequestsPerHour,
+            RateLimitRequestsPerDay = client.RateLimitRequestsPerDay,
+            ThemeName = client.ThemeName,
+            CustomCssUrl = client.CustomCssUrl,
+            CustomJavaScriptUrl = client.CustomJavaScriptUrl,
+            PageTitlePrefix = client.PageTitlePrefix,
+            LogoUri = client.LogoUri,
+            ClientUri = client.ClientUri,
+            PolicyUri = client.PolicyUri,
+            TosUri = client.TosUri,
+            BackChannelLogoutUri = client.BackChannelLogoutUri,
+            BackChannelLogoutSessionRequired = client.BackChannelLogoutSessionRequired,
+            FrontChannelLogoutUri = client.FrontChannelLogoutUri,
+            FrontChannelLogoutSessionRequired = client.FrontChannelLogoutSessionRequired,
+            AllowedCorsOrigins = client.AllowedCorsOrigins,
+            AllowedIdentityProviders = client.AllowedIdentityProviders,
+            ProtocolType = client.ProtocolType,
+            EnableDetailedErrors = client.EnableDetailedErrors,
+            LogSensitiveData = client.LogSensitiveData,
+            EnableLocalLogin = client.EnableLocalLogin,
+            CustomLoginPageUrl = client.CustomLoginPageUrl,
+            CustomLogoutPageUrl = client.CustomLogoutPageUrl,
+            CustomErrorPageUrl = client.CustomErrorPageUrl,
+            RedirectUris = client.RedirectUris.Select(x => x.Uri).ToList(),
+            PostLogoutUris = client.PostLogoutUris.Select(x => x.Uri).ToList(),
+            Scopes = client.Scopes.Select(x => x.Scope).ToList(),
+            Permissions = client.Permissions.Select(x => x.Permission).ToList(),
+            ExportedBy = User?.Identity?.Name ?? "System",
+            ExportedAtUtc = DateTime.UtcNow,
+            FormatVersion = "1.0"
+        };
+
+        return Ok(export);
+    }
+
+    /// <summary>
+    /// Import a client from JSON (upsert using ClientId and RealmName). Does not accept client secret from import.
+    /// If client requires secret, a new secret may be generated and returned once.
+    /// </summary>
+    [HttpPost("import")]
+    public async Task<ActionResult<ClientImportResult>> ImportClient([FromBody] ClientExportDto dto)
+    {
+        if (string.IsNullOrWhiteSpace(dto.ClientId) || string.IsNullOrWhiteSpace(dto.RealmName))
+        {
+            return ValidationProblem("ClientId and RealmName are required");
+        }
+
+        var realm = await _context.Realms.FirstOrDefaultAsync(r => r.Name == dto.RealmName);
+        if (realm == null)
+        {
+            return NotFound($"Realm '{dto.RealmName}' not found. Import the realm first.");
+        }
+
+        string? generatedSecret = null;
+
+        var strategy = _context.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
+        {
+            using var tx = await _context.Database.BeginTransactionAsync();
+            try
+            {
+                var client = await _context.Clients
+                    .Include(c => c.RedirectUris)
+                    .Include(c => c.PostLogoutUris)
+                    .Include(c => c.Scopes)
+                    .Include(c => c.Permissions)
+                    .FirstOrDefaultAsync(c => c.ClientId == dto.ClientId && c.RealmId == realm.Id);
+
+                var now = DateTime.UtcNow;
+                var userName = User?.Identity?.Name;
+
+                if (client == null)
+                {
+                    client = new Client
+                    {
+                        ClientId = dto.ClientId,
+                        RealmId = realm.Id,
+                        CreatedAt = now,
+                        UpdatedAt = now,
+                        CreatedBy = userName,
+                        UpdatedBy = userName
+                    };
+                    _context.Clients.Add(client);
+
+                    // If confidential and requires secret, generate one
+                    if ((dto.ClientType == ClientType.Confidential || dto.ClientType == ClientType.Machine) && dto.RequireClientSecret)
+                    {
+                        generatedSecret = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
+                        client.ClientSecret = generatedSecret;
+                    }
+                }
+
+                // Update simple props
+                client.Name = dto.Name;
+                client.Description = dto.Description;
+                client.IsEnabled = dto.IsEnabled;
+                client.ClientType = dto.ClientType;
+                client.AllowAuthorizationCodeFlow = dto.AllowAuthorizationCodeFlow;
+                client.AllowClientCredentialsFlow = dto.AllowClientCredentialsFlow;
+                client.AllowPasswordFlow = dto.AllowPasswordFlow;
+                client.AllowRefreshTokenFlow = dto.AllowRefreshTokenFlow;
+                client.RequirePkce = dto.RequirePkce;
+                client.RequireClientSecret = dto.RequireClientSecret;
+                client.AccessTokenLifetime = dto.AccessTokenLifetime;
+                client.RefreshTokenLifetime = dto.RefreshTokenLifetime;
+                client.AuthorizationCodeLifetime = dto.AuthorizationCodeLifetime;
+                client.IdTokenLifetimeMinutes = dto.IdTokenLifetimeMinutes;
+                client.DeviceCodeLifetimeMinutes = dto.DeviceCodeLifetimeMinutes;
+
+                client.SessionTimeoutHours = dto.SessionTimeoutHours;
+                client.UseSlidingSessionExpiration = dto.UseSlidingSessionExpiration;
+                client.RememberMeDurationDays = dto.RememberMeDurationDays;
+                client.RequireHttpsForCookies = dto.RequireHttpsForCookies;
+                client.CookieSameSitePolicy = dto.CookieSameSitePolicy;
+                client.RequireConsent = dto.RequireConsent;
+                client.AllowRememberConsent = dto.AllowRememberConsent;
+                client.IncludeJwtId = dto.IncludeJwtId;
+                client.AlwaysSendClientClaims = dto.AlwaysSendClientClaims;
+                client.AlwaysIncludeUserClaimsInIdToken = dto.AlwaysIncludeUserClaimsInIdToken;
+                client.ClientClaimsPrefix = dto.ClientClaimsPrefix;
+                client.AllowAccessToUserInfoEndpoint = dto.AllowAccessToUserInfoEndpoint;
+                client.AllowAccessToIntrospectionEndpoint = dto.AllowAccessToIntrospectionEndpoint;
+                client.AllowAccessToRevocationEndpoint = dto.AllowAccessToRevocationEndpoint;
+                client.RateLimitRequestsPerMinute = dto.RateLimitRequestsPerMinute;
+                client.RateLimitRequestsPerHour = dto.RateLimitRequestsPerHour;
+                client.RateLimitRequestsPerDay = dto.RateLimitRequestsPerDay;
+                client.ThemeName = dto.ThemeName;
+                client.CustomCssUrl = dto.CustomCssUrl;
+                client.CustomJavaScriptUrl = dto.CustomJavaScriptUrl;
+                client.PageTitlePrefix = dto.PageTitlePrefix;
+                client.LogoUri = dto.LogoUri;
+                client.ClientUri = dto.ClientUri;
+                client.PolicyUri = dto.PolicyUri;
+                client.TosUri = dto.TosUri;
+                client.BackChannelLogoutUri = dto.BackChannelLogoutUri;
+                client.BackChannelLogoutSessionRequired = dto.BackChannelLogoutSessionRequired;
+                client.FrontChannelLogoutUri = dto.FrontChannelLogoutUri;
+                client.FrontChannelLogoutSessionRequired = dto.FrontChannelLogoutSessionRequired;
+                client.AllowedCorsOrigins = dto.AllowedCorsOrigins;
+                client.AllowedIdentityProviders = dto.AllowedIdentityProviders;
+                client.ProtocolType = dto.ProtocolType;
+                client.EnableDetailedErrors = dto.EnableDetailedErrors;
+                client.LogSensitiveData = dto.LogSensitiveData;
+                client.EnableLocalLogin = dto.EnableLocalLogin;
+                client.CustomLoginPageUrl = dto.CustomLoginPageUrl;
+                client.CustomLogoutPageUrl = dto.CustomLogoutPageUrl;
+                client.CustomErrorPageUrl = dto.CustomErrorPageUrl;
+
+                client.UpdatedAt = now;
+                client.UpdatedBy = userName;
+
+                // Update collections: replace existing
+                _context.ClientRedirectUris.RemoveRange(client.RedirectUris);
+                foreach (var uri in dto.RedirectUris.Distinct())
+                {
+                    _context.ClientRedirectUris.Add(new ClientRedirectUri { ClientId = client.Id, Uri = uri });
+                }
+
+                _context.ClientPostLogoutUris.RemoveRange(client.PostLogoutUris);
+                foreach (var uri in dto.PostLogoutUris.Distinct())
+                {
+                    _context.ClientPostLogoutUris.Add(new ClientPostLogoutUri { ClientId = client.Id, Uri = uri });
+                }
+
+                _context.ClientScopes.RemoveRange(client.Scopes);
+                foreach (var s in dto.Scopes.Distinct())
+                {
+                    _context.ClientScopes.Add(new ClientScope { ClientId = client.Id, Scope = s });
+                }
+
+                _context.ClientPermissions.RemoveRange(client.Permissions);
+                foreach (var p in dto.Permissions.Distinct())
+                {
+                    _context.ClientPermissions.Add(new ClientPermission { ClientId = client.Id, Permission = p });
+                }
+
+                await _context.SaveChangesAsync();
+                await tx.CommitAsync();
+
+                // Reload full client with related data for returning DTO
+                var full = await _context.Clients
+                    .Include(c => c.Realm)
+                    .Include(c => c.RedirectUris)
+                    .Include(c => c.PostLogoutUris)
+                    .Include(c => c.Scopes)
+                    .Include(c => c.Permissions)
+                    .FirstOrDefaultAsync(c => c.Id == client.Id);
+
+                var clientDto = new ClientDto
+                {
+                    Id = full!.Id,
+                    ClientId = full.ClientId,
+                    Name = full.Name,
+                    Description = full.Description,
+                    IsEnabled = full.IsEnabled,
+                    ClientType = full.ClientType,
+                    AllowAuthorizationCodeFlow = full.AllowAuthorizationCodeFlow,
+                    AllowClientCredentialsFlow = full.AllowClientCredentialsFlow,
+                    AllowPasswordFlow = full.AllowPasswordFlow,
+                    AllowRefreshTokenFlow = full.AllowRefreshTokenFlow,
+                    RequirePkce = full.RequirePkce,
+                    RequireClientSecret = full.RequireClientSecret,
+                    AccessTokenLifetime = full.AccessTokenLifetime,
+                    RefreshTokenLifetime = full.RefreshTokenLifetime,
+                    AuthorizationCodeLifetime = full.AuthorizationCodeLifetime,
+                    RealmId = full.RealmId,
+                    RealmName = full.Realm.Name,
+                    CreatedAt = full.CreatedAt,
+                    UpdatedAt = full.UpdatedAt,
+                    CreatedBy = full.CreatedBy,
+                    UpdatedBy = full.UpdatedBy,
+                    RedirectUris = full.RedirectUris.Select(ru => ru.Uri).ToList(),
+                    PostLogoutUris = full.PostLogoutUris.Select(plu => plu.Uri).ToList(),
+                    Scopes = full.Scopes.Select(s => s.Scope).ToList(),
+                    Permissions = full.Permissions.Select(p => p.Permission).ToList(),
+
+                    // dynamic fields
+                    SessionTimeoutHours = full.SessionTimeoutHours,
+                    UseSlidingSessionExpiration = full.UseSlidingSessionExpiration,
+                    RememberMeDurationDays = full.RememberMeDurationDays,
+                    RequireHttpsForCookies = full.RequireHttpsForCookies,
+                    CookieSameSitePolicy = full.CookieSameSitePolicy,
+                    IdTokenLifetimeMinutes = full.IdTokenLifetimeMinutes,
+                    DeviceCodeLifetimeMinutes = full.DeviceCodeLifetimeMinutes,
+                    AccessTokenType = full.AccessTokenType,
+                    UseOneTimeRefreshTokens = full.UseOneTimeRefreshTokens,
+                    MaxRefreshTokensPerUser = full.MaxRefreshTokensPerUser,
+                    HashAccessTokens = full.HashAccessTokens,
+                    UpdateAccessTokenClaimsOnRefresh = full.UpdateAccessTokenClaimsOnRefresh,
+                    RequireConsent = full.RequireConsent,
+                    AllowRememberConsent = full.AllowRememberConsent,
+                    AllowAccessToUserInfoEndpoint = full.AllowAccessToUserInfoEndpoint,
+                    AllowAccessToIntrospectionEndpoint = full.AllowAccessToIntrospectionEndpoint,
+                    AllowAccessToRevocationEndpoint = full.AllowAccessToRevocationEndpoint,
+                    IncludeJwtId = full.IncludeJwtId,
+                    AlwaysSendClientClaims = full.AlwaysSendClientClaims,
+                    AlwaysIncludeUserClaimsInIdToken = full.AlwaysIncludeUserClaimsInIdToken,
+                    ClientClaimsPrefix = full.ClientClaimsPrefix,
+                    RequireMfa = full.RequireMfa,
+                    MfaGracePeriodMinutes = full.MfaGracePeriodMinutes,
+                    AllowedMfaMethods = full.AllowedMfaMethods,
+                    RememberMfaForSession = full.RememberMfaForSession,
+                    RateLimitRequestsPerMinute = full.RateLimitRequestsPerMinute,
+                    RateLimitRequestsPerHour = full.RateLimitRequestsPerHour,
+                    RateLimitRequestsPerDay = full.RateLimitRequestsPerDay,
+                    ThemeName = full.ThemeName,
+                    CustomCssUrl = full.CustomCssUrl,
+                    CustomJavaScriptUrl = full.CustomJavaScriptUrl,
+                    PageTitlePrefix = full.PageTitlePrefix,
+                    LogoUri = full.LogoUri,
+                    ClientUri = full.ClientUri,
+                    PolicyUri = full.PolicyUri,
+                    TosUri = full.TosUri,
+                    BackChannelLogoutUri = full.BackChannelLogoutUri,
+                    BackChannelLogoutSessionRequired = full.BackChannelLogoutSessionRequired,
+                    FrontChannelLogoutUri = full.FrontChannelLogoutUri,
+                    FrontChannelLogoutSessionRequired = full.FrontChannelLogoutSessionRequired,
+                    AllowedCorsOrigins = full.AllowedCorsOrigins,
+                    AllowedIdentityProviders = full.AllowedIdentityProviders,
+                    ProtocolType = full.ProtocolType,
+                    EnableDetailedErrors = full.EnableDetailedErrors,
+                    LogSensitiveData = full.LogSensitiveData,
+                    EnableLocalLogin = full.EnableLocalLogin,
+                    CustomLoginPageUrl = full.CustomLoginPageUrl,
+                    CustomLogoutPageUrl = full.CustomLogoutPageUrl,
+                    CustomErrorPageUrl = full.CustomErrorPageUrl
+                };
+
+                var result = new ClientImportResult
+                {
+                    Client = clientDto,
+                    GeneratedClientSecret = generatedSecret
+                };
+
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                await tx.RollbackAsync();
+                _logger.LogError(ex, "Failed to import client {ClientId}", dto.ClientId);
+                return Problem(title: "Failed to import client", detail: ex.Message);
+            }
+        });
     }
 
     [HttpPost]
