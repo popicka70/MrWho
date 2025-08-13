@@ -51,8 +51,14 @@ public class SessionsController : ControllerBase
         {
             var sessions = new List<ActiveSessionDto>();
 
-            // Get all active authorizations
+            // Buffer authorizations to avoid nested active DataReaders
+            var authorizations = new List<object>();
             await foreach (var authorization in _authorizationManager.ListAsync())
+            {
+                authorizations.Add(authorization);
+            }
+
+            foreach (var authorization in authorizations)
             {
                 var status = await _authorizationManager.GetStatusAsync(authorization);
                 if (status != OpenIddictConstants.Statuses.Valid)
@@ -85,7 +91,14 @@ public class SessionsController : ControllerBase
         {
             var sessions = new List<ActiveSessionDto>();
 
+            // Buffer authorizations to avoid nested active DataReaders
+            var authorizations = new List<object>();
             await foreach (var authorization in _authorizationManager.FindBySubjectAsync(userId))
+            {
+                authorizations.Add(authorization);
+            }
+
+            foreach (var authorization in authorizations)
             {
                 var status = await _authorizationManager.GetStatusAsync(authorization);
                 if (status != OpenIddictConstants.Statuses.Valid)
@@ -130,7 +143,14 @@ public class SessionsController : ControllerBase
                 return NotFound($"Client '{clientId}' has no identifier");
             }
 
+            // Buffer authorizations to avoid nested active DataReaders
+            var authorizations = new List<object>();
             await foreach (var authorization in _authorizationManager.FindByApplicationIdAsync(applicationId))
+            {
+                authorizations.Add(authorization);
+            }
+
+            foreach (var authorization in authorizations)
             {
                 var status = await _authorizationManager.GetStatusAsync(authorization);
                 if (status != OpenIddictConstants.Statuses.Valid)
@@ -211,7 +231,14 @@ public class SessionsController : ControllerBase
             var revokedCount = 0;
             var backChannelService = HttpContext.RequestServices.GetRequiredService<IBackChannelLogoutService>();
 
+            // Buffer authorizations to avoid nested active DataReaders
+            var authorizations = new List<object>();
             await foreach (var authorization in _authorizationManager.FindBySubjectAsync(userId))
+            {
+                authorizations.Add(authorization);
+            }
+
+            foreach (var authorization in authorizations)
             {
                 var status = await _authorizationManager.GetStatusAsync(authorization);
                 if (status != OpenIddictConstants.Statuses.Valid)
@@ -269,7 +296,14 @@ public class SessionsController : ControllerBase
             }
             var revokedCount = 0;
 
+            // Buffer authorizations to avoid nested active DataReaders
+            var authorizations = new List<object>();
             await foreach (var authorization in _authorizationManager.FindByApplicationIdAsync(applicationId))
+            {
+                authorizations.Add(authorization);
+            }
+
+            foreach (var authorization in authorizations)
             {
                 var status = await _authorizationManager.GetStatusAsync(authorization);
                 if (status != OpenIddictConstants.Statuses.Valid)
@@ -321,7 +355,14 @@ public class SessionsController : ControllerBase
             DateTimeOffset? oldestSession = null;
             DateTimeOffset? newestSession = null;
 
+            // Buffer authorizations to avoid nested active DataReaders
+            var authorizations = new List<object>();
             await foreach (var authorization in _authorizationManager.ListAsync())
+            {
+                authorizations.Add(authorization);
+            }
+
+            foreach (var authorization in authorizations)
             {
                 var status = await _authorizationManager.GetStatusAsync(authorization);
                 if (status != OpenIddictConstants.Statuses.Valid)
