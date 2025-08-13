@@ -52,6 +52,7 @@
                               Click="@(async () => await Toggle())" />
                 <RadzenButton Text="Export" Icon="file_download" ButtonStyle="ButtonStyle.Secondary" Click="@(async () => await ExportClient())" />
                 <RadzenButton Text="Import" Icon="file_upload" ButtonStyle="ButtonStyle.Light" Click="@(async () => await OpenImportClientDialog())" />
+                <RadzenButton Text="Manage Users" Icon="people" ButtonStyle="ButtonStyle.Info" Click="@(() => Navigation.NavigateTo($"/clients/{client.Id}/users"))" />
             </RadzenStack>
 
             <!-- Basic info -->

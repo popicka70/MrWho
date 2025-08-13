@@ -1,0 +1,238 @@
+@page "/clients/{Id}/users"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using MrWho.Shared.Models
+@inject IClientUsersApiService ClientUsersApi
+@inject IUsersApiService UsersApi
+@inject IClientsApiService ClientsApi
+@inject NavigationManager Navigation
+@inject NotificationService NotificationService
+@inject ILogger<ClientAssignedUsers> Logger
+
+<PageTitle>Client Users - MrWho Admin</PageTitle>
+
+<RadzenStack>
+    <RadzenBreadCrumb>
+        <RadzenBreadCrumbItem Path="/clients" Text="Clients" />
+        <RadzenBreadCrumbItem Text="Assigned Users" />
+    </RadzenBreadCrumb>
+
+    <RadzenText TextStyle="TextStyle.H3" TagName="TagName.H1" class="rz-pt-4">
+        <RadzenIcon Icon="people" class="rz-me-1" />
+        Client Assigned Users
+    </RadzenText>
+</RadzenStack>
+
+<RadzenCard class="rz-my-4">
+    @if (isLoading)
+    {
+        <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+    }
+    else if (list == null)
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Danger">Failed to load client users.</RadzenAlert>
+    }
+    else
+    {
+        <RadzenStack Gap="0.75rem">
+            <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Client</RadzenText>
+            <RadzenRow>
+                <RadzenColumn Size="12" SizeMD="4">
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Client ID</RadzenText>
+                    <RadzenText>@list.ClientPublicId</RadzenText>
+                </RadzenColumn>
+                <RadzenColumn Size="12" SizeMD="4">
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Name</RadzenText>
+                    <RadzenText>@list.ClientName</RadzenText>
+                </RadzenColumn>
+            </RadzenRow>
+
+            <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Assigned Users</RadzenText>
+            @if (list.Users.Any())
+            {
+                <RadzenDataGrid Data="@list.Users" TItem="ClientUserDto" AllowPaging="true" PageSize="10" AllowSorting="true">
+                    <Columns>
+                        <RadzenDataGridColumn TItem="ClientUserDto" Property="UserName" Title="User" />
+                        <RadzenDataGridColumn TItem="ClientUserDto" Property="UserEmail" Title="Email" />
+                        <RadzenDataGridColumn TItem="ClientUserDto" Property="CreatedAt" Title="Assigned" />
+                        <RadzenDataGridColumn TItem="ClientUserDto" Title="Actions">
+                            <Template Context="u">
+                                <RadzenButton ButtonStyle="ButtonStyle.Danger" Icon="delete" Size="ButtonSize.Small" Click="@(async ()=> await RemoveUser(u))" />
+                            </Template>
+                        </RadzenDataGridColumn>
+                    </Columns>
+                </RadzenDataGrid>
+            }
+            else
+            {
+                <RadzenAlert AlertStyle="AlertStyle.Info">No users assigned.</RadzenAlert>
+            }
+
+            <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Assign User</RadzenText>
+            <RadzenRow>
+                <RadzenColumn Size="12" SizeMD="8">
+                    <RadzenFormField Text="Find user" Variant="Variant.Outlined">
+                        <ChildContent>
+                            <RadzenTextBox @bind-Value="userSearch" Placeholder="Search by id, username or email..." Style="width: 100%;" />
+                        </ChildContent>
+                        <Helper>
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Type to search and click Find. Then choose a user below or click Assign to use the typed value.</RadzenText>
+                        </Helper>
+                    </RadzenFormField>
+                </RadzenColumn>
+                <RadzenColumn Size="12" SizeMD="4">
+                    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.End">
+                        <RadzenButton Text="Find" Icon="search" ButtonStyle="ButtonStyle.Secondary" IsBusy="@searching" Disabled="@searching" Click="@(async ()=> await FindUsers())" />
+                        <RadzenButton Text="Assign" Icon="person_add" ButtonStyle="ButtonStyle.Primary" Click="@(async ()=> await AssignUserFromSearch())" />
+                        <RadzenButton Text="Back" Icon="arrow_back" ButtonStyle="ButtonStyle.Light" Click="@GoBack" />
+                    </RadzenStack>
+                </RadzenColumn>
+            </RadzenRow>
+
+            @if (searchResults.Any())
+            {
+                <RadzenCard Style="margin-top: .5rem;">
+                    <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-font-weight-600">Search Results</RadzenText>
+                    <RadzenDataGrid Data="@searchResults" TItem="UserDto" AllowPaging="true" PageSize="5" AllowSorting="true">
+                        <Columns>
+                            <RadzenDataGridColumn TItem="UserDto" Property="UserName" Title="Username" />
+                            <RadzenDataGridColumn TItem="UserDto" Property="Email" Title="Email" />
+                            <RadzenDataGridColumn TItem="UserDto" Title="Actions">
+                                <Template Context="user">
+                                    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                                        <RadzenButton Text="Assign" Icon="person_add" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Primary" Click="@(async ()=> await AssignSpecificUser(user))" />
+                                        <RadzenButton Text="Use" Icon="content_paste_go" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@(()=> userSearch = user.Id)" />
+                                    </RadzenStack>
+                                </Template>
+                            </RadzenDataGridColumn>
+                        </Columns>
+                    </RadzenDataGrid>
+                </RadzenCard>
+            }
+        </RadzenStack>
+    }
+</RadzenCard>
+
+@code {
+    [Parameter] public string? Id { get; set; }
+    private ClientUsersListDto? list;
+    private bool isLoading;
+    private string userSearch = string.Empty;
+    private bool searching = false;
+    private List<UserDto> searchResults = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        if (string.IsNullOrWhiteSpace(Id)) { list = null; return; }
+        isLoading = true;
+        try
+        {
+            list = await ClientUsersApi.GetClientUsersAsync(Id);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading client users {Id}", Id);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to load client users");
+        }
+        finally { isLoading = false; }
+    }
+
+    private async Task FindUsers()
+    {
+        searchResults.Clear();
+        if (string.IsNullOrWhiteSpace(userSearch)) return;
+        try
+        {
+            searching = true;
+            var results = await UsersApi.GetUsersAsync(page: 1, pageSize: 10, search: userSearch);
+            if (results?.Items != null)
+            {
+                searchResults = results.Items;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error searching users");
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to search users");
+        }
+        finally { searching = false; }
+    }
+
+    private async Task AssignUserFromSearch()
+    {
+        if (list == null || string.IsNullOrWhiteSpace(userSearch)) return;
+        try
+        {
+            var result = await ClientUsersApi.AssignUserAsync(list.ClientId, new AssignClientUserRequest{ UserId = userSearch, ClientId = list.ClientId });
+            if (result != null)
+            {
+                NotificationService.Notify(NotificationSeverity.Success, "Assigned", $"User {result.UserName} assigned");
+                await LoadAsync();
+                userSearch = string.Empty;
+                searchResults.Clear();
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to assign user");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error assigning user");
+            NotificationService.Notify(NotificationSeverity.Error, "Error", ex.Message);
+        }
+    }
+
+    private async Task AssignSpecificUser(UserDto user)
+    {
+        if (list == null) return;
+        try
+        {
+            var result = await ClientUsersApi.AssignUserAsync(list.ClientId, new AssignClientUserRequest{ UserId = user.Id, ClientId = list.ClientId });
+            if (result != null)
+            {
+                NotificationService.Notify(NotificationSeverity.Success, "Assigned", $"User {result.UserName} assigned");
+                await LoadAsync();
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to assign user");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error assigning user");
+            NotificationService.Notify(NotificationSeverity.Error, "Error", ex.Message);
+        }
+    }
+
+    private async Task RemoveUser(ClientUserDto u)
+    {
+        if (list == null) return;
+        try
+        {
+            var ok = await ClientUsersApi.RemoveUserAsync(list.ClientId, u.UserId);
+            if (ok)
+            {
+                NotificationService.Notify(NotificationSeverity.Success, "Removed", $"User {u.UserName} removed");
+                await LoadAsync();
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to remove user");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error removing user");
+            NotificationService.Notify(NotificationSeverity.Error, "Error", ex.Message);
+        }
+    }
+
+    private void GoBack() => Navigation.NavigateTo("/clients");
+}
