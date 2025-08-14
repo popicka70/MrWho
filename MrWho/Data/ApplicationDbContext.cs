@@ -306,5 +306,42 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
             entity.HasKey(k => k.Id);
             entity.Property(k => k.FriendlyName).HasMaxLength(256);
         });
+
+        // Provider-specific tuning: MySQL row size limits -> move large strings to longtext
+        if (Database.ProviderName?.Contains("MySql", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            builder.Entity<Client>(entity =>
+            {
+                entity.Property(c => c.AllowedCorsOrigins).HasColumnType("longtext");
+                entity.Property(c => c.AllowedIdentityProviders).HasColumnType("longtext");
+                entity.Property(c => c.AllowedMfaMethods).HasColumnType("longtext");
+                entity.Property(c => c.BackChannelLogoutUri).HasColumnType("longtext");
+                entity.Property(c => c.FrontChannelLogoutUri).HasColumnType("longtext");
+                entity.Property(c => c.PolicyUri).HasColumnType("longtext");
+                entity.Property(c => c.TosUri).HasColumnType("longtext");
+                entity.Property(c => c.LogoUri).HasColumnType("longtext");
+                entity.Property(c => c.ClientUri).HasColumnType("longtext");
+                entity.Property(c => c.CustomCssUrl).HasColumnType("longtext");
+                entity.Property(c => c.CustomErrorPageUrl).HasColumnType("longtext");
+                entity.Property(c => c.CustomJavaScriptUrl).HasColumnType("longtext");
+                entity.Property(c => c.CustomLoginPageUrl).HasColumnType("longtext");
+                entity.Property(c => c.CustomLogoutPageUrl).HasColumnType("longtext");
+            });
+
+            builder.Entity<Realm>(entity =>
+            {
+                entity.Property(r => r.RealmCustomCssUrl).HasColumnType("longtext");
+                entity.Property(r => r.RealmLogoUri).HasColumnType("longtext");
+                entity.Property(r => r.RealmPolicyUri).HasColumnType("longtext");
+                entity.Property(r => r.RealmTosUri).HasColumnType("longtext");
+                entity.Property(r => r.RealmUri).HasColumnType("longtext");
+                entity.Property(r => r.DefaultAllowedMfaMethods).HasColumnType("longtext");
+            });
+
+            builder.Entity<PersistentQrSession>(entity =>
+            {
+                entity.Property(p => p.ReturnUrl).HasColumnType("longtext");
+            });
+        }
     }
 }

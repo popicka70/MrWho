@@ -600,6 +600,31 @@ public static class WebApplicationExtensions
                     logger.LogWarning("No migrations found in the configured assembly. Using EnsureCreated as a safety fallback.");
                     await context.Database.EnsureCreatedAsync();
                 }
+                catch (Exception ex) when (ex.Message.Contains("Row size too large", StringComparison.OrdinalIgnoreCase))
+                {
+                    // MySQL/MariaDB row size exceeded due to large varchar columns.
+                    logger.LogWarning("MySQL/MariaDB reported row size too large during migration. Attempting EnsureDeleted + EnsureCreated fallback in development. Error: {Error}", ex.Message);
+
+                    if (app.Environment.IsDevelopment())
+                    {
+                        try
+                        {
+                            await context.Database.EnsureDeletedAsync();
+                            await context.Database.EnsureCreatedAsync();
+                            Console.WriteLine("Database recreated using EnsureCreated due to MySQL row size issue (DEV only fallback)");
+                        }
+                        catch (Exception fallbackEx)
+                        {
+                            logger.LogError(fallbackEx, "Failed EnsureCreated fallback after MySQL row size error");
+                            throw;
+                        }
+                    }
+                    else
+                    {
+                        logger.LogError("Row size too large in non-development environment. Review MySQL schema (use longtext for large string columns) and re-run migrations.");
+                        throw;
+                    }
+                }
                 catch (Exception ex)
                 {
                     logger.LogError(ex, "Error applying database migrations");

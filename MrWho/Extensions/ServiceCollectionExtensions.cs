@@ -98,9 +98,9 @@ public static class ServiceCollectionExtensions
         var isDevelopment = builder.Environment.IsDevelopment();
 
         var provider = (config["Database:Provider"] ?? "SqlServer").Trim().ToLowerInvariant();
-    var connectionName = config["Database:ConnectionName"] ?? "mrwhodb";
+        var connectionName = config["Database:ConnectionName"] ?? "mrwhodb";
         var connectionString = config.GetConnectionString(connectionName) ?? config[$"ConnectionStrings:{connectionName}"];
-    var migrationsAssembly = config["Database:MigrationsAssembly"]; // optional
+        var migrationsAssembly = config["Database:MigrationsAssembly"]; // optional
 
         // Proactively load the migrations assembly if specified and present alongside the app
         if (!string.IsNullOrWhiteSpace(migrationsAssembly))
@@ -168,6 +168,14 @@ public static class ServiceCollectionExtensions
                                 b.MigrationsAssembly(migrationsAssembly);
                         });
                     }
+
+                    // In development, enable EF detailed errors and sensitive data logging for MySQL troubleshooting
+                    if (isDevelopment)
+                    {
+                        options.EnableDetailedErrors();
+                        options.EnableSensitiveDataLogging();
+                    }
+
                     break;
                 }
                 case "postgres":
