@@ -102,7 +102,7 @@
                 </RadzenRow>
             </RadzenStack>
 
-            <!-- Flows -->
+            <!-- Allowed Flows -->
             <RadzenStack Gap="0.5rem">
                 <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Allowed Flows</RadzenText>
                 <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" Wrap="FlexWrap.Wrap">
@@ -179,7 +179,7 @@
                 </RadzenRow>
             </RadzenStack>
 
-            <!-- Token settings -->
+            <!-- Additional Token Settings -->
             <RadzenStack Gap="0.75rem">
                 <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Additional Token Settings</RadzenText>
                 <RadzenRow>
@@ -388,6 +388,36 @@
                         else { <RadzenText>None</RadzenText> }
                     </RadzenColumn>
                 </RadzenRow>
+
+                <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-font-weight-600 rz-mt-2">Redirect URIs</RadzenText>
+                @if (client.RedirectUris?.Any() == true)
+                {
+                    <RadzenStack Gap="0.25rem">
+                        @foreach (var uri in client.RedirectUris)
+                        {
+                            <RadzenText class="font-monospace">@uri</RadzenText>
+                        }
+                    </RadzenStack>
+                }
+                else
+                {
+                    <RadzenText class="rz-color-secondary">None configured</RadzenText>
+                }
+
+                <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-font-weight-600 rz-mt-2">Post-logout Redirect URIs</RadzenText>
+                @if (client.PostLogoutUris?.Any() == true)
+                {
+                    <RadzenStack Gap="0.25rem">
+                        @foreach (var uri in client.PostLogoutUris)
+                        {
+                            <RadzenText class="font-monospace">@uri</RadzenText>
+                        }
+                    </RadzenStack>
+                }
+                else
+                {
+                    <RadzenText class="rz-color-secondary">None configured</RadzenText>
+                }
 
                 <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-font-weight-600 rz-mt-2">Logout</RadzenText>
                 <RadzenRow>

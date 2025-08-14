@@ -146,6 +146,47 @@
                         </div>
                     </RadzenTabsItem>
 
+                    <!-- Redirect URIs Tab -->
+                    <RadzenTabsItem Text="Redirect URIs" Icon="link">
+                        <div style="padding: 1rem; max-height: 550px; overflow-y: auto;">
+                            <RadzenStack Gap="0.75rem">
+                                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Authorization & Logout Redirects</RadzenText>
+
+                                <RadzenFormField Text="Redirect URIs" Variant="Variant.Outlined">
+                                    <ChildContent>
+                                        <RadzenTextArea @bind-Value="@redirectUrisText"
+                                                       Style="width: 100%; height: 140px;"
+                                                       Placeholder="One URI per line, e.g. https://localhost:7257/signin-oidc" />
+                                    </ChildContent>
+                                    <Helper>
+                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                            URIs allowed to receive authorization responses (signin-oidc/callback). One per line.
+                                        </RadzenText>
+                                    </Helper>
+                                </RadzenFormField>
+
+                                <RadzenFormField Text="Post-logout Redirect URIs" Variant="Variant.Outlined">
+                                    <ChildContent>
+                                        <RadzenTextArea @bind-Value="@postLogoutUrisText"
+                                                       Style="width: 100%; height: 120px;"
+                                                       Placeholder="One URI per line, e.g. https://localhost:7257/signout-callback-oidc or https://localhost:7257/" />
+                                    </ChildContent>
+                                    <Helper>
+                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                            URIs the user can be redirected to after logout. One per line.
+                                        </RadzenText>
+                                    </Helper>
+                                </RadzenFormField>
+
+                                <RadzenAlert AlertStyle="AlertStyle.Info" ShowIcon="true">
+                                    <RadzenText TextStyle="TextStyle.Caption">
+                                        Changes here will update OpenIddict application settings immediately after saving.
+                                    </RadzenText>
+                                </RadzenAlert>
+                            </RadzenStack>
+                        </div>
+                    </RadzenTabsItem>
+
                     <!-- Session & Cookie Configuration Tab -->
                     <RadzenTabsItem Text="Session & Cookies" Icon="schedule">
                         <div style="padding: 1rem; max-height: 550px; overflow-y: auto;">
@@ -382,7 +423,7 @@
                                             </RadzenText>
                                         </Helper>
                                     </RadzenFormField>
-                                    <RadzenFormField Variant="Variant.Outlined">
+                                    <RadzenFormField Text="Allow users to remember consent" Variant="Variant.Outlined">
                                         <Start>
                                             <RadzenCheckBox @bind-Value="@model.AllowRememberConsent" TriState="true" Name="rememberConsent" />
                                         </Start>
@@ -396,7 +437,7 @@
                             <RadzenStack Gap="0.75rem" class="rz-mt-4 rz-mb-4">
                                 <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Endpoint Access</RadzenText>
                                 <RadzenStack Gap="1rem">
-                                    <RadzenFormField Text="API Endpoint Access" Variant="Variant.Outlined">
+                                    <RadzenFormField Text="Allow access to UserInfo endpoint" Variant="Variant.Outlined">
                                         <Start>
                                             <RadzenCheckBox @bind-Value="@model.AllowAccessToUserInfoEndpoint" TriState="true" Name="allowUserInfo" />
                                         </Start>
@@ -409,7 +450,7 @@
                                             </RadzenText>
                                         </Helper>
                                     </RadzenFormField>
-                                    <RadzenFormField Variant="Variant.Outlined">
+                                    <RadzenFormField Text="Allow token introspection" Variant="Variant.Outlined">
                                         <Start>
                                             <RadzenCheckBox @bind-Value="@model.AllowAccessToIntrospectionEndpoint" TriState="true" Name="allowIntrospection" />
                                         </Start>
@@ -417,7 +458,7 @@
                                             <RadzenLabel Text="Allow token introspection" Component="allowIntrospection" />
                                         </ChildContent>
                                     </RadzenFormField>
-                                    <RadzenFormField Variant="Variant.Outlined">
+                                    <RadzenFormField Text="Allow token revocation" Variant="Variant.Outlined">
                                         <Start>
                                             <RadzenCheckBox @bind-Value="@model.AllowAccessToRevocationEndpoint" TriState="true" Name="allowRevocation" />
                                         </Start>
@@ -436,7 +477,7 @@
                             <RadzenStack Gap="0.75rem" class="rz-mb-4">
                                 <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Token Claims</RadzenText>
                                 <RadzenStack Gap="1rem">
-                                    <RadzenFormField Variant="Variant.Outlined">
+                                    <RadzenFormField Text="Include JWT ID in tokens" Variant="Variant.Outlined">
                                         <Start>
                                             <RadzenCheckBox @bind-Value="@model.IncludeJwtId" TriState="true" Name="includeJti" />
                                         </Start>
@@ -444,7 +485,7 @@
                                             <RadzenLabel Text="Include JWT ID in tokens" Component="includeJti" />
                                         </ChildContent>
                                     </RadzenFormField>
-                                    <RadzenFormField Variant="Variant.Outlined">
+                                    <RadzenFormField Text="Always send client claims" Variant="Variant.Outlined">
                                         <Start>
                                             <RadzenCheckBox @bind-Value="@model.AlwaysSendClientClaims" TriState="true" Name="alwaysSendClientClaims" />
                                         </Start>
@@ -452,12 +493,12 @@
                                             <RadzenLabel Text="Always send client claims" Component="alwaysSendClientClaims" />
                                         </ChildContent>
                                     </RadzenFormField>
-                                    <RadzenFormField Variant="Variant.Outlined">
+                                    <RadzenFormField Text="Always include user claims in ID token" Variant="Variant.Outlined">
                                         <Start>
-                                            <RadzenCheckBox @bind-Value="@model.AlwaysIncludeUserClaimsInIdToken" TriState="true" Name="alwaysIncludeUserClaims" />
+                                            <RadzenCheckBox @bind-Value="@model.AlwaysIncludeUserClaimsInIdToken" TriState="true" Name="alwaysIncludeUserClaimsInIdToken" />
                                         </Start>
                                         <ChildContent>
-                                            <RadzenLabel Text="Always include user claims in ID token" Component="alwaysIncludeUserClaims" />
+                                            <RadzenLabel Text="Always include user claims in ID token" Component="alwaysIncludeUserClaimsInIdToken" />
                                         </ChildContent>
                                     </RadzenFormField>
 
@@ -478,7 +519,7 @@
                         </div>
                     </RadzenTabsItem>
 
-                    <!-- MFA Configuration Tab -->
+                    <!-- Multi-Factor Auth Tab -->
                     <RadzenTabsItem Text="Multi-Factor Auth" Icon="verified_user">
                         <div style="padding: 1rem; max-height: 550px; overflow-y: auto;">
                             <RadzenStack Gap="0.75rem" class="rz-mb-4">
@@ -942,23 +983,16 @@
                 </Tabs>
             </RadzenTabs>
 
-            <!-- Sticky Action Bar with Validation Summary -->
             <div class="rz-mt-4" style="position: sticky; bottom: 0; background: var(--rz-base-background); border-top: 1px solid var(--rz-panel-border); padding: 0.75rem 1rem; z-index: 10;">
                 <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
                     <ValidationSummary />
-
                     <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
-                        <RadzenButton Text="Cancel" Icon="cancel" ButtonStyle="ButtonStyle.Light" 
-                                      Click="@CancelEdit" />
+                        <RadzenButton Text="Cancel" Icon="cancel" ButtonStyle="ButtonStyle.Light" Click="@CancelEdit" />
                         @if (IsEdit)
                         {
-                            <RadzenButton Text="Reset to Defaults" Icon="restore" ButtonStyle="ButtonStyle.Warning" 
-                                          Click="@(async () => await ResetToDefaults())" />
+                            <RadzenButton Text="Reset to Defaults" Icon="restore" ButtonStyle="ButtonStyle.Warning" Click="@(async () => await ResetToDefaults())" />
                         }
-                        <RadzenButton Text="@(IsEdit ? "Update Client" : "Create Client")" 
-                                      Icon="@(IsEdit ? "save" : "add_circle")" 
-                                      ButtonStyle="ButtonStyle.Primary" 
-                                      ButtonType="ButtonType.Submit" />
+                        <RadzenButton Text="@(IsEdit ? "Update Client" : "Create Client")" Icon="@(IsEdit ? "save" : "add_circle")" ButtonStyle="ButtonStyle.Primary" ButtonType="ButtonType.Submit" />
                     </RadzenStack>
                 </RadzenStack>
             </div>
@@ -974,13 +1008,17 @@
     private List<ScopeDto> availableScopes = new();
     private bool isLoading = false;
     private int selectedTabIndex = 0;
-    
+
     // Dropdown data
     private List<DropdownItem<ClientType>> clientTypes = new();
     private List<DropdownItem<string>> sameSitePolicies = new();
     private List<DropdownItem<string>> accessTokenTypes = new();
-    private List<DropdownItem<string>> availableMfaMethods = new();
     private List<DropdownItem<bool?>> triStateOptions = new();
+    private List<DropdownItem<string>> availableMfaMethods = new();
+
+    // Multi-line text backing for URIs
+    private string redirectUrisText = string.Empty;
+    private string postLogoutUrisText = string.Empty;
 
     private bool IsEdit => !string.IsNullOrEmpty(Id);
 
@@ -989,7 +1027,7 @@
         await LoadRealms();
         await LoadScopes();
         InitializeDropdownData();
-        
+
         if (IsEdit && !string.IsNullOrEmpty(Id))
         {
             await LoadClient();
@@ -1028,6 +1066,13 @@
             new("Reference (Database lookup)", "Reference")
         };
 
+        triStateOptions = new()
+        {
+            new("Use realm default", null),
+            new("Enabled", true),
+            new("Disabled", false)
+        };
+
         availableMfaMethods = new()
         {
             new("Time-based OTP (TOTP)", "totp"),
@@ -1036,13 +1081,6 @@
             new("Push Notifications", "push"),
             new("Hardware Token", "hardware"),
             new("Biometric", "biometric")
-        };
-
-        triStateOptions = new()
-        {
-            new("Use realm default", null),
-            new("Enabled", true),
-            new("Disabled", false)
         };
     }
 
@@ -1084,6 +1122,8 @@
             {
                 // Map from ClientDto to CreateClientRequest with all new dynamic parameters
                 model = MapClientToRequest(client);
+                redirectUrisText = string.Join("\n", client.RedirectUris ?? new());
+                postLogoutUrisText = string.Join("\n", client.PostLogoutUris ?? new());
             }
         }
         catch (Exception ex)
@@ -1107,14 +1147,15 @@
             IsEnabled = client.IsEnabled,
             RealmId = client.RealmId,
             ClientType = client.ClientType,
-            
-            // Dynamic Configuration Parameters
+
+            // Session & cookie
             SessionTimeoutHours = client.SessionTimeoutHours,
             UseSlidingSessionExpiration = client.UseSlidingSessionExpiration,
             RememberMeDurationDays = client.RememberMeDurationDays,
             RequireHttpsForCookies = client.RequireHttpsForCookies,
             CookieSameSitePolicy = client.CookieSameSitePolicy,
-            
+
+            // Token lifecycle
             IdTokenLifetimeMinutes = client.IdTokenLifetimeMinutes,
             DeviceCodeLifetimeMinutes = client.DeviceCodeLifetimeMinutes,
             AccessTokenType = client.AccessTokenType,
@@ -1122,7 +1163,8 @@
             MaxRefreshTokensPerUser = client.MaxRefreshTokensPerUser,
             HashAccessTokens = client.HashAccessTokens,
             UpdateAccessTokenClaimsOnRefresh = client.UpdateAccessTokenClaimsOnRefresh,
-            
+
+            // Security & compliance
             RequireConsent = client.RequireConsent,
             AllowRememberConsent = client.AllowRememberConsent,
             AllowAccessToUserInfoEndpoint = client.AllowAccessToUserInfoEndpoint,
@@ -1132,16 +1174,19 @@
             AlwaysSendClientClaims = client.AlwaysSendClientClaims,
             AlwaysIncludeUserClaimsInIdToken = client.AlwaysIncludeUserClaimsInIdToken,
             ClientClaimsPrefix = client.ClientClaimsPrefix,
-            
+
+            // MFA
             RequireMfa = client.RequireMfa,
             MfaGracePeriodMinutes = client.MfaGracePeriodMinutes,
             AllowedMfaMethods = client.AllowedMfaMethods,
             RememberMfaForSession = client.RememberMfaForSession,
             
+            // Rate limits
             RateLimitRequestsPerMinute = client.RateLimitRequestsPerMinute,
             RateLimitRequestsPerHour = client.RateLimitRequestsPerHour,
             RateLimitRequestsPerDay = client.RateLimitRequestsPerDay,
             
+            // Branding & endpoints
             ThemeName = client.ThemeName,
             CustomCssUrl = client.CustomCssUrl,
             CustomJavaScriptUrl = client.CustomJavaScriptUrl,
@@ -1150,14 +1195,14 @@
             ClientUri = client.ClientUri,
             PolicyUri = client.PolicyUri,
             TosUri = client.TosUri,
-            
+
             BackChannelLogoutUri = client.BackChannelLogoutUri,
             BackChannelLogoutSessionRequired = client.BackChannelLogoutSessionRequired,
             FrontChannelLogoutUri = client.FrontChannelLogoutUri,
             FrontChannelLogoutSessionRequired = client.FrontChannelLogoutSessionRequired,
             AllowedCorsOrigins = client.AllowedCorsOrigins,
             AllowedIdentityProviders = client.AllowedIdentityProviders,
-            
+
             ProtocolType = client.ProtocolType,
             EnableDetailedErrors = client.EnableDetailedErrors,
             LogSensitiveData = client.LogSensitiveData,
@@ -1172,7 +1217,7 @@
     {
         if (string.IsNullOrEmpty(model.AllowedMfaMethods))
             return false;
-            
+
         try
         {
             var methods = System.Text.Json.JsonSerializer.Deserialize<string[]>(model.AllowedMfaMethods);
@@ -1187,7 +1232,7 @@
     private void ToggleMfaMethod(string method, bool selected)
     {
         var methods = new List<string>();
-        
+
         if (!string.IsNullOrEmpty(model.AllowedMfaMethods))
         {
             try
@@ -1209,19 +1254,93 @@
             methods.Remove(method);
         }
 
-        model.AllowedMfaMethods = methods.Any() ? 
-            System.Text.Json.JsonSerializer.Serialize(methods.ToArray()) : 
-            null;
+        model.AllowedMfaMethods = methods.Any()
+            ? System.Text.Json.JsonSerializer.Serialize(methods.ToArray())
+            : null;
     }
 
     private async Task OnSave(CreateClientRequest formModel)
     {
         try
         {
+            // Sync URI lists from multi-line text boxes
+            formModel.RedirectUris = SplitLines(redirectUrisText).ToList();
+            formModel.PostLogoutUris = SplitLines(postLogoutUrisText).ToList();
+
             if (IsEdit)
             {
-                // For updates, use the CreateClientRequest directly since UpdateClientAsync should accept it
-                var result = await ClientsApiService.UpdateClientAsync(Id!, formModel);
+                var update = new UpdateClientRequest
+                {
+                    Name = formModel.Name,
+                    Description = formModel.Description,
+                    IsEnabled = formModel.IsEnabled,
+                    ClientType = formModel.ClientType,
+                    AllowAuthorizationCodeFlow = formModel.AllowAuthorizationCodeFlow,
+                    AllowClientCredentialsFlow = formModel.AllowClientCredentialsFlow,
+                    AllowPasswordFlow = formModel.AllowPasswordFlow,
+                    AllowRefreshTokenFlow = formModel.AllowRefreshTokenFlow,
+                    RequirePkce = formModel.RequirePkce,
+                    RequireClientSecret = formModel.RequireClientSecret,
+                    AccessTokenLifetime = formModel.AccessTokenLifetime,
+                    RefreshTokenLifetime = formModel.RefreshTokenLifetime,
+                    AuthorizationCodeLifetime = formModel.AuthorizationCodeLifetime,
+                    RedirectUris = formModel.RedirectUris,
+                    PostLogoutUris = formModel.PostLogoutUris,
+
+                    // dynamic config
+                    SessionTimeoutHours = formModel.SessionTimeoutHours,
+                    UseSlidingSessionExpiration = formModel.UseSlidingSessionExpiration,
+                    RememberMeDurationDays = formModel.RememberMeDurationDays,
+                    RequireHttpsForCookies = formModel.RequireHttpsForCookies,
+                    CookieSameSitePolicy = formModel.CookieSameSitePolicy,
+                    IdTokenLifetimeMinutes = formModel.IdTokenLifetimeMinutes,
+                    DeviceCodeLifetimeMinutes = formModel.DeviceCodeLifetimeMinutes,
+                    AccessTokenType = formModel.AccessTokenType,
+                    UseOneTimeRefreshTokens = formModel.UseOneTimeRefreshTokens,
+                    MaxRefreshTokensPerUser = formModel.MaxRefreshTokensPerUser,
+                    HashAccessTokens = formModel.HashAccessTokens,
+                    UpdateAccessTokenClaimsOnRefresh = formModel.UpdateAccessTokenClaimsOnRefresh,
+                    RequireConsent = formModel.RequireConsent,
+                    AllowRememberConsent = formModel.AllowRememberConsent,
+                    AllowAccessToUserInfoEndpoint = formModel.AllowAccessToUserInfoEndpoint,
+                    AllowAccessToIntrospectionEndpoint = formModel.AllowAccessToIntrospectionEndpoint,
+                    AllowAccessToRevocationEndpoint = formModel.AllowAccessToRevocationEndpoint,
+                    IncludeJwtId = formModel.IncludeJwtId,
+                    AlwaysSendClientClaims = formModel.AlwaysSendClientClaims,
+                    AlwaysIncludeUserClaimsInIdToken = formModel.AlwaysIncludeUserClaimsInIdToken,
+
+                    // MFA & limits & branding & integrations
+                    RequireMfa = formModel.RequireMfa,
+                    MfaGracePeriodMinutes = formModel.MfaGracePeriodMinutes,
+                    AllowedMfaMethods = formModel.AllowedMfaMethods,
+                    RememberMfaForSession = formModel.RememberMfaForSession,
+                    RateLimitRequestsPerMinute = formModel.RateLimitRequestsPerMinute,
+                    RateLimitRequestsPerHour = formModel.RateLimitRequestsPerHour,
+                    RateLimitRequestsPerDay = formModel.RateLimitRequestsPerDay,
+                    ThemeName = formModel.ThemeName,
+                    CustomCssUrl = formModel.CustomCssUrl,
+                    CustomJavaScriptUrl = formModel.CustomJavaScriptUrl,
+                    PageTitlePrefix = formModel.PageTitlePrefix,
+                    LogoUri = formModel.LogoUri,
+                    ClientUri = formModel.ClientUri,
+                    PolicyUri = formModel.PolicyUri,
+                    TosUri = formModel.TosUri,
+                    BackChannelLogoutUri = formModel.BackChannelLogoutUri,
+                    BackChannelLogoutSessionRequired = formModel.BackChannelLogoutSessionRequired,
+                    FrontChannelLogoutUri = formModel.FrontChannelLogoutUri,
+                    FrontChannelLogoutSessionRequired = formModel.FrontChannelLogoutSessionRequired,
+                    AllowedCorsOrigins = formModel.AllowedCorsOrigins,
+                    AllowedIdentityProviders = formModel.AllowedIdentityProviders,
+                    ProtocolType = formModel.ProtocolType,
+                    EnableDetailedErrors = formModel.EnableDetailedErrors,
+                    LogSensitiveData = formModel.LogSensitiveData,
+                    EnableLocalLogin = formModel.EnableLocalLogin,
+                    CustomLoginPageUrl = formModel.CustomLoginPageUrl,
+                    CustomLogoutPageUrl = formModel.CustomLogoutPageUrl,
+                    CustomErrorPageUrl = formModel.CustomErrorPageUrl
+                };
+
+                var result = await ClientsApiService.UpdateClientAsync(Id!, update);
                 if (result != null)
                 {
                     NotificationService.Notify(NotificationSeverity.Success, "Success", "Client updated successfully");
@@ -1247,10 +1366,7 @@
 
     private async Task ResetToDefaults()
     {
-        var result = await DialogService.Confirm("Reset all dynamic configuration to realm/system defaults?", 
-            "Reset Configuration", 
-            new ConfirmOptions() { OkButtonText = "Reset", CancelButtonText = "Cancel" });
-        
+        var result = await DialogService.Confirm("Reset all dynamic configuration to realm/system defaults?", "Reset Configuration", new ConfirmOptions() { OkButtonText = "Reset", CancelButtonText = "Cancel" });
         if (result == true)
         {
             // Reset nullable dynamic parameters to null (will use defaults)
@@ -1263,7 +1379,7 @@
             model.RateLimitRequestsPerMinute = null;
             model.RateLimitRequestsPerHour = null;
             model.RateLimitRequestsPerDay = null;
-            
+
             // Reset strings to null
             model.CookieSameSitePolicy = null;
             model.AccessTokenType = null;
@@ -1273,7 +1389,7 @@
             model.CustomJavaScriptUrl = null;
             model.PageTitlePrefix = null;
             model.ClientClaimsPrefix = null;
-            
+
             NotificationService.Notify(NotificationSeverity.Info, "Reset", "Configuration reset to defaults");
             StateHasChanged();
         }
@@ -1284,6 +1400,12 @@
         Navigation.NavigateTo("/clients");
     }
 
-    // Helper class for dropdown items
+    private IEnumerable<string> SplitLines(string? multi)
+    {
+        if (string.IsNullOrWhiteSpace(multi)) yield break;
+        var parts = multi.Replace("\r", "").Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        foreach (var p in parts) yield return p;
+    }
+
     private record DropdownItem<T>(string Text, T Value);
 }

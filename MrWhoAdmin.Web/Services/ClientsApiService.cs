@@ -112,7 +112,7 @@ public class ClientsApiService : IClientsApiService
         }
     }
 
-    public async Task<ClientDto?> UpdateClientAsync(string id, CreateClientRequest request)
+    public async Task<ClientDto?> UpdateClientAsync(string id, UpdateClientRequest request)
     {
         try
         {
