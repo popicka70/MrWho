@@ -143,6 +143,25 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         _logger.LogDebug("? User found: {UserName} (ID: {UserId}) for client {ClientId}", 
             user.UserName, user.Id, clientId);
 
+        // NEW: Enforce realm/client access assignment before issuing authorization code
+        try
+        {
+            var realmValidation = await _realmValidationService.ValidateUserRealmAccessAsync(user, clientId);
+            if (!realmValidation.IsValid)
+            {
+                _logger.LogWarning("Access denied for user {UserName} to client {ClientId}. Reason: {Reason} (Code: {Code}, ClientRealm: {Realm})",
+                    user.UserName, clientId, realmValidation.Reason, realmValidation.ErrorCode, realmValidation.ClientRealm);
+                await SafeSignOutClientAsync(clientId);
+                return Results.Forbid();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during realm validation for user {UserId} and client {ClientId}", user.Id, clientId);
+            await SafeSignOutClientAsync(clientId);
+            return Results.Forbid();
+        }
+
         // New: enforce user profile state must be Active
         try
         {
