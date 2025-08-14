@@ -1,0 +1,120 @@
+@page "/users/registrations"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject IRegistrationsApiService RegistrationsApi
+@inject NotificationService NotificationService
+@inject ILogger<PendingRegistrations> Logger
+
+<PageTitle>Pending Registrations - MrWho Admin</PageTitle>
+
+<RadzenStack Gap="0.75rem">
+    <RadzenText TextStyle="TextStyle.H3" TagName="TagName.H1" class="rz-pt-4">
+        <RadzenIcon Icon="how_to_reg" class="rz-me-1" />
+        Pending User Registrations
+    </RadzenText>
+
+    <RadzenCard>
+        @if (isLoading)
+        {
+            <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+            <RadzenText class="rz-mt-3">Loading pending users...</RadzenText>
+        }
+        else if (!pending.Any())
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Info" ShowIcon="true">
+                <RadzenText>No pending registrations found.</RadzenText>
+            </RadzenAlert>
+        }
+        else
+        {
+            <RadzenDataGrid Data="@pending" TItem="PendingUserDto" AllowPaging="true" PageSize="10">
+                <Columns>
+                    <RadzenDataGridColumn TItem="PendingUserDto" Property="DisplayName" Title="Name" />
+                    <RadzenDataGridColumn TItem="PendingUserDto" Property="Email" Title="Email" />
+                    <RadzenDataGridColumn TItem="PendingUserDto" Property="State" Title="State" />
+                    <RadzenDataGridColumn TItem="PendingUserDto" Property="CreatedAt" Title="Created" />
+                    <RadzenDataGridColumn TItem="PendingUserDto" Title="Actions" Sortable="false" Width="220px">
+                        <Template Context="item">
+                            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                                <RadzenButton Text="Approve" Icon="check" ButtonStyle="ButtonStyle.Success" Click="@(async ()=> await Approve(item))" />
+                                <RadzenButton Text="Reject" Icon="close" ButtonStyle="ButtonStyle.Danger" Click="@(async ()=> await Reject(item))" />
+                            </RadzenStack>
+                        </Template>
+                    </RadzenDataGridColumn>
+                </Columns>
+            </RadzenDataGrid>
+        }
+    </RadzenCard>
+</RadzenStack>
+
+@code {
+    private bool isLoading = true;
+    private List<PendingUserDto> pending = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        try
+        {
+            pending = await RegistrationsApi.GetPendingAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading pending registrations");
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to load pending registrations");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task Approve(PendingUserDto item)
+    {
+        try
+        {
+            var ok = await RegistrationsApi.ApproveAsync(item.Id);
+            if (ok)
+            {
+                NotificationService.Notify(NotificationSeverity.Success, "Approved", $"Approved {item.Email}");
+                await LoadAsync();
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Approve failed");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Approve failed");
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Approve failed");
+        }
+    }
+
+    private async Task Reject(PendingUserDto item)
+    {
+        try
+        {
+            var ok = await RegistrationsApi.RejectAsync(item.Id);
+            if (ok)
+            {
+                NotificationService.Notify(NotificationSeverity.Success, "Rejected", $"Rejected {item.Email}");
+                await LoadAsync();
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Reject failed");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Reject failed");
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Reject failed");
+        }
+    }
+}

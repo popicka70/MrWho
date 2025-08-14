@@ -42,6 +42,9 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
     public DbSet<PersistentQrSession> PersistentQrSessions { get; set; }
     public DbSet<DeviceAuthenticationLog> DeviceAuthenticationLogs { get; set; }
 
+    // User profile
+    public DbSet<UserProfile> UserProfiles { get; set; }
+
     // Data Protection keys for antiforgery/auth cookie encryption persistence
     public DbSet<Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.DataProtectionKey> DataProtectionKeys { get; set; }
 
@@ -49,6 +52,15 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
     {
         base.OnModelCreating(builder);
         builder.UseOpenIddict();
+
+        // Configure UserProfile entity
+        builder.Entity<UserProfile>(entity =>
+        {
+            entity.HasKey(p => p.UserId);
+            entity.Property(p => p.FirstName).HasMaxLength(256);
+            entity.Property(p => p.LastName).HasMaxLength(256);
+            entity.Property(p => p.DisplayName).HasMaxLength(512);
+        });
 
         // Configure Realm entity
         builder.Entity<Realm>(entity =>

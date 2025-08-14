@@ -9,6 +9,9 @@ using MrWho.Services;
 using System.Security.Claims;
 using System.Web;
 using static OpenIddict.Abstractions.OpenIddictConstants;
+using MrWho.Shared.Models;
+using MrWho.Data;
+using MrWho.Models;
 
 namespace MrWho.Controllers;
 
@@ -20,6 +23,7 @@ public class AuthController : Controller
     private readonly IClientCookieConfigurationService _cookieService;
     private readonly IDynamicCookieService _dynamicCookieService;
     private readonly IOpenIddictApplicationManager _applicationManager;
+    private readonly ApplicationDbContext _db;
     private readonly ILogger<AuthController> _logger;
 
     public AuthController(
@@ -28,6 +32,7 @@ public class AuthController : Controller
         IClientCookieConfigurationService cookieService,
         IDynamicCookieService dynamicCookieService,
         IOpenIddictApplicationManager applicationManager,
+        ApplicationDbContext db,
         ILogger<AuthController> logger)
     {
         _signInManager = signInManager;
@@ -35,6 +40,7 @@ public class AuthController : Controller
         _cookieService = cookieService;
         _dynamicCookieService = dynamicCookieService;
         _applicationManager = applicationManager;
+        _db = db;
         _logger = logger;
     }
 
@@ -542,6 +548,73 @@ public class AuthController : Controller
 
         ViewData["ClientName"] = clientName;
         return View();
+    }
+
+    [HttpGet("register")]
+    [AllowAnonymous]
+    public IActionResult Register()
+    {
+        return View("Register", new RegisterUserRequest());
+    }
+
+    [HttpPost("register")]
+    [AllowAnonymous]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Register([FromForm] RegisterUserRequest input)
+    {
+        if (!ModelState.IsValid)
+        {
+            return View("Register", input);
+        }
+
+        // Check uniqueness
+        var existingByEmail = await _userManager.FindByEmailAsync(input.Email);
+        if (existingByEmail != null)
+        {
+            ModelState.AddModelError("Email", "An account with this email already exists.");
+            return View("Register", input);
+        }
+
+        // Use email as username for now
+        var user = new IdentityUser
+        {
+            UserName = input.Email,
+            Email = input.Email,
+            EmailConfirmed = false
+        };
+
+        var result = await _userManager.CreateAsync(user, input.Password);
+        if (!result.Succeeded)
+        {
+            foreach (var error in result.Errors)
+            {
+                ModelState.AddModelError(string.Empty, error.Description);
+            }
+            return View("Register", input);
+        }
+
+        // Create profile with state New
+        var profile = new UserProfile
+        {
+            UserId = user.Id,
+            FirstName = input.FirstName,
+            LastName = input.LastName,
+            DisplayName = $"{input.FirstName} {input.LastName}".Trim(),
+            State = UserState.New,
+            CreatedAt = DateTime.UtcNow
+        };
+        _db.UserProfiles.Add(profile);
+        await _db.SaveChangesAsync();
+
+        TempData["RegistrationSuccess"] = true;
+        return RedirectToAction("RegisterSuccess");
+    }
+
+    [HttpGet("register/success")]
+    [AllowAnonymous]
+    public IActionResult RegisterSuccess()
+    {
+        return View("RegisterSuccess");
     }
 }
 

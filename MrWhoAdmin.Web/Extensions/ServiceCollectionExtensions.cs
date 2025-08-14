@@ -173,6 +173,15 @@ public static class ServiceCollectionExtensions
         })
         .AddHttpMessageHandler<AuthenticationDelegatingHandler>();
 
+        // Add Registrations API service
+        services.AddHttpClient<IRegistrationsApiService, RegistrationsApiService>(client =>
+        {
+            client.BaseAddress = new Uri(mrWhoApiBaseUrl);
+            client.DefaultRequestHeaders.Add("Accept", "application/json");
+            client.Timeout = defaultTimeout;
+        })
+        .AddHttpMessageHandler<AuthenticationDelegatingHandler>();
+
         return services;
     }
 
