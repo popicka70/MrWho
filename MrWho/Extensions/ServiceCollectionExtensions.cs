@@ -19,6 +19,7 @@ using System.Reflection;
 using System.Runtime.Loader;
 using System.IO;
 using System.Linq;
+using Microsoft.EntityFrameworkCore.Diagnostics; // Added for ConfigureWarnings/RelationalEventId
 
 namespace MrWho.Extensions;
 
@@ -94,6 +95,7 @@ public static class ServiceCollectionExtensions
         // Multi-provider database configuration (SqlServer/MySql/Postgres)
         var config = builder.Configuration;
         var services = builder.Services;
+        var isDevelopment = builder.Environment.IsDevelopment();
 
         var provider = (config["Database:Provider"] ?? "SqlServer").Trim().ToLowerInvariant();
     var connectionName = config["Database:ConnectionName"] ?? "mrwhodb";
@@ -184,6 +186,12 @@ public static class ServiceCollectionExtensions
                             b.MigrationsAssembly(migrationsAssembly);
                     });
                     break;
+            }
+
+            // In development, log (do not throw) when EF detects pending model changes so the app can migrate/apply.
+            if (isDevelopment)
+            {
+                options.ConfigureWarnings(w => w.Log(RelationalEventId.PendingModelChangesWarning));
             }
 
             // Required by OpenIddict EF stores

@@ -94,8 +94,21 @@ public class ClientExportDto
     public List<string> Scopes { get; set; } = new();
     public List<string> Permissions { get; set; } = new();
 
+    // Assigned users (portable references - no DB IDs)
+    public List<ClientAssignedUserRef> AssignedUsers { get; set; } = new();
+
     // Metadata
     public string ExportedBy { get; set; } = "System";
     public DateTime ExportedAtUtc { get; set; } = DateTime.UtcNow;
-    public string FormatVersion { get; set; } = "1.0";
+    public string FormatVersion { get; set; } = "1.1";
+}
+
+/// <summary>
+/// Portable reference to a user for client assignment import/export.
+/// Prefer matching by UserName; fall back to Email if provided.
+/// </summary>
+public class ClientAssignedUserRef
+{
+    public string? UserName { get; set; }
+    public string? Email { get; set; }
 }

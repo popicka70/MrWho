@@ -6,6 +6,9 @@ using System.Security.Claims;
 using MrWho.Services;
 using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.AspNetCore;
+using MrWho.Data;
+using Microsoft.EntityFrameworkCore;
+using MrWho.Models;
 
 namespace MrWho.Handlers;
 
@@ -21,6 +24,7 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
     private readonly IClientCookieConfigurationService _cookieService;
     private readonly IDynamicCookieService _dynamicCookieService;
     private readonly IUserRealmValidationService _realmValidationService;
+    private readonly ApplicationDbContext _context;
     private readonly ILogger<OidcAuthorizationHandler> _logger;
 
     public OidcAuthorizationHandler(
@@ -29,6 +33,7 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         IClientCookieConfigurationService cookieService,
         IDynamicCookieService dynamicCookieService,
         IUserRealmValidationService realmValidationService,
+        ApplicationDbContext context,
         ILogger<OidcAuthorizationHandler> logger)
     {
         _userManager = userManager;
@@ -36,6 +41,7 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         _cookieService = cookieService;
         _dynamicCookieService = dynamicCookieService;
         _realmValidationService = realmValidationService;
+        _context = context;
         _logger = logger;
     }
 
@@ -133,6 +139,31 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         _logger.LogDebug("? User found: {UserName} (ID: {UserId}) for client {ClientId}", 
             user.UserName, user.Id, clientId);
 
+        // New: enforce user profile state must be Active
+        try
+        {
+            var profile = await _context.UserProfiles.AsNoTracking().FirstOrDefaultAsync(p => p.UserId == user.Id);
+            if (profile == null)
+            {
+                _logger.LogWarning("User {UserName} has no profile. Denying authorization.", user.UserName);
+                await SafeSignOutClientAsync(clientId);
+                return Results.Forbid();
+            }
+
+            if (profile.State != UserState.Active)
+            {
+                _logger.LogWarning("User {UserName} state is {State}. Denying authorization for client {ClientId}.", user.UserName, profile.State, clientId);
+                await SafeSignOutClientAsync(clientId);
+                return Results.Forbid();
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error checking user profile state for user {UserId}", user.Id);
+            await SafeSignOutClientAsync(clientId);
+            return Results.Forbid();
+        }
+
         // CRITICAL: Validate user can access this client based on realm restrictions
         var realmValidation = await _realmValidationService.ValidateUserRealmAccessAsync(user, clientId);
         if (!realmValidation.IsValid)
@@ -142,16 +173,7 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
             _logger.LogWarning("   ?? Realm Details: UserRealm='{UserRealm}', ClientRealm='{ClientRealm}'", 
                 realmValidation.UserRealm, realmValidation.ClientRealm);
 
-            // Sign out the user from client-specific authentication since they don't have access
-            try
-            {
-                await _dynamicCookieService.SignOutFromClientAsync(clientId);
-                _logger.LogDebug("Signed out user from client-specific authentication due to realm validation failure");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to sign out from client-specific authentication");
-            }
+            await SafeSignOutClientAsync(clientId);
 
             // Return access denied error
             return Results.Forbid();
@@ -240,6 +262,18 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
             user.UserName, clientId);
 
         return Results.SignIn(authPrincipal, authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+    }
+
+    private async Task SafeSignOutClientAsync(string clientId)
+    {
+        try
+        {
+            await _dynamicCookieService.SignOutFromClientAsync(clientId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to sign out from client-specific authentication");
+        }
     }
 
     /// <summary>

@@ -776,6 +776,33 @@ namespace MrWho.Migrations.SqlServer.Migrations
                         onDelete: ReferentialAction.Cascade);
                 });
 
+            migrationBuilder.CreateTable(
+                name: "ClientUsers",
+                columns: table => new
+                {
+                    Id = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    ClientId = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    UserId = table.Column<string>(type: "nvarchar(450)", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    CreatedBy = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ClientUsers", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_ClientUsers_AspNetUsers_UserId",
+                        column: x => x.UserId,
+                        principalTable: "AspNetUsers",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_ClientUsers_Clients_ClientId",
+                        column: x => x.ClientId,
+                        principalTable: "Clients",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
             migrationBuilder.CreateIndex(
                 name: "IX_ApiResourceClaims_ApiResourceId_ClaimType",
                 table: "ApiResourceClaims",
@@ -872,6 +899,17 @@ namespace MrWho.Migrations.SqlServer.Migrations
                 table: "ClientScopes",
                 columns: new[] { "ClientId", "Scope" },
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ClientUsers_ClientId_UserId",
+                table: "ClientUsers",
+                columns: new[] { "ClientId", "UserId" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ClientUsers_UserId",
+                table: "ClientUsers",
+                column: "UserId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_DeviceAuthenticationLogs_ActivityType_OccurredAt",
@@ -1051,6 +1089,9 @@ namespace MrWho.Migrations.SqlServer.Migrations
 
             migrationBuilder.DropTable(
                 name: "ClientScopes");
+
+            migrationBuilder.DropTable(
+                name: "ClientUsers");
 
             migrationBuilder.DropTable(
                 name: "DataProtectionKeys");

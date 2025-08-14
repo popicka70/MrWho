@@ -20,6 +20,7 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
     public DbSet<ClientPostLogoutUri> ClientPostLogoutUris { get; set; }
     public DbSet<ClientScope> ClientScopes { get; set; }
     public DbSet<ClientPermission> ClientPermissions { get; set; }
+    public DbSet<ClientUser> ClientUsers { get; set; }
     
     // Scope management entities
     public DbSet<Scope> Scopes { get; set; }
@@ -41,6 +42,9 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
     public DbSet<PersistentQrSession> PersistentQrSessions { get; set; }
     public DbSet<DeviceAuthenticationLog> DeviceAuthenticationLogs { get; set; }
 
+    // User profile
+    public DbSet<UserProfile> UserProfiles { get; set; }
+
     // Data Protection keys for antiforgery/auth cookie encryption persistence
     public DbSet<Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.DataProtectionKey> DataProtectionKeys { get; set; }
 
@@ -48,6 +52,15 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
     {
         base.OnModelCreating(builder);
         builder.UseOpenIddict();
+
+        // Configure UserProfile entity
+        builder.Entity<UserProfile>(entity =>
+        {
+            entity.HasKey(p => p.UserId);
+            entity.Property(p => p.FirstName).HasMaxLength(256);
+            entity.Property(p => p.LastName).HasMaxLength(256);
+            entity.Property(p => p.DisplayName).HasMaxLength(512);
+        });
 
         // Configure Realm entity
         builder.Entity<Realm>(entity =>
@@ -83,6 +96,21 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
             entity.Property(c => c.AuthorizationCodeLifetime).HasConversion(
                 v => v.HasValue ? v.Value.TotalMinutes : (double?)null,
                 v => v.HasValue ? TimeSpan.FromMinutes(v.Value) : null);
+        });
+
+        // Configure ClientUser entity (user-client assignments)
+        builder.Entity<ClientUser>(entity =>
+        {
+            entity.HasKey(cu => cu.Id);
+            entity.HasIndex(cu => new { cu.ClientId, cu.UserId }).IsUnique();
+            entity.HasOne(cu => cu.Client)
+                  .WithMany()
+                  .HasForeignKey(cu => cu.ClientId)
+                  .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(cu => cu.User)
+                  .WithMany()
+                  .HasForeignKey(cu => cu.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
         });
 
         // Configure Identity Resource entities

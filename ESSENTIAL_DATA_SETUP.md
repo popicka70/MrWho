@@ -47,7 +47,7 @@ The MrWho OIDC server now automatically creates essential data that must always 
 ### 3. Admin User
 - **Username**: `admin@mrwho.local`
 - **Email**: `admin@mrwho.local`
-- **Password**: `MrWhoAdmin2024!`
+- **Password**: `Adm1n#2025!G7x`
 - **Email Confirmed**: ?
 
 ## Application Configuration

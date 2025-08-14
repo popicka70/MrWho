@@ -212,7 +212,7 @@ public sealed class AdminClientInfoHandler : IRequestHandler<AdminClientInfoRequ
             Scopes = adminClient.Scopes.Select(s => s.Scope).ToArray(),
             SampleAuthUrl = $"https://localhost:7113/connect/authorize?client_id={adminClient.ClientId}&response_type=code&redirect_uri=https://localhost:7257/signin-oidc&scope=openid%20email%20profile%20roles%20api.read%20api.write&state=admin_test",
             SampleLogoutUrl = "https://localhost:7113/connect/logout?post_logout_redirect_uri=https://localhost:7257/signout-callback-oidc",
-            AdminCredentials = new { Username = "admin@mrwho.local", Password = "MrWhoAdmin2024!" }
+            AdminCredentials = new { Username = "admin@mrwho.local", Password = "Adm1n#2025!G7x" }
         });
     }
 }
@@ -303,7 +303,7 @@ public sealed class EssentialDataHandler : IRequestHandler<EssentialDataRequest,
             SetupInstructions = new
             {
                 LoginUrl = "https://localhost:7257/login",
-                AdminCredentials = new { Username = "admin@mrwho.local", Password = "MrWhoAdmin2024!" }
+                AdminCredentials = new { Username = "admin@mrwho.local", Password = "Adm1n#2025!G7x" }
             }
         });
     }
