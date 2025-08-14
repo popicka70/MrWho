@@ -568,6 +568,32 @@ public static class WebApplicationExtensions
                         throw;
                     }
                 }
+                catch (InvalidOperationException ex) when (ex.Message.Contains("PendingModelChangesWarning", StringComparison.OrdinalIgnoreCase))
+                {
+                    // EF Core detected model changes not covered by migrations.
+                    logger.LogWarning("EF Core detected pending model changes without corresponding migrations. {Message}", ex.Message);
+
+                    if (app.Environment.IsDevelopment())
+                    {
+                        logger.LogWarning("Development environment detected. Falling back to EnsureDeleted + EnsureCreated to unblock startup. Generate proper migrations ASAP.");
+                        try
+                        {
+                            await context.Database.EnsureDeletedAsync();
+                            await context.Database.EnsureCreatedAsync();
+                            Console.WriteLine("Database recreated using EnsureCreated due to pending model changes (DEV only fallback)");
+                        }
+                        catch (Exception fallbackEx)
+                        {
+                            logger.LogError(fallbackEx, "Failed EnsureCreated fallback after PendingModelChangesWarning");
+                            throw;
+                        }
+                    }
+                    else
+                    {
+                        logger.LogError("Pending model changes detected in non-development environment. The application requires migrations to be created and applied.");
+                        throw; // Re-throw for production/staging to force proper migrations
+                    }
+                }
                 catch (Exception ex) when (ex.Message.Contains("No migrations were found", StringComparison.OrdinalIgnoreCase))
                 {
                     // Migrations assembly discovered but has no migrations, or assembly not loaded
@@ -664,6 +690,8 @@ public static class WebApplicationExtensions
                     // Admin and seeded demo/test users should be Active by default
                     var isSeeded = string.Equals(u.UserName, "admin@mrwho.local", StringComparison.OrdinalIgnoreCase)
                                    || string.Equals(u.Email, "admin@mrwho.local", StringComparison.OrdinalIgnoreCase)
+                                   || string.Equals(u.UserName, "mrwho_admin@mrwho.local", StringComparison.OrdinalIgnoreCase)
+                                   || string.Equals(u.Email, "mrwho_admin@mrwho.local", StringComparison.OrdinalIgnoreCase)
                                    || string.Equals(u.UserName, "demo1@example.com", StringComparison.OrdinalIgnoreCase)
                                    || string.Equals(u.Email, "demo1@example.com", StringComparison.OrdinalIgnoreCase)
                                    || string.Equals(u.UserName, "test@example.com", StringComparison.OrdinalIgnoreCase)
