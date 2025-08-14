@@ -84,7 +84,7 @@ builder.Services.AddAuthentication(options =>
 .AddOpenIdConnect(OpenIdConnectDefaults.AuthenticationScheme, options => // Use standard OIDC scheme
 {
     options.SignInScheme = demo1CookieScheme;
-    options.Authority = "https://localhost:7113"; // MrWho OIDC Server
+    options.Authority = "https://mrwho-production.up.railway.app"; // MrWho OIDC Server (Production)
     options.ClientId = "mrwho_demo1";
     options.ClientSecret = "Demo1Secret2024!";
     options.ResponseType = OpenIdConnectResponseType.Code;
@@ -103,8 +103,8 @@ builder.Services.AddAuthentication(options =>
     // Use PKCE for additional security
     options.UsePkce = true;
     
-    // SSL configuration for development
-    options.RequireHttpsMetadata = false; // Only for development
+    // SSL configuration for production authority
+    options.RequireHttpsMetadata = true; // Production: require HTTPS metadata
     
     // Disable the default inbound claim type mappings to preserve JWT claim names
     options.MapInboundClaims = false;
