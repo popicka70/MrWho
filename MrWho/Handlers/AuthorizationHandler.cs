@@ -122,6 +122,8 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
                 string.Join(", ", principal.Claims.Select(c => $"{c.Type}={c.Value}")));
             _logger.LogWarning("   ?? Looking for: {NameId} OR {Subject}", 
                 ClaimTypes.NameIdentifier, OpenIddictConstants.Claims.Subject);
+            // The client-specific authentication is invalid/corrupt; clear it to avoid loops
+            await SafeSignOutClientAsync(clientId);
             return Results.Forbid();
         }
 
@@ -133,6 +135,8 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         {
             _logger.LogWarning("? User not found for subject {Subject} (client: {ClientId})", subjectClaim.Value, clientId);
             _logger.LogWarning("   ?? Subject claim type: {ClaimType}", subjectClaim.Type);
+            // Stale session (user deleted/renamed). Clear client-specific auth.
+            await SafeSignOutClientAsync(clientId);
             return Results.Forbid();
         }
 
