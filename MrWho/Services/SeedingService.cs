@@ -172,7 +172,8 @@ public class SeedingService : ISeedingService
     private async Task SeedDefaultUser()
     {
         const string defaultEmail = "admin@mrwho.local";
-        const string defaultPassword = "Admin123!";
+        // Stronger, more random-looking development seed password
+        const string defaultPassword = "Adm1n#2025!G7x";
 
         if (await _userManager.FindByEmailAsync(defaultEmail) == null)
         {

@@ -387,7 +387,8 @@ public class OidcClientService : IOidcClientService
                 EmailConfirmed = true
             };
 
-            var result = await _userManager.CreateAsync(adminUser, "MrWhoAdmin2024!");
+            // Stronger, more random-looking development seed password
+            var result = await _userManager.CreateAsync(adminUser, "Adm1n#2025!G7x");
             if (result.Succeeded)
             {
                 // Add name claims to admin user for proper display name
@@ -459,7 +460,8 @@ public class OidcClientService : IOidcClientService
                 EmailConfirmed = true
             };
 
-            var result = await _userManager.CreateAsync(demo1User, "Demo123");
+            // Stronger sample password for development/demo user
+            var result = await _userManager.CreateAsync(demo1User, "Dem0!User#2025");
             if (result.Succeeded)
             {
                 // Add name claims to demo1 user for proper display name

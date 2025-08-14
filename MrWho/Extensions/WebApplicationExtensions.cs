@@ -628,7 +628,8 @@ public static class WebApplicationExtensions
                 Email = "test@example.com", 
                 EmailConfirmed = true 
             };
-            var result = await userManager.CreateAsync(testUser, "Test123!");
+            // Stronger seed password for test user
+            var result = await userManager.CreateAsync(testUser, "T3st#User!2025");
             if (result.Succeeded)
             {
                 // Add name claims to test user
@@ -649,7 +650,7 @@ public static class WebApplicationExtensions
                 Email = "jane.smith@example.com", 
                 EmailConfirmed = true 
             };
-            var result = await userManager.CreateAsync(janeUser, "Test123!");
+            var result = await userManager.CreateAsync(janeUser, "J@ne#Smith2025");
             if (result.Succeeded)
             {
                 // Add name claims to Jane
@@ -670,7 +671,7 @@ public static class WebApplicationExtensions
                 Email = "bob.wilson@example.com", 
                 EmailConfirmed = true 
             };
-            var result = await userManager.CreateAsync(bobUser, "Test123!");
+            var result = await userManager.CreateAsync(bobUser, "B0b#Wilson!2025");
             if (result.Succeeded)
             {
                 // Intentionally not adding name claims to test email-based fallback
