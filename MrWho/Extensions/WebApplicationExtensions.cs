@@ -19,6 +19,7 @@ using Microsoft.AspNetCore.Mvc;
 using static OpenIddict.Abstractions.OpenIddictConstants;
 using MrWho.Shared;
 using Microsoft.AspNetCore.HttpOverrides;
+using MrWho.Models; // added for UserProfile, UserState
 
 namespace MrWho.Extensions;
 
@@ -519,8 +520,10 @@ public static class WebApplicationExtensions
             {
                 try
                 {
-                    // Check if database exists, if not create it with migrations
+                    // Check migrations state
                     var pendingMigrations = await context.Database.GetPendingMigrationsAsync();
+                    var appliedMigrations = await context.Database.GetAppliedMigrationsAsync();
+
                     if (pendingMigrations.Any())
                     {
                         logger.LogInformation("Applying {Count} pending migrations: {Migrations}", 
@@ -530,6 +533,13 @@ public static class WebApplicationExtensions
                         await ApplyMigrationsWithRetryAsync(context, logger);
                         
                         Console.WriteLine($"Applied {pendingMigrations.Count()} pending migrations");
+                    }
+                    else if (!appliedMigrations.Any())
+                    {
+                        // No migrations discovered and none applied => likely empty DB or missing migrations assembly
+                        logger.LogWarning("No migrations discovered or applied. Falling back to EnsureCreated for one-time bootstrap.");
+                        await context.Database.EnsureCreatedAsync();
+                        Console.WriteLine("Database created using EnsureCreated fallback (no migrations discovered)");
                     }
                     else
                     {
@@ -557,6 +567,12 @@ public static class WebApplicationExtensions
                         logger.LogError(fallbackEx, "Failed to create database even with EnsureCreated fallback");
                         throw;
                     }
+                }
+                catch (Exception ex) when (ex.Message.Contains("No migrations were found", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Migrations assembly discovered but has no migrations, or assembly not loaded
+                    logger.LogWarning("No migrations found in the configured assembly. Using EnsureCreated as a safety fallback.");
+                    await context.Database.EnsureCreatedAsync();
                 }
                 catch (Exception ex)
                 {
@@ -617,6 +633,66 @@ public static class WebApplicationExtensions
         {
             Console.WriteLine($"Error initializing essential OIDC data: {ex.Message}");
             throw;
+        }
+        
+        // Ensure UserProfile rows exist for all users (mark seeded/system users as Active)
+        try
+        {
+            var allUsers = await context.Users.AsNoTracking().ToListAsync();
+            var userIdsWithProfile = await context.UserProfiles.Select(p => p.UserId).ToListAsync();
+            var missingProfiles = allUsers.Where(u => !userIdsWithProfile.Contains(u.Id)).ToList();
+
+            if (missingProfiles.Any())
+            {
+                var claimsByUser = new Dictionary<string, IList<Claim>>();
+                foreach (var u in missingProfiles)
+                {
+                    try { claimsByUser[u.Id] = await userManager.GetClaimsAsync(u); }
+                    catch { claimsByUser[u.Id] = new List<Claim>(); }
+                }
+
+                foreach (var u in missingProfiles)
+                {
+                    var claims = claimsByUser[u.Id];
+                    var given = claims.FirstOrDefault(c => c.Type == "given_name")?.Value;
+                    var family = claims.FirstOrDefault(c => c.Type == "family_name")?.Value;
+                    var display = claims.FirstOrDefault(c => c.Type == "name")?.Value
+                                  ?? (!string.IsNullOrEmpty(given) || !string.IsNullOrEmpty(family)
+                                      ? $"{given} {family}".Trim()
+                                      : ConvertEmailToName(u.UserName ?? u.Email ?? u.Id));
+
+                    // Admin and seeded demo/test users should be Active by default
+                    var isSeeded = string.Equals(u.UserName, "admin@mrwho.local", StringComparison.OrdinalIgnoreCase)
+                                   || string.Equals(u.Email, "admin@mrwho.local", StringComparison.OrdinalIgnoreCase)
+                                   || string.Equals(u.UserName, "demo1@example.com", StringComparison.OrdinalIgnoreCase)
+                                   || string.Equals(u.Email, "demo1@example.com", StringComparison.OrdinalIgnoreCase)
+                                   || string.Equals(u.UserName, "test@example.com", StringComparison.OrdinalIgnoreCase)
+                                   || string.Equals(u.Email, "test@example.com", StringComparison.OrdinalIgnoreCase)
+                                   || string.Equals(u.UserName, "jane.smith@example.com", StringComparison.OrdinalIgnoreCase)
+                                   || string.Equals(u.Email, "jane.smith@example.com", StringComparison.OrdinalIgnoreCase)
+                                   || string.Equals(u.UserName, "bob.wilson@example.com", StringComparison.OrdinalIgnoreCase)
+                                   || string.Equals(u.Email, "bob.wilson@example.com", StringComparison.OrdinalIgnoreCase);
+
+                    var profile = new UserProfile
+                    {
+                        UserId = u.Id,
+                        FirstName = given,
+                        LastName = family,
+                        DisplayName = display,
+                        State = isSeeded ? UserState.Active : UserState.Active, // default Active for backfill
+                        CreatedAt = DateTime.UtcNow
+                    };
+                    context.UserProfiles.Add(profile);
+                }
+
+                await context.SaveChangesAsync();
+                Console.WriteLine($"Backfilled {missingProfiles.Count} UserProfiles as Active");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error backfilling user profiles: {ex.Message}");
+            // Do not rethrow; non-fatal but will block authorization if missing
         }
         
         // Seed additional test users for development
@@ -778,5 +854,14 @@ public static class WebApplicationExtensions
         }
         
         return isTest;
+    }
+
+    private static string ConvertEmailToName(string input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return "User";
+        var local = input.Contains('@') ? input.Split('@')[0] : input;
+        var friendly = local.Replace('.', ' ').Replace('_', ' ').Replace('-', ' ');
+        var parts = friendly.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return string.Join(' ', parts.Select(p => char.ToUpper(p[0]) + (p.Length > 1 ? p.Substring(1).ToLower() : "")));
     }
 }
