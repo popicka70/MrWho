@@ -79,8 +79,6 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddApiServices(this IServiceCollection services, IConfiguration configuration)
     {
         var mrWhoApiBaseUrl = configuration.GetValue<string>("MrWhoApi:BaseUrl") ?? "https://localhost:7113/";
-
-        // Configure default timeout for all HTTP clients
         var defaultTimeout = TimeSpan.FromSeconds(30);
 
         // Register MrWho API clients with authentication and improved timeout handling
@@ -159,6 +157,15 @@ public static class ServiceCollectionExtensions
 
         // Add Client Users API service
         services.AddHttpClient<IClientUsersApiService, ClientUsersApiService>(client =>
+        {
+            client.BaseAddress = new Uri(mrWhoApiBaseUrl);
+            client.DefaultRequestHeaders.Add("Accept", "application/json");
+            client.Timeout = defaultTimeout;
+        })
+        .AddHttpMessageHandler<AuthenticationDelegatingHandler>();
+
+        // Add User Clients API service
+        services.AddHttpClient<IUserClientsApiService, UserClientsApiService>(client =>
         {
             client.BaseAddress = new Uri(mrWhoApiBaseUrl);
             client.DefaultRequestHeaders.Add("Accept", "application/json");
