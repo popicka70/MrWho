@@ -1,0 +1,21 @@
+services:
+  mrwhoadmin:
+    build:
+      context: .
+      dockerfile: MrWhoAdmin.Web/Dockerfile
+    container_name: mrwho-admin
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      # Set to true if running behind a reverse proxy/ingress that terminates TLS
+      DISABLE_HTTPS_REDIRECT: "true"
+      # Optional: if your OIDC server discovery requires a specific host for backchannel
+      Authentication__MetadataAddress: https://mrwho-production.up.railway.app/.well-known/openid-configuration
+      # Optional: override Authority via env var (otherwise appsettings.Production.json is used)
+      Authentication__Authority: https://mrwho-production.up.railway.app/
+      Authentication__ClientId: mrwho_admin_web
+      Authentication__ClientSecret: MrWhoAdmin2024!SecretKey
+      Authentication__RequireHttpsMetadata: "true"
+      MrWhoApi__BaseUrl: https://mrwho-production.up.railway.app/
+      MrWhoApi__Timeout: 00:00:30
+    ports:
+      - "8081:8080" # Expose on host 8081 (container listens on 8080)

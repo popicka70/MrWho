@@ -29,7 +29,18 @@ public static class WebApplicationExtensions
             app.UseHsts();
         }
 
-        app.UseHttpsRedirection();
+        // Allow disabling HTTPS redirection for containerized scenarios without TLS termination
+        var disableHttpsRedirect = app.Configuration.GetValue<bool>("DISABLE_HTTPS_REDIRECT");
+        if (!disableHttpsRedirect)
+        {
+            app.UseHttpsRedirection();
+        }
+        else
+        {
+            var logger = app.Services.GetRequiredService<ILogger<Program>>();
+            logger.LogWarning("HTTPS redirection is disabled via DISABLE_HTTPS_REDIRECT configuration. Running over HTTP.");
+        }
+
         app.UseStaticFiles();
         app.UseRouting();
         app.UseOutputCache();

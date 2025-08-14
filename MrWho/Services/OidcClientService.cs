@@ -102,11 +102,13 @@ public class OidcClientService : IOidcClientService
             _context.Clients.Add(adminClient);
             await _context.SaveChangesAsync();
 
-            // Add redirect URIs for MrWhoAdmin.Web (port 7257)
+            // Add redirect URIs for MrWhoAdmin.Web (local https 7257 and docker host http 8081)
             var redirectUris = new[]
             {
                 "https://localhost:7257/signin-oidc",
-                "https://localhost:7257/callback"
+                "https://localhost:7257/callback",
+                "http://localhost:8081/signin-oidc",
+                "http://localhost:8081/callback"
             };
 
             foreach (var uri in redirectUris)
@@ -118,11 +120,13 @@ public class OidcClientService : IOidcClientService
                 });
             }
 
-            // Add post-logout URIs
+            // Add post-logout URIs (local https 7257 and docker host http 8081)
             var postLogoutUris = new[]
             {
                 "https://localhost:7257/",
-                "https://localhost:7257/signout-callback-oidc"
+                "https://localhost:7257/signout-callback-oidc",
+                "http://localhost:8081/",
+                "http://localhost:8081/signout-callback-oidc"
             };
 
             foreach (var uri in postLogoutUris)
@@ -173,10 +177,58 @@ public class OidcClientService : IOidcClientService
             }
 
             await _context.SaveChangesAsync();
-            _logger.LogInformation("Created admin client 'mrwho_admin_web' with API access");
+            _logger.LogInformation("Created admin client 'mrwho_admin_web' with API access and redirect URIs for 7257 and 8081");
         }
         else
         {
+            // Ensure required redirect/post-logout URIs exist (add 8081 entries for docker-hosted admin)
+            var requiredRedirects = new[]
+            {
+                "https://localhost:7257/signin-oidc",
+                "https://localhost:7257/callback",
+                "http://localhost:8081/signin-oidc",
+                "http://localhost:8081/callback"
+            };
+            var requiredPostLogout = new[]
+            {
+                "https://localhost:7257/",
+                "https://localhost:7257/signout-callback-oidc",
+                "http://localhost:8081/",
+                "http://localhost:8081/signout-callback-oidc"
+            };
+
+            var missingRedirects = requiredRedirects
+                .Where(u => !adminClient.RedirectUris.Any(r => r.Uri == u))
+                .ToList();
+            var missingPostLogout = requiredPostLogout
+                .Where(u => !adminClient.PostLogoutUris.Any(r => r.Uri == u))
+                .ToList();
+
+            if (missingRedirects.Count > 0)
+            {
+                _logger.LogInformation("Adding missing admin client redirect URIs: {Uris}", string.Join(", ", missingRedirects));
+                foreach (var uri in missingRedirects)
+                {
+                    _context.ClientRedirectUris.Add(new ClientRedirectUri
+                    {
+                        ClientId = adminClient.Id,
+                        Uri = uri
+                    });
+                }
+            }
+            if (missingPostLogout.Count > 0)
+            {
+                _logger.LogInformation("Adding missing admin client post-logout URIs: {Uris}", string.Join(", ", missingPostLogout));
+                foreach (var uri in missingPostLogout)
+                {
+                    _context.ClientPostLogoutUris.Add(new ClientPostLogoutUri
+                    {
+                        ClientId = adminClient.Id,
+                        Uri = uri
+                    });
+                }
+            }
+
             // Check if existing admin client has API scopes and add them if missing
             var existingApiScopes = adminClient.Scopes.Where(s => s.Scope.StartsWith("api.")).ToList();
             var existingCorrectApiPermissions = adminClient.Permissions.Where(p => p.Permission.StartsWith("oidc:scope:api.")).ToList();
@@ -258,12 +310,12 @@ public class OidcClientService : IOidcClientService
                 });
             }
 
-            if (existingApiScopes.Count == 0 || existingCorrectApiPermissions.Count == 0 || !hasOfflineAccess || !hasMrWhoUse || !hasMrWhoUsePermission || oldApiPermissions.Any())
+            if (missingRedirects.Count > 0 || missingPostLogout.Count > 0 || existingApiScopes.Count == 0 || existingCorrectApiPermissions.Count == 0 || !hasOfflineAccess || !hasMrWhoUse || !hasMrWhoUsePermission || oldApiPermissions.Any())
             {
                 await _context.SaveChangesAsync();
-                _logger.LogInformation("Updated API scopes and permissions on existing admin client");
+                _logger.LogInformation("Updated admin client with missing URIs/scopes/permissions");
                 
-                // Reload the client with new scopes and permissions
+                // Reload the client with new settings
                 adminClient = await _context.Clients
                     .Include(c => c.RedirectUris)
                     .Include(c => c.PostLogoutUris)

@@ -274,7 +274,11 @@ public static class ServiceCollectionExtensions
         options.ResponseType = "code";
         options.SaveTokens = true; // CRITICAL: This saves tokens for API calls
         options.GetClaimsFromUserInfoEndpoint = false; // TEMPORARILY DISABLE: Skip UserInfo endpoint due to 403 issue
-        options.RequireHttpsMetadata = false; // Only for development
+        
+        // Production-friendly: allow configuring HTTPS metadata requirement via config (default true when using HTTPS Authority)
+        var defaultRequireHttps = options.Authority.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
+        options.RequireHttpsMetadata = authConfig.GetValue("RequireHttpsMetadata", defaultRequireHttps);
+        
         options.UsePkce = true; // Enable PKCE for better security
 
         // Set explicit callback paths for the admin web app (port 7257)
@@ -289,7 +293,7 @@ public static class ServiceCollectionExtensions
         var metadataAddress = authConfig.GetValue<string>("MetadataAddress");
         var resolvedMetadata = !string.IsNullOrWhiteSpace(metadataAddress)
             ? metadataAddress
-            : $"{options.Authority}.well-known/openid-configuration";
+            : $"{options.Authority.TrimEnd('/')}/.well-known/openid-configuration";
         options.MetadataAddress = resolvedMetadata;
 
         // Configure token refresh settings
@@ -317,14 +321,14 @@ public static class ServiceCollectionExtensions
         {
             var retriever = new Microsoft.IdentityModel.Protocols.HttpDocumentRetriever
             {
-                RequireHttps = false
+                RequireHttps = options.RequireHttpsMetadata
             };
             if (backchannelHandler != null)
             {
                 // Use a custom HttpClient with our permissive handler for self-signed certs
                 retriever = new Microsoft.IdentityModel.Protocols.HttpDocumentRetriever(new HttpClient(backchannelHandler, disposeHandler: false))
                 {
-                    RequireHttps = false
+                    RequireHttps = options.RequireHttpsMetadata
                 };
             }
 
