@@ -14,5 +14,6 @@
     },
     "[markdown]": {
         "editor.wordWrap": "on"
-    }
+    },
+    "java.configuration.updateBuildConfiguration": "interactive"
 }

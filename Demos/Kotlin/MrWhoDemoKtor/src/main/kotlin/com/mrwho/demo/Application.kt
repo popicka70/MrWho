@@ -2,16 +2,16 @@ package com.mrwho.demo
 
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.SerializationFeature
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import io.ktor.client.*
 import io.ktor.client.call.body
 import io.ktor.client.engine.java.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
+import io.ktor.client.request.forms.*
 import io.ktor.http.*
 import io.ktor.serialization.jackson.*
 import io.ktor.server.application.*
-import io.ktor.server.auth.*
-import io.ktor.server.auth.oauth.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
 import io.ktor.server.plugins.contentnegotiation.*
@@ -22,13 +22,22 @@ import io.ktor.server.sessions.*
 import io.ktor.util.*
 import kotlinx.coroutines.runBlocking
 
+// Disambiguate server/client ContentNegotiation plugins
+import io.ktor.server.plugins.contentnegotiation.ContentNegotiation as ServerContentNegotiation
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation as ClientContentNegotiation
+
 fun main(args: Array<String>) = EngineMain.main(args)
 
-data class UserSession(val idToken: String? = null, val accessToken: String? = null, val refreshToken: String? = null)
+data class UserSession(
+    val idToken: String? = null,
+    val accessToken: String? = null,
+    val refreshToken: String? = null,
+    val state: String? = null
+)
 
 @Suppress("unused")
 fun Application.module() {
-    install(ContentNegotiation) {
+    install(ServerContentNegotiation) {
         jackson {
             enable(SerializationFeature.INDENT_OUTPUT)
             disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
@@ -45,13 +54,13 @@ fun Application.module() {
     }
 
     val httpClient = HttpClient(Java) {
-        install(ContentNegotiation) { jackson() }
+        install(ClientContentNegotiation) { jackson() }
     }
 
     val authority = environment.config.propertyOrNull("mrwho.authority")?.getString()?.trimEnd('/')
-        ?: "https://localhost:7113"
+        ?: "https://mrwho-production.up.railway.app"
     val clientId = environment.config.propertyOrNull("mrwho.clientId")?.getString() ?: "demo.web"
-    val clientSecret = environment.config.propertyOrNull("mrwho.clientSecret")?.getString() ?: "dev-secret"
+    val clientSecret = environment.config.propertyOrNull("mrwho.clientSecret")?.getString() ?: "Demo1Secret2024!"
     val redirectUrl = environment.config.propertyOrNull("mrwho.redirectUrl")?.getString() ?: "http://localhost:8085/callback"
     val postLogoutRedirectUrl = environment.config.propertyOrNull("mrwho.postLogoutRedirectUrl")?.getString() ?: "http://localhost:8085/"
     val scopes = environment.config.propertyOrNull("mrwho.scopes")?.getList()
@@ -59,6 +68,7 @@ fun Application.module() {
 
     val wellKnown = "${authority}/.well-known/openid-configuration"
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
     data class DiscoveryDoc(
         val authorization_endpoint: String,
         val token_endpoint: String,
@@ -71,24 +81,14 @@ fun Application.module() {
         return httpClient.get(wellKnown).body()
     }
 
-    install(Authentication) {
-        oauth("mrwho-oauth") {
-            urlProvider = { redirectUrl }
-            client = httpClient
-            providerLookup = {
-                val d = runBlocking { discover() }
-                OAuthServerSettings.OAuth2ServerSettings(
-                    name = "MrWho",
-                    authorizeUrl = d.authorization_endpoint,
-                    accessTokenUrl = d.token_endpoint,
-                    requestMethod = HttpMethod.Post,
-                    clientId = clientId,
-                    clientSecret = clientSecret,
-                    defaultScopes = scopes
-                )
-            }
-        }
-    }
+    data class TokenResponse(
+        val access_token: String? = null,
+        val id_token: String? = null,
+        val refresh_token: String? = null,
+        val token_type: String? = null,
+        val expires_in: Long? = null,
+        val scope: String? = null
+    )
 
     routing {
         get("/") {
@@ -124,25 +124,60 @@ fun Application.module() {
             }
         }
 
-        authenticate("mrwho-oauth") {
-            get("/login") {
-                // This just triggers the OAuth redirect
+        get("/login") {
+            val state = generateNonce()
+            val current = call.sessions.get<UserSession>() ?: UserSession()
+            call.sessions.set(current.copy(state = state))
+
+            val d = runBlocking { discover() }
+            val url = URLBuilder(d.authorization_endpoint).apply {
+                parameters.append("response_type", "code")
+                parameters.append("client_id", clientId)
+                parameters.append("redirect_uri", redirectUrl)
+                parameters.append("scope", scopes.joinToString(" "))
+                parameters.append("state", state)
+            }.buildString()
+            call.respondRedirect(url)
+        }
+
+        get("/callback") {
+            val error = call.request.queryParameters["error"]
+            if (error != null) {
+                call.respond(HttpStatusCode.BadRequest, "OAuth error: $error")
+                return@get
+            }
+            val code = call.request.queryParameters["code"]
+            val state = call.request.queryParameters["state"]
+            if (code.isNullOrBlank() || state.isNullOrBlank()) {
+                call.respond(HttpStatusCode.BadRequest, "Missing code/state")
+                return@get
+            }
+            val session = call.sessions.get<UserSession>()
+            if (session?.state == null || session.state != state) {
+                call.respond(HttpStatusCode.BadRequest, "Invalid state")
+                return@get
             }
 
-            get("/callback") {
-                val principal: OAuthAccessTokenResponse.OAuth2? = call.principal()
-                if (principal == null) {
-                    call.respond(HttpStatusCode.Unauthorized, "No principal returned")
-                    return@get
+            val d = runBlocking { discover() }
+            val tokenResp: TokenResponse = httpClient.submitForm(
+                url = d.token_endpoint,
+                formParameters = Parameters.build {
+                    append("grant_type", "authorization_code")
+                    append("code", code)
+                    append("redirect_uri", redirectUrl)
+                    append("client_id", clientId)
+                    append("client_secret", clientSecret)
                 }
-                val session = UserSession(
-                    idToken = principal.extraParameters["id_token"],
-                    accessToken = principal.accessToken,
-                    refreshToken = principal.refreshToken
-                )
-                call.sessions.set(session)
-                call.respondRedirect("/")
-            }
+            ) { method = HttpMethod.Post }.body()
+
+            val newSession = UserSession(
+                idToken = tokenResp.id_token,
+                accessToken = tokenResp.access_token,
+                refreshToken = tokenResp.refresh_token,
+                state = null
+            )
+            call.sessions.set(newSession)
+            call.respondRedirect("/")
         }
 
         get("/me") {
