@@ -20,6 +20,7 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
     public DbSet<ClientPostLogoutUri> ClientPostLogoutUris { get; set; }
     public DbSet<ClientScope> ClientScopes { get; set; }
     public DbSet<ClientPermission> ClientPermissions { get; set; }
+    public DbSet<ClientUser> ClientUsers { get; set; }
     
     // Scope management entities
     public DbSet<Scope> Scopes { get; set; }
@@ -41,6 +42,9 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
     public DbSet<PersistentQrSession> PersistentQrSessions { get; set; }
     public DbSet<DeviceAuthenticationLog> DeviceAuthenticationLogs { get; set; }
 
+    // User profile
+    public DbSet<UserProfile> UserProfiles { get; set; }
+
     // Data Protection keys for antiforgery/auth cookie encryption persistence
     public DbSet<Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.DataProtectionKey> DataProtectionKeys { get; set; }
 
@@ -48,6 +52,15 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
     {
         base.OnModelCreating(builder);
         builder.UseOpenIddict();
+
+        // Configure UserProfile entity
+        builder.Entity<UserProfile>(entity =>
+        {
+            entity.HasKey(p => p.UserId);
+            entity.Property(p => p.FirstName).HasMaxLength(256);
+            entity.Property(p => p.LastName).HasMaxLength(256);
+            entity.Property(p => p.DisplayName).HasMaxLength(512);
+        });
 
         // Configure Realm entity
         builder.Entity<Realm>(entity =>
@@ -83,6 +96,21 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
             entity.Property(c => c.AuthorizationCodeLifetime).HasConversion(
                 v => v.HasValue ? v.Value.TotalMinutes : (double?)null,
                 v => v.HasValue ? TimeSpan.FromMinutes(v.Value) : null);
+        });
+
+        // Configure ClientUser entity (user-client assignments)
+        builder.Entity<ClientUser>(entity =>
+        {
+            entity.HasKey(cu => cu.Id);
+            entity.HasIndex(cu => new { cu.ClientId, cu.UserId }).IsUnique();
+            entity.HasOne(cu => cu.Client)
+                  .WithMany()
+                  .HasForeignKey(cu => cu.ClientId)
+                  .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(cu => cu.User)
+                  .WithMany()
+                  .HasForeignKey(cu => cu.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
         });
 
         // Configure Identity Resource entities
@@ -278,5 +306,42 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
             entity.HasKey(k => k.Id);
             entity.Property(k => k.FriendlyName).HasMaxLength(256);
         });
+
+        // Provider-specific tuning: MySQL row size limits -> move large strings to longtext
+        if (Database.ProviderName?.Contains("MySql", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            builder.Entity<Client>(entity =>
+            {
+                entity.Property(c => c.AllowedCorsOrigins).HasColumnType("longtext");
+                entity.Property(c => c.AllowedIdentityProviders).HasColumnType("longtext");
+                entity.Property(c => c.AllowedMfaMethods).HasColumnType("longtext");
+                entity.Property(c => c.BackChannelLogoutUri).HasColumnType("longtext");
+                entity.Property(c => c.FrontChannelLogoutUri).HasColumnType("longtext");
+                entity.Property(c => c.PolicyUri).HasColumnType("longtext");
+                entity.Property(c => c.TosUri).HasColumnType("longtext");
+                entity.Property(c => c.LogoUri).HasColumnType("longtext");
+                entity.Property(c => c.ClientUri).HasColumnType("longtext");
+                entity.Property(c => c.CustomCssUrl).HasColumnType("longtext");
+                entity.Property(c => c.CustomErrorPageUrl).HasColumnType("longtext");
+                entity.Property(c => c.CustomJavaScriptUrl).HasColumnType("longtext");
+                entity.Property(c => c.CustomLoginPageUrl).HasColumnType("longtext");
+                entity.Property(c => c.CustomLogoutPageUrl).HasColumnType("longtext");
+            });
+
+            builder.Entity<Realm>(entity =>
+            {
+                entity.Property(r => r.RealmCustomCssUrl).HasColumnType("longtext");
+                entity.Property(r => r.RealmLogoUri).HasColumnType("longtext");
+                entity.Property(r => r.RealmPolicyUri).HasColumnType("longtext");
+                entity.Property(r => r.RealmTosUri).HasColumnType("longtext");
+                entity.Property(r => r.RealmUri).HasColumnType("longtext");
+                entity.Property(r => r.DefaultAllowedMfaMethods).HasColumnType("longtext");
+            });
+
+            builder.Entity<PersistentQrSession>(entity =>
+            {
+                entity.Property(p => p.ReturnUrl).HasColumnType("longtext");
+            });
+        }
     }
 }

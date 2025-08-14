@@ -54,9 +54,10 @@
                     <div class="card-body">
                         <p>Secure login and logout functionality.</p>
                         <a href="@Url.Action("Login", "Auth")" class="btn btn-primary">Login</a>
+                        <a href="/connect/register" class="btn btn-outline-primary ms-2">Register</a>
                         @if (User.Identity?.IsAuthenticated == true)
                         {
-                            <a href="/connect/logout" class="btn btn-outline-secondary">Logout</a>
+                            <a href="/connect/logout" class="btn btn-outline-secondary ms-2">Logout</a>
                         }
                         else if (!logoutSuccess)
                         {
@@ -77,6 +78,7 @@
                             <p>You have successfully logged out. You can:</p>
                             <ul class="list-unstyled">
                                 <li><i class="bi bi-arrow-right text-primary"></i> <a href="/connect/login">Sign in again</a></li>
+                                <li><i class="bi bi-arrow-right text-primary"></i> <a href="/connect/register">Register a new account</a></li>
                                 <li><i class="bi bi-arrow-right text-primary"></i> <a href="/device-management">Manage your devices</a></li>
                                 <li><i class="bi bi-arrow-right text-primary"></i> <a href="/qr-login/start">Try QR login</a></li>
                             </ul>

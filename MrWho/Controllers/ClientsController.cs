@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MrWho.Data;
@@ -17,15 +18,18 @@ public class ClientsController : ControllerBase
     private readonly ApplicationDbContext _context;
     private readonly ILogger<ClientsController> _logger;
     private readonly IOpenIddictApplicationManager _applicationManager;
+    private readonly UserManager<IdentityUser> _userManager;
 
     public ClientsController(
         ApplicationDbContext context, 
         ILogger<ClientsController> logger,
-        IOpenIddictApplicationManager applicationManager)
+        IOpenIddictApplicationManager applicationManager,
+        UserManager<IdentityUser> userManager)
     {
         _context = context;
         _logger = logger;
         _applicationManager = applicationManager;
+        _userManager = userManager;
     }
 
     [HttpGet]
@@ -255,7 +259,7 @@ public class ClientsController : ControllerBase
     }
 
     /// <summary>
-    /// Export a client to JSON (no secrets/IDs). Uses realm name to make it portable.
+    /// Export a client to JSON (no secrets/IDs). Includes assigned users by username/email for portability.
     /// </summary>
     [HttpGet("{id}/export")]
     public async Task<ActionResult<ClientExportDto>> ExportClient(string id)
@@ -333,15 +337,23 @@ public class ClientsController : ControllerBase
             Permissions = client.Permissions.Select(x => x.Permission).ToList(),
             ExportedBy = User?.Identity?.Name ?? "System",
             ExportedAtUtc = DateTime.UtcNow,
-            FormatVersion = "1.0"
+            FormatVersion = "1.1"
         };
+
+        // Assigned users (by username/email only)
+        var assignedUsers = await _context.ClientUsers
+            .Where(cu => cu.ClientId == client.Id)
+            .Join(_context.Users, cu => cu.UserId, u => u.Id, (cu, u) => new { u.UserName, u.Email })
+            .ToListAsync();
+        export.AssignedUsers = assignedUsers
+            .Select(x => new ClientAssignedUserRef { UserName = x.UserName, Email = x.Email })
+            .ToList();
 
         return Ok(export);
     }
 
     /// <summary>
-    /// Import a client from JSON (upsert using ClientId and RealmName). Does not accept client secret from import.
-    /// If client requires secret, a new secret may be generated and returned once.
+    /// Import a client from JSON (upsert using ClientId and RealmName). Includes applying assigned users if provided.
     /// </summary>
     [HttpPost("import")]
     public async Task<ActionResult<ClientImportResult>> ImportClient([FromBody] ClientExportDto dto)
@@ -481,6 +493,51 @@ public class ClientsController : ControllerBase
                 }
 
                 await _context.SaveChangesAsync();
+
+                // Apply assigned users if provided
+                if (dto.AssignedUsers?.Count > 0)
+                {
+                    // Load current assignments
+                    var currentAssignments = await _context.ClientUsers.Where(cu => cu.ClientId == client.Id).ToListAsync();
+
+                    // Build target user IDs from references
+                    var targetUserIds = new HashSet<string>();
+                    foreach (var uref in dto.AssignedUsers)
+                    {
+                        IdentityUser? user = null;
+                        if (!string.IsNullOrWhiteSpace(uref.UserName))
+                            user = await _userManager.FindByNameAsync(uref.UserName);
+                        if (user == null && !string.IsNullOrWhiteSpace(uref.Email))
+                            user = await _userManager.FindByEmailAsync(uref.Email);
+
+                        if (user != null)
+                        {
+                            targetUserIds.Add(user.Id);
+                            if (!currentAssignments.Any(a => a.UserId == user.Id))
+                            {
+                                _context.ClientUsers.Add(new ClientUser
+                                {
+                                    ClientId = client.Id,
+                                    UserId = user.Id,
+                                    CreatedAt = now,
+                                    CreatedBy = userName
+                                });
+                            }
+                        }
+                    }
+
+                    // Remove assignments that are not in import list
+                    foreach (var ass in currentAssignments)
+                    {
+                        if (!targetUserIds.Contains(ass.UserId))
+                        {
+                            _context.ClientUsers.Remove(ass);
+                        }
+                    }
+
+                    await _context.SaveChangesAsync();
+                }
+
                 await tx.CommitAsync();
 
                 // Reload full client with related data for returning DTO

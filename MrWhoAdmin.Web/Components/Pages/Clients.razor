@@ -23,7 +23,10 @@
                            Placeholder="Filter by realm..." Style="width: 200px;" AllowClear="true" />
             <RadzenButton Click="@LoadClients" Icon="search" ButtonStyle="ButtonStyle.Secondary" />
         </RadzenStack>
-        <RadzenButton Click="@(() => Navigation.NavigateTo("/clients/add"))" Icon="add" ButtonStyle="ButtonStyle.Primary" Text="Add Client" />
+        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+            <RadzenButton Click="@(() => Navigation.NavigateTo("/clients/add"))" Icon="add" ButtonStyle="ButtonStyle.Primary" Text="Add Client" />
+            <RadzenButton Click="@(() => Navigation.NavigateTo($"/clients/{selectedClientIdForUsers ?? string.Empty}/users"))" Icon="people" ButtonStyle="ButtonStyle.Info" Disabled="@string.IsNullOrWhiteSpace(selectedClientIdForUsers)" Text="Assigned Users" />
+        </RadzenStack>
     </RadzenStack>
 
     @if (isLoading)
@@ -32,7 +35,7 @@
     }
     else if (clients.Any())
     {
-        <RadzenDataGrid Data="@clients" TItem="ClientDto" AllowPaging="true" PageSize="10" AllowSorting="true">
+        <RadzenDataGrid Data="@clients" TItem="ClientDto" AllowPaging="true" PageSize="10" AllowSorting="true" RowSelect="@OnRowSelect">
             <Columns>
                 <RadzenDataGridColumn TItem="ClientDto" Property="ClientId" Title="Client ID" Width="200px">
                     <Template Context="client">
@@ -85,7 +88,7 @@
                     </Template>
                 </RadzenDataGridColumn>
                 
-                <RadzenDataGridColumn TItem="ClientDto" Title="Actions" Width="350px" Sortable="false">
+                <RadzenDataGridColumn TItem="ClientDto" Title="Actions" Width="420px" Sortable="false">
                     <Template Context="client">
                         <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
                             <RadzenButton Click="@(() => EditClient(client.Id))" Icon="edit" Size="ButtonSize.Medium" 
@@ -94,6 +97,7 @@
                                          ButtonStyle="ButtonStyle.Info" Text="View" />
                             <RadzenButton Click="@(async () => await ToggleClientStatus(client))" Icon="@(client.IsEnabled ? "toggle_on" : "toggle_off")" 
                                          Size="ButtonSize.Medium" ButtonStyle="ButtonStyle.Warning" Text="Toggle" />
+                            <RadzenButton Click="@(() => Navigation.NavigateTo($"/clients/{client.Id}/users"))" Icon="people" Size="ButtonSize.Medium" ButtonStyle="ButtonStyle.Primary" Text="Users" />
                         </RadzenStack>
                     </Template>
                 </RadzenDataGridColumn>
@@ -114,6 +118,7 @@
     private bool isLoading = false;
     private string searchTerm = "";
     private string? selectedRealmId = null;
+    private string? selectedClientIdForUsers = null;
 
     protected override async Task OnInitializedAsync()
     {
@@ -207,6 +212,11 @@
             Logger.LogError(ex, "Error toggling client status for {ClientId}", client.Id);
             NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to toggle client status");
         }
+    }
+
+    private void OnRowSelect(ClientDto client)
+    {
+        selectedClientIdForUsers = client.Id;
     }
 
     private string GetClientTypeIcon(ClientType clientType)

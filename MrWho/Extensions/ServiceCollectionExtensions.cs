@@ -19,6 +19,7 @@ using System.Reflection;
 using System.Runtime.Loader;
 using System.IO;
 using System.Linq;
+using Microsoft.EntityFrameworkCore.Diagnostics; // Added for ConfigureWarnings/RelationalEventId
 
 namespace MrWho.Extensions;
 
@@ -94,11 +95,12 @@ public static class ServiceCollectionExtensions
         // Multi-provider database configuration (SqlServer/MySql/Postgres)
         var config = builder.Configuration;
         var services = builder.Services;
+        var isDevelopment = builder.Environment.IsDevelopment();
 
         var provider = (config["Database:Provider"] ?? "SqlServer").Trim().ToLowerInvariant();
-    var connectionName = config["Database:ConnectionName"] ?? "mrwhodb";
+        var connectionName = config["Database:ConnectionName"] ?? "mrwhodb";
         var connectionString = config.GetConnectionString(connectionName) ?? config[$"ConnectionStrings:{connectionName}"];
-    var migrationsAssembly = config["Database:MigrationsAssembly"]; // optional
+        var migrationsAssembly = config["Database:MigrationsAssembly"]; // optional
 
         // Proactively load the migrations assembly if specified and present alongside the app
         if (!string.IsNullOrWhiteSpace(migrationsAssembly))
@@ -166,6 +168,14 @@ public static class ServiceCollectionExtensions
                                 b.MigrationsAssembly(migrationsAssembly);
                         });
                     }
+
+                    // In development, enable EF detailed errors and sensitive data logging for MySQL troubleshooting
+                    if (isDevelopment)
+                    {
+                        options.EnableDetailedErrors();
+                        options.EnableSensitiveDataLogging();
+                    }
+
                     break;
                 }
                 case "postgres":
@@ -184,6 +194,12 @@ public static class ServiceCollectionExtensions
                             b.MigrationsAssembly(migrationsAssembly);
                     });
                     break;
+            }
+
+            // In development, log (do not throw) when EF detects pending model changes so the app can migrate/apply.
+            if (isDevelopment)
+            {
+                options.ConfigureWarnings(w => w.Log(RelationalEventId.PendingModelChangesWarning));
             }
 
             // Required by OpenIddict EF stores

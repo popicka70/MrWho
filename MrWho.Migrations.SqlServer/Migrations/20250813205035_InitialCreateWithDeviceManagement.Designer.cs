@@ -9,10 +9,10 @@ using MrWho.Data;
 
 #nullable disable
 
-namespace MrWho.Migrations
+namespace MrWho.Migrations.SqlServer.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250812090648_InitialCreateWithDeviceManagement")]
+    [Migration("20250813205035_InitialCreateWithDeviceManagement")]
     partial class InitialCreateWithDeviceManagement
     {
         /// <inheritdoc />
@@ -707,6 +707,35 @@ namespace MrWho.Migrations
                         .IsUnique();
 
                     b.ToTable("ClientScopes");
+                });
+
+            modelBuilder.Entity("MrWho.Models.ClientUser", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<string>("ClientId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(450)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("ClientId", "UserId")
+                        .IsUnique();
+
+                    b.ToTable("ClientUsers");
                 });
 
             modelBuilder.Entity("MrWho.Models.DeviceAuthenticationLog", b =>
@@ -1581,6 +1610,25 @@ namespace MrWho.Migrations
                         .IsRequired();
 
                     b.Navigation("Client");
+                });
+
+            modelBuilder.Entity("MrWho.Models.ClientUser", b =>
+                {
+                    b.HasOne("MrWho.Models.Client", "Client")
+                        .WithMany()
+                        .HasForeignKey("ClientId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Microsoft.AspNetCore.Identity.IdentityUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Client");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("MrWho.Models.DeviceAuthenticationLog", b =>

@@ -7,6 +7,9 @@
 @inject DialogService DialogService
 @inject IUsersApiService UsersApiService
 @inject ILogger<EditUser> Logger
+@inject IUserClientsApiService UserClientsApi
+@inject IClientsApiService ClientsApi
+@inject IClientUsersApiService ClientUsersApi
 
 <PageTitle>@(IsEdit ? "Edit User" : "Add User") - MrWho Admin</PageTitle>
 
@@ -385,6 +388,71 @@ else
                         </div>
                     </RadzenTabsItem>
 
+                    <!-- Clients Tab -->
+                    <RadzenTabsItem Text="Clients" Icon="apps">
+                        <div style="padding: 1rem;">
+                            <RadzenStack Gap="1.5rem">
+                                <RadzenText TextStyle="TextStyle.H6" Text="Client Assignments" />
+
+                                <RadzenCard Style="background-color: var(--rz-base-50);">
+                                    <RadzenStack Gap="1rem">
+                                        <RadzenText TextStyle="TextStyle.Subtitle1" Text="Assign to Client" />
+                                        <RadzenRow>
+                                            <RadzenColumn Size="12" SizeMD="8">
+                                                <RadzenFormField Text="Client" Variant="Variant.Outlined">
+                                                    <RadzenDropDown @bind-Value="selectedClientId" 
+                                                                   Data="@availableClients" 
+                                                                   TextProperty="Name" 
+                                                                   ValueProperty="Id"
+                                                                   AllowFiltering="true"
+                                                                   FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                                                   Placeholder="Select a client"
+                                                                   Style="width: 100%;" />
+                                                </RadzenFormField>
+                                            </RadzenColumn>
+                                            <RadzenColumn Size="12" SizeMD="4">
+                                                <RadzenFormField Text="Action" Variant="Variant.Outlined">
+                                                    <RadzenButton Click="@(async () => await AssignClient())"
+                                                                 Icon="person_add"
+                                                                 ButtonStyle="ButtonStyle.Primary"
+                                                                 Text="Assign"
+                                                                 Disabled="@string.IsNullOrWhiteSpace(selectedClientId)"
+                                                                 IsBusy="@isAssigningClient"
+                                                                 Style="width: 100%;" />
+                                                </RadzenFormField>
+                                            </RadzenColumn>
+                                        </RadzenRow>
+                                    </RadzenStack>
+                                </RadzenCard>
+
+                                <RadzenStack Gap="0.75rem">
+                                    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Assigned Clients</RadzenText>
+                                    @if (assignedClients.Any())
+                                    {
+                                        <RadzenDataGrid Data="@assignedClients" TItem="UserClientDto" AllowPaging="true" PageSize="10" AllowSorting="true">
+                                            <Columns>
+                                                <RadzenDataGridColumn TItem="UserClientDto" Property="ClientPublicId" Title="Client ID" />
+                                                <RadzenDataGridColumn TItem="UserClientDto" Property="ClientName" Title="Name" />
+                                                <RadzenDataGridColumn TItem="UserClientDto" Property="CreatedAt" Title="Assigned" />
+                                                <RadzenDataGridColumn TItem="UserClientDto" Title="Actions" Width="120px">
+                                                    <Template Context="c">
+                                                        <RadzenButton Click="@(async () => await RemoveClient(c))" Icon="delete" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Danger" Variant="Variant.Text" />
+                                                    </Template>
+                                                </RadzenDataGridColumn>
+                                            </Columns>
+                                        </RadzenDataGrid>
+                                    }
+                                    else
+                                    {
+                                        <RadzenAlert AlertStyle="AlertStyle.Info">
+                                            <RadzenText>This user is not assigned to any clients.</RadzenText>
+                                        </RadzenAlert>
+                                    }
+                                </RadzenStack>
+                            </RadzenStack>
+                        </div>
+                    </RadzenTabsItem>
+
                     <!-- Security Tab -->
                     <RadzenTabsItem Text="Security" Icon="security">
                         <div style="padding: 1rem;">
@@ -501,6 +569,12 @@ else
     // Roles management
     private string selectedRoleId = string.Empty;
 
+    // Clients tab state
+    private List<UserClientDto> assignedClients = new();
+    private List<ClientDto> availableClients = new();
+    private string? selectedClientId;
+    private bool isAssigningClient = false;
+
     protected override async Task OnInitializedAsync()
     {
         if (IsEdit)
@@ -508,6 +582,8 @@ else
             await LoadUser();
             await LoadUserRoles();
             await LoadAvailableRoles();
+            await LoadUserClients();
+            await LoadAvailableClients();
         }
         else
         {
@@ -589,6 +665,35 @@ else
         {
             Logger.LogError(ex, "Error loading available roles");
             availableRoles = new List<RoleDto>();
+        }
+    }
+
+    private async Task LoadUserClients()
+    {
+        try
+        {
+            var result = await UserClientsApi.GetClientsForUserAsync(Id!);
+            assignedClients = result?.Clients ?? new List<UserClientDto>();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading user clients {UserId}", Id);
+            assignedClients = new List<UserClientDto>();
+        }
+    }
+
+    private async Task LoadAvailableClients()
+    {
+        try
+        {
+            var result = await ClientsApi.GetClientsAsync(page: 1, pageSize: 200);
+            var all = result?.Items ?? new List<ClientDto>();
+            availableClients = all.Where(c => !assignedClients.Any(ac => ac.ClientId == c.Id)).ToList();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading available clients for user {UserId}", Id);
+            availableClients = new List<ClientDto>();
         }
     }
 
@@ -838,6 +943,63 @@ else
         {
             Logger.LogError(ex, "Error removing role from user {UserId}", Id);
             NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to remove role");
+        }
+    }
+
+    private async Task AssignClient()
+    {
+        if (string.IsNullOrWhiteSpace(selectedClientId) || currentUser == null) return;
+        isAssigningClient = true;
+        try
+        {
+            // Reuse API: assign user to client from client perspective
+            var result = await ClientUsersApi.AssignUserAsync(selectedClientId, new AssignClientUserRequest
+            {
+                UserId = currentUser.Id,
+                ClientId = selectedClientId
+            });
+
+            if (result != null)
+            {
+                NotificationService.Notify(NotificationSeverity.Success, "Assigned", $"User assigned to client '{result.ClientName}'");
+                await LoadUserClients();
+                await LoadAvailableClients();
+                selectedClientId = null;
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to assign user to client");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error assigning client for user {UserId}", Id);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", ex.Message);
+        }
+        finally { isAssigningClient = false; }
+    }
+
+    private async Task RemoveClient(UserClientDto c)
+    {
+        if (currentUser == null) return;
+        try
+        {
+            var ok = await ClientUsersApi.RemoveUserAsync(c.ClientId, currentUser.Id);
+            if (ok)
+            {
+                NotificationService.Notify(NotificationSeverity.Success, "Removed", $"Removed from client '{c.ClientName}'");
+                await LoadUserClients();
+                await LoadAvailableClients();
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to remove from client");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error removing client for user {UserId}", Id);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", ex.Message);
         }
     }
 

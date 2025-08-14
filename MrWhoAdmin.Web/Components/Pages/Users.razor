@@ -20,7 +20,10 @@
             <RadzenTextBox @bind-Value="@searchTerm" Placeholder="Search users..." Style="width: 300px;" />
             <RadzenButton Click="@LoadUsers" Icon="search" ButtonStyle="ButtonStyle.Secondary" />
         </RadzenStack>
-        <RadzenButton Click="@(() => Navigation.NavigateTo("/users/add"))" Icon="person_add" ButtonStyle="ButtonStyle.Primary" Text="Add User" />
+        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+            <RadzenButton Click="@(() => Navigation.NavigateTo("/users/registrations"))" Icon="how_to_reg" ButtonStyle="ButtonStyle.Light" Text="Pending" />
+            <RadzenButton Click="@(() => Navigation.NavigateTo("/users/add"))" Icon="person_add" ButtonStyle="ButtonStyle.Primary" Text="Add User" />
+        </RadzenStack>
     </RadzenStack>
 
     @if (isLoading)
@@ -87,7 +90,7 @@
                         <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
                             <RadzenButton Click="@(() => EditUser(user.Id))" Icon="edit" Size="ButtonSize.Medium" 
                                          ButtonStyle="ButtonStyle.Light" Text="Edit" />
-                            <RadzenButton Click="@(() => ResetPassword(user.Id))" Icon="lock_reset" Size="ButtonSize.Medium" 
+                            <RadzenButton Click="@(async () => await ResetPassword(user.Id))" Icon="lock_reset" Size="ButtonSize.Medium" 
                                          ButtonStyle="ButtonStyle.Warning" Text="Reset" />
                             <RadzenButton Click="@(async () => await ToggleLockout(user))" Icon="@(IsUserLocked(user) ? "lock_open" : "lock")" 
                                          Size="ButtonSize.Medium" ButtonStyle="ButtonStyle.Secondary" 
@@ -121,7 +124,6 @@
         isLoading = true;
         try
         {
-            // Call the real API instead of using mock data
             var result = await UsersApi.GetUsersAsync(page: 1, pageSize: 100, search: searchTerm);
             
             if (result != null)
@@ -185,7 +187,7 @@
             }
             else
             {
-                user.LockoutEnd = DateTimeOffset.UtcNow.AddDays(30); // Lock for 30 days
+                user.LockoutEnd = DateTimeOffset.UtcNow.AddDays(30);
                 NotificationService.Notify(NotificationSeverity.Success, "User Locked", $"User '{user.Email}' has been locked");
             }
             StateHasChanged();

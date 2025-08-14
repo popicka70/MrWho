@@ -246,7 +246,7 @@ namespace MrWho.Migrations.MySql.Migrations
                     DefaultIncludeJwtId = table.Column<bool>(type: "tinyint(1)", nullable: false),
                     DefaultRequireMfa = table.Column<bool>(type: "tinyint(1)", nullable: false),
                     DefaultMfaGracePeriodMinutes = table.Column<int>(type: "int", nullable: true),
-                    DefaultAllowedMfaMethods = table.Column<string>(type: "varchar(1000)", maxLength: 1000, nullable: true)
+                    DefaultAllowedMfaMethods = table.Column<string>(type: "longtext", nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     DefaultRememberMfaForSession = table.Column<bool>(type: "tinyint(1)", nullable: false),
                     DefaultRateLimitRequestsPerMinute = table.Column<int>(type: "int", nullable: true),
@@ -256,15 +256,15 @@ namespace MrWho.Migrations.MySql.Migrations
                     DefaultLogSensitiveData = table.Column<bool>(type: "tinyint(1)", nullable: false),
                     DefaultThemeName = table.Column<string>(type: "varchar(100)", maxLength: 100, nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    RealmLogoUri = table.Column<string>(type: "varchar(2000)", maxLength: 2000, nullable: true)
+                    RealmLogoUri = table.Column<string>(type: "longtext", nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    RealmUri = table.Column<string>(type: "varchar(2000)", maxLength: 2000, nullable: true)
+                    RealmUri = table.Column<string>(type: "longtext", nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    RealmPolicyUri = table.Column<string>(type: "varchar(2000)", maxLength: 2000, nullable: true)
+                    RealmPolicyUri = table.Column<string>(type: "longtext", nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    RealmTosUri = table.Column<string>(type: "varchar(2000)", maxLength: 2000, nullable: true)
+                    RealmTosUri = table.Column<string>(type: "longtext", nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    RealmCustomCssUrl = table.Column<string>(type: "varchar(2000)", maxLength: 2000, nullable: true)
+                    RealmCustomCssUrl = table.Column<string>(type: "longtext", nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     CreatedAt = table.Column<DateTime>(type: "datetime(6)", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "datetime(6)", nullable: false),
@@ -683,16 +683,16 @@ namespace MrWho.Migrations.MySql.Migrations
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     DeviceCodePollingIntervalSeconds = table.Column<int>(type: "int", nullable: true),
                     BackChannelLogoutSessionRequired = table.Column<bool>(type: "tinyint(1)", nullable: true),
-                    BackChannelLogoutUri = table.Column<string>(type: "varchar(2000)", maxLength: 2000, nullable: true)
+                    BackChannelLogoutUri = table.Column<string>(type: "longtext", nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     FrontChannelLogoutSessionRequired = table.Column<bool>(type: "tinyint(1)", nullable: true),
-                    FrontChannelLogoutUri = table.Column<string>(type: "varchar(2000)", maxLength: 2000, nullable: true)
+                    FrontChannelLogoutUri = table.Column<string>(type: "longtext", nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     AccessTokenType = table.Column<string>(type: "varchar(20)", maxLength: 20, nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     HashAccessTokens = table.Column<bool>(type: "tinyint(1)", nullable: true),
                     UpdateAccessTokenClaimsOnRefresh = table.Column<bool>(type: "tinyint(1)", nullable: true),
-                    AllowedCorsOrigins = table.Column<string>(type: "varchar(4000)", maxLength: 4000, nullable: true)
+                    AllowedCorsOrigins = table.Column<string>(type: "longtext", nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     ClientClaimsPrefix = table.Column<string>(type: "varchar(100)", maxLength: 100, nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
@@ -706,33 +706,33 @@ namespace MrWho.Migrations.MySql.Migrations
                     ProtocolType = table.Column<string>(type: "varchar(50)", maxLength: 50, nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     EnableLocalLogin = table.Column<bool>(type: "tinyint(1)", nullable: true),
-                    AllowedIdentityProviders = table.Column<string>(type: "varchar(2000)", maxLength: 2000, nullable: true)
+                    AllowedIdentityProviders = table.Column<string>(type: "longtext", nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     ShowClientLogo = table.Column<bool>(type: "tinyint(1)", nullable: true),
-                    LogoUri = table.Column<string>(type: "varchar(2000)", maxLength: 2000, nullable: true)
+                    LogoUri = table.Column<string>(type: "longtext", nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    ClientUri = table.Column<string>(type: "varchar(2000)", maxLength: 2000, nullable: true)
+                    ClientUri = table.Column<string>(type: "longtext", nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    PolicyUri = table.Column<string>(type: "varchar(2000)", maxLength: 2000, nullable: true)
+                    PolicyUri = table.Column<string>(type: "longtext", nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    TosUri = table.Column<string>(type: "varchar(2000)", maxLength: 2000, nullable: true)
+                    TosUri = table.Column<string>(type: "longtext", nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     EnableDetailedErrors = table.Column<bool>(type: "tinyint(1)", nullable: true),
                     LogSensitiveData = table.Column<bool>(type: "tinyint(1)", nullable: true),
-                    CustomErrorPageUrl = table.Column<string>(type: "varchar(2000)", maxLength: 2000, nullable: true)
+                    CustomErrorPageUrl = table.Column<string>(type: "longtext", nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    CustomLoginPageUrl = table.Column<string>(type: "varchar(2000)", maxLength: 2000, nullable: true)
+                    CustomLoginPageUrl = table.Column<string>(type: "longtext", nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    CustomLogoutPageUrl = table.Column<string>(type: "varchar(2000)", maxLength: 2000, nullable: true)
+                    CustomLogoutPageUrl = table.Column<string>(type: "longtext", nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     RequireMfa = table.Column<bool>(type: "tinyint(1)", nullable: true),
                     MfaGracePeriodMinutes = table.Column<int>(type: "int", nullable: true),
-                    AllowedMfaMethods = table.Column<string>(type: "varchar(1000)", maxLength: 1000, nullable: true)
+                    AllowedMfaMethods = table.Column<string>(type: "longtext", nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     RememberMfaForSession = table.Column<bool>(type: "tinyint(1)", nullable: true),
-                    CustomCssUrl = table.Column<string>(type: "varchar(2000)", maxLength: 2000, nullable: true)
+                    CustomCssUrl = table.Column<string>(type: "longtext", nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    CustomJavaScriptUrl = table.Column<string>(type: "varchar(2000)", maxLength: 2000, nullable: true)
+                    CustomJavaScriptUrl = table.Column<string>(type: "longtext", nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     ThemeName = table.Column<string>(type: "varchar(100)", maxLength: 100, nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
@@ -838,7 +838,7 @@ namespace MrWho.Migrations.MySql.Migrations
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     ClientId = table.Column<string>(type: "varchar(200)", maxLength: 200, nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
-                    ReturnUrl = table.Column<string>(type: "varchar(2000)", maxLength: 2000, nullable: true)
+                    ReturnUrl = table.Column<string>(type: "longtext", nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     Status = table.Column<int>(type: "int", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime(6)", nullable: false),

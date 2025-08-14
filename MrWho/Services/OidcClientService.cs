@@ -387,7 +387,8 @@ public class OidcClientService : IOidcClientService
                 EmailConfirmed = true
             };
 
-            var result = await _userManager.CreateAsync(adminUser, "MrWhoAdmin2024!");
+            // Stronger, more random-looking development seed password
+            var result = await _userManager.CreateAsync(adminUser, "Adm1n#2025!G7x");
             if (result.Succeeded)
             {
                 // Add name claims to admin user for proper display name
@@ -459,7 +460,8 @@ public class OidcClientService : IOidcClientService
                 EmailConfirmed = true
             };
 
-            var result = await _userManager.CreateAsync(demo1User, "Demo123");
+            // Stronger sample password for development/demo user
+            var result = await _userManager.CreateAsync(demo1User, "Dem0!User#2025");
             if (result.Succeeded)
             {
                 // Add name claims to demo1 user for proper display name
@@ -491,6 +493,37 @@ public class OidcClientService : IOidcClientService
                 _logger.LogInformation("Added 'realm' claim to existing demo1 user");
             }
         }
+
+        // Ensure required user-client assignments exist so admins/demos can sign in
+        if (adminClient != null && adminUser != null)
+        {
+            if (!await _context.ClientUsers.AnyAsync(cu => cu.ClientId == adminClient.Id && cu.UserId == adminUser.Id))
+            {
+                _context.ClientUsers.Add(new ClientUser
+                {
+                    ClientId = adminClient.Id,
+                    UserId = adminUser.Id,
+                    CreatedAt = DateTime.UtcNow,
+                    CreatedBy = "System"
+                });
+                _logger.LogInformation("Assigned admin user to admin client for access control");
+            }
+        }
+        if (demo1Client != null && demo1User != null)
+        {
+            if (!await _context.ClientUsers.AnyAsync(cu => cu.ClientId == demo1Client.Id && cu.UserId == demo1User.Id))
+            {
+                _context.ClientUsers.Add(new ClientUser
+                {
+                    ClientId = demo1Client.Id,
+                    UserId = demo1User.Id,
+                    CreatedAt = DateTime.UtcNow,
+                    CreatedBy = "System"
+                });
+                _logger.LogInformation("Assigned demo1 user to demo1 client for access control");
+            }
+        }
+        await _context.SaveChangesAsync();
 
         // Sync the admin client with OpenIddict
         await SyncClientWithOpenIddictAsync(adminClient!);

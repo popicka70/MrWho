@@ -1,0 +1,61 @@
+@model MrWho.Shared.Models.RegisterUserRequest
+@{
+    ViewData["Title"] = "Create an account";
+    var success = TempData["RegistrationSuccess"] as bool? ?? false;
+}
+
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0"><i class="bi bi-person-plus"></i> Create an account</h4>
+            </div>
+            <div class="card-body">
+                @if (success)
+                {
+                    <div class="alert alert-success">
+                        <i class="bi bi-check-circle"></i> Registration submitted. An administrator will review and approve your account.
+                    </div>
+                }
+                else
+                {
+                    <form method="post" action="/connect/register">
+                        @Html.AntiForgeryToken()
+                        <div class="mb-3">
+                            <label class="form-label">Email</label>
+                            <input asp-for="Email" class="form-control" />
+                            <span asp-validation-for="Email" class="text-danger"></span>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Password</label>
+                            <input asp-for="Password" type="password" class="form-control" />
+                            <span asp-validation-for="Password" class="text-danger"></span>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">First name</label>
+                                    <input asp-for="FirstName" class="form-control" />
+                                    <span asp-validation-for="FirstName" class="text-danger"></span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Last name</label>
+                                    <input asp-for="LastName" class="form-control" />
+                                    <span asp-validation-for="LastName" class="text-danger"></span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary"><i class="bi bi-person-plus"></i> Register</button>
+                        </div>
+                    </form>
+                }
+            </div>
+            <div class="card-footer text-end">
+                <a href="/connect/login" class="btn btn-link">Back to login</a>
+            </div>
+        </div>
+    </div>
+</div>
