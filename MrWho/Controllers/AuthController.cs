@@ -513,9 +513,23 @@ public class AuthController : Controller
         {
             try
             {
-                var uri = new Uri(returnUrl);
-                var query = HttpUtility.ParseQueryString(uri.Query);
-                clientId = query["client_id"];
+                // Handle both absolute and relative URLs safely
+                if (Uri.TryCreate(returnUrl, UriKind.Absolute, out var absUri))
+                {
+                    var query = HttpUtility.ParseQueryString(absUri.Query);
+                    clientId = query["client_id"];
+                }
+                else if (Uri.TryCreate(returnUrl, UriKind.Relative, out var relUri))
+                {
+                    // relUri.Query is empty for relative URIs created without base; parse manually
+                    var idx = returnUrl.IndexOf('?');
+                    if (idx >= 0 && idx < returnUrl.Length - 1)
+                    {
+                        var query = HttpUtility.ParseQueryString(returnUrl.Substring(idx)); // includes leading '?'
+                        clientId = query["client_id"];
+                    }
+                }
+
                 ViewData["ClientId"] = clientId;
             }
             catch (Exception ex)
