@@ -35,12 +35,13 @@
 else
 {
     <RadzenCard class="rz-my-4">
-        <RadzenTabs @bind-SelectedIndex="selectedTabIndex" RenderMode="TabRenderMode.Client">
-            <Tabs>
-                <!-- Basic Information Tab -->
-                <RadzenTabsItem Text="Basic Information" Icon="person">
-                    <div style="padding: 1rem;">
-                        <RadzenTemplateForm Data="@userModel" TItem="object" Submit="@OnSaveUser">
+        <!-- Single form wrapping all tabs so actions are always visible -->
+        <RadzenTemplateForm Data="@userModel" TItem="UserEditModel" Submit="@OnSaveUser">
+            <RadzenTabs @bind-SelectedIndex="selectedTabIndex" RenderMode="TabRenderMode.Client">
+                <Tabs>
+                    <!-- Basic Information Tab -->
+                    <RadzenTabsItem Text="Basic Information" Icon="person">
+                        <div style="padding: 1rem;">
                             <RadzenStack Gap="2rem">
                                 <RadzenStack Gap="0.75rem" class="rz-mb-2">
                                     <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">User Information</RadzenText>
@@ -48,10 +49,7 @@ else
                                         <RadzenRow>
                                             <RadzenColumn Size="12" SizeMD="6">
                                                 <RadzenFormField Text="Email Address" Variant="Variant.Outlined">
-                                                    <RadzenTextBox @bind-Value="@userModel.Email" 
-                                                                  Placeholder="user@example.com" 
-                                                                  Style="width: 100%;" 
-                                                                  Disabled="@IsEdit" />
+                                                    <RadzenTextBox @bind-Value="@userModel.Email" Placeholder="user@example.com" Style="width: 100%;" Disabled="@IsEdit" />
                                                     <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
                                                         @(IsEdit ? "Email cannot be changed after creation" : "This will be used for login")
                                                     </RadzenText>
@@ -59,10 +57,7 @@ else
                                             </RadzenColumn>
                                             <RadzenColumn Size="12" SizeMD="6">
                                                 <RadzenFormField Text="Username" Variant="Variant.Outlined">
-                                                    <RadzenTextBox @bind-Value="@userModel.UserName" 
-                                                                  Placeholder="Enter username" 
-                                                                  Style="width: 100%;" 
-                                                                  Disabled="@IsEdit" />
+                                                    <RadzenTextBox @bind-Value="@userModel.UserName" Placeholder="Enter username" Style="width: 100%;" Disabled="@IsEdit" />
                                                     <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
                                                         @(IsEdit ? "Username cannot be changed after creation" : "Leave blank to use email as username")
                                                     </RadzenText>
@@ -76,29 +71,16 @@ else
                                                 <RadzenColumn Size="12" SizeMD="6">
                                                     <RadzenFormField Text="Password" Variant="Variant.Outlined">
                                                         <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Stretch">
-                                                            <RadzenTextBox @bind-Value="@userModel.Password" 
-                                                                          Type="@(showPassword ? "text" : "password")"
-                                                                          Placeholder="Enter password" 
-                                                                          Style="flex: 1;" />
-                                                            <RadzenButton Icon="@(showPassword ? "visibility_off" : "visibility")" 
-                                                                         ButtonStyle="ButtonStyle.Light" 
-                                                                         Click="@(() => showPassword = !showPassword)" />
-                                                            <RadzenButton Icon="refresh" 
-                                                                         ButtonStyle="ButtonStyle.Secondary" 
-                                                                         Text="Generate" 
-                                                                         Click="@GeneratePassword" />
+                                                            <RadzenTextBox @bind-Value="@userModel.Password" Type="@(showPassword ? "text" : "password")" Placeholder="Enter password" Style="flex: 1;" />
+                                                            <RadzenButton Icon="@(showPassword ? "visibility_off" : "visibility")" ButtonStyle="ButtonStyle.Light" Click="@(() => showPassword = !showPassword)" />
+                                                            <RadzenButton Icon="refresh" ButtonStyle="ButtonStyle.Secondary" Text="Generate" Click="@GeneratePassword" />
                                                         </RadzenStack>
-                                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                            Minimum 8 characters with mixed case, numbers, and symbols
-                                                        </RadzenText>
+                                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Minimum 8 characters with mixed case, numbers, and symbols</RadzenText>
                                                     </RadzenFormField>
                                                 </RadzenColumn>
                                                 <RadzenColumn Size="12" SizeMD="6">
                                                     <RadzenFormField Text="Confirm Password" Variant="Variant.Outlined">
-                                                        <RadzenTextBox @bind-Value="@confirmPassword" 
-                                                                      Type="password"
-                                                                      Placeholder="Confirm password" 
-                                                                      Style="width: 100%;" />
+                                                        <RadzenTextBox @bind-Value="@confirmPassword" Type="password" Placeholder="Confirm password" Style="width: 100%;" />
                                                     </RadzenFormField>
                                                 </RadzenColumn>
                                             </RadzenRow>
@@ -108,19 +90,13 @@ else
                                             <RadzenRow>
                                                 <RadzenColumn Size="12" SizeMD="6">
                                                     <RadzenFormField Text="User ID" Variant="Variant.Outlined">
-                                                        <RadzenTextBox Value="@(currentUser?.Id ?? "")" 
-                                                                      ReadOnly="true" 
-                                                                      Style="width: 100%;" />
+                                                        <RadzenTextBox Value="@(currentUser?.Id ?? "")" ReadOnly="true" Style="width: 100%;" />
                                                     </RadzenFormField>
                                                 </RadzenColumn>
                                                 <RadzenColumn Size="12" SizeMD="6">
                                                     <RadzenFormField Text="Phone Number" Variant="Variant.Outlined">
-                                                        <RadzenTextBox @bind-Value="@userModel.PhoneNumber" 
-                                                                      Placeholder="+1 (555) 123-4567" 
-                                                                      Style="width: 100%;" />
-                                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                            Optional - used for two-factor authentication
-                                                        </RadzenText>
+                                                        <RadzenTextBox @bind-Value="@userModel.PhoneNumber" Placeholder="+1 (555) 123-4567" Style="width: 100%;" />
+                                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Optional - used for two-factor authentication</RadzenText>
                                                     </RadzenFormField>
                                                 </RadzenColumn>
                                             </RadzenRow>
@@ -129,12 +105,8 @@ else
                                         @if (!IsEdit)
                                         {
                                             <RadzenFormField Text="Phone Number" Variant="Variant.Outlined">
-                                                <RadzenTextBox @bind-Value="@userModel.PhoneNumber" 
-                                                              Placeholder="+1 (555) 123-4567" 
-                                                              Style="width: 100%;" />
-                                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                    Optional - used for two-factor authentication
-                                                </RadzenText>
+                                                <RadzenTextBox @bind-Value="@userModel.PhoneNumber" Placeholder="+1 (555) 123-4567" Style="width: 100%;" />
+                                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Optional - used for two-factor authentication</RadzenText>
                                             </RadzenFormField>
                                         }
 
@@ -176,401 +148,325 @@ else
                                     </RadzenStack>
                                 </RadzenStack>
 
-                                <!-- Sticky Action Bar -->
-                                <div style="position: sticky; bottom: 0; background: var(--rz-base-50); border-top: 1px solid var(--rz-border-color); padding: 0.75rem 1rem; z-index: 5;" class="rz-mt-4">
-                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween" Gap="1rem">
-                                        <div style="min-height: 1.25rem;">
-                                            <ValidationSummary />
-                                        </div>
-                                        <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem">
-                                            <RadzenButton Click="@Cancel" Icon="cancel" ButtonStyle="ButtonStyle.Light" Text="Cancel" />
-                                            @if (IsEdit)
-                                            {
-                                                <RadzenButton Click="@(async () => await DeleteUser())" Icon="delete" ButtonStyle="ButtonStyle.Danger" 
-                                                             Text="Delete User" Disabled="@isSaving" IsBusy="@isDeleting" />
-                                            }
-                                            <RadzenButton ButtonType="ButtonType.Submit" Icon="save" ButtonStyle="ButtonStyle.Primary" 
-                                                         Text="@(IsEdit ? "Update User" : "Create User")" 
-                                                         IsBusy="@isSaving" Disabled="@isSaving" />
-                                        </RadzenStack>
-                                    </RadzenStack>
-                                </div>
+                                <!-- Removed per-tab sticky bar; global action bar is below the tabs -->
                             </RadzenStack>
-                        </RadzenTemplateForm>
-                    </div>
-                </RadzenTabsItem>
+                        </div>
+                    </RadzenTabsItem>
 
-                <!-- Claims Management Tab -->
-                @if (IsEdit)
-                {
-                    <RadzenTabsItem Text="Claims" Icon="verified_user">
-                        <div style="padding: 1rem;">
-                            <RadzenStack Gap="2rem">
-                                <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
-                                    <RadzenText TextStyle="TextStyle.H6" Text="User Claims Management" />
-                                    <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="@($"{userClaims.Count} claims")" />
-                                </RadzenStack>
-                                
-                                <!-- Add New Claim Section -->
-                                <RadzenCard Style="background-color: var(--rz-base-50);">
-                                    <RadzenStack Gap="1rem">
-                                        <RadzenText TextStyle="TextStyle.Subtitle1" Text="Add New Claim" />
-                                        
-                                        <RadzenRow>
-                                            <RadzenColumn Size="12" SizeMD="4">
-                                                <RadzenFormField Text="Claim Type" Variant="Variant.Outlined">
-                                                    <RadzenDropDown @bind-Value="@newClaimType" 
-                                                                   Data="@CommonClaimTypes.StandardClaims" 
-                                                                   TextProperty="DisplayName" 
-                                                                   ValueProperty="Type"
-                                                                   AllowClear="true" 
-                                                                   Placeholder="Select or type custom claim type"
-                                                                   AllowFiltering="true"
-                                                                   FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
-                                                                   Style="width: 100%;" />
-                                                </RadzenFormField>
-                                            </RadzenColumn>
-                                            <RadzenColumn Size="12" SizeMD="4">
-                                                <RadzenFormField Text="Claim Value" Variant="Variant.Outlined">
-                                                    <RadzenTextBox @bind-Value="@newClaimValue" 
-                                                                  Placeholder="Enter claim value" 
-                                                                  Style="width: 100%;" />
-                                                </RadzenFormField>
-                                            </RadzenColumn>
-                                            <RadzenColumn Size="12" SizeMD="4">
-                                                <RadzenFormField Text="Action" Variant="Variant.Outlined">
-                                                    <RadzenButton Click="@(async () => await AddClaim())" 
-                                                                 Icon="add" 
-                                                                 ButtonStyle="ButtonStyle.Success" 
-                                                                 Text="Add Claim" 
-                                                                 Disabled="@(string.IsNullOrWhiteSpace(newClaimType) || string.IsNullOrWhiteSpace(newClaimValue))" 
-                                                                 IsBusy="@isAddingClaim"
-                                                                 Style="width: 100%;" />
-                                                </RadzenFormField>
-                                            </RadzenColumn>
-                                        </RadzenRow>
-                                        
-                                        @if (!string.IsNullOrWhiteSpace(newClaimType))
-                                        {
-                                            var claimInfo = CommonClaimTypes.StandardClaims.FirstOrDefault(c => c.Type == newClaimType);
-                                            if (claimInfo != default)
+                    <!-- Claims Management Tab -->
+                    @if (IsEdit)
+                    {
+                        <RadzenTabsItem Text="Claims" Icon="verified_user">
+                            <div style="padding: 1rem;">
+                                <RadzenStack Gap="2rem">
+                                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                                        <RadzenText TextStyle="TextStyle.H6" Text="User Claims Management" />
+                                        <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="@($"{userClaims.Count} claims")" />
+                                    </RadzenStack>
+
+                                    <!-- Add New Claim Section -->
+                                    <RadzenCard Style="background-color: var(--rz-base-50);">
+                                        <RadzenStack Gap="1rem">
+                                            <RadzenText TextStyle="TextStyle.Subtitle1" Text="Add New Claim" />
+
+                                            <RadzenRow>
+                                                <RadzenColumn Size="12" SizeMD="4">
+                                                    <RadzenFormField Text="Claim Type" Variant="Variant.Outlined">
+                                                        <RadzenDropDown @bind-Value="@newClaimType" Data="@CommonClaimTypes.StandardClaims" TextProperty="DisplayName" ValueProperty="Type" AllowClear="true" Placeholder="Select or type custom claim type" AllowFiltering="true" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive" Style="width: 100%;" />
+                                                    </RadzenFormField>
+                                                </RadzenColumn>
+                                                <RadzenColumn Size="12" SizeMD="4">
+                                                    <RadzenFormField Text="Claim Value" Variant="Variant.Outlined">
+                                                        <RadzenTextBox @bind-Value="@newClaimValue" Placeholder="Enter claim value" Style="width: 100%;" />
+                                                    </RadzenFormField>
+                                                </RadzenColumn>
+                                                <RadzenColumn Size="12" SizeMD="4">
+                                                    <RadzenFormField Text="Action" Variant="Variant.Outlined">
+                                                        <RadzenButton Click="@(async () => await AddClaim())" Icon="add" ButtonStyle="ButtonStyle.Success" Text="Add Claim" Disabled="@(string.IsNullOrWhiteSpace(newClaimType) || string.IsNullOrWhiteSpace(newClaimValue))" IsBusy="@isAddingClaim" Style="width: 100%;" />
+                                                    </RadzenFormField>
+                                                </RadzenColumn>
+                                            </RadzenRow>
+
+                                            @if (!string.IsNullOrWhiteSpace(newClaimType))
                                             {
-                                                <RadzenAlert AlertStyle="AlertStyle.Info" Size="AlertSize.Small">
-                                                    <RadzenText><strong>@claimInfo.DisplayName:</strong> @claimInfo.Description</RadzenText>
-                                                </RadzenAlert>
+                                                var claimInfo = CommonClaimTypes.StandardClaims.FirstOrDefault(c => c.Type == newClaimType);
+                                                if (claimInfo != default)
+                                                {
+                                                    <RadzenAlert AlertStyle="AlertStyle.Info" Size="AlertSize.Small">
+                                                        <RadzenText><strong>@claimInfo.DisplayName:</strong> @claimInfo.Description</RadzenText>
+                                                    </RadzenAlert>
+                                                }
                                             }
+                                        </RadzenStack>
+                                    </RadzenCard>
+
+                                    <!-- Current Claims List -->
+                                    <RadzenStack Gap="0.75rem">
+                                        <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Current Claims</RadzenText>
+                                        @if (userClaims.Any())
+                                        {
+                                            <div style="max-height: 400px; overflow-y: auto;">
+                                                <RadzenDataGrid Data="@userClaims" TItem="UserClaimDto" AllowPaging="false" AllowSorting="true">
+                                                    <Columns>
+                                                        <RadzenDataGridColumn TItem="UserClaimDto" Property="ClaimType" Title="Claim Type" Width="200px">
+                                                            <Template Context="claim">
+                                                                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
+                                                                    <RadzenIcon Icon="verified_user" Style="color: var(--rz-info); font-size: 16px;" />
+                                                                    <RadzenText Text="@claim.ClaimType" />
+                                                                </RadzenStack>
+                                                            </Template>
+                                                        </RadzenDataGridColumn>
+
+                                                        <RadzenDataGridColumn TItem="UserClaimDto" Property="ClaimValue" Title="Value">
+                                                            <Template Context="claim">
+                                                                <RadzenText Text="@claim.ClaimValue" Style="word-break: break-all;" />
+                                                            </Template>
+                                                        </RadzenDataGridColumn>
+
+                                                        <RadzenDataGridColumn TItem="UserClaimDto" Title="Actions" Width="120px" Sortable="false">
+                                                            <Template Context="claim">
+                                                                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                                                                    <RadzenButton Click="@(async () => await RemoveClaim(claim))" Icon="delete" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Danger" Variant="Variant.Text" />
+                                                                </RadzenStack>
+                                                            </Template>
+                                                        </RadzenDataGridColumn>
+                                                    </Columns>
+                                                </RadzenDataGrid>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <RadzenAlert AlertStyle="AlertStyle.Info">
+                                                <RadzenText>No claims assigned to this user. Add claims above to provide additional user information.</RadzenText>
+                                            </RadzenAlert>
                                         }
                                     </RadzenStack>
-                                </RadzenCard>
+                                </RadzenStack>
+                            </div>
+                        </RadzenTabsItem>
 
-                                <!-- Current Claims List -->
-                                <RadzenStack Gap="0.75rem">
-                                    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Current Claims</RadzenText>
-                                    @if (userClaims.Any())
-                                    {
-                                        <div style="max-height: 400px; overflow-y: auto;">
-                                            <RadzenDataGrid Data="@userClaims" TItem="UserClaimDto" AllowPaging="false" AllowSorting="true">
+                        <!-- Roles Management Tab -->
+                        <RadzenTabsItem Text="Roles" Icon="group">
+                            <div style="padding: 1rem;">
+                                <RadzenStack Gap="2rem">
+                                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                                        <RadzenText TextStyle="TextStyle.H6" Text="User Roles" />
+                                        <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="@($"{userRoles.Count} roles")" />
+                                    </RadzenStack>
+
+                                    <!-- Role Assignment Section -->
+                                    <RadzenCard Style="background-color: var(--rz-base-50);">
+                                        <RadzenStack Gap="1rem">
+                                            <RadzenText TextStyle="TextStyle.Subtitle1" Text="Assign Role" />
+                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                Roles provide groups of permissions and appear in the 'role' claim when the roles scope is requested.
+                                            </RadzenText>
+
+                                            <RadzenRow>
+                                                <RadzenColumn Size="12" SizeMD="8">
+                                                    <RadzenFormField Text="Available Roles" Variant="Variant.Outlined">
+                                                        <RadzenDropDown @bind-Value="@selectedRoleId" Data="@availableRoles" TextProperty="Name" ValueProperty="Id" Placeholder="Select a role to assign" Style="width: 100%;" />
+                                                    </RadzenFormField>
+                                                </RadzenColumn>
+                                                <RadzenColumn Size="12" SizeMD="4">
+                                                    <RadzenFormField Text="Action" Variant="Variant.Outlined">
+                                                        <RadzenButton Click="@(async () => await AssignRole())" Icon="add" ButtonStyle="ButtonStyle.Success" Text="Assign Role" Disabled="@(string.IsNullOrWhiteSpace(selectedRoleId))" IsBusy="@isAssigningRole" Style="width: 100%;" />
+                                                    </RadzenFormField>
+                                                </RadzenColumn>
+                                            </RadzenRow>
+                                        </RadzenStack>
+                                    </RadzenCard>
+
+                                    <!-- Current Roles List -->
+                                    <RadzenStack Gap="0.75rem">
+                                        <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Assigned Roles</RadzenText>
+                                        @if (userRoles.Any())
+                                        {
+                                            <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" Wrap="FlexWrap.Wrap">
+                                                @foreach (var role in userRoles)
+                                                {
+                                                    <RadzenBadge BadgeStyle="BadgeStyle.Success" class="rz-p-3">
+                                                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
+                                                            <RadzenIcon Icon="group" />
+                                                            <RadzenText Text="@role.Name" />
+                                                            <RadzenButton Click="@(async () => await RemoveRole(role.Id))" Icon="close" Size="ButtonSize.ExtraSmall" ButtonStyle="ButtonStyle.Danger" Variant="Variant.Text" />
+                                                        </RadzenStack>
+                                                    </RadzenBadge>
+                                                }
+                                            </RadzenStack>
+                                        }
+                                        else
+                                        {
+                                            <RadzenAlert AlertStyle="AlertStyle.Info">
+                                                <RadzenText>No roles assigned to this user. Assign roles above to grant permissions.</RadzenText>
+                                            </RadzenAlert>
+                                        }
+                                    </RadzenStack>
+                                </RadzenStack>
+                            </div>
+                        </RadzenTabsItem>
+
+                        <!-- Clients Tab -->
+                        <RadzenTabsItem Text="Clients" Icon="apps">
+                            <div style="padding: 1rem;">
+                                <RadzenStack Gap="1.5rem">
+                                    <RadzenText TextStyle="TextStyle.H6" Text="Client Assignments" />
+
+                                    <RadzenCard Style="background-color: var(--rz-base-50);">
+                                        <RadzenStack Gap="1rem">
+                                            <RadzenText TextStyle="TextStyle.Subtitle1" Text="Assign to Client" />
+                                            <RadzenRow>
+                                                <RadzenColumn Size="12" SizeMD="8">
+                                                    <RadzenFormField Text="Client" Variant="Variant.Outlined">
+                                                        <RadzenDropDown @bind-Value="selectedClientId" Data="@availableClients" TextProperty="Name" ValueProperty="Id" AllowFiltering="true" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive" Placeholder="Select a client" Style="width: 100%;" />
+                                                    </RadzenFormField>
+                                                </RadzenColumn>
+                                                <RadzenColumn Size="12" SizeMD="4">
+                                                    <RadzenFormField Text="Action" Variant="Variant.Outlined">
+                                                        <RadzenButton Click="@(async () => await AssignClient())" Icon="person_add" ButtonStyle="ButtonStyle.Primary" Text="Assign" Disabled="@string.IsNullOrWhiteSpace(selectedClientId)" IsBusy="@isAssigningClient" Style="width: 100%;" />
+                                                    </RadzenFormField>
+                                                </RadzenColumn>
+                                            </RadzenRow>
+                                        </RadzenStack>
+                                    </RadzenCard>
+
+                                    <RadzenStack Gap="0.75rem">
+                                        <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Assigned Clients</RadzenText>
+                                        @if (assignedClients.Any())
+                                        {
+                                            <RadzenDataGrid Data="@assignedClients" TItem="UserClientDto" AllowPaging="true" PageSize="10" AllowSorting="true">
                                                 <Columns>
-                                                    <RadzenDataGridColumn TItem="UserClaimDto" Property="ClaimType" Title="Claim Type" Width="200px">
-                                                        <Template Context="claim">
-                                                            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
-                                                                <RadzenIcon Icon="verified_user" Style="color: var(--rz-info); font-size: 16px;" />
-                                                                <RadzenText Text="@claim.ClaimType" />
-                                                            </RadzenStack>
-                                                        </Template>
-                                                    </RadzenDataGridColumn>
-                                                
-                                                    <RadzenDataGridColumn TItem="UserClaimDto" Property="ClaimValue" Title="Value">
-                                                        <Template Context="claim">
-                                                            <RadzenText Text="@claim.ClaimValue" Style="word-break: break-all;" />
-                                                        </Template>
-                                                    </RadzenDataGridColumn>
-                                                
-                                                    <RadzenDataGridColumn TItem="UserClaimDto" Title="Actions" Width="120px" Sortable="false">
-                                                        <Template Context="claim">
-                                                            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
-                                                                <RadzenButton Click="@(async () => await RemoveClaim(claim))" 
-                                                                             Icon="delete" 
-                                                                             Size="ButtonSize.Small" 
-                                                                             ButtonStyle="ButtonStyle.Danger" 
-                                                                             Variant="Variant.Text" />
-                                                            </RadzenStack>
+                                                    <RadzenDataGridColumn TItem="UserClientDto" Property="ClientPublicId" Title="Client ID" />
+                                                    <RadzenDataGridColumn TItem="UserClientDto" Property="ClientName" Title="Name" />
+                                                    <RadzenDataGridColumn TItem="UserClientDto" Property="CreatedAt" Title="Assigned" />
+                                                    <RadzenDataGridColumn TItem="UserClientDto" Title="Actions" Width="120px">
+                                                        <Template Context="c">
+                                                            <RadzenButton Click="@(async () => await RemoveClient(c))" Icon="delete" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Danger" Variant="Variant.Text" />
                                                         </Template>
                                                     </RadzenDataGridColumn>
                                                 </Columns>
                                             </RadzenDataGrid>
-                                        </div>
-                                    }
-                                    else
-                                    {
-                                        <RadzenAlert AlertStyle="AlertStyle.Info">
-                                            <RadzenText>No claims assigned to this user. Add claims above to provide additional user information.</RadzenText>
-                                        </RadzenAlert>
-                                    }
-                                </RadzenStack>
-                            </RadzenStack>
-                        </div>
-                    </RadzenTabsItem>
-
-                    <!-- Roles Management Tab -->
-                    <RadzenTabsItem Text="Roles" Icon="group">
-                        <div style="padding: 1rem;">
-                            <RadzenStack Gap="2rem">
-                                <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
-                                    <RadzenText TextStyle="TextStyle.H6" Text="User Roles" />
-                                    <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="@($"{userRoles.Count} roles")" />
-                                </RadzenStack>
-                                
-                                <!-- Role Assignment Section -->
-                                <RadzenCard Style="background-color: var(--rz-base-50);">
-                                    <RadzenStack Gap="1rem">
-                                        <RadzenText TextStyle="TextStyle.Subtitle1" Text="Assign Role" />
-                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                            Roles provide groups of permissions and appear in the 'role' claim when the roles scope is requested.
-                                        </RadzenText>
-                                        
-                                        <RadzenRow>
-                                            <RadzenColumn Size="12" SizeMD="8">
-                                                <RadzenFormField Text="Available Roles" Variant="Variant.Outlined">
-                                                    <RadzenDropDown @bind-Value="@selectedRoleId" 
-                                                                   Data="@availableRoles" 
-                                                                   TextProperty="Name" 
-                                                                   ValueProperty="Id"
-                                                                   Placeholder="Select a role to assign"
-                                                                   Style="width: 100%;" />
-                                                </RadzenFormField>
-                                            </RadzenColumn>
-                                            <RadzenColumn Size="12" SizeMD="4">
-                                                <RadzenFormField Text="Action" Variant="Variant.Outlined">
-                                                    <RadzenButton Click="@(async () => await AssignRole())" 
-                                                                 Icon="add" 
-                                                                 ButtonStyle="ButtonStyle.Success" 
-                                                                 Text="Assign Role" 
-                                                                 Disabled="@(string.IsNullOrWhiteSpace(selectedRoleId))" 
-                                                                 IsBusy="@isAssigningRole"
-                                                                 Style="width: 100%;" />
-                                                </RadzenFormField>
-                                            </RadzenColumn>
-                                        </RadzenRow>
+                                        }
+                                        else
+                                        {
+                                            <RadzenAlert AlertStyle="AlertStyle.Info">
+                                                <RadzenText>This user is not assigned to any clients.</RadzenText>
+                                            </RadzenAlert>
+                                        }
                                     </RadzenStack>
-                                </RadzenCard>
-
-                                <!-- Current Roles List -->
-                                <RadzenStack Gap="0.75rem">
-                                    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Assigned Roles</RadzenText>
-                                    @if (userRoles.Any())
-                                    {
-                                        <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" Wrap="FlexWrap.Wrap">
-                                            @foreach (var role in userRoles)
-                                            {
-                                                <RadzenBadge BadgeStyle="BadgeStyle.Success" class="rz-p-3">
-                                                    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
-                                                        <RadzenIcon Icon="group" />
-                                                        <RadzenText Text="@role.Name" />
-                                                        <RadzenButton Click="@(async () => await RemoveRole(role.Id))" 
-                                                                     Icon="close" 
-                                                                     Size="ButtonSize.ExtraSmall" 
-                                                                     ButtonStyle="ButtonStyle.Danger" 
-                                                                     Variant="Variant.Text" />
-                                                    </RadzenStack>
-                                                </RadzenBadge>
-                                            }
-                                        </RadzenStack>
-                                    }
-                                    else
-                                    {
-                                        <RadzenAlert AlertStyle="AlertStyle.Info">
-                                            <RadzenText>No roles assigned to this user. Assign roles above to grant permissions.</RadzenText>
-                                        </RadzenAlert>
-                                    }
                                 </RadzenStack>
-                            </RadzenStack>
-                        </div>
-                    </RadzenTabsItem>
+                            </div>
+                        </RadzenTabsItem>
 
-                    <!-- Clients Tab -->
-                    <RadzenTabsItem Text="Clients" Icon="apps">
-                        <div style="padding: 1rem;">
-                            <RadzenStack Gap="1.5rem">
-                                <RadzenText TextStyle="TextStyle.H6" Text="Client Assignments" />
+                        <!-- Security Tab -->
+                        <RadzenTabsItem Text="Security" Icon="security">
+                            <div style="padding: 1rem;">
+                                <RadzenStack Gap="2rem">
+                                    <RadzenText TextStyle="TextStyle.H6" Text="Security Management" />
 
-                                <RadzenCard Style="background-color: var(--rz-base-50);">
-                                    <RadzenStack Gap="1rem">
-                                        <RadzenText TextStyle="TextStyle.Subtitle1" Text="Assign to Client" />
-                                        <RadzenRow>
-                                            <RadzenColumn Size="12" SizeMD="8">
-                                                <RadzenFormField Text="Client" Variant="Variant.Outlined">
-                                                    <RadzenDropDown @bind-Value="selectedClientId" 
-                                                                   Data="@availableClients" 
-                                                                   TextProperty="Name" 
-                                                                   ValueProperty="Id"
-                                                                   AllowFiltering="true"
-                                                                   FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
-                                                                   Placeholder="Select a client"
-                                                                   Style="width: 100%;" />
-                                                </RadzenFormField>
-                                            </RadzenColumn>
-                                            <RadzenColumn Size="12" SizeMD="4">
-                                                <RadzenFormField Text="Action" Variant="Variant.Outlined">
-                                                    <RadzenButton Click="@(async () => await AssignClient())"
-                                                                 Icon="person_add"
-                                                                 ButtonStyle="ButtonStyle.Primary"
-                                                                 Text="Assign"
-                                                                 Disabled="@string.IsNullOrWhiteSpace(selectedClientId)"
-                                                                 IsBusy="@isAssigningClient"
-                                                                 Style="width: 100%;" />
-                                                </RadzenFormField>
-                                            </RadzenColumn>
-                                        </RadzenRow>
-                                    </RadzenStack>
-                                </RadzenCard>
+                                    <RadzenStack Gap="0.75rem">
+                                        <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Profile Status</RadzenText>
+                                        <RadzenCard>
+                                            <RadzenStack Gap="1rem">
+                                                <RadzenText TextStyle="TextStyle.Subtitle2">Current State</RadzenText>
+                                                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.75rem" AlignItems="AlignItems.Center">
+                                                    @if (profileState?.State?.Equals("Active", StringComparison.OrdinalIgnoreCase) == true)
+                                                    {
+                                                        <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="ACTIVE" />
+                                                    }
+                                                    else if (profileState?.State?.Equals("Suspended", StringComparison.OrdinalIgnoreCase) == true)
+                                                    {
+                                                        <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text="SUSPENDED" />
+                                                    }
+                                                    else if (profileState?.State?.Equals("Disabled", StringComparison.OrdinalIgnoreCase) == true)
+                                                    {
+                                                        <RadzenBadge BadgeStyle="BadgeStyle.Danger" Text="DISABLED" />
+                                                    }
+                                                    else
+                                                    {
+                                                        <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="NEW" />
+                                                    }
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Only users with state 'Active' can complete OIDC authorization.</RadzenText>
+                                                </RadzenStack>
 
-                                <RadzenStack Gap="0.75rem">
-                                    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Assigned Clients</RadzenText>
-                                    @if (assignedClients.Any())
-                                    {
-                                        <RadzenDataGrid Data="@assignedClients" TItem="UserClientDto" AllowPaging="true" PageSize="10" AllowSorting="true">
-                                            <Columns>
-                                                <RadzenDataGridColumn TItem="UserClientDto" Property="ClientPublicId" Title="Client ID" />
-                                                <RadzenDataGridColumn TItem="UserClientDto" Property="ClientName" Title="Name" />
-                                                <RadzenDataGridColumn TItem="UserClientDto" Property="CreatedAt" Title="Assigned" />
-                                                <RadzenDataGridColumn TItem="UserClientDto" Title="Actions" Width="120px">
-                                                    <Template Context="c">
-                                                        <RadzenButton Click="@(async () => await RemoveClient(c))" Icon="delete" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Danger" Variant="Variant.Text" />
-                                                    </Template>
-                                                </RadzenDataGridColumn>
-                                            </Columns>
-                                        </RadzenDataGrid>
-                                    }
-                                    else
-                                    {
-                                        <RadzenAlert AlertStyle="AlertStyle.Info">
-                                            <RadzenText>This user is not assigned to any clients.</RadzenText>
-                                        </RadzenAlert>
-                                    }
-                                </RadzenStack>
-                            </RadzenStack>
-                        </div>
-                    </RadzenTabsItem>
-
-                    <!-- Security Tab -->
-                    <RadzenTabsItem Text="Security" Icon="security">
-                        <div style="padding: 1rem;">
-                            <RadzenStack Gap="2rem">
-                                <RadzenText TextStyle="TextStyle.H6" Text="Security Management" />
-                                
-                                <!-- Profile Status -->
-                                <RadzenStack Gap="0.75rem">
-                                    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Profile Status</RadzenText>
-                                    <RadzenCard>
-                                        <RadzenStack Gap="1rem">
-                                            <RadzenText TextStyle="TextStyle.Subtitle2">Current State</RadzenText>
-                                            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.75rem" AlignItems="AlignItems.Center">
-                                                @if (profileState?.State?.Equals("Active", StringComparison.OrdinalIgnoreCase) == true)
-                                                {
-                                                    <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="ACTIVE" />
-                                                }
-                                                else if (profileState?.State?.Equals("Suspended", StringComparison.OrdinalIgnoreCase) == true)
-                                                {
-                                                    <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text="SUSPENDED" />
-                                                }
-                                                else if (profileState?.State?.Equals("Disabled", StringComparison.OrdinalIgnoreCase) == true)
-                                                {
-                                                    <RadzenBadge BadgeStyle="BadgeStyle.Danger" Text="DISABLED" />
-                                                }
-                                                else
-                                                {
-                                                    <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="NEW" />
-                                                }
-                                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                    Only users with state 'Active' can complete OIDC authorization.
-                                                </RadzenText>
+                                                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                                                    <RadzenButton Click="@(async () => await SetProfileState("Active"))" Icon="check_circle" ButtonStyle="ButtonStyle.Success" Text="Activate" />
+                                                    <RadzenButton Click="@(async () => await SetProfileState("Suspended"))" Icon="pause_circle" ButtonStyle="ButtonStyle.Secondary" Text="Suspend" />
+                                                    <RadzenButton Click="@(async () => await SetProfileState("Disabled"))" Icon="cancel" ButtonStyle="ButtonStyle.Danger" Text="Deactivate" />
+                                                </RadzenStack>
                                             </RadzenStack>
+                                        </RadzenCard>
+                                    </RadzenStack>
 
-                                            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
-                                                <RadzenButton Click="@(async () => await SetProfileState("Active"))" Icon="check_circle" ButtonStyle="ButtonStyle.Success" Text="Activate" />
-                                                <RadzenButton Click="@(async () => await SetProfileState("Suspended"))" Icon="pause_circle" ButtonStyle="ButtonStyle.Secondary" Text="Suspend" />
-                                                <RadzenButton Click="@(async () => await SetProfileState("Disabled"))" Icon="cancel" ButtonStyle="ButtonStyle.Danger" Text="Deactivate" />
-                                            </RadzenStack>
+                                    <RadzenStack Gap="0.75rem">
+                                        <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Account Lock Status</RadzenText>
+                                        <RadzenStack Gap="1rem">
+                                            <RadzenRow>
+                                                <RadzenColumn Size="12" SizeMD="6">
+                                                    <RadzenCard>
+                                                        <RadzenStack Gap="1rem">
+                                                            <RadzenText TextStyle="TextStyle.Subtitle1" Text="Account Lock Status" />
+                                                            @if (IsUserLocked())
+                                                            {
+                                                                <RadzenBadge BadgeStyle="BadgeStyle.Danger" Text="LOCKED" />
+                                                                <RadzenText TextStyle="TextStyle.Caption">Locked until: @(currentUser?.LockoutEnd?.ToString("yyyy-MM-dd HH:mm"))</RadzenText>
+                                                                <RadzenButton Click="@(async () => await UnlockUser())" Icon="lock_open" ButtonStyle="ButtonStyle.Success" Text="Unlock Account" IsBusy="@isTogglingLock" />
+                                                            }
+                                                            else
+                                                            {
+                                                                <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="ACTIVE" />
+                                                                <RadzenButton Click="@(async () => await LockUser())" Icon="lock" ButtonStyle="ButtonStyle.Warning" Text="Lock Account" IsBusy="@isTogglingLock" />
+                                                            }
+                                                        </RadzenStack>
+                                                    </RadzenCard>
+                                                </RadzenColumn>
+                                                <RadzenColumn Size="12" SizeMD="6">
+                                                    <RadzenCard>
+                                                        <RadzenStack Gap="1rem">
+                                                            <RadzenText TextStyle="TextStyle.Subtitle1" Text="Password Management" />
+                                                            <RadzenButton Click="@(async () => await ResetPassword())" Icon="key" ButtonStyle="ButtonStyle.Primary" Text="Reset Password" IsBusy="@isResettingPassword" />
+                                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Generates a new temporary password and notifies the user</RadzenText>
+                                                        </RadzenStack>
+                                                    </RadzenCard>
+                                                </RadzenColumn>
+                                            </RadzenRow>
                                         </RadzenStack>
-                                    </RadzenCard>
-                                </RadzenStack>
-                                
-                                <!-- Account Status -->
-                                <RadzenStack Gap="0.75rem">
-                                    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Account Lock Status</RadzenText>
-                                    <RadzenStack Gap="1rem">
-                                        <RadzenRow>
-                                            <RadzenColumn Size="12" SizeMD="6">
-                                                <RadzenCard>
-                                                    <RadzenStack Gap="1rem">
-                                                        <RadzenText TextStyle="TextStyle.Subtitle1" Text="Account Lock Status" />
-                                                        @if (IsUserLocked())
-                                                        {
-                                                            <RadzenBadge BadgeStyle="BadgeStyle.Danger" Text="LOCKED" />
-                                                            <RadzenText TextStyle="TextStyle.Caption">
-                                                                Locked until: @(currentUser?.LockoutEnd?.ToString("yyyy-MM-dd HH:mm"))
-                                                            </RadzenText>
-                                                            <RadzenButton Click="@(async () => await UnlockUser())" 
-                                                                         Icon="lock_open" 
-                                                                         ButtonStyle="ButtonStyle.Success" 
-                                                                         Text="Unlock Account" 
-                                                                         IsBusy="@isTogglingLock" />
-                                                        }
-                                                        else
-                                                        {
-                                                            <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="ACTIVE" />
-                                                            <RadzenButton Click="@(async () => await LockUser())" 
-                                                                         Icon="lock" 
-                                                                         ButtonStyle="ButtonStyle.Warning" 
-                                                                         Text="Lock Account" 
-                                                                         IsBusy="@isTogglingLock" />
-                                                        }
-                                                    </RadzenStack>
-                                                </RadzenCard>
-                                            </RadzenColumn>
-                                            <RadzenColumn Size="12" SizeMD="6">
-                                                <RadzenCard>
-                                                    <RadzenStack Gap="1rem">
-                                                        <RadzenText TextStyle="TextStyle.Subtitle1" Text="Password Management" />
-                                                        <RadzenButton Click="@(async () => await ResetPassword())" 
-                                                                     Icon="key" 
-                                                                     ButtonStyle="ButtonStyle.Primary" 
-                                                                     Text="Reset Password" 
-                                                                     IsBusy="@isResettingPassword" />
-                                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                            Generates a new temporary password and notifies the user
-                                                        </RadzenText>
-                                                    </RadzenStack>
-                                                </RadzenCard>
-                                            </RadzenColumn>
-                                        </RadzenRow>
+                                    </RadzenStack>
+
+                                    <RadzenStack Gap="0.75rem">
+                                        <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Session Management</RadzenText>
+                                        <RadzenCard>
+                                            <RadzenStack Gap="1rem">
+                                                <RadzenText TextStyle="TextStyle.Subtitle1" Text="Active Sessions" />
+                                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Force logout will invalidate all active sessions for this user</RadzenText>
+                                                <RadzenButton Click="@(async () => await ForceLogout())" Icon="logout" ButtonStyle="ButtonStyle.Danger" Text="Force Logout All Sessions" IsBusy="@isForcingLogout" />
+                                            </RadzenStack>
+                                        </RadzenCard>
                                     </RadzenStack>
                                 </RadzenStack>
+                            </div>
+                        </RadzenTabsItem>
+                    }
+                </Tabs>
+            </RadzenTabs>
 
-                                <!-- Session Management -->
-                                <RadzenStack Gap="0.75rem">
-                                    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Session Management</RadzenText>
-                                    <RadzenCard>
-                                        <RadzenStack Gap="1rem">
-                                            <RadzenText TextStyle="TextStyle.Subtitle1" Text="Active Sessions" />
-                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                Force logout will invalidate all active sessions for this user
-                                            </RadzenText>
-                                            <RadzenButton Click="@(async () => await ForceLogout())" 
-                                                         Icon="logout" 
-                                                         ButtonStyle="ButtonStyle.Danger" 
-                                                         Text="Force Logout All Sessions" 
-                                                         IsBusy="@isForcingLogout" />
-                                        </RadzenStack>
-                                    </RadzenCard>
-                                </RadzenStack>
-                            </RadzenStack>
-                        </div>
-                    </RadzenTabsItem>
-                }
-            </Tabs>
-        </RadzenTabs>
+            <!-- Global sticky action bar visible on all tabs -->
+            <div class="rz-mt-4" style="position: sticky; bottom: 0; background: var(--rz-base-background); border-top: 1px solid var(--rz-panel-border); padding: 0.75rem 1rem; z-index: 10;">
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween" Gap="1rem">
+                    <div style="min-height: 1.25rem;">
+                        <ValidationSummary />
+                    </div>
+                    <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem">
+                        <RadzenButton Click="@Cancel" Icon="cancel" ButtonStyle="ButtonStyle.Light" Text="Cancel" />
+                        @if (IsEdit)
+                        {
+                            <RadzenButton Click="@(async () => await DeleteUser())" Icon="delete" ButtonStyle="ButtonStyle.Danger" Text="Delete User" Disabled="@isSaving" IsBusy="@isDeleting" />
+                        }
+                        <RadzenButton ButtonType="ButtonType.Submit" Icon="save" ButtonStyle="ButtonStyle.Primary" Text="@(IsEdit ? "Update User" : "Create User")" IsBusy="@isSaving" Disabled="@isSaving" />
+                    </RadzenStack>
+                </RadzenStack>
+            </div>
+        </RadzenTemplateForm>
     </RadzenCard>
 }
 
@@ -594,7 +490,7 @@ else
     // User data
     private UserWithClaimsDto? currentUser = null;
     private UserEditModel userModel = new();
-    private string confirmPassword = "";
+    private string confirmPassword = string.Empty;
     private List<UserClaimDto> userClaims = new();
     private List<RoleDto> userRoles = new();
     private List<RoleDto> availableRoles = new();
@@ -736,7 +632,6 @@ else
             var result = await UsersApiService.GetRolesAsync(page: 1, pageSize: 100);
             if (result != null)
             {
-                // Filter out roles already assigned to the user
                 availableRoles = result.Items.Where(r => !userRoles.Any(ur => ur.Id == r.Id)).ToList();
             }
             else
@@ -806,7 +701,6 @@ else
         isSaving = true;
         try
         {
-            // Set username to email if not provided
             if (string.IsNullOrWhiteSpace(userModel.UserName))
             {
                 userModel.UserName = userModel.Email;
@@ -873,30 +767,18 @@ else
 
     private async Task AddClaim()
     {
-        if (string.IsNullOrWhiteSpace(newClaimType) || string.IsNullOrWhiteSpace(newClaimValue))
-            return;
+        if (string.IsNullOrWhiteSpace(newClaimType) || string.IsNullOrWhiteSpace(newClaimValue)) return;
 
         isAddingClaim = true;
         try
         {
-            var request = new AddUserClaimRequest
-            {
-                ClaimType = newClaimType.Trim(),
-                ClaimValue = newClaimValue.Trim()
-            };
-
+            var request = new AddUserClaimRequest { ClaimType = newClaimType.Trim(), ClaimValue = newClaimValue.Trim() };
             var success = await UsersApiService.AddUserClaimAsync(Id!, request);
             if (success)
             {
-                userClaims.Add(new UserClaimDto 
-                { 
-                    ClaimType = request.ClaimType, 
-                    ClaimValue = request.ClaimValue 
-                });
-
+                userClaims.Add(new UserClaimDto { ClaimType = request.ClaimType, ClaimValue = request.ClaimValue });
                 newClaimType = string.Empty;
                 newClaimValue = string.Empty;
-
                 NotificationService.Notify(NotificationSeverity.Success, "Success", "Claim added successfully");
                 StateHasChanged();
             }
@@ -923,17 +805,11 @@ else
             $"Are you sure you want to remove the claim '{claim.ClaimType}' with value '{claim.ClaimValue}'?",
             "Remove Claim",
             new ConfirmOptions() { OkButtonText = "Remove", CancelButtonText = "Cancel" });
-
         if (confirmed != true) return;
 
         try
         {
-            var request = new RemoveUserClaimRequest
-            {
-                ClaimType = claim.ClaimType,
-                ClaimValue = claim.ClaimValue
-            };
-
+            var request = new RemoveUserClaimRequest { ClaimType = claim.ClaimType, ClaimValue = claim.ClaimValue };
             var success = await UsersApiService.RemoveUserClaimAsync(Id!, request);
             if (success)
             {
@@ -955,15 +831,13 @@ else
 
     private async Task AssignRole()
     {
-        if (string.IsNullOrWhiteSpace(selectedRoleId))
-            return;
+        if (string.IsNullOrWhiteSpace(selectedRoleId)) return;
 
         isAssigningRole = true;
         try
         {
             var request = new AssignRoleRequest { RoleId = selectedRoleId };
             var success = await UsersApiService.AssignUserRoleAsync(Id!, request);
-            
             if (success)
             {
                 var role = availableRoles.FirstOrDefault(r => r.Id == selectedRoleId);
@@ -972,7 +846,6 @@ else
                     userRoles.Add(role);
                     availableRoles.Remove(role);
                     selectedRoleId = string.Empty;
-                    
                     NotificationService.Notify(NotificationSeverity.Success, "Success", $"Role '{role.Name}' assigned successfully");
                     StateHasChanged();
                 }
@@ -1003,7 +876,6 @@ else
             $"Are you sure you want to remove the role '{role.Name}' from this user?",
             "Remove Role",
             new ConfirmOptions() { OkButtonText = "Remove", CancelButtonText = "Cancel" });
-
         if (confirmed != true) return;
 
         try
@@ -1013,7 +885,6 @@ else
             {
                 userRoles.Remove(role);
                 availableRoles.Add(role);
-                
                 NotificationService.Notify(NotificationSeverity.Success, "Success", $"Role '{role.Name}' removed successfully");
                 StateHasChanged();
             }
@@ -1035,13 +906,7 @@ else
         isAssigningClient = true;
         try
         {
-            // Reuse API: assign user to client from client perspective
-            var result = await ClientUsersApi.AssignUserAsync(selectedClientId, new AssignClientUserRequest
-            {
-                UserId = currentUser.Id,
-                ClientId = selectedClientId
-            });
-
+            var result = await ClientUsersApi.AssignUserAsync(selectedClientId, new AssignClientUserRequest { UserId = currentUser.Id, ClientId = selectedClientId });
             if (result != null)
             {
                 NotificationService.Notify(NotificationSeverity.Success, "Assigned", $"User assigned to client '{result.ClientName}'");
@@ -1093,24 +958,17 @@ else
 
     private async Task LockUser()
     {
-        var confirmed = await DialogService.Confirm(
-            "Are you sure you want to lock this user account?",
-            "Lock Account",
-            new ConfirmOptions() { OkButtonText = "Lock", CancelButtonText = "Cancel" });
-
+        var confirmed = await DialogService.Confirm("Are you sure you want to lock this user account?", "Lock Account", new ConfirmOptions() { OkButtonText = "Lock", CancelButtonText = "Cancel" });
         if (confirmed != true) return;
 
         isTogglingLock = true;
         try
         {
-            var lockoutEnd = DateTimeOffset.UtcNow.AddYears(100); // Effectively permanent
+            var lockoutEnd = DateTimeOffset.UtcNow.AddYears(100);
             var success = await UsersApiService.SetLockoutAsync(Id!, lockoutEnd);
-            
             if (success)
             {
-                if (currentUser != null)
-                    currentUser.LockoutEnd = lockoutEnd;
-                
+                if (currentUser != null) currentUser.LockoutEnd = lockoutEnd;
                 NotificationService.Notify(NotificationSeverity.Success, "Success", "User account locked");
                 StateHasChanged();
             }
@@ -1133,23 +991,16 @@ else
 
     private async Task UnlockUser()
     {
-        var confirmed = await DialogService.Confirm(
-            "Are you sure you want to unlock this user account?",
-            "Unlock Account",
-            new ConfirmOptions() { OkButtonText = "Unlock", CancelButtonText = "Cancel" });
-
+        var confirmed = await DialogService.Confirm("Are you sure you want to unlock this user account?", "Unlock Account", new ConfirmOptions() { OkButtonText = "Unlock", CancelButtonText = "Cancel" });
         if (confirmed != true) return;
 
         isTogglingLock = true;
         try
         {
             var success = await UsersApiService.SetLockoutAsync(Id!, null);
-            
             if (success)
             {
-                if (currentUser != null)
-                    currentUser.LockoutEnd = null;
-                
+                if (currentUser != null) currentUser.LockoutEnd = null;
                 NotificationService.Notify(NotificationSeverity.Success, "Success", "User account unlocked");
                 StateHasChanged();
             }
@@ -1172,11 +1023,7 @@ else
 
     private async Task ResetPassword()
     {
-        var confirmed = await DialogService.Confirm(
-            "Are you sure you want to reset this user's password? A new temporary password will be generated.",
-            "Reset Password",
-            new ConfirmOptions() { OkButtonText = "Reset", CancelButtonText = "Cancel" });
-
+        var confirmed = await DialogService.Confirm("Are you sure you want to reset this user's password? A new temporary password will be generated.", "Reset Password", new ConfirmOptions() { OkButtonText = "Reset", CancelButtonText = "Cancel" });
         if (confirmed != true) return;
 
         isResettingPassword = true;
@@ -1184,7 +1031,6 @@ else
         {
             var newPassword = GenerateTemporaryPassword();
             var success = await UsersApiService.ResetPasswordAsync(Id!, newPassword);
-            
             if (success)
             {
                 await DialogService.Alert($"Password has been reset to: {newPassword}\n\nPlease provide this to the user securely.", "Password Reset");
@@ -1209,18 +1055,13 @@ else
 
     private async Task ForceLogout()
     {
-        var confirmed = await DialogService.Confirm(
-            "Are you sure you want to force logout all sessions for this user?",
-            "Force Logout",
-            new ConfirmOptions() { OkButtonText = "Force Logout", CancelButtonText = "Cancel" });
-
+        var confirmed = await DialogService.Confirm("Are you sure you want to force logout all sessions for this user?", "Force Logout", new ConfirmOptions() { OkButtonText = "Force Logout", CancelButtonText = "Cancel" });
         if (confirmed != true) return;
 
         isForcingLogout = true;
         try
         {
             var success = await UsersApiService.ForceLogoutAsync(Id!);
-            
             if (success)
             {
                 NotificationService.Notify(NotificationSeverity.Success, "Success", "All user sessions terminated");
@@ -1244,11 +1085,7 @@ else
 
     private async Task DeleteUser()
     {
-        var confirmed = await DialogService.Confirm(
-            $"Are you sure you want to delete the user '{currentUser?.UserName}'? This action cannot be undone.",
-            "Delete User",
-            new ConfirmOptions() { OkButtonText = "Delete", CancelButtonText = "Cancel" });
-
+        var confirmed = await DialogService.Confirm($"Are you sure you want to delete the user '{currentUser?.UserName}'? This action cannot be undone.", "Delete User", new ConfirmOptions() { OkButtonText = "Delete", CancelButtonText = "Cancel" });
         if (confirmed != true) return;
 
         isDeleting = true;
@@ -1286,10 +1123,8 @@ else
     {
         var random = new Random();
         var chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
-        userModel.Password = new string(Enumerable.Repeat(chars, 16)
-            .Select(s => s[random.Next(s.Length)]).ToArray());
+        userModel.Password = new string(Enumerable.Repeat(chars, 16).Select(s => s[random.Next(s.Length)]).ToArray());
         confirmPassword = userModel.Password;
-        
         NotificationService.Notify(NotificationSeverity.Info, "Generated", "New password generated");
     }
 
@@ -1297,11 +1132,9 @@ else
     {
         const string chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
         var random = new Random();
-        return new string(Enumerable.Repeat(chars, 12)
-            .Select(s => s[random.Next(s.Length)]).ToArray());
+        return new string(Enumerable.Repeat(chars, 12).Select(s => s[random.Next(s.Length)]).ToArray());
     }
 
-    // Helper model for user editing
     public class UserEditModel
     {
         public string? UserName { get; set; }
