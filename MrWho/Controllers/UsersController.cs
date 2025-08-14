@@ -289,8 +289,8 @@ public class UsersController : ControllerBase
         
         if (claimToRemove == null)
         {
-            return NotFound($"User does not have claim '{request.ClaimType}' with value '{request.ClaimValue}'.")
-;        }
+            return NotFound($"User does not have claim '{request.ClaimType}' with value '{request.ClaimValue}'.");
+        }
 
         var result = await _userManager.RemoveClaimAsync(user, claimToRemove);
 
@@ -332,8 +332,8 @@ public class UsersController : ControllerBase
         
         if (oldClaim == null)
         {
-            return NotFound($"User does not have claim '{request.OldClaimType}' with value '{request.OldClaimValue}'.")
-;        }
+            return NotFound($"User does not have claim '{request.OldClaimType}' with value '{request.OldClaimValue}'.");
+        }
 
         // Check if new claim already exists (unless it's the same claim)
         if (!(request.OldClaimType == request.NewClaimType && request.OldClaimValue == request.NewClaimValue))
@@ -622,6 +622,55 @@ public class UsersController : ControllerBase
         };
 
         return Ok(roleDto);
+    }
+
+    #endregion
+
+    #region Profile State Management
+
+    /// <summary>
+    /// Get the UserProfile.State for the specified user
+    /// </summary>
+    [HttpGet("{id}/profile-state")]
+    public async Task<ActionResult<UserProfileStateDto>> GetProfileState(string id)
+    {
+        var profile = await _context.UserProfiles.AsNoTracking().FirstOrDefaultAsync(p => p.UserId == id);
+        if (profile == null)
+        {
+            return NotFound("User profile not found");
+        }
+
+        return Ok(new UserProfileStateDto { State = profile.State.ToString() });
+    }
+
+    /// <summary>
+    /// Set the UserProfile.State for the specified user
+    /// </summary>
+    [HttpPost("{id}/profile-state")]
+    public async Task<ActionResult> SetProfileState(string id, [FromBody] SetUserProfileStateRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.State))
+        {
+            return BadRequest("State is required");
+        }
+
+        if (!Enum.TryParse<UserState>(request.State, ignoreCase: true, out var newState))
+        {
+            return BadRequest($"Invalid state '{request.State}'. Allowed: {string.Join(", ", Enum.GetNames(typeof(UserState)))}");
+        }
+
+        var profile = await _context.UserProfiles.FirstOrDefaultAsync(p => p.UserId == id);
+        if (profile == null)
+        {
+            return NotFound("User profile not found");
+        }
+
+        profile.State = newState;
+        profile.UpdatedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Changed profile state for user {UserId} to {State} by {Admin}", id, newState, User.Identity?.Name);
+        return Ok(new UserProfileStateDto { State = profile.State.ToString() });
     }
 
     #endregion

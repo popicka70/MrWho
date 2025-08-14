@@ -61,28 +61,6 @@ public class UserRealmValidationService : IUserRealmValidationService
                 };
             }
 
-            // Determine user's realm based on business rules
-            var userRealm = await DetermineUserRealmAsync(user);
-            
-            _logger.LogDebug("User {UserName} belongs to realm '{UserRealm}', client {ClientId} belongs to realm '{ClientRealm}'",
-                user.UserName, userRealm, clientId, client.Realm.Name);
-
-            // Check if user's realm matches client's realm
-            if (userRealm != client.Realm.Name)
-            {
-                _logger.LogWarning("User {UserName} from realm '{UserRealm}' attempted to access client {ClientId} from realm '{ClientRealm}'",
-                    user.UserName, userRealm, clientId, client.Realm.Name);
-                
-                return new UserRealmValidationResult
-                {
-                    IsValid = false,
-                    Reason = $"User belongs to realm '{userRealm}' but client belongs to realm '{client.Realm.Name}'",
-                    UserRealm = userRealm,
-                    ClientRealm = client.Realm.Name,
-                    ErrorCode = "REALM_MISMATCH"
-                };
-            }
-
             // NEW: Enforce assigned users to clients
             var assigned = await _context.ClientUsers.AnyAsync(cu => cu.ClientId == client.Id && cu.UserId == user.Id);
             if (!assigned)
@@ -92,7 +70,6 @@ public class UserRealmValidationService : IUserRealmValidationService
                 {
                     IsValid = false,
                     Reason = "User not assigned to this client",
-                    UserRealm = userRealm,
                     ClientRealm = client.Realm.Name,
                     ErrorCode = "CLIENT_USER_NOT_ASSIGNED"
                 };
@@ -104,7 +81,6 @@ public class UserRealmValidationService : IUserRealmValidationService
             return new UserRealmValidationResult
             {
                 IsValid = true,
-                UserRealm = userRealm,
                 ClientRealm = client.Realm.Name
             };
         }
@@ -120,65 +96,5 @@ public class UserRealmValidationService : IUserRealmValidationService
                 ErrorCode = "VALIDATION_ERROR"
             };
         }
-    }
-
-    /// <summary>
-    /// Determines which realm a user belongs to based on business rules
-    /// </summary>
-    private async Task<string> DetermineUserRealmAsync(IdentityUser user)
-    {
-        try
-        {
-            // Method 1: Check for explicit realm claim
-            var claims = await _userManager.GetClaimsAsync(user);
-            var realmClaim = claims.FirstOrDefault(c => c.Type == "realm");
-            if (!string.IsNullOrEmpty(realmClaim?.Value))
-            {
-                _logger.LogDebug("User {UserName} has explicit realm claim: {Realm}", user.UserName, realmClaim.Value);
-                return realmClaim.Value;
-            }
-
-            // Method 2: Determine realm based on username patterns
-            var realm = DetermineRealmFromUsername(user.UserName!);
-            _logger.LogDebug("User {UserName} assigned to realm '{Realm}' based on username pattern", user.UserName, realm);
-            return realm;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error determining realm for user {UserName}", user.UserName);
-            return "default"; // Fallback to default realm
-        }
-    }
-
-    /// <summary>
-    /// Determines realm based on username patterns
-    /// </summary>
-    private string DetermineRealmFromUsername(string username)
-    {
-        // Business rules for realm assignment based on username:
-        
-        // 1. Admin users (admin@mrwho.local) belong to admin realm
-        if (username.Equals("admin@mrwho.local", StringComparison.OrdinalIgnoreCase) ||
-            username.StartsWith("admin", StringComparison.OrdinalIgnoreCase))
-        {
-            return "admin";
-        }
-
-        // 2. Demo users (demo1@example.com, demo*@example.com) belong to demo realm
-        if (username.Contains("@example.com", StringComparison.OrdinalIgnoreCase) ||
-            username.StartsWith("demo", StringComparison.OrdinalIgnoreCase))
-        {
-            return "demo";
-        }
-
-        // 3. Test users belong to default realm
-        if (username.Contains("test", StringComparison.OrdinalIgnoreCase) ||
-            username.Contains("postman", StringComparison.OrdinalIgnoreCase))
-        {
-            return "default";
-        }
-
-        // 4. Default fallback
-        return "default";
     }
 }

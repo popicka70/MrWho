@@ -459,9 +459,46 @@ else
                             <RadzenStack Gap="2rem">
                                 <RadzenText TextStyle="TextStyle.H6" Text="Security Management" />
                                 
+                                <!-- Profile Status -->
+                                <RadzenStack Gap="0.75rem">
+                                    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Profile Status</RadzenText>
+                                    <RadzenCard>
+                                        <RadzenStack Gap="1rem">
+                                            <RadzenText TextStyle="TextStyle.Subtitle2">Current State</RadzenText>
+                                            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.75rem" AlignItems="AlignItems.Center">
+                                                @if (profileState?.State?.Equals("Active", StringComparison.OrdinalIgnoreCase) == true)
+                                                {
+                                                    <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="ACTIVE" />
+                                                }
+                                                else if (profileState?.State?.Equals("Suspended", StringComparison.OrdinalIgnoreCase) == true)
+                                                {
+                                                    <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text="SUSPENDED" />
+                                                }
+                                                else if (profileState?.State?.Equals("Disabled", StringComparison.OrdinalIgnoreCase) == true)
+                                                {
+                                                    <RadzenBadge BadgeStyle="BadgeStyle.Danger" Text="DISABLED" />
+                                                }
+                                                else
+                                                {
+                                                    <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="NEW" />
+                                                }
+                                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                    Only users with state 'Active' can complete OIDC authorization.
+                                                </RadzenText>
+                                            </RadzenStack>
+
+                                            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                                                <RadzenButton Click="@(async () => await SetProfileState("Active"))" Icon="check_circle" ButtonStyle="ButtonStyle.Success" Text="Activate" />
+                                                <RadzenButton Click="@(async () => await SetProfileState("Suspended"))" Icon="pause_circle" ButtonStyle="ButtonStyle.Secondary" Text="Suspend" />
+                                                <RadzenButton Click="@(async () => await SetProfileState("Disabled"))" Icon="cancel" ButtonStyle="ButtonStyle.Danger" Text="Deactivate" />
+                                            </RadzenStack>
+                                        </RadzenStack>
+                                    </RadzenCard>
+                                </RadzenStack>
+                                
                                 <!-- Account Status -->
                                 <RadzenStack Gap="0.75rem">
-                                    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Account Status</RadzenText>
+                                    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Account Lock Status</RadzenText>
                                     <RadzenStack Gap="1rem">
                                         <RadzenRow>
                                             <RadzenColumn Size="12" SizeMD="6">
@@ -575,6 +612,9 @@ else
     private string? selectedClientId;
     private bool isAssigningClient = false;
 
+    // Profile state
+    private UserProfileStateDto? profileState;
+
     protected override async Task OnInitializedAsync()
     {
         if (IsEdit)
@@ -584,6 +624,7 @@ else
             await LoadAvailableRoles();
             await LoadUserClients();
             await LoadAvailableClients();
+            await LoadProfileState();
         }
         else
         {
@@ -591,6 +632,48 @@ else
             userModel.EmailConfirmed = false;
             userModel.PhoneNumberConfirmed = false;
             userModel.TwoFactorEnabled = false;
+        }
+    }
+
+    private async Task LoadProfileState()
+    {
+        try
+        {
+            profileState = await UsersApiService.GetProfileStateAsync(Id!);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading profile state for {UserId}", Id);
+        }
+        StateHasChanged();
+    }
+
+    private async Task SetProfileState(string state)
+    {
+        var confirmed = await DialogService.Confirm(
+            $"Are you sure you want to set this user's profile state to '{state}'?",
+            "Change Profile State",
+            new ConfirmOptions() { OkButtonText = "Confirm", CancelButtonText = "Cancel" });
+
+        if (confirmed != true) return;
+
+        try
+        {
+            var ok = await UsersApiService.SetProfileStateAsync(Id!, new SetUserProfileStateRequest { State = state });
+            if (ok)
+            {
+                NotificationService.Notify(NotificationSeverity.Success, "Updated", $"Profile state set to {state}");
+                await LoadProfileState();
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to update profile state");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error setting profile state for {UserId}", Id);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to update profile state");
         }
     }
 

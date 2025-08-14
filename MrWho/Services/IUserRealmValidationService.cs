@@ -31,7 +31,6 @@ public class UserRealmValidationResult
 {
     public bool IsValid { get; set; }
     public string? Reason { get; set; }
-    public string? UserRealm { get; set; }
     public string? ClientRealm { get; set; }
     public string? ErrorCode { get; set; }
 }

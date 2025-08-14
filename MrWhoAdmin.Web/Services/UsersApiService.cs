@@ -1,3 +1,4 @@
+using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using MrWho.Shared.Models;
@@ -8,32 +9,25 @@ public class UsersApiService : IUsersApiService
 {
     private readonly HttpClient _httpClient;
     private readonly ILogger<UsersApiService> _logger;
-    private readonly JsonSerializerOptions _jsonOptions;
+    private readonly JsonSerializerOptions _jsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        PropertyNameCaseInsensitive = true
+    };
 
     public UsersApiService(HttpClient httpClient, ILogger<UsersApiService> logger)
     {
         _httpClient = httpClient;
         _logger = logger;
-        _jsonOptions = new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            PropertyNameCaseInsensitive = true
-        };
     }
 
     public async Task<PagedResult<UserDto>?> GetUsersAsync(int page = 1, int pageSize = 10, string? search = null)
     {
         try
         {
-            var queryString = $"?page={page}&pageSize={pageSize}";
-            if (!string.IsNullOrWhiteSpace(search))
-            {
-                queryString += $"&search={Uri.EscapeDataString(search)}";
-            }
-
-            var response = await _httpClient.GetAsync($"api/users{queryString}");
+            var url = $"api/users?page={page}&pageSize={pageSize}" + (string.IsNullOrWhiteSpace(search) ? string.Empty : $"&search={Uri.EscapeDataString(search)}");
+            var response = await _httpClient.GetAsync(url);
             response.EnsureSuccessStatusCode();
-
             var json = await response.Content.ReadAsStringAsync();
             return JsonSerializer.Deserialize<PagedResult<UserDto>>(json, _jsonOptions);
         }
@@ -48,9 +42,8 @@ public class UsersApiService : IUsersApiService
     {
         try
         {
-            var response = await _httpClient.GetAsync($"api/users/{id}");
+            var response = await _httpClient.GetAsync($"api/users/{Uri.EscapeDataString(id)}");
             response.EnsureSuccessStatusCode();
-
             var json = await response.Content.ReadAsStringAsync();
             return JsonSerializer.Deserialize<UserDto>(json, _jsonOptions);
         }
@@ -65,9 +58,8 @@ public class UsersApiService : IUsersApiService
     {
         try
         {
-            var response = await _httpClient.GetAsync($"api/users/{id}/with-claims");
+            var response = await _httpClient.GetAsync($"api/users/{Uri.EscapeDataString(id)}/with-claims");
             response.EnsureSuccessStatusCode();
-
             var json = await response.Content.ReadAsStringAsync();
             return JsonSerializer.Deserialize<UserWithClaimsDto>(json, _jsonOptions);
         }
@@ -84,10 +76,8 @@ public class UsersApiService : IUsersApiService
         {
             var json = JsonSerializer.Serialize(request, _jsonOptions);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
-
             var response = await _httpClient.PostAsync("api/users", content);
             response.EnsureSuccessStatusCode();
-
             var responseJson = await response.Content.ReadAsStringAsync();
             return JsonSerializer.Deserialize<UserDto>(responseJson, _jsonOptions);
         }
@@ -104,10 +94,8 @@ public class UsersApiService : IUsersApiService
         {
             var json = JsonSerializer.Serialize(request, _jsonOptions);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
-
-            var response = await _httpClient.PutAsync($"api/users/{id}", content);
+            var response = await _httpClient.PutAsync($"api/users/{Uri.EscapeDataString(id)}", content);
             response.EnsureSuccessStatusCode();
-
             var responseJson = await response.Content.ReadAsStringAsync();
             return JsonSerializer.Deserialize<UserDto>(responseJson, _jsonOptions);
         }
@@ -122,7 +110,7 @@ public class UsersApiService : IUsersApiService
     {
         try
         {
-            var response = await _httpClient.DeleteAsync($"api/users/{id}");
+            var response = await _httpClient.DeleteAsync($"api/users/{Uri.EscapeDataString(id)}");
             return response.IsSuccessStatusCode;
         }
         catch (Exception ex)
@@ -190,10 +178,8 @@ public class UsersApiService : IUsersApiService
     {
         try
         {
-            // This would typically send a confirmation email
-            // For now we'll just return true as a placeholder
             _logger.LogInformation("Sending confirmation email for user {UserId}", id);
-            await Task.Delay(100); // Simulate API call
+            await Task.Delay(100);
             return true;
         }
         catch (Exception ex)
@@ -207,10 +193,8 @@ public class UsersApiService : IUsersApiService
     {
         try
         {
-            // This would typically invalidate all user sessions
-            // For now we'll just return true as a placeholder
             _logger.LogInformation("Forcing logout for user {UserId}", id);
-            await Task.Delay(100); // Simulate API call
+            await Task.Delay(100);
             return true;
         }
         catch (Exception ex)
@@ -250,7 +234,7 @@ public class UsersApiService : IUsersApiService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error adding claim to user {UserId}", userId);
+            _logger.LogError(ex, "Error adding claim for user {UserId}", userId);
             return false;
         }
     }
@@ -262,17 +246,18 @@ public class UsersApiService : IUsersApiService
             var json = JsonSerializer.Serialize(request, _jsonOptions);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-            var requestMessage = new HttpRequestMessage(HttpMethod.Delete, $"api/users/{userId}/claims")
+            var response = await _httpClient.SendAsync(new HttpRequestMessage
             {
+                Method = HttpMethod.Delete,
+                RequestUri = new Uri($"api/users/{userId}/claims", UriKind.Relative),
                 Content = content
-            };
+            });
 
-            var response = await _httpClient.SendAsync(requestMessage);
             return response.IsSuccessStatusCode;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error removing claim from user {UserId}", userId);
+            _logger.LogError(ex, "Error removing claim for user {UserId}", userId);
             return false;
         }
     }
@@ -281,15 +266,7 @@ public class UsersApiService : IUsersApiService
     {
         try
         {
-            var request = new
-            {
-                OldClaimType = oldClaimType,
-                OldClaimValue = oldClaimValue,
-                NewClaimType = newClaim.ClaimType,
-                NewClaimValue = newClaim.ClaimValue
-            };
-
-            var json = JsonSerializer.Serialize(request, _jsonOptions);
+            var json = JsonSerializer.Serialize(new { OldClaimType = oldClaimType, OldClaimValue = oldClaimValue, NewClaimType = newClaim.ClaimType, NewClaimValue = newClaim.ClaimValue }, _jsonOptions);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
 
             var response = await _httpClient.PutAsync($"api/users/{userId}/claims", content);
@@ -308,7 +285,6 @@ public class UsersApiService : IUsersApiService
         {
             var response = await _httpClient.GetAsync("api/users/claim-types");
             response.EnsureSuccessStatusCode();
-
             var json = await response.Content.ReadAsStringAsync();
             return JsonSerializer.Deserialize<List<ClaimTypeInfo>>(json, _jsonOptions);
         }
@@ -319,14 +295,12 @@ public class UsersApiService : IUsersApiService
         }
     }
 
-    // Role management methods  
     public async Task<List<RoleDto>?> GetUserRolesAsync(string userId)
     {
         try
         {
             var response = await _httpClient.GetAsync($"api/users/{userId}/roles");
             response.EnsureSuccessStatusCode();
-
             var json = await response.Content.ReadAsStringAsync();
             return JsonSerializer.Deserialize<List<RoleDto>>(json, _jsonOptions);
         }
@@ -343,13 +317,12 @@ public class UsersApiService : IUsersApiService
         {
             var json = JsonSerializer.Serialize(request, _jsonOptions);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
-
             var response = await _httpClient.PostAsync($"api/users/{userId}/roles", content);
             return response.IsSuccessStatusCode;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error assigning role to user {UserId}", userId);
+            _logger.LogError(ex, "Error assigning role for user {UserId}", userId);
             return false;
         }
     }
@@ -363,7 +336,7 @@ public class UsersApiService : IUsersApiService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error removing role from user {UserId}", userId);
+            _logger.LogError(ex, "Error removing role for user {UserId}", userId);
             return false;
         }
     }
@@ -372,15 +345,9 @@ public class UsersApiService : IUsersApiService
     {
         try
         {
-            var queryString = $"?page={page}&pageSize={pageSize}";
-            if (!string.IsNullOrWhiteSpace(search))
-            {
-                queryString += $"&search={Uri.EscapeDataString(search)}";
-            }
-
-            var response = await _httpClient.GetAsync($"api/users/roles{queryString}");
+            var url = $"api/users/roles?page={page}&pageSize={pageSize}" + (string.IsNullOrWhiteSpace(search) ? string.Empty : $"&search={Uri.EscapeDataString(search)}");
+            var response = await _httpClient.GetAsync(url);
             response.EnsureSuccessStatusCode();
-
             var json = await response.Content.ReadAsStringAsync();
             return JsonSerializer.Deserialize<PagedResult<RoleDto>>(json, _jsonOptions);
         }
@@ -388,6 +355,39 @@ public class UsersApiService : IUsersApiService
         {
             _logger.LogError(ex, "Error getting roles");
             return null;
+        }
+    }
+
+    // Profile state
+    public async Task<UserProfileStateDto?> GetProfileStateAsync(string userId)
+    {
+        try
+        {
+            var response = await _httpClient.GetAsync($"api/users/{userId}/profile-state");
+            response.EnsureSuccessStatusCode();
+            var json = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<UserProfileStateDto>(json, _jsonOptions);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting profile state for user {UserId}", userId);
+            return null;
+        }
+    }
+
+    public async Task<bool> SetProfileStateAsync(string userId, SetUserProfileStateRequest request)
+    {
+        try
+        {
+            var json = JsonSerializer.Serialize(request, _jsonOptions);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var response = await _httpClient.PostAsync($"api/users/{userId}/profile-state", content);
+            return response.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error setting profile state for user {UserId}", userId);
+            return false;
         }
     }
 }

@@ -940,7 +940,6 @@ public sealed class Demo1TroubleshootHandler : IRequestHandler<Demo1Troubleshoot
                     {
                         IsValid = realmValidation.IsValid,
                         Reason = realmValidation.Reason,
-                        UserRealm = realmValidation.UserRealm,
                         ClientRealm = realmValidation.ClientRealm,
                         ErrorCode = realmValidation.ErrorCode
                     }

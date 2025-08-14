@@ -164,24 +164,6 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
             return Results.Forbid();
         }
 
-        // CRITICAL: Validate user can access this client based on realm restrictions
-        var realmValidation = await _realmValidationService.ValidateUserRealmAccessAsync(user, clientId);
-        if (!realmValidation.IsValid)
-        {
-            _logger.LogWarning("?? REALM VALIDATION FAILED: User {UserName} denied access to client {ClientId}: {Reason} (ErrorCode: {ErrorCode})", 
-                user.UserName, clientId, realmValidation.Reason, realmValidation.ErrorCode);
-            _logger.LogWarning("   ?? Realm Details: UserRealm='{UserRealm}', ClientRealm='{ClientRealm}'", 
-                realmValidation.UserRealm, realmValidation.ClientRealm);
-
-            await SafeSignOutClientAsync(clientId);
-
-            // Return access denied error
-            return Results.Forbid();
-        }
-
-        _logger.LogInformation("? REALM VALIDATION PASSED: User {UserName} authorized for client {ClientId} (UserRealm: '{UserRealm}', ClientRealm: '{ClientRealm}')", 
-            user.UserName, clientId, realmValidation.UserRealm, realmValidation.ClientRealm);
-
         // User is authenticated and authorized for this client, create authorization code
         var claimsIdentity = new ClaimsIdentity(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
 

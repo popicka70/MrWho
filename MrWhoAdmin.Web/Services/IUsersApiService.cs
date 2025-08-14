@@ -31,4 +31,8 @@ public interface IUsersApiService
     Task<bool> AssignUserRoleAsync(string userId, AssignRoleRequest request);
     Task<bool> RemoveUserRoleAsync(string userId, string roleId);
     Task<PagedResult<RoleDto>?> GetRolesAsync(int page = 1, int pageSize = 10, string? search = null);
+
+    // Profile state
+    Task<UserProfileStateDto?> GetProfileStateAsync(string userId);
+    Task<bool> SetProfileStateAsync(string userId, SetUserProfileStateRequest request);
 }
