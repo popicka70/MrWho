@@ -102,13 +102,15 @@ public class OidcClientService : IOidcClientService
             _context.Clients.Add(adminClient);
             await _context.SaveChangesAsync();
 
-            // Add redirect URIs for MrWhoAdmin.Web (local https 7257 and docker host http 8081)
+            // Add redirect URIs for MrWhoAdmin.Web (local https 7257, docker host http 8081, and hosted onrender)
             var redirectUris = new[]
             {
                 "https://localhost:7257/signin-oidc",
                 "https://localhost:7257/callback",
                 "http://localhost:8081/signin-oidc",
-                "http://localhost:8081/callback"
+                "http://localhost:8081/callback",
+                "https://mrwho.onrender.com/signin-oidc",
+                "https://mrwho.onrender.com/callback"
             };
 
             foreach (var uri in redirectUris)
@@ -120,13 +122,15 @@ public class OidcClientService : IOidcClientService
                 });
             }
 
-            // Add post-logout URIs (local https 7257 and docker host http 8081)
+            // Add post-logout URIs (local https 7257, docker host http 8081, and hosted onrender)
             var postLogoutUris = new[]
             {
                 "https://localhost:7257/",
                 "https://localhost:7257/signout-callback-oidc",
                 "http://localhost:8081/",
-                "http://localhost:8081/signout-callback-oidc"
+                "http://localhost:8081/signout-callback-oidc",
+                "https://mrwho.onrender.com/",
+                "https://mrwho.onrender.com/signout-callback-oidc"
             };
 
             foreach (var uri in postLogoutUris)
@@ -177,24 +181,28 @@ public class OidcClientService : IOidcClientService
             }
 
             await _context.SaveChangesAsync();
-            _logger.LogInformation("Created admin client 'mrwho_admin_web' with API access and redirect URIs for 7257 and 8081");
+            _logger.LogInformation("Created admin client 'mrwho_admin_web' with API access and redirect URIs for 7257, 8081 and onrender");
         }
         else
         {
-            // Ensure required redirect/post-logout URIs exist (add 8081 entries for docker-hosted admin)
+            // Ensure required redirect/post-logout URIs exist (add 8081 entries for docker-hosted admin and onrender hosted)
             var requiredRedirects = new[]
             {
                 "https://localhost:7257/signin-oidc",
                 "https://localhost:7257/callback",
                 "http://localhost:8081/signin-oidc",
-                "http://localhost:8081/callback"
+                "http://localhost:8081/callback",
+                "https://mrwho.onrender.com/signin-oidc",
+                "https://mrwho.onrender.com/callback"
             };
             var requiredPostLogout = new[]
             {
                 "https://localhost:7257/",
                 "https://localhost:7257/signout-callback-oidc",
                 "http://localhost:8081/",
-                "http://localhost:8081/signout-callback-oidc"
+                "http://localhost:8081/signout-callback-oidc",
+                "https://mrwho.onrender.com/",
+                "https://mrwho.onrender.com/signout-callback-oidc"
             };
 
             var missingRedirects = requiredRedirects
