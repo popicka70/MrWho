@@ -20,6 +20,7 @@ using static OpenIddict.Abstractions.OpenIddictConstants;
 using MrWho.Shared;
 using Microsoft.AspNetCore.HttpOverrides;
 using MrWho.Models; // added for UserProfile, UserState
+using System.Data;
 
 namespace MrWho.Extensions;
 

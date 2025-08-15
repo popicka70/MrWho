@@ -1,10 +1,14 @@
 using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using MrWho.Data;
 
 #nullable disable
 
 namespace MrWho.Migrations.PostgreSql.Migrations
 {
     /// <inheritdoc />
+    [DbContext(typeof(ApplicationDbContext))]
+    [Migration("20250815090000_AddWebAuthnCredentials_PostgreSql")]
     public partial class AddWebAuthnCredentials_PostgreSql : Migration
     {
         /// <inheritdoc />
