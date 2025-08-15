@@ -1,0 +1,87 @@
+@page
+@model MrWho.Views.Passkeys.RegisterModel
+@{
+    ViewData["Title"] = "Register Passkey";
+}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+        <div class="card">
+            <div class="card-header"><h5>Register a Passkey</h5></div>
+            <div class="card-body">
+                <p class="text-muted">Create a passkey (Windows Hello, Touch ID, Android, or security key) for passwordless sign-in.</p>
+                <div class="mb-3">
+                    <label class="form-label">Nickname (optional)</label>
+                    <input id="nickname" class="form-control" placeholder="e.g., Work Laptop" />
+                </div>
+                <div class="d-grid">
+                    <button id="btn-create" class="btn btn-primary">Create Passkey</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+(function(){
+  const btn = document.getElementById('btn-create');
+  if(!btn || !window.PublicKeyCredential) return;
+  btn.addEventListener('click', async () => {
+    try{
+      const nickname = document.getElementById('nickname').value || '';
+      const res = await fetch('/webauthn/register/options' + (nickname ? ('?nickname=' + encodeURIComponent(nickname)) : ''));
+      if(!res.ok){ alert('Failed to start'); return; }
+      const options = await res.json();
+
+      // Convert option fields
+      options.challenge = base64urlToBuffer(options.challenge);
+      options.user.id = base64urlToBuffer(options.user.id);
+      if(options.excludeCredentials){
+        options.excludeCredentials = options.excludeCredentials.map(c => ({...c, id: base64urlToBuffer(c.id)}));
+      }
+
+      const cred = await navigator.credentials.create({ publicKey: options });
+      const data = {
+        id: bufferToBase64Url(cred.rawId),
+        rawId: bufferToBase64Url(cred.rawId),
+        type: cred.type,
+        extensions: cred.getClientExtensionResults ? cred.getClientExtensionResults() : {},
+        response: {
+          clientDataJSON: bufferToBase64Url(cred.response.clientDataJSON),
+          attestationObject: bufferToBase64Url(cred.response.attestationObject)
+        }
+      };
+
+      const verify = await fetch('/webauthn/register/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+      if(verify.ok){
+        alert('Passkey registered.');
+        window.location.href = '/profile';
+      } else {
+        const msg = await verify.text();
+        alert('Registration failed: ' + msg);
+      }
+    }catch(e){
+      console.error(e);
+      alert('Error: ' + e);
+    }
+  });
+
+  function base64urlToBuffer(base64url){
+    const base64 = base64url.replace(/-/g,'+').replace(/_/g,'/');
+    const pad = base64.length % 4 === 0 ? 0 : 4 - (base64.length % 4);
+    const base64Padded = base64 + '='.repeat(pad);
+    const str = atob(base64Padded);
+    const buffer = new ArrayBuffer(str.length);
+    const view = new Uint8Array(buffer);
+    for(let i=0;i<str.length;i++) view[i] = str.charCodeAt(i);
+    return buffer;
+  }
+  function bufferToBase64Url(buffer){
+    const bytes = new Uint8Array(buffer);
+    let str = '';
+    for(let i=0;i<bytes.byteLength;i++) str += String.fromCharCode(bytes[i]);
+    return btoa(str).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/g,'');
+  }
+})();
+</script>
+}

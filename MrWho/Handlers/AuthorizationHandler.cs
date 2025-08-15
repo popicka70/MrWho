@@ -53,170 +53,142 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         var clientId = request.ClientId!;
         _logger.LogDebug("Authorization request received for client {ClientId}", clientId);
 
-        // Check if user is authenticated for this specific client using the dynamic cookie service
-        ClaimsPrincipal? principal = null;
+        ClaimsPrincipal? clientPrincipal = null;
+        IdentityUser? authUser = null; // The user we will authorize
+        ClaimsPrincipal? amrSource = null; // For AMR propagation
+
+        // 1) Try client-specific cookie first
         try
         {
             if (await _dynamicCookieService.IsAuthenticatedForClientAsync(clientId))
             {
-                principal = await _dynamicCookieService.GetClientPrincipalAsync(clientId);
-                if (principal?.Identity?.IsAuthenticated == true)
+                clientPrincipal = await _dynamicCookieService.GetClientPrincipalAsync(clientId);
+                if (clientPrincipal?.Identity?.IsAuthenticated == true)
                 {
                     _logger.LogDebug("User already authenticated for client {ClientId}", clientId);
+                    var sub = clientPrincipal.FindFirst(ClaimTypes.NameIdentifier) ??
+                              clientPrincipal.FindFirst(OpenIddictConstants.Claims.Subject);
+                    if (sub != null)
+                    {
+                        authUser = await _userManager.FindByIdAsync(sub.Value);
+                        amrSource = clientPrincipal;
+                    }
                 }
                 else
                 {
-                    principal = null;
-                    _logger.LogDebug("User cookie exists but principal is invalid for client {ClientId}", clientId);
+                    clientPrincipal = null;
                 }
-            }
-            else
-            {
-                _logger.LogDebug("User not authenticated for client {ClientId}", clientId);
             }
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "Failed to check authentication for client {ClientId}", clientId);
+            _logger.LogDebug(ex, "Failed to check client cookie for {ClientId}", clientId);
         }
 
-        // If user is not authenticated with THIS client, trigger login
-        if (principal == null)
+        // 2) Fallback to default Identity cookie and bootstrap client cookie (don't require AuthenticateAsync immediately)
+        if (authUser == null)
         {
-            _logger.LogDebug("User not authenticated for client {ClientId}, triggering login challenge", 
-                clientId);
-            
-            // Store the authorization request parameters for later use
-            var properties = new AuthenticationProperties
+            try
             {
-                RedirectUri = context.Request.GetDisplayUrl(),
-                Items =
+                var defaultAuth = await context.AuthenticateAsync(IdentityConstants.ApplicationScheme);
+                if (defaultAuth.Succeeded && defaultAuth.Principal?.Identity?.IsAuthenticated == true)
                 {
-                    ["client_id"] = clientId,
-                    ["return_url"] = context.Request.GetDisplayUrl()
+                    var subj = defaultAuth.Principal.FindFirst(ClaimTypes.NameIdentifier) ??
+                               defaultAuth.Principal.FindFirst(OpenIddictConstants.Claims.Subject) ??
+                               defaultAuth.Principal.FindFirst("sub");
+                    if (subj != null)
+                    {
+                        authUser = await _userManager.FindByIdAsync(subj.Value);
+                        amrSource = defaultAuth.Principal;
+                        _logger.LogDebug("Default Identity cookie authenticated. Using user {UserId} and bootstrapping client cookie for {ClientId}", subj.Value, clientId);
+
+                        // Best-effort client cookie sign-in for next requests
+                        if (authUser != null)
+                        {
+                            try
+                            {
+                                await _dynamicCookieService.SignInWithClientCookieAsync(clientId, authUser, rememberMe: false);
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogWarning(ex, "Failed to sign in client-specific cookie for {ClientId} (continuing)", clientId);
+                            }
+                        }
+                    }
                 }
-            };
-
-            // Store client ID in session for callback handling
-            if (context.Session.IsAvailable)
-            {
-                context.Session.Set("oidc_client_id", System.Text.Encoding.UTF8.GetBytes(clientId));
             }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Default cookie fallback failed for {ClientId}", clientId);
+            }
+        }
 
-            // Redirect to login with client ID parameter
+        // 3) If we still don't have a user, redirect to login
+        if (authUser == null)
+        {
+            _logger.LogDebug("No authenticated user found for client {ClientId}, redirecting to login", clientId);
             var loginUrl = $"/connect/login?clientId={Uri.EscapeDataString(clientId)}&returnUrl={Uri.EscapeDataString(context.Request.GetDisplayUrl())}";
             return Results.Redirect(loginUrl);
         }
 
-        // User is authenticated with the correct client scheme, create authorization code
-        var identity = new ClaimsIdentity(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
-
-        // Get user from database to ensure we have the latest information
-        var subjectClaim = principal.FindFirst(ClaimTypes.NameIdentifier) ?? 
-                          principal.FindFirst(OpenIddictConstants.Claims.Subject);
-        
-        if (subjectClaim == null)
-        {
-            _logger.LogWarning("? No subject claim found in authenticated principal for client {ClientId}", clientId);
-            _logger.LogWarning("   ?? Available claims: {Claims}", 
-                string.Join(", ", principal.Claims.Select(c => $"{c.Type}={c.Value}")));
-            _logger.LogWarning("   ?? Looking for: {NameId} OR {Subject}", 
-                ClaimTypes.NameIdentifier, OpenIddictConstants.Claims.Subject);
-            // The client-specific authentication is invalid/corrupt; clear it to avoid loops
-            await SafeSignOutClientAsync(clientId);
-            return Results.Forbid();
-        }
-
-        _logger.LogDebug("? Subject claim found: Type='{ClaimType}', Value='{ClaimValue}'", 
-            subjectClaim.Type, subjectClaim.Value);
-
-        var user = await _userManager.FindByIdAsync(subjectClaim.Value);
-        if (user == null)
-        {
-            _logger.LogWarning("? User not found for subject {Subject} (client: {ClientId})", subjectClaim.Value, clientId);
-            _logger.LogWarning("   ?? Subject claim type: {ClaimType}", subjectClaim.Type);
-            // Stale session (user deleted/renamed). Clear client-specific auth.
-            await SafeSignOutClientAsync(clientId);
-            return Results.Forbid();
-        }
-
-        _logger.LogDebug("? User found: {UserName} (ID: {UserId}) for client {ClientId}", 
-            user.UserName, user.Id, clientId);
-
-        // NEW: Enforce realm/client access assignment before issuing authorization code
+        // 4) Realm and profile checks
         try
         {
-            var realmValidation = await _realmValidationService.ValidateUserRealmAccessAsync(user, clientId);
+            var realmValidation = await _realmValidationService.ValidateUserRealmAccessAsync(authUser, clientId);
             if (!realmValidation.IsValid)
             {
-                _logger.LogWarning("Access denied for user {UserName} to client {ClientId}. Reason: {Reason} (Code: {Code}, ClientRealm: {Realm})",
-                    user.UserName, clientId, realmValidation.Reason, realmValidation.ErrorCode, realmValidation.ClientRealm);
+                _logger.LogWarning("Access denied for user {UserName} to client {ClientId}. Reason: {Reason}", authUser.UserName, clientId, realmValidation.Reason);
                 await SafeSignOutClientAsync(clientId);
                 return Results.Forbid();
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during realm validation for user {UserId} and client {ClientId}", user.Id, clientId);
+            _logger.LogError(ex, "Error during realm validation for user {UserId} and client {ClientId}", authUser.Id, clientId);
             await SafeSignOutClientAsync(clientId);
             return Results.Forbid();
         }
 
-        // New: enforce user profile state must be Active
         try
         {
-            var profile = await _context.UserProfiles.AsNoTracking().FirstOrDefaultAsync(p => p.UserId == user.Id);
-            if (profile == null)
+            var profile = await _context.UserProfiles.AsNoTracking().FirstOrDefaultAsync(p => p.UserId == authUser.Id);
+            if (profile == null || profile.State != UserState.Active)
             {
-                _logger.LogWarning("User {UserName} has no profile. Denying authorization.", user.UserName);
-                await SafeSignOutClientAsync(clientId);
-                return Results.Forbid();
-            }
-
-            if (profile.State != UserState.Active)
-            {
-                _logger.LogWarning("User {UserName} state is {State}. Denying authorization for client {ClientId}.", user.UserName, profile.State, clientId);
+                _logger.LogWarning("User {UserName} has invalid/missing profile for client {ClientId}", authUser.UserName, clientId);
                 await SafeSignOutClientAsync(clientId);
                 return Results.Forbid();
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error checking user profile state for user {UserId}", user.Id);
+            _logger.LogError(ex, "Error checking user profile state for user {UserId}", authUser.Id);
             await SafeSignOutClientAsync(clientId);
             return Results.Forbid();
         }
 
-        // User is authenticated and authorized for this client, create authorization code
+        // 5) Build authorization principal
         var claimsIdentity = new ClaimsIdentity(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
 
-        // Get requested scopes to determine claim destinations
-        var scopes = request.GetScopes();
-
-        // Create claims for the authorization code with proper destinations
-        var subClaim = new Claim(OpenIddictConstants.Claims.Subject, user.Id);
+        var subClaim = new Claim(OpenIddictConstants.Claims.Subject, authUser.Id);
         subClaim.SetDestinations(OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken);
         claimsIdentity.AddClaim(subClaim);
 
-        var emailClaim = new Claim(OpenIddictConstants.Claims.Email, user.Email!);
+        var emailClaim = new Claim(OpenIddictConstants.Claims.Email, authUser.Email ?? string.Empty);
         emailClaim.SetDestinations(OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken);
         claimsIdentity.AddClaim(emailClaim);
-        
-        // Get the user's name claim, fallback to friendly name from username
-        var userName = await GetUserNameClaimAsync(user);
+
+        var userName = await GetUserNameClaimAsync(authUser);
         var nameClaim = new Claim(OpenIddictConstants.Claims.Name, userName);
         nameClaim.SetDestinations(OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken);
         claimsIdentity.AddClaim(nameClaim);
 
-        var preferredUsernameClaim = new Claim(OpenIddictConstants.Claims.PreferredUsername, user.UserName!);
+        var preferredUsernameClaim = new Claim(OpenIddictConstants.Claims.PreferredUsername, authUser.UserName ?? string.Empty);
         preferredUsernameClaim.SetDestinations(OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken);
         claimsIdentity.AddClaim(preferredUsernameClaim);
 
-        // Add other profile claims with proper destinations if available
-        await AddProfileClaimsAsync(claimsIdentity, user, scopes);
-
-        // Add roles with proper destinations
-        var roles = await _userManager.GetRolesAsync(user);
+        // Add extra profile claims and roles
+        await AddProfileClaimsAsync(claimsIdentity, authUser, request.GetScopes());
+        var roles = await _userManager.GetRolesAsync(authUser);
         foreach (var role in roles)
         {
             var roleClaim = new Claim(OpenIddictConstants.Claims.Role, role);
@@ -224,11 +196,11 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
             claimsIdentity.AddClaim(roleClaim);
         }
 
-        // Propagate AMR (Authentication Methods References) claims if present so clients know MFA was used
+        // Propagate AMR from whichever principal we have (client or default)
         try
         {
-            var amrClaims = principal?.FindAll("amr")?.ToList();
-            if (amrClaims != null && amrClaims.Count > 0)
+            var amrClaims = amrSource?.FindAll("amr")?.ToList();
+            if (amrClaims != null)
             {
                 foreach (var amr in amrClaims)
                 {
@@ -240,32 +212,20 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "Failed to propagate amr claims to authorization identity");
+            _logger.LogDebug(ex, "Failed to propagate amr claims");
         }
 
         var authPrincipal = new ClaimsPrincipal(claimsIdentity);
         authPrincipal.SetScopes(request.GetScopes());
 
-        // Sign in the user with the client-specific scheme if not already done
-        // CRITICAL: Ensure user is signed in with the client-specific scheme for proper session isolation
+        // Best-effort: ensure client cookie exists for next requests
         if (!await _dynamicCookieService.IsAuthenticatedForClientAsync(clientId))
         {
-            _logger.LogDebug("User not signed in with client-specific authentication, signing them in for client {ClientId}", clientId);
-            try
-            {
-                await _dynamicCookieService.SignInWithClientCookieAsync(clientId, user, false);
-                _logger.LogDebug("Successfully signed in user {UserName} with client-specific authentication", 
-                    user.UserName);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to sign in with client-specific authentication");
-            }
+            try { await _dynamicCookieService.SignInWithClientCookieAsync(clientId, authUser, false); }
+            catch (Exception ex) { _logger.LogDebug(ex, "Best-effort client cookie sign-in failed for {ClientId}", clientId); }
         }
 
-        _logger.LogDebug("Authorization granted for user {UserName} and client {ClientId}", 
-            user.UserName, clientId);
-
+        _logger.LogDebug("Authorization granted for user {UserName} and client {ClientId}", authUser.UserName, clientId);
         return Results.SignIn(authPrincipal, authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
     }
 
@@ -281,43 +241,28 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         }
     }
 
-    /// <summary>
-    /// Get the user's name claim, with intelligent fallback to username conversion
-    /// </summary>
     private async Task<string> GetUserNameClaimAsync(IdentityUser user)
     {
         try
         {
             var claims = await _userManager.GetClaimsAsync(user);
             var nameClaim = claims.FirstOrDefault(c => c.Type == "name")?.Value;
-            
-            if (!string.IsNullOrEmpty(nameClaim))
-            {
-                return nameClaim;
-            }
+            if (!string.IsNullOrEmpty(nameClaim)) return nameClaim;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving name claim for user {UserId}", user.Id);
         }
-
-        // Fallback to converting username to friendly display name
         return ConvertToFriendlyName(user.UserName ?? "Unknown User");
     }
 
-    /// <summary>
-    /// Add additional profile claims with proper destinations if available
-    /// </summary>
     private async Task AddProfileClaimsAsync(ClaimsIdentity claimsIdentity, IdentityUser user, IEnumerable<string> scopes)
     {
         try
         {
             var claims = await _userManager.GetClaimsAsync(user);
-            
-            // Only include profile claims if profile scope is requested
             if (scopes.Contains(OpenIddictConstants.Scopes.Profile))
             {
-                // Add given_name if available
                 var givenName = claims.FirstOrDefault(c => c.Type == "given_name")?.Value;
                 if (!string.IsNullOrEmpty(givenName))
                 {
@@ -325,8 +270,6 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
                     givenNameClaim.SetDestinations(OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken);
                     claimsIdentity.AddClaim(givenNameClaim);
                 }
-
-                // Add family_name if available
                 var familyName = claims.FirstOrDefault(c => c.Type == "family_name")?.Value;
                 if (!string.IsNullOrEmpty(familyName))
                 {
@@ -334,8 +277,6 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
                     familyNameClaim.SetDestinations(OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken);
                     claimsIdentity.AddClaim(familyNameClaim);
                 }
-
-                // Add other profile claims as needed
                 var picture = claims.FirstOrDefault(c => c.Type == "picture")?.Value;
                 if (!string.IsNullOrEmpty(picture))
                 {
@@ -351,43 +292,25 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         }
     }
 
-    /// <summary>
-    /// Convert a username to a friendly display name
-    /// </summary>
     private string ConvertToFriendlyName(string input)
     {
         if (string.IsNullOrEmpty(input))
             return "Unknown User";
-
-        // If username is an email, extract the local part and convert to friendly name
         if (input.Contains('@'))
         {
             var localPart = input.Split('@')[0];
             return ConvertToDisplayName(localPart);
         }
-
-        // Otherwise just convert the username to friendly name
         return ConvertToDisplayName(input);
     }
 
-    /// <summary>
-    /// Convert a username or email local part to a friendly display name
-    /// </summary>
     private string ConvertToDisplayName(string input)
     {
         if (string.IsNullOrEmpty(input))
             return "Unknown User";
-
-        // Replace common separators with spaces
-        var friendlyName = input.Replace('.', ' ')
-                               .Replace('_', ' ')
-                               .Replace('-', ' ');
-
-        // Split into words and capitalize each word
+        var friendlyName = input.Replace('.', ' ').Replace('_', ' ').Replace('-', ' ');
         var words = friendlyName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        var capitalizedWords = words.Select(word => 
-            word.Length > 0 ? char.ToUpper(word[0]) + word.Substring(1).ToLower() : word);
-
+        var capitalizedWords = words.Select(word => word.Length > 0 ? char.ToUpper(word[0]) + word.Substring(1).ToLower() : word);
         return string.Join(" ", capitalizedWords);
     }
 }

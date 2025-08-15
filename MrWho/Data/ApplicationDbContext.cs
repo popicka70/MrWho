@@ -45,6 +45,9 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
     // User profile
     public DbSet<UserProfile> UserProfiles { get; set; }
 
+    // WebAuthn credentials
+    public DbSet<WebAuthnCredential> WebAuthnCredentials { get; set; }
+
     // Data Protection keys for antiforgery/auth cookie encryption persistence
     public DbSet<Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.DataProtectionKey> DataProtectionKeys { get; set; }
 
@@ -298,6 +301,26 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
                   .WithMany()
                   .HasForeignKey(l => l.UserId)
                   .OnDelete(DeleteBehavior.Restrict); // No cascade - logs are audit data, keep them
+        });
+
+        // =========================================================================
+        // WEBAUTHN CONFIGURATION
+        // =========================================================================
+        builder.Entity<WebAuthnCredential>(entity =>
+        {
+            entity.HasKey(c => c.Id);
+            entity.HasIndex(c => new { c.UserId, c.CredentialId }).IsUnique();
+            entity.Property(c => c.CredentialId).IsRequired();
+            entity.Property(c => c.PublicKey).IsRequired();
+            entity.Property(c => c.UserHandle).IsRequired();
+            entity.Property(c => c.AaGuid).HasMaxLength(64);
+            entity.Property(c => c.AttestationFmt).HasMaxLength(64);
+            entity.Property(c => c.Nickname).HasMaxLength(256);
+
+            entity.HasOne<IdentityUser>()
+                  .WithMany()
+                  .HasForeignKey(c => c.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
         });
 
         // Configure DataProtectionKey entity

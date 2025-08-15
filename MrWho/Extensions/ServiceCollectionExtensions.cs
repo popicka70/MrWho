@@ -102,32 +102,40 @@ public static class ServiceCollectionExtensions
         var connectionString = config.GetConnectionString(connectionName) ?? config[$"ConnectionStrings:{connectionName}"];
         var migrationsAssembly = config["Database:MigrationsAssembly"]; // optional
 
-        // Proactively load the migrations assembly if specified and present alongside the app
-        if (!string.IsNullOrWhiteSpace(migrationsAssembly))
+        // Auto-detect provider-specific migrations assembly when not explicitly configured
+        if (string.IsNullOrWhiteSpace(migrationsAssembly))
         {
-            try
+            migrationsAssembly = provider switch
             {
-                var alreadyLoaded = AppDomain.CurrentDomain.GetAssemblies()
-                    .Any(a => string.Equals(a.GetName().Name, migrationsAssembly, StringComparison.OrdinalIgnoreCase));
-                if (!alreadyLoaded)
+                "postgres" or "postgresql" => "MrWho.Migrations.PostgreSql",
+                "mysql" or "mariadb" => "MrWho.Migrations.MySql",
+                _ => "MrWho.Migrations.SqlServer"
+            };
+        }
+
+        // Proactively load the migrations assembly if present alongside the app
+        try
+        {
+            var alreadyLoaded = AppDomain.CurrentDomain.GetAssemblies()
+                .Any(a => string.Equals(a.GetName().Name, migrationsAssembly, StringComparison.OrdinalIgnoreCase));
+            if (!alreadyLoaded)
+            {
+                var baseDir = AppContext.BaseDirectory;
+                var candidate = Path.Combine(baseDir, $"{migrationsAssembly}.dll");
+                if (File.Exists(candidate))
                 {
-                    var baseDir = AppContext.BaseDirectory;
-                    var candidate = Path.Combine(baseDir, $"{migrationsAssembly}.dll");
-                    if (File.Exists(candidate))
-                    {
-                        AssemblyLoadContext.Default.LoadFromAssemblyPath(candidate);
-                    }
-                    else
-                    {
-                        // Fallback: attempt by name (may succeed if on probing paths)
-                        Assembly.Load(new AssemblyName(migrationsAssembly));
-                    }
+                    AssemblyLoadContext.Default.LoadFromAssemblyPath(candidate);
+                }
+                else
+                {
+                    // Fallback: attempt by name (may succeed if on probing paths)
+                    Assembly.Load(new AssemblyName(migrationsAssembly));
                 }
             }
-            catch
-            {
-                // Ignore and let EF try its default resolution which may still work locally
-            }
+        }
+        catch
+        {
+            // Ignore and let EF try its default resolution which may still work locally
         }
 
         if (string.IsNullOrWhiteSpace(connectionString))
@@ -155,8 +163,7 @@ public static class ServiceCollectionExtensions
                         var serverVersion = new MariaDbServerVersion(parsedVersion);
                         options.UseMySql(connectionString, serverVersion, b =>
                         {
-                            if (!string.IsNullOrWhiteSpace(migrationsAssembly))
-                                b.MigrationsAssembly(migrationsAssembly);
+                            b.MigrationsAssembly(migrationsAssembly);
                         });
                     }
                     else
@@ -164,8 +171,7 @@ public static class ServiceCollectionExtensions
                         var serverVersion = new MySqlServerVersion(parsedVersion);
                         options.UseMySql(connectionString, serverVersion, b =>
                         {
-                            if (!string.IsNullOrWhiteSpace(migrationsAssembly))
-                                b.MigrationsAssembly(migrationsAssembly);
+                            b.MigrationsAssembly(migrationsAssembly);
                         });
                     }
 
@@ -182,16 +188,14 @@ public static class ServiceCollectionExtensions
                 case "postgresql":
                     options.UseNpgsql(connectionString, b =>
                     {
-                        if (!string.IsNullOrWhiteSpace(migrationsAssembly))
-                            b.MigrationsAssembly(migrationsAssembly);
+                        b.MigrationsAssembly(migrationsAssembly);
                     });
                     break;
                 case "sqlserver":
                 default:
                     options.UseSqlServer(connectionString, b =>
                     {
-                        if (!string.IsNullOrWhiteSpace(migrationsAssembly))
-                            b.MigrationsAssembly(migrationsAssembly);
+                        b.MigrationsAssembly(migrationsAssembly);
                     });
                     break;
             }
