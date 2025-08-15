@@ -84,7 +84,7 @@ builder.Services.AddAuthentication(options =>
 .AddOpenIdConnect(OpenIdConnectDefaults.AuthenticationScheme, options => // Use standard OIDC scheme
 {
     options.SignInScheme = demo1CookieScheme;
-    options.Authority = "https://localhost:7113"; // "https://mrwho-production.up.railway.app"; // MrWho OIDC Server (Production)
+    options.Authority = "https://localhost:7113"; // "https://mrwho.up.railway.app"; // MrWho OIDC Server (Production)
     options.ClientId = "mrwho_demo1";
     options.ClientSecret = "Demo1Secret2024!";
     options.ResponseType = OpenIdConnectResponseType.Code;

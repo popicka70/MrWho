@@ -12,6 +12,6 @@ services:
       # External Neon Postgres connection (set NEON_PG_CONNSTR in your .env)
       ConnectionStrings__mrwhodb: ${NEON_PG_CONNSTR}
       DISABLE_HTTPS_REDIRECT: "true"
-      OPENIDDICT__ISSUER: https://mrwho-production.up.railway.app/
+      OPENIDDICT__ISSUER: https://mrwho.up.railway.app/
     ports:
       - "8080:8080"  # HTTP

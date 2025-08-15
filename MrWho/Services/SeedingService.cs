@@ -244,7 +244,7 @@ public class SeedingService : ISeedingService
             {
                 Name = "sample-staging",
                 DisplayName = "Staging Environment",
-                Description = "Sample realm for staging and pre-production testing",
+                Description = "Sample realm for staging and pre testing",
                 IsEnabled = true,
                 AccessTokenLifetime = TimeSpan.FromMinutes(60),
                 RefreshTokenLifetime = TimeSpan.FromDays(14),
