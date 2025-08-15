@@ -1,9 +1,10 @@
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using OpenIddict.Abstractions;
 using MrWho.Data;
 using MrWho.Models;
 using MrWho.Shared;
-using Microsoft.AspNetCore.Identity;
+using OpenIddict.Abstractions;
+using static System.Net.WebRequestMethods;
 
 namespace MrWho.Services;
 
@@ -110,7 +111,9 @@ public class OidcClientService : IOidcClientService
                 "http://localhost:8081/signin-oidc",
                 "http://localhost:8081/callback",
                 "https://mrwho.onrender.com/signin-oidc",
-                "https://mrwho.onrender.com/callback"
+                "https://mrwho.onrender.com/callback",
+                "https://mrwhoadmin.onrender.com/signin-oidc",
+                "https://mrwhoadmin.onrender.com/callback"
             };
 
             foreach (var uri in redirectUris)
@@ -130,7 +133,9 @@ public class OidcClientService : IOidcClientService
                 "http://localhost:8081/",
                 "http://localhost:8081/signout-callback-oidc",
                 "https://mrwho.onrender.com/",
-                "https://mrwho.onrender.com/signout-callback-oidc"
+                "https://mrwho.onrender.com/signout-callback-oidc",
+                "https://mrwhoadmin.onrender.com/",
+                "https://mrwhoadmin.onrender.com/signout-callback-oidc"
             };
 
             foreach (var uri in postLogoutUris)
@@ -193,7 +198,9 @@ public class OidcClientService : IOidcClientService
                 "http://localhost:8081/signin-oidc",
                 "http://localhost:8081/callback",
                 "https://mrwho.onrender.com/signin-oidc",
-                "https://mrwho.onrender.com/callback"
+                "https://mrwho.onrender.com/callback",
+                "https://mrwhoadmin.onrender.com/signin-oidc",
+                "https://mrwhoadmin.onrender.com/callback"
             };
             var requiredPostLogout = new[]
             {
@@ -202,7 +209,9 @@ public class OidcClientService : IOidcClientService
                 "http://localhost:8081/",
                 "http://localhost:8081/signout-callback-oidc",
                 "https://mrwho.onrender.com/",
-                "https://mrwho.onrender.com/signout-callback-oidc"
+                "https://mrwho.onrender.com/signout-callback-oidc",
+                "https://mrwhoadmin.onrender.com/",
+                "https://mrwhoadmin.onrender.com/signout-callback-oidc"
             };
 
             var missingRedirects = requiredRedirects
