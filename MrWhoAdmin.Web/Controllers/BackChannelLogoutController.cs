@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
 using System.Text.Json;
+using System.IdentityModel.Tokens.Jwt;
 
 namespace MrWhoAdmin.Web.Controllers;
 
@@ -39,11 +40,46 @@ public class BackChannelLogoutController : ControllerBase
                 return BadRequest("Missing logout_token");
             }
 
-            // Parse the logout token (in production, verify JWT signature)
-            var logoutData = JsonSerializer.Deserialize<JsonElement>(logout_token);
-            
-            var subject = logoutData.TryGetProperty("sub", out var subElement) ? subElement.GetString() : null;
-            var sessionId = logoutData.TryGetProperty("sid", out var sidElement) ? sidElement.GetString() : null;
+            string? subject = null;
+            string? sessionId = null;
+
+            // Prefer JWT parsing (spec-compliant)
+            if (logout_token.Count(c => c == '.') == 2)
+            {
+                try
+                {
+                    var handler = new JwtSecurityTokenHandler();
+                    var jwt = handler.ReadJwtToken(logout_token);
+                    subject = jwt.Claims.FirstOrDefault(c => c.Type == "sub")?.Value;
+                    sessionId = jwt.Claims.FirstOrDefault(c => c.Type == "sid")?.Value;
+
+                    if (!jwt.Payload.TryGetValue("events", out var _))
+                    {
+                        _logger.LogWarning("logout_token missing events claim");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to parse logout_token as JWT, will try JSON fallback");
+                }
+            }
+
+            // Fallback: legacy JSON (dev mode, unsigned)
+            if (subject == null && sessionId == null)
+            {
+                try
+                {
+                    using var doc = JsonDocument.Parse(logout_token);
+                    var root = doc.RootElement;
+                    if (root.TryGetProperty("sub", out var subElement)) subject = subElement.GetString();
+                    if (root.TryGetProperty("sid", out var sidElement)) sessionId = sidElement.GetString();
+                }
+                catch (Exception jsonEx)
+                {
+                    _logger.LogError(jsonEx, "Failed to parse logout_token JSON");
+                    return BadRequest("Invalid logout_token");
+                }
+            }
 
             _logger.LogInformation("Processing Admin Web logout for subject: {Subject}, session: {SessionId}", subject, sessionId);
 

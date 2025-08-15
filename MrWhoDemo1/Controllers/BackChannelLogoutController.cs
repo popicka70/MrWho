@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
 using System.Text.Json;
+using System.IdentityModel.Tokens.Jwt;
 
 namespace MrWhoDemo1.Controllers;
 
@@ -39,16 +40,51 @@ public class BackChannelLogoutController : ControllerBase
                 return BadRequest("Missing logout_token");
             }
 
-            // Parse the logout token (in production, verify JWT signature)
-            var logoutData = JsonSerializer.Deserialize<JsonElement>(logout_token);
-            
-            var subject = logoutData.TryGetProperty("sub", out var subElement) ? subElement.GetString() : null;
-            var sessionId = logoutData.TryGetProperty("sid", out var sidElement) ? sidElement.GetString() : null;
+            string? subject = null;
+            string? sessionId = null;
+
+            // Prefer JWT parsing (spec-compliant)
+            if (logout_token.Count(c => c == '.') == 2)
+            {
+                try
+                {
+                    var handler = new JwtSecurityTokenHandler();
+                    var jwt = handler.ReadJwtToken(logout_token);
+                    subject = jwt.Claims.FirstOrDefault(c => c.Type == "sub")?.Value;
+                    sessionId = jwt.Claims.FirstOrDefault(c => c.Type == "sid")?.Value;
+
+                    // Optionally validate events claim presence
+                    if (!jwt.Payload.TryGetValue("events", out var eventsObj))
+                    {
+                        _logger.LogWarning("logout_token missing events claim");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to parse logout_token as JWT, will try JSON fallback");
+                }
+            }
+
+            // Fallback: legacy JSON (dev mode, unsigned)
+            if (subject == null && sessionId == null)
+            {
+                try
+                {
+                    using var doc = JsonDocument.Parse(logout_token);
+                    var root = doc.RootElement;
+                    if (root.TryGetProperty("sub", out var subElement)) subject = subElement.GetString();
+                    if (root.TryGetProperty("sid", out var sidElement)) sessionId = sidElement.GetString();
+                }
+                catch (Exception jsonEx)
+                {
+                    _logger.LogError(jsonEx, "Failed to parse logout_token JSON");
+                    return BadRequest("Invalid logout_token");
+                }
+            }
 
             _logger.LogInformation("Processing Demo1 logout for subject: {Subject}, session: {SessionId}", subject, sessionId);
 
             // Store logout information in cache with expiration
-            // This allows subsequent requests to detect that the session has been invalidated
             if (!string.IsNullOrEmpty(subject))
             {
                 var logoutInfo = new
@@ -59,19 +95,15 @@ public class BackChannelLogoutController : ControllerBase
                     Reason = "BackChannelLogout"
                 };
                 
-                // Store logout notification for this subject for 1 hour
-                // This helps detect invalidated sessions on subsequent requests
                 _cache.Set($"logout_{subject}", logoutInfo, TimeSpan.FromHours(1));
                 
-                // Also store by session ID if available
                 if (!string.IsNullOrEmpty(sessionId))
                 {
                     _cache.Set($"logout_session_{sessionId}", logoutInfo, TimeSpan.FromHours(1));
                 }
             }
 
-            // Force logout by clearing all authentication
-            // This will clear the local authentication cookie for this request
+            // Clear local authentication for this request
             await HttpContext.SignOutAsync("Demo1Cookies");
             
             // Store logout information in session for any active sessions to detect

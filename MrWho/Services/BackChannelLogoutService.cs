@@ -3,6 +3,10 @@ using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using MrWho.Data;
 using OpenIddict.Abstractions;
+using Microsoft.Extensions.Options;
+using OpenIddict.Server;
+using System.IdentityModel.Tokens.Jwt;
+using Microsoft.IdentityModel.Tokens;
 
 namespace MrWho.Services;
 
@@ -32,15 +36,18 @@ public class BackChannelLogoutService : IBackChannelLogoutService
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<BackChannelLogoutService> _logger;
     private readonly IServiceProvider _serviceProvider; // Changed from direct DbContext injection
+    private readonly IOptionsMonitor<OpenIddictServerOptions> _serverOptions;
 
     public BackChannelLogoutService(
         IHttpClientFactory httpClientFactory,
         ILogger<BackChannelLogoutService> logger,
-        IServiceProvider serviceProvider) // Use service provider to create scoped contexts
+        IServiceProvider serviceProvider, // Use service provider to create scoped contexts
+        IOptionsMonitor<OpenIddictServerOptions> serverOptions)
     {
         _httpClientFactory = httpClientFactory;
         _logger = logger;
         _serviceProvider = serviceProvider;
+        _serverOptions = serverOptions;
     }
 
     public async Task NotifyClientLogoutAsync(string authorizationId, string subject, string sessionId)
@@ -136,7 +143,7 @@ public class BackChannelLogoutService : IBackChannelLogoutService
                 return;
             }
 
-            // Get the back-channel logout URI for this client
+            // Get the back-channel logout URI for this client from configuration
             var logoutUri = GetBackChannelLogoutUri(client);
             if (string.IsNullOrEmpty(logoutUri))
             {
@@ -179,23 +186,89 @@ public class BackChannelLogoutService : IBackChannelLogoutService
 
     public Task<string> CreateLogoutTokenAsync(string clientId, string subject, string sessionId)
     {
-        // For now, create a simple JWT-like structure
-        // In production, this should be a properly signed JWT
-        var logoutToken = new
+        try
         {
-            iss = "https://localhost:7113", // Your OIDC server
-            sub = subject,
-            aud = clientId,
-            iat = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
-            jti = Guid.NewGuid().ToString(),
-            events = new Dictionary<string, object>
-            {
-                ["http://schemas.openid.net/event/backchannel-logout"] = new { }
-            },
-            sid = sessionId
-        };
+            var options = _serverOptions.CurrentValue;
+            var issuer = options.Issuer?.AbsoluteUri?.TrimEnd('/') ?? string.Empty;
 
-    return Task.FromResult(JsonSerializer.Serialize(logoutToken));
+            if (string.IsNullOrEmpty(issuer))
+            {
+                _logger.LogWarning("OpenIddict issuer is not configured. Using fallback localhost issuer for logout_token.");
+                issuer = "https://localhost:7113";
+            }
+
+            // Pick first signing credentials
+            var signing = options.SigningCredentials.FirstOrDefault();
+            if (signing is null)
+            {
+                _logger.LogWarning("No OpenIddict signing credentials configured. Back-channel logout_token cannot be signed.");
+                // As a fallback, return the previous JSON payload to avoid breaking clients in dev
+                var fallback = new
+                {
+                    iss = issuer,
+                    sub = subject,
+                    aud = clientId,
+                    iat = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                    jti = Guid.NewGuid().ToString(),
+                    events = new Dictionary<string, object>
+                    {
+                        ["http://schemas.openid.net/event/backchannel-logout"] = new Dictionary<string, object>()
+                    },
+                    sid = sessionId
+                };
+                return Task.FromResult(JsonSerializer.Serialize(fallback));
+            }
+
+            var now = DateTimeOffset.UtcNow;
+
+            var claims = new List<System.Security.Claims.Claim>
+            {
+                new("sub", subject),
+                new("sid", sessionId),
+                new("jti", Guid.NewGuid().ToString())
+            };
+
+            var token = new JwtSecurityToken(
+                issuer: issuer,
+                audience: clientId,
+                claims: claims,
+                notBefore: now.UtcDateTime,
+                expires: now.AddMinutes(2).UtcDateTime, // short-lived
+                signingCredentials: signing
+            );
+
+            // Set required extra payload members
+            token.Payload["events"] = new Dictionary<string, object>
+            {
+                ["http://schemas.openid.net/event/backchannel-logout"] = new Dictionary<string, object>()
+            };
+            token.Payload["iat"] = now.ToUnixTimeSeconds();
+
+            // Set header typ to logout+jwt
+            token.Header[JwtHeaderParameterNames.Typ] = "logout+jwt";
+
+            var handler = new JwtSecurityTokenHandler();
+            var jwt = handler.WriteToken(token);
+            return Task.FromResult(jwt);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to create spec-compliant logout_token. Falling back to JSON payload.");
+            var fallback = new
+            {
+                iss = "https://localhost:7113",
+                sub = subject,
+                aud = clientId,
+                iat = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+                jti = Guid.NewGuid().ToString(),
+                events = new Dictionary<string, object>
+                {
+                    ["http://schemas.openid.net/event/backchannel-logout"] = new Dictionary<string, object>()
+                },
+                sid = sessionId
+            };
+            return Task.FromResult(JsonSerializer.Serialize(fallback));
+        }
     }
 
     /// <summary>
@@ -211,8 +284,13 @@ public class BackChannelLogoutService : IBackChannelLogoutService
 
     private string? GetBackChannelLogoutUri(Models.Client client)
     {
-        // For now, construct a standard back-channel logout URI
-        // In a real implementation, this would be stored in the client configuration
+        // Prefer the configured BackChannelLogoutUri on the client
+        if (!string.IsNullOrWhiteSpace(client.BackChannelLogoutUri))
+        {
+            return client.BackChannelLogoutUri;
+        }
+
+        // Fallbacks for known demo clients (dev only)
         return client.ClientId switch
         {
             "mrwho_demo1" => "https://localhost:7037/signout-backchannel",
