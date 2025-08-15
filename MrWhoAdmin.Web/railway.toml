@@ -1,0 +1,18 @@
+[build]
+# Build and deploy the Admin Web as a separate Railway service
+builder = "DOCKERFILE"
+dockerfilePath = "MrWhoAdmin.Web/Dockerfile"
+
+[deploy]
+healthcheckPath = "/"
+restartPolicyType = "ALWAYS"
+
+# Notes for this service:
+# - PORT is provided by Railway. Ensure the container listens on $PORT.
+# - The Admin Web uses OpenID Connect against the MrWho OIDC service.
+#   Configure these variables in the Admin Web service:
+#     - Authentication__Authority=https://<your-oidc-public-domain>
+#     - Authentication__ClientId=mrwho_admin_web
+#     - Authentication__ClientSecret=<secure-secret>
+#     - MrWhoApi__BaseUrl=https://<your-oidc-public-domain>/
+#     - DISABLE_HTTPS_REDIRECT=true  # Railway terminates TLS

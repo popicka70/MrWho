@@ -27,4 +27,5 @@ COPY --from=build /app/publish .
 ENV ASPNETCORE_FORWARDEDHEADERS_ENABLED=true
 ENV DOTNET_RUNNING_IN_CONTAINER=true
 
-ENTRYPOINT ["dotnet", "MrWhoAdmin.Web.dll"]
+# Respect Railway $PORT at runtime
+ENTRYPOINT ["/bin/sh","-c","ASPNETCORE_URLS=http://+:${PORT:-8080} dotnet MrWhoAdmin.Web.dll"]

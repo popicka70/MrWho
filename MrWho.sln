@@ -19,6 +19,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Položky řešení", "Polo�
 		.github\copilot-instructions.md = .github\copilot-instructions.md
 		docker-compose.yml = docker-compose.yml
 		ESSENTIAL_DATA_SETUP.md = ESSENTIAL_DATA_SETUP.md
+		railway.toml = railway.toml
 		README.md = README.md
 	EndProjectSection
 EndProject

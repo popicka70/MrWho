@@ -1,7 +1,7 @@
 [build]
 # Use the Dockerfile for the MrWho service (nested in the repo)
 builder = "DOCKERFILE"
-dockerfilePath = "Dockerfile"
+dockerfilePath = "MrWho/Dockerfile"
 
 [deploy]
 # Rely on the Dockerfile ENTRYPOINT; no startCommand needed
@@ -12,7 +12,12 @@ healthcheckPath = "/"
 restartPolicyType = "ALWAYS"
 
 # Note about PORT handling on Railway:
-# - This app currently listens on 8080/8443 per ASPNETCORE_URLS in the Dockerfile.
-# - Set a service variable PORT=8080 on Railway so traffic is routed correctly.
-# - Alternatively, modify the Dockerfile/entrypoint to respect $PORT at runtime.
+# - This app currently listens on 8080 by default, but MrWho's Dockerfile respects $PORT at runtime.
+# - Set a service variable PORT=8080 on Railway OR let the platform inject PORT automatically.
+# - Ensure environment variables are set in Railway:
+#     - ConnectionStrings__mrwhodb: <your-connection-string>
+#     - Database__Provider: <SqlServer|PostgreSql|MySql>
+#     - Database__MigrationsAssembly: MrWho.Migrations.<Provider>
+#     - OPENIDDICT__ISSUER: https://<your-oidc-public-domain>
+#     - DISABLE_HTTPS_REDIRECT=true (since TLS is terminated by Railway)
 

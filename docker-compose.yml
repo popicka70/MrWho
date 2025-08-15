@@ -15,3 +15,19 @@ services:
       OPENIDDICT__ISSUER: https://mrwho.up.railway.app/
     ports:
       - "8080:8080"  # HTTP
+  adminweb:
+    build:
+      context: .
+      dockerfile: MrWhoAdmin.Web/Dockerfile
+    container_name: mrwho-adminweb
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      DISABLE_HTTPS_REDIRECT: "true"
+      Authentication__Authority: http://mrwho:8080
+      Authentication__ClientId: mrwho_admin_web
+      Authentication__ClientSecret: ${ADMIN_CLIENT_SECRET:-MrWhoAdmin2024!SecretKey}
+      MrWhoApi__BaseUrl: http://mrwho:8080/
+    depends_on:
+      - mrwho
+    ports:
+      - "8081:8080"
