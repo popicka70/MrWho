@@ -20,7 +20,7 @@ The MrWho OIDC Server now includes a comprehensive **Device Management System** 
 - **Complete Audit Trail**: Every approval/rejection is logged with device and location info
 - **Backward Compatible**: Original QR login continues to work seamlessly
 
-### ??? Security & Compliance 
+### ??? Security & Compliance
 - **Authentication Logging**: Comprehensive audit trails for compliance requirements
 - **Compromise Detection**: Automatic detection and handling of compromised devices
 - **IP Tracking**: Monitor device locations and detect suspicious movements
