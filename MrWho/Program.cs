@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using MrWho.Services;
 using Microsoft.AspNetCore.HttpOverrides;
+using Fido2NetLib;
+using Microsoft.AspNetCore.Authentication.Cookies;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -25,6 +27,36 @@ builder.Services.AddMrWhoOpenIddict();
 builder.Services.AddMrWhoAuthorizationWithClientCookies(); // Use authorization with client cookie support
 builder.Services.AddMrWhoMediator(); // Lightweight mediator + endpoint handlers
 
+// Global cookie overrides from configuration (domain, HTTPS)
+var configuredCookieDomain = builder.Configuration["Cookie:Domain"];
+var configuredRequireHttps = string.Equals(builder.Configuration["Cookie:RequireHttps"], "true", StringComparison.OrdinalIgnoreCase);
+
+builder.Services.PostConfigureAll<CookieAuthenticationOptions>(options =>
+{
+    if (!string.IsNullOrWhiteSpace(configuredCookieDomain))
+    {
+        options.Cookie.Domain = configuredCookieDomain;
+    }
+    if (configuredRequireHttps)
+    {
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        options.Cookie.SameSite = SameSiteMode.Lax; // keep Lax for OIDC redirects
+    }
+});
+
+// WebAuthn/FIDO2 config (attestation none, userVerification required)
+var rpId = builder.Configuration["WebAuthn:RelyingPartyId"] ?? new Uri(builder.Configuration["OpenIddict:Issuer"] ?? "https://localhost:7113").Host;
+var rpName = builder.Configuration["WebAuthn:RelyingPartyName"] ?? "MrWho";
+var origins = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "https://localhost:7113", "http://localhost:7113" };
+var fromConfig = builder.Configuration.GetSection("WebAuthn:Origins").Get<string[]>() ?? Array.Empty<string>();
+foreach (var o in fromConfig) if (!string.IsNullOrWhiteSpace(o)) origins.Add(o);
+builder.Services.AddSingleton(new Fido2(new Fido2Configuration
+{
+    ServerDomain = rpId,
+    ServerName = rpName,
+    Origins = origins
+}));
+
 // Honor X-Forwarded-* headers from the hosting platform (Railway/reverse proxies)
 // so Request.Scheme becomes https and OpenIddict doesn't reject requests.
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
@@ -43,6 +75,15 @@ builder.Services.AddSession(options =>
     options.Cookie.HttpOnly = true;
     options.Cookie.IsEssential = true;
     options.Cookie.Name = ".MrWho.Session";
+    if (!string.IsNullOrWhiteSpace(configuredCookieDomain))
+    {
+        options.Cookie.Domain = configuredCookieDomain;
+    }
+    if (configuredRequireHttps)
+    {
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        options.Cookie.SameSite = SameSiteMode.Lax;
+    }
 });
 
 // Authorization policies
