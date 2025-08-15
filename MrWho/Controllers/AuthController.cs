@@ -50,6 +50,18 @@ public class AuthController : Controller
     public async Task<IActionResult> Login(string? returnUrl = null, string? clientId = null, string? mode = null)
     {
         _logger.LogDebug("Login page requested, returnUrl = {ReturnUrl}, clientId = {ClientId}", returnUrl, clientId);
+
+        // If clientId is not provided explicitly, try to extract it from the returnUrl's client_id parameter
+        if (string.IsNullOrEmpty(clientId) && !string.IsNullOrEmpty(returnUrl))
+        {
+            var extracted = TryExtractClientIdFromReturnUrl(returnUrl);
+            if (!string.IsNullOrEmpty(extracted))
+            {
+                clientId = extracted;
+                _logger.LogDebug("Extracted client_id '{ClientId}' from returnUrl", clientId);
+            }
+        }
+
         ViewData["ReturnUrl"] = returnUrl;
         ViewData["ClientId"] = clientId;
 
@@ -75,15 +87,26 @@ public class AuthController : Controller
             }
         }
 
-    ViewData["ClientName"] = clientName;
-    var useCode = string.Equals(mode, "code", StringComparison.OrdinalIgnoreCase);
-    return View(new LoginViewModel { UseCode = useCode });
+        ViewData["ClientName"] = clientName;
+        var useCode = string.Equals(mode, "code", StringComparison.OrdinalIgnoreCase);
+        return View(new LoginViewModel { UseCode = useCode });
     }
 
     [HttpPost("login")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Login(LoginViewModel model, string? returnUrl = null, string? clientId = null)
     {
+        // If clientId not explicitly passed, attempt extraction from returnUrl
+        if (string.IsNullOrEmpty(clientId) && !string.IsNullOrEmpty(returnUrl))
+        {
+            var extracted = TryExtractClientIdFromReturnUrl(returnUrl);
+            if (!string.IsNullOrEmpty(extracted))
+            {
+                clientId = extracted;
+                _logger.LogDebug("POST login: extracted client_id '{ClientId}' from returnUrl", clientId);
+            }
+        }
+
         ViewData["ReturnUrl"] = returnUrl;
         ViewData["ClientId"] = clientId;
 
@@ -499,6 +522,35 @@ public class AuthController : Controller
             word.Length > 0 ? char.ToUpper(word[0]) + word.Substring(1).ToLower() : word);
 
         return string.Join(" ", capitalizedWords);
+    }
+
+    // Helper: extract client_id from a full OIDC returnUrl (absolute or relative)
+    private static string? TryExtractClientIdFromReturnUrl(string? returnUrl)
+    {
+        if (string.IsNullOrEmpty(returnUrl)) return null;
+        try
+        {
+            // Handle both absolute and relative URLs safely
+            if (Uri.TryCreate(returnUrl, UriKind.Absolute, out var absUri))
+            {
+                var query = HttpUtility.ParseQueryString(absUri.Query);
+                return query["client_id"];            
+            }
+            else
+            {
+                var idx = returnUrl.IndexOf('?');
+                if (idx >= 0 && idx < returnUrl.Length - 1)
+                {
+                    var query = HttpUtility.ParseQueryString(returnUrl.Substring(idx)); // includes leading '?'
+                    return query["client_id"];            
+                }
+            }
+        }
+        catch
+        {
+            // Ignore
+        }
+        return null;
     }
 
     [HttpGet("access-denied")]

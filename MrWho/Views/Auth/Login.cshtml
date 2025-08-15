@@ -191,10 +191,17 @@
                     if(!res.ok){ alert('Failed to start passkey'); return; }
                     const options = await res.json();
 
-                    // Convert challenge and allowCredentials to ArrayBuffers
+                    // Convert challenge
                     options.challenge = base64urlToBuffer(options.challenge);
-                    if (options.allowCredentials) {
-                        options.allowCredentials = options.allowCredentials.map(c => ({...c, id: base64urlToBuffer(c.id)}));
+
+                    // Ensure allowCredentials is either a sequence or omitted entirely
+                    if (!Array.isArray(options.allowCredentials) || options.allowCredentials.length === 0) {
+                        delete options.allowCredentials; // let authenticator use discoverable credentials
+                    } else {
+                        options.allowCredentials = options.allowCredentials.map(c => ({
+                            ...c,
+                            id: base64urlToBuffer(c.id)
+                        }));
                     }
 
                     const assertion = await navigator.credentials.get({ publicKey: options });

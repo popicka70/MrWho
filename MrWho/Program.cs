@@ -33,10 +33,13 @@ var configuredRequireHttps = string.Equals(builder.Configuration["Cookie:Require
 
 builder.Services.PostConfigureAll<CookieAuthenticationOptions>(options =>
 {
-    if (!string.IsNullOrWhiteSpace(configuredCookieDomain))
+    // Only apply an explicit cookie domain when not running in Development.
+    // In Development we typically use https://localhost which cannot set a cookie for another domain.
+    if (!builder.Environment.IsDevelopment() && !string.IsNullOrWhiteSpace(configuredCookieDomain))
     {
         options.Cookie.Domain = configuredCookieDomain;
     }
+    // Respect RequireHttps override (safe in dev too, we use https://localhost)
     if (configuredRequireHttps)
     {
         options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
@@ -75,7 +78,8 @@ builder.Services.AddSession(options =>
     options.Cookie.HttpOnly = true;
     options.Cookie.IsEssential = true;
     options.Cookie.Name = ".MrWho.Session";
-    if (!string.IsNullOrWhiteSpace(configuredCookieDomain))
+    // Only apply cookie domain outside Development to avoid localhost domain mismatch
+    if (!builder.Environment.IsDevelopment() && !string.IsNullOrWhiteSpace(configuredCookieDomain))
     {
         options.Cookie.Domain = configuredCookieDomain;
     }
