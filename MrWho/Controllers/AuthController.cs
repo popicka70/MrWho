@@ -25,6 +25,7 @@ public class AuthController : Controller
     private readonly IOpenIddictApplicationManager _applicationManager;
     private readonly ApplicationDbContext _db;
     private readonly ILogger<AuthController> _logger;
+    private readonly IConfiguration _configuration;
 
     public AuthController(
         SignInManager<IdentityUser> signInManager, 
@@ -33,7 +34,8 @@ public class AuthController : Controller
         IDynamicCookieService dynamicCookieService,
         IOpenIddictApplicationManager applicationManager,
         ApplicationDbContext db,
-        ILogger<AuthController> logger)
+        ILogger<AuthController> logger,
+        IConfiguration configuration)
     {
         _signInManager = signInManager;
         _userManager = userManager;
@@ -42,6 +44,7 @@ public class AuthController : Controller
         _applicationManager = applicationManager;
         _db = db;
         _logger = logger;
+        _configuration = configuration;
     }
 
     // REMOVED: [HttpGet("authorize")] - Now handled by minimal API with client-specific cookies
@@ -304,6 +307,8 @@ public class AuthController : Controller
         
         // Perform logout
         await _signInManager.SignOutAsync();
+        // Extra safety: delete default cookie across domain variants
+        DeleteCookieAcrossDomains(".AspNetCore.Identity.Application");
         
         // Clear any client-specific cookies if we can detect the client
         string? detectedClientId = clientId ?? await TryGetClientIdFromRequest();
@@ -313,10 +318,26 @@ public class AuthController : Controller
             {
                 await _dynamicCookieService.SignOutFromClientAsync(detectedClientId);
                 _logger.LogDebug("Signed out from client-specific cookie for client {ClientId}", detectedClientId);
+                // Extra safety: delete client cookie across domain variants
+                var cookieName = _cookieService.GetCookieNameForClient(detectedClientId);
+                DeleteCookieAcrossDomains(cookieName);
             }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Failed to sign out from client-specific cookie for client {ClientId}", detectedClientId);
+            }
+        }
+        else
+        {
+            // Attempt to clear all known client cookies
+            foreach (var kvp in _cookieService.GetAllClientConfigurations())
+            {
+                try
+                {
+                    await _dynamicCookieService.SignOutFromClientAsync(kvp.Key);
+                }
+                catch { /* ignore */ }
+                DeleteCookieAcrossDomains(kvp.Value.CookieName);
             }
         }
         
@@ -351,6 +372,7 @@ public class AuthController : Controller
         
         // Perform logout
         await _signInManager.SignOutAsync();
+        DeleteCookieAcrossDomains(".AspNetCore.Identity.Application");
         
         // Clear any client-specific cookies if we can detect the client
         string? detectedClientId = clientId ?? await TryGetClientIdFromRequest();
@@ -360,10 +382,24 @@ public class AuthController : Controller
             {
                 await _dynamicCookieService.SignOutFromClientAsync(detectedClientId);
                 _logger.LogDebug("Signed out from client-specific cookie for client {ClientId}", detectedClientId);
+                var cookieName = _cookieService.GetCookieNameForClient(detectedClientId);
+                DeleteCookieAcrossDomains(cookieName);
             }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex, "Failed to sign out from client-specific cookie for client {ClientId}", detectedClientId);
+            }
+        }
+        else
+        {
+            foreach (var kvp in _cookieService.GetAllClientConfigurations())
+            {
+                try
+                {
+                    await _dynamicCookieService.SignOutFromClientAsync(kvp.Key);
+                }
+                catch { /* ignore */ }
+                DeleteCookieAcrossDomains(kvp.Value.CookieName);
             }
         }
         
@@ -463,6 +499,8 @@ public class AuthController : Controller
             // Always sign out from the default Identity scheme
             await _signInManager.SignOutAsync();
             _logger.LogDebug("Signed out from default Identity scheme");
+            // Extra safety: delete default cookie across domain variants
+            DeleteCookieAcrossDomains(".AspNetCore.Identity.Application");
 
             // If we have a client ID, also sign out from the client-specific cookie
             if (!string.IsNullOrEmpty(clientId))
@@ -476,6 +514,14 @@ public class AuthController : Controller
                 {
                     _logger.LogWarning(ex, "Failed to sign out from client-specific cookie for client {ClientId}", clientId);
                 }
+
+                // Extra safety: explicitly delete the client cookie by name across domain variants
+                try
+                {
+                    var cookieName = _cookieService.GetCookieNameForClient(clientId);
+                    DeleteCookieAcrossDomains(cookieName);
+                }
+                catch { /* ignore */ }
             }
             else
             {
@@ -494,12 +540,47 @@ public class AuthController : Controller
                     {
                         _logger.LogDebug(ex, "Failed to sign out from client configuration for client {ClientId} (may not be signed in)", config.Key);
                     }
+
+                    // Also try manual deletion for both domain variants
+                    DeleteCookieAcrossDomains(config.Value.CookieName);
                 }
             }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during logout process");
+        }
+    }
+
+    /// <summary>
+    /// Extra-safe cookie deletion: attempts to delete with and without configured Domain
+    /// to handle historic cookies created with different Domain attributes.
+    /// </summary>
+    private void DeleteCookieAcrossDomains(string cookieName)
+    {
+        if (string.IsNullOrWhiteSpace(cookieName)) return;
+
+        try
+        {
+            // Delete host-only cookie (no domain attribute)
+            Response.Cookies.Delete(cookieName, new CookieOptions{ Path = "/" });
+
+            var configuredDomain = _configuration["Cookie:Domain"];
+            if (!string.IsNullOrWhiteSpace(configuredDomain))
+            {
+                // Delete cookie set with explicit domain
+                Response.Cookies.Delete(cookieName, new CookieOptions
+                {
+                    Domain = configuredDomain,
+                    Path = "/"
+                });
+            }
+
+            _logger.LogDebug("Attempted deletion for cookie {CookieName} with host-only and configured domain variants", cookieName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Error deleting cookie {CookieName}", cookieName);
         }
     }
 
