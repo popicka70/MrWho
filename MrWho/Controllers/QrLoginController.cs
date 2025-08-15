@@ -76,8 +76,8 @@ public class QrLoginController : Controller
         string deepLink;
         if (persistent)
         {
-            // For persistent QR, link to the device management approve endpoint
-            deepLink = Url.Action("ApprovePersistent", "DeviceManagement", new { token }, Request.Scheme, Request.Host.ToString())!;
+            // For persistent QR, link to the device management approve endpoint (Web UI controller)
+            deepLink = Url.Action("ApprovePersistent", "DeviceManagementWeb", new { token }, Request.Scheme, Request.Host.ToString())!;
         }
         else
         {

@@ -207,7 +207,8 @@ public class DeviceManagementController : ControllerBase
             {
                 Token = token,
                 QrCodeUrl = Url.Action("QrPng", "QrLogin", new { token }, Request.Scheme),
-                ApprovalUrl = Url.Action("ApprovePersistent", "DeviceManagement", new { token }, Request.Scheme),
+                // Point approval to the Web UI controller so users can select a device
+                ApprovalUrl = Url.Action("ApprovePersistent", "DeviceManagementWeb", new { token }, Request.Scheme),
                 ExpiresAt = DateTime.UtcNow.AddMinutes(request.ExpirationMinutes ?? 5)
             });
         }
