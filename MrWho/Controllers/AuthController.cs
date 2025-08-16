@@ -29,6 +29,7 @@ public class AuthController : Controller
     private readonly ILogger<AuthController> _logger;
     private readonly IConfiguration _configuration;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IHostEnvironment _env;
 
     public AuthController(
         SignInManager<IdentityUser> signInManager, 
@@ -39,7 +40,8 @@ public class AuthController : Controller
         ApplicationDbContext db,
         ILogger<AuthController> logger,
         IConfiguration configuration,
-        IHttpClientFactory httpClientFactory)
+        IHttpClientFactory httpClientFactory,
+        IHostEnvironment env)
     {
         _signInManager = signInManager;
         _userManager = userManager;
@@ -50,6 +52,19 @@ public class AuthController : Controller
         _logger = logger;
         _configuration = configuration;
         _httpClientFactory = httpClientFactory;
+        _env = env;
+    }
+
+    private bool ShouldUseRecaptcha()
+    {
+        if (_env.IsDevelopment()) return false; // Always off in development
+        var site = _configuration["GoogleReCaptcha:SiteKey"];
+        var secret = _configuration["GoogleReCaptcha:SecretKey"];
+        // Optional explicit override flag
+        var enabledFlag = _configuration["GoogleReCaptcha:Enabled"];
+        if (!string.IsNullOrWhiteSpace(enabledFlag) && bool.TryParse(enabledFlag, out var enabled) && !enabled)
+            return false;
+        return !string.IsNullOrWhiteSpace(site) && !string.IsNullOrWhiteSpace(secret);
     }
 
     // REMOVED: [HttpGet("authorize")] - Now handled by minimal API with client-specific cookies
@@ -72,7 +87,7 @@ public class AuthController : Controller
 
         ViewData["ReturnUrl"] = returnUrl;
         ViewData["ClientId"] = clientId;
-        ViewData["RecaptchaSiteKey"] = _configuration["GoogleReCaptcha:SiteKey"]; // pass site key
+        ViewData["RecaptchaSiteKey"] = ShouldUseRecaptcha() ? _configuration["GoogleReCaptcha:SiteKey"] : null; // pass site key only when enabled
 
         // Try to get client name if clientId is provided
         string? clientName = null;
@@ -105,13 +120,15 @@ public class AuthController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Login(LoginViewModel model, string? returnUrl = null, string? clientId = null)
     {
-        // Verify reCAPTCHA token
-        var token = Request.Form["recaptchaToken"].ToString();
-        var recaptchaOk = await VerifyRecaptchaAsync(token, "login");
-        if (!recaptchaOk)
+        // Verify reCAPTCHA token (only when enabled)
+        if (ShouldUseRecaptcha())
         {
-            ModelState.AddModelError(string.Empty, "reCAPTCHA verification failed. Please try again.");
-            ViewData["RecaptchaSiteKey"] = _configuration["GoogleReCaptcha:SiteKey"];
+            var token = Request.Form["recaptchaToken"].ToString();
+            var recaptchaOk = await VerifyRecaptchaAsync(token, "login");
+            if (!recaptchaOk)
+            {
+                ModelState.AddModelError(string.Empty, "reCAPTCHA verification failed. Please try again.");
+            }
         }
 
         // If clientId not explicitly passed, attempt extraction from returnUrl
@@ -127,7 +144,7 @@ public class AuthController : Controller
 
         ViewData["ReturnUrl"] = returnUrl;
         ViewData["ClientId"] = clientId;
-        ViewData["RecaptchaSiteKey"] = _configuration["GoogleReCaptcha:SiteKey"];
+        ViewData["RecaptchaSiteKey"] = ShouldUseRecaptcha() ? _configuration["GoogleReCaptcha:SiteKey"] : null;
 
         // Try to get client name if clientId is provided (for error scenarios)
         string? clientName = null;
@@ -717,8 +734,8 @@ public class AuthController : Controller
     [AllowAnonymous]
     public IActionResult Register()
     {
-        // Pass reCAPTCHA site key to the view if configured
-        ViewData["RecaptchaSiteKey"] = _configuration["GoogleReCaptcha:SiteKey"];
+        // Pass reCAPTCHA site key to the view if configured and enabled
+        ViewData["RecaptchaSiteKey"] = ShouldUseRecaptcha() ? _configuration["GoogleReCaptcha:SiteKey"] : null;
         return View("Register", new RegisterUserRequest());
     }
 
@@ -726,18 +743,17 @@ public class AuthController : Controller
 
     private async Task<bool> VerifyRecaptchaAsync(string? token, string actionExpected)
     {
-        var secret = _configuration["GoogleReCaptcha:SecretKey"];
-        if (string.IsNullOrWhiteSpace(secret))
+        if (!ShouldUseRecaptcha())
         {
-            // Not configured: treat as success to avoid blocking dev
-            _logger.LogDebug("reCAPTCHA not configured - skipping verification");
+            _logger.LogDebug("reCAPTCHA disabled or not configured - skipping verification");
             return true;
         }
+        var secret = _configuration["GoogleReCaptcha:SecretKey"];
         if (string.IsNullOrWhiteSpace(token)) return false;
 
         var client = _httpClientFactory.CreateClient();
         var resp = await client.PostAsync("https://www.google.com/recaptcha/api/siteverify", new FormUrlEncodedContent(new Dictionary<string,string>{
-            ["secret"] = secret,
+            ["secret"] = secret!,
             ["response"] = token,
             ["remoteip"] = HttpContext.Connection.RemoteIpAddress?.ToString() ?? string.Empty
         }));
@@ -772,13 +788,13 @@ public class AuthController : Controller
         if (!recaptchaOk)
         {
             ModelState.AddModelError(string.Empty, "reCAPTCHA verification failed. Please try again.");
-            ViewData["RecaptchaSiteKey"] = _configuration["GoogleReCaptcha:SiteKey"];
+            ViewData["RecaptchaSiteKey"] = ShouldUseRecaptcha() ? _configuration["GoogleReCaptcha:SiteKey"] : null;
             return View("Register", input);
         }
 
         if (!ModelState.IsValid)
         {
-            ViewData["RecaptchaSiteKey"] = _configuration["GoogleReCaptcha:SiteKey"];
+            ViewData["RecaptchaSiteKey"] = ShouldUseRecaptcha() ? _configuration["GoogleReCaptcha:SiteKey"] : null;
             return View("Register", input);
         }
 
@@ -787,7 +803,7 @@ public class AuthController : Controller
         if (existingByEmail != null)
         {
             ModelState.AddModelError("Email", "An account with this email already exists.");
-            ViewData["RecaptchaSiteKey"] = _configuration["GoogleReCaptcha:SiteKey"];
+            ViewData["RecaptchaSiteKey"] = ShouldUseRecaptcha() ? _configuration["GoogleReCaptcha:SiteKey"] : null;
             return View("Register", input);
         }
 
@@ -806,7 +822,7 @@ public class AuthController : Controller
             {
                 ModelState.AddModelError(string.Empty, error.Description);
             }
-            ViewData["RecaptchaSiteKey"] = _configuration["GoogleReCaptcha:SiteKey"];
+            ViewData["RecaptchaSiteKey"] = ShouldUseRecaptcha() ? _configuration["GoogleReCaptcha:SiteKey"] : null;
             return View("Register", input);
         }
 
