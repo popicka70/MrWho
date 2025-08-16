@@ -37,7 +37,7 @@
                         <RadzenDataGrid Data="@context.User.Claims.OrderBy(c => c.Type)" TItem="System.Security.Claims.Claim" 
                                        PageSize="20" AllowPaging="true" AllowSorting="true" AllowFiltering="true">
                             <Columns>
-                                <RadzenDataGridColumn TItem="System.Security.Claims.Claim" Property="Type" Title="Claim Type" Width="250px">
+                                <RadzenDataGridColumn TItem="System.Security.Claims.Claim" Property="Type" Title="Claim Type" Width="350px">
                                     <Template Context="claim">
                                         <RadzenText Text="@claim.Type" Style="font-family: monospace; font-weight: bold;" />
                                     </Template>

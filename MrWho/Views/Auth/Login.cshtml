@@ -3,6 +3,7 @@
     ViewData["Title"] = "Login";
     var clientId = ViewData["ClientId"] as string;
     var clientName = ViewData["ClientName"] as string;
+    var recaptchaSiteKey = ViewData["RecaptchaSiteKey"] as string; // Provided by controller
 }
 
 <div class="row justify-content-center">
@@ -46,9 +47,10 @@
                     </div>
                 }
                 
-                <form method="post">
+                <form id="loginForm" method="post">
                     @Html.AntiForgeryToken()
                     <div asp-validation-summary="All" class="text-danger"></div>
+                    <input type="hidden" id="recaptchaToken" name="recaptchaToken" />
                     
                     @if (!string.IsNullOrEmpty(ViewData["ReturnUrl"] as string))
                     {
@@ -90,7 +92,7 @@
                     </div>
                     
                     <div class="d-grid mb-3">
-                        <button type="submit" class="btn btn-primary btn-lg">
+                        <button id="btnLogin" type="submit" class="btn btn-primary btn-lg">
                             <i class="bi bi-box-arrow-in-right me-2"></i>Sign In
                         </button>
                     </div>
@@ -177,6 +179,31 @@
 
 @section Scripts {
     <partial name="_LoginPartial" />
+    @if (!string.IsNullOrWhiteSpace(recaptchaSiteKey))
+    {
+        <script src="https://www.google.com/recaptcha/api.js?render=@recaptchaSiteKey"></script>
+        <script>
+            (function(){
+                const form = document.getElementById('loginForm');
+                if(!form || !window.grecaptcha) return;
+                form.addEventListener('submit', function(e){
+                    const existing = document.getElementById('recaptchaToken').value;
+                    if(existing) return; // already have token
+                    e.preventDefault();
+                    const btn = document.getElementById('btnLogin');
+                    if(btn){ btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Verifying...'; }
+                    grecaptcha.ready(function(){
+                        grecaptcha.execute('@recaptchaSiteKey', { action: 'login' }).then(function(token){
+                            document.getElementById('recaptchaToken').value = token;
+                            form.submit();
+                        }).catch(function(){
+                            if(btn){ btn.disabled = false; btn.innerHTML = '<i class="bi bi-box-arrow-in-right me-2"></i>Sign In'; }
+                        });
+                    });
+                });
+            })();
+        </script>
+    }
     <script>
         (function(){
             const passkeyBtn = document.getElementById('btn-passkey');
