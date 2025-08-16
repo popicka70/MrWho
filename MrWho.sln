@@ -26,8 +26,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MrWho.Shared", "MrWho.Share
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MrWhoDemo1", "MrWhoDemo1\MrWhoDemo1.csproj", "{5030B16E-2DA2-2015-64F1-510B69AE5CBD}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Migrations", "Migrations", "{C2C79C92-5C8C-4A4C-AEA6-3A1F117B2440}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
