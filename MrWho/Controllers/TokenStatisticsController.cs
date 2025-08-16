@@ -6,6 +6,8 @@ using MrWho.Shared;
 using MrWho.Shared.Models;
 using OpenIddict.Abstractions;
 using OpenIddict.EntityFrameworkCore.Models;
+using MrWho.Models;
+using MrWho.Services;
 
 namespace MrWho.Controllers;
 
@@ -16,11 +18,13 @@ public class TokenStatisticsController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
     private readonly ILogger<TokenStatisticsController> _logger;
+    private readonly ITokenStatisticsSnapshotService _snapshotService;
 
-    public TokenStatisticsController(ApplicationDbContext context, ILogger<TokenStatisticsController> logger)
+    public TokenStatisticsController(ApplicationDbContext context, ILogger<TokenStatisticsController> logger, ITokenStatisticsSnapshotService snapshotService)
     {
         _context = context;
         _logger = logger;
+        _snapshotService = snapshotService;
     }
 
     [HttpGet("overview")]
@@ -178,5 +182,35 @@ public class TokenStatisticsController : ControllerBase
         }
 
         return Ok(points);
+    }
+
+    // === Snapshot persistence endpoints ===
+
+    [HttpPost("snapshots/capture/hourly")]
+    public async Task<ActionResult<TokenStatisticsSnapshot>> CaptureHourlyAsync(CancellationToken ct)
+        => Ok(await _snapshotService.CaptureHourlyAsync(ct));
+
+    [HttpPost("snapshots/capture/daily")]
+    public async Task<ActionResult<TokenStatisticsSnapshot>> CaptureDailyAsync(CancellationToken ct)
+        => Ok(await _snapshotService.CaptureDailyAsync(ct));
+
+    [HttpPost("snapshots/cleanup")]
+    public async Task<ActionResult<int>> CleanupAsync([FromQuery] int retainDays = 90, CancellationToken ct = default)
+    {
+        retainDays = Math.Clamp(retainDays, 7, 3650);
+        var removed = await _snapshotService.CleanupAsync(TimeSpan.FromDays(retainDays), ct);
+        return Ok(removed);
+    }
+
+    [HttpGet("snapshots")]
+    public async Task<ActionResult<IEnumerable<TokenStatisticsSnapshot>>> GetSnapshotsAsync([FromQuery] string granularity = "daily", [FromQuery] int take = 60)
+    {
+        take = Math.Clamp(take, 1, 1000);
+        var items = await _context.TokenStatisticsSnapshots
+            .Where(s => s.Granularity == granularity)
+            .OrderByDescending(s => s.PeriodStartUtc)
+            .Take(take)
+            .ToListAsync();
+        return Ok(items);
     }
 }

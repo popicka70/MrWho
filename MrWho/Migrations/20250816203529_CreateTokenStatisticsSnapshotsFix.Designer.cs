@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace MrWho.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250816184438_InitialCreate_PostgreSql")]
-    partial class InitialCreate_PostgreSql
+    [Migration("20250816203529_CreateTokenStatisticsSnapshotsFix")]
+    partial class CreateTokenStatisticsSnapshotsFix
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -1227,6 +1227,57 @@ namespace MrWho.Migrations
                         .IsUnique();
 
                     b.ToTable("ScopeClaims");
+                });
+
+            modelBuilder.Entity("MrWho.Models.TokenStatisticsSnapshot", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("text");
+
+                    b.Property<long>("AccessTokensIssued")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("ActiveAccessTokensEnd")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("ActiveRefreshTokensEnd")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("AuthorizationCodesIssued")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("DeviceCodesIssued")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("ExpiredTokensEnd")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Granularity")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTimeOffset>("PeriodEndUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("PeriodStartUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long>("RefreshTokensIssued")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("RevokedTokensEnd")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Granularity", "PeriodStartUtc")
+                        .IsUnique();
+
+                    b.ToTable("TokenStatisticsSnapshots");
                 });
 
             modelBuilder.Entity("MrWho.Models.UserDevice", b =>
