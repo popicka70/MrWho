@@ -118,6 +118,11 @@ For production deployment, ensure:
 5. Use production certificates instead of development certificates
 6. Configure proper logging and monitoring
 
+## Recaptcha v3
+GoogleReCaptcha:SiteKey 6LduwqcrAAAAANR-cw0tl0Hm8zD0S4bKDLHGJznP
+GoogleReCaptcha:SecretKey 6LduwqcrAAAAAAYHMB5seC3aPX42hXQEhk9RIr_T
+
+
 ## Troubleshooting
 
 ### Common Issues
