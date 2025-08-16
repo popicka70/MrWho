@@ -96,6 +96,10 @@ public static class ServiceCollectionExtensions
         // Register QR code service (if not already registered)
         services.AddSingleton<IQrCodeService, QrCodeService>();
 
+        // Token statistics snapshot service
+        services.AddScoped<ITokenStatisticsSnapshotService, TokenStatisticsSnapshotService>();
+        services.AddHostedService<TokenStatisticsSnapshotHostedService>();
+
         return services;
     }
 
@@ -128,63 +132,6 @@ public static class ServiceCollectionExtensions
 
             // Required by OpenIddict EF stores
             options.UseOpenIddict();
-        });
-
-        return services;
-    }
-
-    /// <summary>
-    /// Configures the database for test scenarios with in-memory database
-    /// This method is specifically for test projects
-    /// </summary>
-    public static IServiceCollection AddMrWhoTestDatabase(this IServiceCollection services)
-    {
-        // Use in-memory database for tests
-        services.AddDbContext<ApplicationDbContext>(options =>
-        {
-            options.UseInMemoryDatabase("TestDatabase");
-            options.UseOpenIddict();
-        });
-
-        return services;
-    }
-
-    /// <summary>
-    /// Forces database to use EnsureCreatedAsync instead of migrations
-    /// Useful for test scenarios where you want predictable database state
-    /// </summary>
-    public static IServiceCollection ConfigureTestDatabaseBehavior(this IServiceCollection services)
-    {
-        // Register a configuration that indicates test database behavior
-        services.Configure<DatabaseInitializationOptions>(options =>
-        {
-            options.ForceUseEnsureCreated = true;
-            options.SkipMigrations = true;
-        });
-
-        return services;
-    }
-
-    public static IServiceCollection AddMrWhoIdentity(this IServiceCollection services)
-    {
-        // Configure Identity
-        services.AddIdentity<IdentityUser, IdentityRole>()
-            .AddEntityFrameworkStores<ApplicationDbContext>()
-            .AddDefaultTokenProviders();
-
-        // Configure Identity options
-        services.Configure<IdentityOptions>(options =>
-        {
-            options.Password.RequireDigit = true;
-            options.Password.RequiredLength = 6;
-            options.Password.RequireNonAlphanumeric = false;
-            options.Password.RequireUppercase = false;
-            options.Password.RequireLowercase = false;
-            
-            // Configure Claims Identity to work with OpenIddict claims
-            options.ClaimsIdentity.UserIdClaimType = OpenIddictConstants.Claims.Subject;
-            options.ClaimsIdentity.UserNameClaimType = OpenIddictConstants.Claims.Name;
-            options.ClaimsIdentity.EmailClaimType = OpenIddictConstants.Claims.Email;
         });
 
         return services;

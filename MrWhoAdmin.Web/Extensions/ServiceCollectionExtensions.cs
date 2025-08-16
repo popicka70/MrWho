@@ -191,6 +191,15 @@ public static class ServiceCollectionExtensions
         })
         .AddHttpMessageHandler<AuthenticationDelegatingHandler>();
 
+        // Add Token Statistics API service
+        services.AddHttpClient<ITokenStatisticsApiService, TokenStatisticsApiService>(client =>
+        {
+            client.BaseAddress = new Uri(mrWhoApiBaseUrl);
+            client.DefaultRequestHeaders.Add("Accept", "application/json");
+            client.Timeout = defaultTimeout;
+        })
+        .AddHttpMessageHandler<AuthenticationDelegatingHandler>();
+
         return services;
     }
 

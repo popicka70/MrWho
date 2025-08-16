@@ -1,0 +1,206 @@
+@page "/monitoring/tokens"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using MrWho.Shared.Models
+@inject ITokenStatisticsApiService TokenStats
+@inject NotificationService Notifications
+@inject ILogger<TokenStatistics> Logger
+
+<PageTitle>Token Statistics - MrWho Admin</PageTitle>
+
+<RadzenStack Gap="1rem">
+    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+            <RadzenIcon Icon="bar_chart" Style="font-size: 2rem;" />
+            <RadzenText TextStyle="TextStyle.H4" Text="Token Statistics" />
+        </RadzenStack>
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.75rem">
+            <RadzenFormField Text="Days" Variant="Variant.Outlined">
+                <RadzenNumeric @bind-Value="days" Min="1" Max="90" Style="width: 120px;" />
+            </RadzenFormField>
+            <RadzenButton Icon="refresh" Text="Refresh" ButtonStyle="ButtonStyle.Secondary" Click="@(async () => await LoadAsync())" IsBusy="@isLoading" />
+        </RadzenStack>
+    </RadzenStack>
+
+    @if (overview != null)
+    {
+        <RadzenRow Gap="1rem">
+            <RadzenColumn Size="12" SizeMD="3">
+                <RadzenCard Style="text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                    <RadzenStack Gap="0.25rem">
+                        <RadzenIcon Icon="data_thresholding" Style="font-size: 2.5rem;" />
+                        <RadzenText TextStyle="TextStyle.H3" Text="@overview.TotalTokens.ToString()" />
+                        <RadzenText TextStyle="TextStyle.Subtitle2" Text="Total Tokens" />
+                    </RadzenStack>
+                </RadzenCard>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="3">
+                <RadzenCard Style="text-align: center; background: linear-gradient(135deg, #34e89e 0%, #0f3443 100%); color: white;">
+                    <RadzenStack Gap="0.25rem">
+                        <RadzenIcon Icon="vpn_key" Style="font-size: 2.5rem;" />
+                        <RadzenText TextStyle="TextStyle.H3" Text="@overview.ActiveAccessTokens.ToString()" />
+                        <RadzenText TextStyle="TextStyle.Subtitle2" Text="Active Access Tokens" />
+                    </RadzenStack>
+                </RadzenCard>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="3">
+                <RadzenCard Style="text-align: center; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white;">
+                    <RadzenStack Gap="0.25rem">
+                        <RadzenIcon Icon="autorenew" Style="font-size: 2.5rem;" />
+                        <RadzenText TextStyle="TextStyle.H3" Text="@overview.ActiveRefreshTokens.ToString()" />
+                        <RadzenText TextStyle="TextStyle.Subtitle2" Text="Active Refresh Tokens" />
+                    </RadzenStack>
+                </RadzenCard>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="3">
+                <RadzenCard Style="text-align: center; background: linear-gradient(135deg, #ff9966 0%, #ff5e62 100%); color: white;">
+                    <RadzenStack Gap="0.25rem">
+                        <RadzenIcon Icon="error_outline" Style="font-size: 2.5rem;" />
+                        <RadzenText TextStyle="TextStyle.H3" Text="@overview.ExpiredTokens.ToString()" />
+                        <RadzenText TextStyle="TextStyle.Subtitle2" Text="Expired Tokens" />
+                    </RadzenStack>
+                </RadzenCard>
+            </RadzenColumn>
+        </RadzenRow>
+
+        <RadzenRow Gap="1rem">
+            <RadzenColumn Size="12" SizeMD="6">
+                <RadzenCard>
+                    <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">Issued per day (last @days days)</RadzenText>
+                    <RadzenChart Style="height: 320px;">
+                        <RadzenAreaSeries Data="@series" CategoryProperty="Date" Title="Access" ValueProperty="AccessTokens" />
+                        <RadzenAreaSeries Data="@series" CategoryProperty="Date" Title="Refresh" ValueProperty="RefreshTokens" />
+                        <RadzenAreaSeries Data="@series" CategoryProperty="Date" Title="Auth Codes" ValueProperty="AuthorizationCodes" />
+                        <RadzenAreaSeries Data="@series" CategoryProperty="Date" Title="Device Codes" ValueProperty="DeviceCodes" />
+                        <RadzenCategoryAxis FormatString="{0:yyyy-MM-dd}" />
+                        <RadzenValueAxis />
+                        <RadzenLegend />
+                    </RadzenChart>
+                </RadzenCard>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="6">
+                <RadzenCard>
+                    <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">Top clients by tokens</RadzenText>
+                    <RadzenDataGrid Data="@clients" TItem="TokenClientStatDto" AllowPaging="true" PageSize="10">
+                        <Columns>
+                            <RadzenDataGridColumn TItem="TokenClientStatDto" Property="ClientId" Title="Client Id" Width="220px" />
+                            <RadzenDataGridColumn TItem="TokenClientStatDto" Property="ClientName" Title="Name" />
+                            <RadzenDataGridColumn TItem="TokenClientStatDto" Property="AccessTokens" Title="Access" Width="100px" />
+                            <RadzenDataGridColumn TItem="TokenClientStatDto" Property="RefreshTokens" Title="Refresh" Width="100px" />
+                            <RadzenDataGridColumn TItem="TokenClientStatDto" Property="ActiveAccessTokens" Title="Active Access" Width="130px" />
+                            <RadzenDataGridColumn TItem="TokenClientStatDto" Property="ActiveRefreshTokens" Title="Active Refresh" Width="135px" />
+                            <RadzenDataGridColumn TItem="TokenClientStatDto" Property="RevokedTokens" Title="Revoked" Width="100px" />
+                        </Columns>
+                    </RadzenDataGrid>
+                </RadzenCard>
+            </RadzenColumn>
+        </RadzenRow>
+
+        <RadzenRow Gap="1rem">
+            <RadzenColumn Size="12">
+                <RadzenCard>
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween" class="rz-mb-2">
+                        <RadzenText TextStyle="TextStyle.H6">Persisted daily snapshots</RadzenText>
+                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.75rem">
+                            <RadzenButton Icon="history" Text="Capture Hourly Now" ButtonStyle="ButtonStyle.Light" Click="@(async () => await CaptureHourlyNow())" />
+                            <RadzenButton Icon="event_available" Text="Capture Daily Now" ButtonStyle="ButtonStyle.Light" Click="@(async () => await CaptureDailyNow())" />
+                            <RadzenFormField Text="Keep Days" Variant="Variant.Outlined">
+                                <RadzenNumeric @bind-Value="retainDays" Min="7" Max="3650" Style="width: 120px;" />
+                            </RadzenFormField>
+                            <RadzenButton Icon="delete" Text="Cleanup" ButtonStyle="ButtonStyle.Danger" Click="@(async () => await CleanupSnapshots())" />
+                        </RadzenStack>
+                    </RadzenStack>
+
+                    <RadzenChart Style="height: 320px;">
+                        <RadzenLineSeries Data="@daily" CategoryProperty="PeriodStart" Title="Access Issued" ValueProperty="AccessTokensIssued" />
+                        <RadzenLineSeries Data="@daily" CategoryProperty="PeriodStart" Title="Refresh Issued" ValueProperty="RefreshTokensIssued" />
+                        <RadzenLineSeries Data="@daily" CategoryProperty="PeriodStart" Title="Active Access (End)" ValueProperty="ActiveAccessTokensEnd" />
+                        <RadzenLineSeries Data="@daily" CategoryProperty="PeriodStart" Title="Active Refresh (End)" ValueProperty="ActiveRefreshTokensEnd" />
+                        <RadzenCategoryAxis FormatString="{0:yyyy-MM-dd}" />
+                        <RadzenValueAxis />
+                        <RadzenLegend />
+                    </RadzenChart>
+                </RadzenCard>
+            </RadzenColumn>
+        </RadzenRow>
+    }
+    else if (!isLoading)
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Info">No statistics available.</RadzenAlert>
+    }
+</RadzenStack>
+
+@code {
+    private TokenStatisticsOverviewDto? overview;
+    private List<TokenClientStatDto> clients = new();
+    private List<TokenTimeSeriesPointDto> series = new();
+    private List<TokenStatisticsSnapshotDto> daily = new();
+    private bool isLoading;
+    private int days = 14;
+    private int retainDays = 180;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            isLoading = true;
+            var o = await TokenStats.GetOverviewAsync();
+            var c = await TokenStats.GetTopClientsAsync(20);
+            var s = await TokenStats.GetTimeSeriesAsync(days);
+            var d = await TokenStats.GetSnapshotsAsync("daily", 180);
+            // Order ascending for charts
+            daily = d.OrderBy(x => x.PeriodStartUtc).ToList();
+            overview = o;
+            clients = c;
+            series = s;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load token statistics");
+            Notifications.Notify(new NotificationMessage { Severity = NotificationSeverity.Error, Summary = "Error", Detail = "Failed to load token statistics" });
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task CaptureHourlyNow()
+    {
+        if (await TokenStats.CaptureHourlyAsync())
+        {
+            Notifications.Notify(new NotificationMessage { Severity = NotificationSeverity.Success, Summary = "Captured", Detail = "Hourly snapshot captured" });
+            await LoadAsync();
+        }
+        else
+        {
+            Notifications.Notify(new NotificationMessage { Severity = NotificationSeverity.Warning, Summary = "Failed", Detail = "Hourly capture failed" });
+        }
+    }
+
+    private async Task CaptureDailyNow()
+    {
+        if (await TokenStats.CaptureDailyAsync())
+        {
+            Notifications.Notify(new NotificationMessage { Severity = NotificationSeverity.Success, Summary = "Captured", Detail = "Daily snapshot captured" });
+            await LoadAsync();
+        }
+        else
+        {
+            Notifications.Notify(new NotificationMessage { Severity = NotificationSeverity.Warning, Summary = "Failed", Detail = "Daily capture failed" });
+        }
+    }
+
+    private async Task CleanupSnapshots()
+    {
+        var removed = await TokenStats.CleanupAsync(retainDays);
+        Notifications.Notify(new NotificationMessage { Severity = NotificationSeverity.Info, Summary = "Cleanup", Detail = $"Removed {removed} old snapshots" });
+        await LoadAsync();
+    }
+}

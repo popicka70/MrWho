@@ -56,6 +56,9 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
     // WebAuthn credentials
     public DbSet<WebAuthnCredential> WebAuthnCredentials { get; set; }
 
+    // Statistics snapshots
+    public DbSet<TokenStatisticsSnapshot> TokenStatisticsSnapshots { get; set; }
+
     // Data Protection keys for antiforgery/auth cookie encryption persistence
     public DbSet<Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.DataProtectionKey> DataProtectionKeys { get; set; }
 
@@ -339,6 +342,13 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
                   .WithMany()
                   .HasForeignKey(c => c.UserId)
                   .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Configure TokenStatisticsSnapshot entity
+        builder.Entity<TokenStatisticsSnapshot>(entity =>
+        {
+            entity.HasKey(s => s.Id);
+            entity.HasIndex(s => new { s.Granularity, s.PeriodStartUtc }).IsUnique();
         });
 
         // Configure DataProtectionKey entity
