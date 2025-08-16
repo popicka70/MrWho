@@ -12,7 +12,7 @@ using static OpenIddict.Abstractions.OpenIddictConstants;
 using MrWho.Shared.Models;
 using MrWho.Data;
 using MrWho.Models;
-using Microsoft.AspNetCore.RateLimiting; // added
+using Microsoft.AspNetCore.RateLimiting;
 using System.Net.Http;
 using System.Text.Json;
 
