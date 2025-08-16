@@ -246,6 +246,75 @@ This is the code block that represents the suggested code change:
 2. Test manually: Browse to `{authority}/.well-known/openid-configuration`
 3. Verify JSON response contains all required OIDC endpoints
 
+## EF Core multi-provider migrations — authoritative checklist
+
+Always create, validate, and commit provider-specific migrations for ALL supported providers whenever the domain model changes. Supported providers:
+- SQL Server (project: MrWho.Migrations.SqlServer)
+- PostgreSQL (project: MrWho.Migrations.PostgreSql)
+- MySQL/MariaDB (project: MrWho.Migrations.MySql)
+
+### 1) Generate migrations for each provider (from solution root)
+Use the design-time factories already present in each migrations project. Run these commands (PowerShell) and replace `Name` with a descriptive change name:
+
+- SQL Server:
+  `dotnet ef migrations add Name_SqlServer -s "MrWho\MrWho.csproj" -p "MrWho.Migrations.SqlServer\MrWho.Migrations.SqlServer.csproj"; echo ""`
+
+- PostgreSQL:
+  `dotnet ef migrations add Name_PostgreSql -s "MrWho\MrWho.csproj" -p "MrWho.Migrations.PostgreSql\MrWho.Migrations.PostgreSql.csproj"; echo ""`
+
+- MySQL/MariaDB:
+  `dotnet ef migrations add Name_MySql -s "MrWho\MrWho.csproj" -p "MrWho.Migrations.MySql\MrWho.Migrations.MySql.csproj"; echo ""`
+
+Notes:
+- Run all three commands for every model change.
+- Use the same base `Name` across providers to keep history aligned.
+
+### 2) Ensure discoverability at runtime
+- Each migration class should include:
+  - `[DbContext(typeof(ApplicationDbContext))]`
+  - `[Migration("<timestamp>_<Name>_Provider")]`
+- If EF didn’t add attributes, add them manually.
+- The MrWho.csproj already copies provider migrations DLLs next to the app on build/publish. Keep those targets intact.
+- `AddMrWhoDatabase()` proactively loads the configured migrations assembly — do not remove this logic.
+
+### 3) Provider-specific schema adjustments (must-verify)
+- Strings/large text:
+  - SQL Server: prefer explicit `HasMaxLength(...)` to avoid implicit `nvarchar(max)` when you want bounded columns.
+  - PostgreSQL: if the model has `HasMaxLength(X)`, migrations must use `character varying(X)` (not `text`). Example: AuditLog.Changes -> `character varying(8000)`.
+  - MySQL/MariaDB: large, variable-length strings should use `longtext` to avoid row size issues.
+- Composite index key length (MySQL/MariaDB): add `.Annotation("MySql:IndexPrefixLength", new[] { ... })` for composite string indexes (e.g., `{ 256, 512, 0 }`).
+- Date/time:
+  - SQL Server: `datetime2`
+  - PostgreSQL: `timestamp with time zone` where appropriate
+  - MySQL/MariaDB: `datetime(6)`
+- DataProtectionKeys table: ensure it’s included and matches the model (Id int identity, FriendlyName length 256, Xml text/longtext as needed per provider).
+- OpenIddict entities: keep indexes and max lengths consistent with what OpenIddict EF stores expect.
+
+### 4) Keep model and migrations in sync (no pending changes)
+- If the model uses `HasMaxLength(...)`, reflect that in provider migrations (don’t fall back to `text`/`nvarchar(max)` unless intended).
+- Verify the provider-specific `ApplicationDbContextModelSnapshot.cs` is updated alongside new migrations.
+- Build the solution after generating all three provider migrations.
+- Run the app with each provider setting (Database:Provider = SqlServer/PostgreSql/MySql) to ensure `MigrateAsync()` applies cleanly and no `PendingModelChangesWarning` appears.
+- If EF logs pending changes, fix the mismatched provider migration immediately.
+
+### 5) Local/dev/test specifics
+- Tests use `EnsureCreatedAsync()` and may mask migration gaps. Always validate migrations by running the app against each real provider.
+- In Docker, set `DOTNET_RUNNING_IN_CONTAINER=false` for app services that must use migrations (not EnsureCreated fallback).
+- When a migration fails mid-way, bring the stack down with volumes (`down -v`) before retrying to avoid partial schema conflicts.
+
+### 6) Production safety
+- Do not rely on EnsureCreated in production. Always ship provider migrations with the app and let `Database.MigrateAsync()` run on startup.
+- For MySQL/MariaDB, prefer `longtext` for very large strings and set index prefix lengths on composite indexes to prevent key length errors.
+
+### 7) Naming & review checklist per change
+- [ ] Created 3 migrations: SqlServer, PostgreSql, MySql with the same base name
+- [ ] Attributes present: `[DbContext(...)]` and `[Migration("<timestamp>_Name_Provider")]`
+- [ ] Index annotations for MySQL where composite string indexes exist
+- [ ] Column types/lengths match model (`HasMaxLength`, `IsRequired`, etc.) for each provider
+- [ ] Model snapshots updated for each provider project
+- [ ] Built the solution and verified no pending changes warnings at runtime for each provider
+- [ ] Committed all migration files
+
 ## Lessons learned: EF Core migrations across providers and Docker
 
 - Keep provider migrations in sync:
@@ -253,13 +322,20 @@ This is the code block that represents the suggested code change:
     - Do not rely on EnsureCreated for dev/prod; only for tests. Containers must run migrations.
 
 - Make migrations discoverable at runtime:
-    - In each provider-specific migration file, include attributes so EF picks them up: `[DbContext(typeof(ApplicationDbContext))]` and `[Migration("<timestamp>_<Name>")]` on the migration class.
+    - In each provider-specific migration file, include attributes so EF picks them up: `[DbContext(typeof(ApplicationDbContext))]` and `[Migration("<timestamp>_<Name>")]` on the migration class. Prefer suffixing `<Name>` with the provider (e.g., `_SqlServer`, `_PostgreSql`, `_MySql`).
     - Ensure the app copies provider migrations assemblies into the published image and preload them before `Database.MigrateAsync()`.
 
 - MySQL/MariaDB specifics:
     - Long composite indexes may exceed key length; use `MySql:IndexPrefixLength` annotations on affected indexes.
     - Large string columns can cause "Row size too large"; switch big varchars to `longtext` in MySQL/MariaDB migrations.
     - MariaDB healthcheck: prefer `CMD-SHELL` and `mariadb-admin ping -h 127.0.0.1 -uroot -p$MARIADB_ROOT_PASSWORD`.
+
+- PostgreSQL specifics:
+    - Respect `HasMaxLength(X)` with `character varying(X)` instead of `text` when the model specifies lengths (avoids pending changes).
+    - Use `timestamp with time zone` where the model expects UTC timestamps and provider default aligns with that mapping.
+
+- SQL Server specifics:
+    - Prefer explicit `nvarchar(X)` for bounded columns when the model uses `HasMaxLength(X)`; avoid unintended `nvarchar(max)`.
 
 - Container test detection pitfalls:
     - Env var `DOTNET_RUNNING_IN_CONTAINER` can trigger test heuristics; set `DOTNET_RUNNING_IN_CONTAINER=false` in compose for app services that must use migrations.
