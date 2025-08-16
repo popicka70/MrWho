@@ -164,11 +164,12 @@ public class TokenStatisticsController : ControllerBase
         for (var i = 0; i < days; i++)
         {
             var d = DateOnly.FromDateTime(start.AddDays(i).Date);
+            var dUtc = new DateTime(d.Year, d.Month, d.Day, 0, 0, 0, DateTimeKind.Utc);
             if (byDay.TryGetValue(d, out var agg))
             {
                 points.Add(new TokenTimeSeriesPointDto
                 {
-                    Date = d,
+                    Date = dUtc,
                     AccessTokens = agg.Access,
                     RefreshTokens = agg.Refresh,
                     AuthorizationCodes = agg.Auth,
@@ -177,7 +178,7 @@ public class TokenStatisticsController : ControllerBase
             }
             else
             {
-                points.Add(new TokenTimeSeriesPointDto { Date = d });
+                points.Add(new TokenTimeSeriesPointDto { Date = dUtc });
             }
         }
 

@@ -112,10 +112,10 @@
                     </RadzenStack>
 
                     <RadzenChart Style="height: 320px;">
-                        <RadzenLineSeries Data="@daily" CategoryProperty="PeriodStartUtc" Title="Access Issued" ValueProperty="AccessTokensIssued" />
-                        <RadzenLineSeries Data="@daily" CategoryProperty="PeriodStartUtc" Title="Refresh Issued" ValueProperty="RefreshTokensIssued" />
-                        <RadzenLineSeries Data="@daily" CategoryProperty="PeriodStartUtc" Title="Active Access (End)" ValueProperty="ActiveAccessTokensEnd" />
-                        <RadzenLineSeries Data="@daily" CategoryProperty="PeriodStartUtc" Title="Active Refresh (End)" ValueProperty="ActiveRefreshTokensEnd" />
+                        <RadzenLineSeries Data="@daily" CategoryProperty="PeriodStart" Title="Access Issued" ValueProperty="AccessTokensIssued" />
+                        <RadzenLineSeries Data="@daily" CategoryProperty="PeriodStart" Title="Refresh Issued" ValueProperty="RefreshTokensIssued" />
+                        <RadzenLineSeries Data="@daily" CategoryProperty="PeriodStart" Title="Active Access (End)" ValueProperty="ActiveAccessTokensEnd" />
+                        <RadzenLineSeries Data="@daily" CategoryProperty="PeriodStart" Title="Active Refresh (End)" ValueProperty="ActiveRefreshTokensEnd" />
                         <RadzenCategoryAxis FormatString="{0:yyyy-MM-dd}" />
                         <RadzenValueAxis />
                         <RadzenLegend />

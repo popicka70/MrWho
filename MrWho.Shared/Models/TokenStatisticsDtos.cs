@@ -37,7 +37,8 @@ public class TokenClientStatDto
 
 public class TokenTimeSeriesPointDto
 {
-    public DateOnly Date { get; set; }
+    // Use DateTime for UI charts; API can still serialize DateOnly via custom mapping if needed
+    public DateTime Date { get; set; }
     public long AccessTokens { get; set; }
     public long RefreshTokens { get; set; }
     public long AuthorizationCodes { get; set; }

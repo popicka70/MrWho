@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace MrWho.Shared.Models;
 
 public class TokenStatisticsSnapshotDto
@@ -18,4 +20,11 @@ public class TokenStatisticsSnapshotDto
     public long RevokedTokensEnd { get; set; }
 
     public DateTimeOffset CreatedAtUtc { get; set; }
+
+    // Helper properties for UI binding (not serialized)
+    [JsonIgnore]
+    public DateTime PeriodStart => PeriodStartUtc.UtcDateTime;
+
+    [JsonIgnore]
+    public DateTime PeriodEnd => PeriodEndUtc.UtcDateTime;
 }
