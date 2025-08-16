@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace MrWho.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250816203529_CreateTokenStatisticsSnapshotsFix")]
-    partial class CreateTokenStatisticsSnapshotsFix
+    [Migration("20250816210853_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
