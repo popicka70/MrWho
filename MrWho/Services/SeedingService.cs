@@ -44,7 +44,8 @@ public class SeedingService : ISeedingService
 
     public async Task SeedAsync()
     {
-        await _context.Database.EnsureCreatedAsync();
+        // Schema managed via EF Core migrations on application startup.
+        // No EnsureCreated calls here.
         
         // Seed default realm
         await SeedDefaultRealm();
@@ -84,7 +85,6 @@ public class SeedingService : ISeedingService
             };
             _context.Realms.Add(defaultRealm);
             await _context.SaveChangesAsync();
-            _logger.LogInformation("Created default realm");
         }
     }
 

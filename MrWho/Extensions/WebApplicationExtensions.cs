@@ -63,7 +63,7 @@ public static class WebApplicationExtensions
         app.UseAuthentication();
         app.UseAuthorization();
 
-        // Initialize database and seed essential data
+        // Initialize database and apply EF Core migrations
         await app.InitializeDatabaseAsync();
 
         // Configure routing for controllers
@@ -119,7 +119,7 @@ public static class WebApplicationExtensions
         app.UseAuthentication();
         app.UseAuthorization();
 
-        // Initialize database and seed essential data
+        // Initialize database and apply EF Core migrations
         await app.InitializeDatabaseAsync();
 
         // Configure routing for controllers
@@ -499,159 +499,20 @@ public static class WebApplicationExtensions
         var oidcClientService = scope.ServiceProvider.GetRequiredService<IOidcClientService>();
         var scopeSeederService = scope.ServiceProvider.GetRequiredService<IScopeSeederService>();
         var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-        
-        // Check for explicit database configuration options
-        var dbOptions = scope.ServiceProvider.GetService<IOptions<DatabaseInitializationOptions>>()?.Value ?? new DatabaseInitializationOptions();
-        
-        // Detect if we're running in a test environment
-        bool isTestEnvironment = IsTestEnvironment();
-        
-        // Determine database initialization strategy
-        bool shouldUseEnsureCreated = isTestEnvironment || dbOptions.ForceUseEnsureCreated;
-        bool shouldSkipMigrations = dbOptions.SkipMigrations;
-        bool shouldRecreateDatabase = dbOptions.RecreateDatabase;
 
-        if (shouldUseEnsureCreated)
+        // Always use EF Core migrations when running the application
+        try
         {
-            // For tests or when explicitly configured: Use EnsureCreated for fast setup
-            logger.LogInformation("Using EnsureCreated strategy for database setup (TestEnv: {IsTest}, Forced: {Forced})", 
-                isTestEnvironment, dbOptions.ForceUseEnsureCreated);
-            
-            if (shouldRecreateDatabase)
-            {
-                logger.LogInformation("Recreating database for clean test state");
-                await context.Database.EnsureDeletedAsync();
-            }
-            
-            await context.Database.EnsureCreatedAsync();
-            Console.WriteLine("Database created using EnsureCreated strategy");
+            logger.LogInformation("Applying EF Core migrations (Environment: {Environment})", app.Environment.EnvironmentName);
+            await context.Database.MigrateAsync();
+            Console.WriteLine("Database schema is up to date");
         }
-        else
+        catch (Exception ex)
         {
-            // For development and production: Use migrations with error handling
-            logger.LogInformation("Using migrations for database setup (Environment: {Environment})", app.Environment.EnvironmentName);
-            
-            if (!shouldSkipMigrations)
-            {
-                try
-                {
-                    // Check migrations state
-                    var pendingMigrations = await context.Database.GetPendingMigrationsAsync();
-                    var appliedMigrations = await context.Database.GetAppliedMigrationsAsync();
-
-                    if (pendingMigrations.Any())
-                    {
-                        logger.LogInformation("Applying {Count} pending migrations: {Migrations}", 
-                            pendingMigrations.Count(), string.Join(", ", pendingMigrations));
-                        
-                        // Apply migrations with retry logic for constraint conflicts
-                        await ApplyMigrationsWithRetryAsync(context, logger);
-                        
-                        Console.WriteLine($"Applied {pendingMigrations.Count()} pending migrations");
-                    }
-                    else if (!appliedMigrations.Any())
-                    {
-                        // No migrations discovered and none applied => likely empty DB or missing migrations assembly
-                        logger.LogWarning("No migrations discovered or applied. Falling back to EnsureCreated for one-time bootstrap.");
-                        await context.Database.EnsureCreatedAsync();
-                        Console.WriteLine("Database created using EnsureCreated fallback (no migrations discovered)");
-                    }
-                    else
-                    {
-                        logger.LogInformation("Database is up to date");
-                        Console.WriteLine("Database is up to date - no migrations needed");
-                    }
-                }
-                catch (Exception ex) when (ex.Message.Contains("multiple cascade paths") || ex.Message.Contains("cycles"))
-                {
-                    // Handle SQL Server cascade constraint issues gracefully
-                    logger.LogWarning("Migration failed due to cascade constraints. Attempting to recreate database with EnsureCreated: {Error}", ex.Message);
-                    
-                    try
-                    {
-                        // Fall back to EnsureCreated for initial setup
-                        await context.Database.EnsureDeletedAsync();
-                        await context.Database.EnsureCreatedAsync();
-                        Console.WriteLine("Database recreated using EnsureCreated due to migration constraints");
-                        
-                        // Log this as a known issue
-                        logger.LogInformation("?? Device Management tables created successfully with EnsureCreated fallback");
-                    }
-                    catch (Exception fallbackEx)
-                    {
-                        logger.LogError(fallbackEx, "Failed to create database even with EnsureCreated fallback");
-                        throw;
-                    }
-                }
-                catch (InvalidOperationException ex) when (ex.Message.Contains("PendingModelChangesWarning", StringComparison.OrdinalIgnoreCase))
-                {
-                    // EF Core detected model changes not covered by migrations.
-                    logger.LogWarning("EF Core detected pending model changes without corresponding migrations. {Message}", ex.Message);
-
-                    if (app.Environment.IsDevelopment())
-                    {
-                        logger.LogWarning("Development environment detected. Falling back to EnsureDeleted + EnsureCreated to unblock startup. Generate proper migrations ASAP.");
-                        try
-                        {
-                            await context.Database.EnsureDeletedAsync();
-                            await context.Database.EnsureCreatedAsync();
-                            Console.WriteLine("Database recreated using EnsureCreated due to pending model changes (DEV only fallback)");
-                        }
-                        catch (Exception fallbackEx)
-                        {
-                            logger.LogError(fallbackEx, "Failed EnsureCreated fallback after PendingModelChangesWarning");
-                            throw;
-                        }
-                    }
-                    else
-                    {
-                        logger.LogError("Pending model changes detected in non-development environment. The application requires migrations to be created and applied.");
-                        throw; // Re-throw for production/staging to force proper migrations
-                    }
-                }
-                catch (Exception ex) when (ex.Message.Contains("No migrations were found", StringComparison.OrdinalIgnoreCase))
-                {
-                    // Migrations assembly discovered but has no migrations, or assembly not loaded
-                    logger.LogWarning("No migrations found in the configured assembly. Using EnsureCreated as a safety fallback.");
-                    await context.Database.EnsureCreatedAsync();
-                }
-                catch (Exception ex) when (ex.Message.Contains("Row size too large", StringComparison.OrdinalIgnoreCase))
-                {
-                    // MySQL/MariaDB row size exceeded due to large varchar columns.
-                    logger.LogWarning("MySQL/MariaDB reported row size too large during migration. Attempting EnsureDeleted + EnsureCreated fallback in development. Error: {Error}", ex.Message);
-
-                    if (app.Environment.IsDevelopment())
-                    {
-                        try
-                        {
-                            await context.Database.EnsureDeletedAsync();
-                            await context.Database.EnsureCreatedAsync();
-                            Console.WriteLine("Database recreated using EnsureCreated due to MySQL row size issue (DEV only fallback)");
-                        }
-                        catch (Exception fallbackEx)
-                        {
-                            logger.LogError(fallbackEx, "Failed EnsureCreated fallback after MySQL row size error");
-                            throw;
-                        }
-                    }
-                    else
-                    {
-                        logger.LogError("Row size too large in non-development environment. Review MySQL schema (use longtext for large string columns) and re-run migrations.");
-                        throw;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    logger.LogError(ex, "Error applying database migrations");
-                    throw;
-                }
-            }
-            else
-            {
-                logger.LogInformation("Skipping migrations as requested by configuration");
-            }
+            logger.LogError(ex, "Error applying EF Core migrations");
+            throw;
         }
-        
+
         // Initialize standard scopes first
         try
         {
@@ -675,7 +536,7 @@ public static class WebApplicationExtensions
             Console.WriteLine($"Error initializing standard identity resources: {ex.Message}");
             throw;
         }
-        
+
         // CRITICAL: Synchronize all scopes from database with OpenIddict
         try
         {
@@ -688,7 +549,7 @@ public static class WebApplicationExtensions
             Console.WriteLine($"Error synchronizing scopes with OpenIddict: {ex.Message}");
             throw;
         }
-        
+
         // Initialize essential data (admin realm, admin client, admin user)
         try
         {
@@ -834,39 +695,6 @@ public static class WebApplicationExtensions
         {
             Console.WriteLine($"Error initializing dynamic OIDC client configuration: {ex.Message}");
             throw;
-        }
-    }
-
-    /// <summary>
-    /// Applies migrations with retry logic for SQL Server constraint issues
-    /// </summary>
-    private static async Task ApplyMigrationsWithRetryAsync(ApplicationDbContext context, ILogger logger)
-    {
-        const int maxRetries = 3;
-        int retryCount = 0;
-
-        while (retryCount < maxRetries)
-        {
-            try
-            {
-                await context.Database.MigrateAsync();
-                return; // Success
-            }
-            catch (Exception ex) when (ex.Message.Contains("multiple cascade paths") || ex.Message.Contains("cycles"))
-            {
-                retryCount++;
-                logger.LogWarning("Migration attempt {Retry} failed due to cascade constraints: {Error}", retryCount, ex.Message);
-
-                if (retryCount >= maxRetries)
-                {
-                    // Final attempt: try to clean up and recreate
-                    logger.LogWarning("All migration attempts failed. This is expected for the new device management tables due to SQL Server cascade constraints.");
-                    throw; // Re-throw to be caught by the outer handler
-                }
-
-                // Wait before retrying
-                await Task.Delay(1000);
-            }
         }
     }
 
