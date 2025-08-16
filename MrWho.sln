@@ -28,8 +28,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MrWhoDemo1", "MrWhoDemo1\Mr
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Migrations", "Migrations", "{C2C79C92-5C8C-4A4C-AEA6-3A1F117B2440}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MrWho.Migrations.PostgreSql", "MrWho.Migrations.PostgreSql\MrWho.Migrations.PostgreSql.csproj", "{F9D9952E-49E0-4E0E-9C0F-4D7F3188E96E}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -64,16 +62,9 @@ Global
 		{5030B16E-2DA2-2015-64F1-510B69AE5CBD}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5030B16E-2DA2-2015-64F1-510B69AE5CBD}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5030B16E-2DA2-2015-64F1-510B69AE5CBD}.Release|Any CPU.Build.0 = Release|Any CPU
-		{F9D9952E-49E0-4E0E-9C0F-4D7F3188E96E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{F9D9952E-49E0-4E0E-9C0F-4D7F3188E96E}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{F9D9952E-49E0-4E0E-9C0F-4D7F3188E96E}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{F9D9952E-49E0-4E0E-9C0F-4D7F3188E96E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
-	EndGlobalSection
-	GlobalSection(NestedProjects) = preSolution
-		{F9D9952E-49E0-4E0E-9C0F-4D7F3188E96E} = {C2C79C92-5C8C-4A4C-AEA6-3A1F117B2440}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {BF4EA67D-7DF2-433B-A438-DA0AEDC253C3}
