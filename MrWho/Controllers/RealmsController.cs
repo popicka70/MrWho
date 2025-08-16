@@ -781,4 +781,102 @@ public class RealmsController : ControllerBase
 
         return Ok(dto);
     }
+
+    /// <summary>
+    /// Update default configuration and branding for a realm
+    /// </summary>
+    [HttpPut("{id}/defaults")]
+    public async Task<ActionResult<RealmDto>> UpdateDefaults(string id, [FromBody] UpdateRealmDefaultsRequest request)
+    {
+        var realm = await _context.Realms.FirstOrDefaultAsync(r => r.Id == id);
+        if (realm == null)
+        {
+            return NotFound();
+        }
+
+        // Map all defaults and branding fields
+        realm.DefaultSessionTimeoutHours = request.DefaultSessionTimeoutHours;
+        realm.DefaultRememberMeDurationDays = request.DefaultRememberMeDurationDays;
+        realm.DefaultUseSlidingSessionExpiration = request.DefaultUseSlidingSessionExpiration;
+        realm.DefaultCookieSameSitePolicy = request.DefaultCookieSameSitePolicy;
+        realm.DefaultRequireHttpsForCookies = request.DefaultRequireHttpsForCookies;
+
+        realm.DefaultRequireConsent = request.DefaultRequireConsent;
+        realm.DefaultAllowRememberConsent = request.DefaultAllowRememberConsent;
+        realm.DefaultMaxRefreshTokensPerUser = request.DefaultMaxRefreshTokensPerUser;
+        realm.DefaultUseOneTimeRefreshTokens = request.DefaultUseOneTimeRefreshTokens;
+        realm.DefaultIncludeJwtId = request.DefaultIncludeJwtId;
+
+        realm.DefaultRequireMfa = request.DefaultRequireMfa;
+        realm.DefaultMfaGracePeriodMinutes = request.DefaultMfaGracePeriodMinutes;
+        realm.DefaultAllowedMfaMethods = request.DefaultAllowedMfaMethods;
+        realm.DefaultRememberMfaForSession = request.DefaultRememberMfaForSession;
+
+        realm.DefaultRateLimitRequestsPerMinute = request.DefaultRateLimitRequestsPerMinute;
+        realm.DefaultRateLimitRequestsPerHour = request.DefaultRateLimitRequestsPerHour;
+        realm.DefaultRateLimitRequestsPerDay = request.DefaultRateLimitRequestsPerDay;
+
+        realm.DefaultEnableDetailedErrors = request.DefaultEnableDetailedErrors;
+        realm.DefaultLogSensitiveData = request.DefaultLogSensitiveData;
+
+        realm.DefaultThemeName = request.DefaultThemeName;
+        realm.RealmCustomCssUrl = request.RealmCustomCssUrl;
+        realm.RealmLogoUri = request.RealmLogoUri;
+        realm.RealmUri = request.RealmUri;
+        realm.RealmPolicyUri = request.RealmPolicyUri;
+        realm.RealmTosUri = request.RealmTosUri;
+
+        realm.UpdatedAt = DateTime.UtcNow;
+        realm.UpdatedBy = User?.Identity?.Name;
+
+        await _context.SaveChangesAsync();
+
+        var dto = new RealmDto
+        {
+            Id = realm.Id,
+            Name = realm.Name,
+            Description = realm.Description,
+            DisplayName = realm.DisplayName,
+            IsEnabled = realm.IsEnabled,
+            AccessTokenLifetime = realm.AccessTokenLifetime,
+            RefreshTokenLifetime = realm.RefreshTokenLifetime,
+            AuthorizationCodeLifetime = realm.AuthorizationCodeLifetime,
+            IdTokenLifetime = realm.IdTokenLifetime,
+            DeviceCodeLifetime = realm.DeviceCodeLifetime,
+            CreatedAt = realm.CreatedAt,
+            UpdatedAt = realm.UpdatedAt,
+            CreatedBy = realm.CreatedBy,
+            UpdatedBy = realm.UpdatedBy,
+            ClientCount = await _context.Clients.CountAsync(c => c.RealmId == realm.Id),
+            
+            // defaults
+            DefaultSessionTimeoutHours = realm.DefaultSessionTimeoutHours,
+            DefaultRememberMeDurationDays = realm.DefaultRememberMeDurationDays,
+            DefaultUseSlidingSessionExpiration = realm.DefaultUseSlidingSessionExpiration,
+            DefaultCookieSameSitePolicy = realm.DefaultCookieSameSitePolicy,
+            DefaultRequireHttpsForCookies = realm.DefaultRequireHttpsForCookies,
+            DefaultRequireConsent = realm.DefaultRequireConsent,
+            DefaultAllowRememberConsent = realm.DefaultAllowRememberConsent,
+            DefaultMaxRefreshTokensPerUser = realm.DefaultMaxRefreshTokensPerUser,
+            DefaultUseOneTimeRefreshTokens = realm.DefaultUseOneTimeRefreshTokens,
+            DefaultIncludeJwtId = realm.DefaultIncludeJwtId,
+            DefaultRequireMfa = realm.DefaultRequireMfa,
+            DefaultMfaGracePeriodMinutes = realm.DefaultMfaGracePeriodMinutes,
+            DefaultAllowedMfaMethods = realm.DefaultAllowedMfaMethods,
+            DefaultRememberMfaForSession = realm.DefaultRememberMfaForSession,
+            DefaultRateLimitRequestsPerMinute = realm.DefaultRateLimitRequestsPerMinute,
+            DefaultRateLimitRequestsPerHour = realm.DefaultRateLimitRequestsPerHour,
+            DefaultRateLimitRequestsPerDay = realm.DefaultRateLimitRequestsPerDay,
+            DefaultEnableDetailedErrors = realm.DefaultEnableDetailedErrors,
+            DefaultLogSensitiveData = realm.DefaultLogSensitiveData,
+            DefaultThemeName = realm.DefaultThemeName,
+            RealmCustomCssUrl = realm.RealmCustomCssUrl,
+            RealmLogoUri = realm.RealmLogoUri,
+            RealmUri = realm.RealmUri,
+            RealmPolicyUri = realm.RealmPolicyUri,
+            RealmTosUri = realm.RealmTosUri
+        };
+
+        return Ok(dto);
+    }
 }
