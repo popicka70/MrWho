@@ -832,6 +832,67 @@ public class ClientsController : ControllerBase
                 client.AccessTokenLifetime = request.AccessTokenLifetime;
                 client.RefreshTokenLifetime = request.RefreshTokenLifetime;
                 client.AuthorizationCodeLifetime = request.AuthorizationCodeLifetime;
+
+                // === Apply dynamic configuration (allow setting to null to reset to defaults) ===
+                client.SessionTimeoutHours = request.SessionTimeoutHours;
+                client.UseSlidingSessionExpiration = request.UseSlidingSessionExpiration;
+                client.RememberMeDurationDays = request.RememberMeDurationDays;
+                client.RequireHttpsForCookies = request.RequireHttpsForCookies;
+                client.CookieSameSitePolicy = request.CookieSameSitePolicy;
+
+                client.IdTokenLifetimeMinutes = request.IdTokenLifetimeMinutes;
+                client.DeviceCodeLifetimeMinutes = request.DeviceCodeLifetimeMinutes;
+                client.AccessTokenType = request.AccessTokenType;
+                client.UseOneTimeRefreshTokens = request.UseOneTimeRefreshTokens;
+                client.MaxRefreshTokensPerUser = request.MaxRefreshTokensPerUser;
+                client.HashAccessTokens = request.HashAccessTokens;
+                client.UpdateAccessTokenClaimsOnRefresh = request.UpdateAccessTokenClaimsOnRefresh;
+
+                client.RequireConsent = request.RequireConsent;
+                client.AllowRememberConsent = request.AllowRememberConsent;
+                client.AllowAccessToUserInfoEndpoint = request.AllowAccessToUserInfoEndpoint;
+                client.AllowAccessToIntrospectionEndpoint = request.AllowAccessToIntrospectionEndpoint;
+                client.AllowAccessToRevocationEndpoint = request.AllowAccessToRevocationEndpoint;
+                client.IncludeJwtId = request.IncludeJwtId;
+                client.AlwaysSendClientClaims = request.AlwaysSendClientClaims;
+                client.AlwaysIncludeUserClaimsInIdToken = request.AlwaysIncludeUserClaimsInIdToken;
+                client.ClientClaimsPrefix = request.ClientClaimsPrefix;
+
+                client.RequireMfa = request.RequireMfa;
+                client.MfaGracePeriodMinutes = request.MfaGracePeriodMinutes;
+                client.AllowedMfaMethods = request.AllowedMfaMethods;
+                client.RememberMfaForSession = request.RememberMfaForSession;
+
+                client.RateLimitRequestsPerMinute = request.RateLimitRequestsPerMinute;
+                client.RateLimitRequestsPerHour = request.RateLimitRequestsPerHour;
+                client.RateLimitRequestsPerDay = request.RateLimitRequestsPerDay;
+
+                client.ThemeName = request.ThemeName;
+                client.CustomCssUrl = request.CustomCssUrl;
+                client.CustomJavaScriptUrl = request.CustomJavaScriptUrl;
+                client.PageTitlePrefix = request.PageTitlePrefix;
+                client.LogoUri = request.LogoUri;
+                client.ClientUri = request.ClientUri;
+                client.PolicyUri = request.PolicyUri;
+                client.TosUri = request.TosUri;
+
+                client.BackChannelLogoutUri = request.BackChannelLogoutUri;
+                client.BackChannelLogoutSessionRequired = request.BackChannelLogoutSessionRequired;
+                client.FrontChannelLogoutUri = request.FrontChannelLogoutUri;
+                client.FrontChannelLogoutSessionRequired = request.FrontChannelLogoutSessionRequired;
+
+                client.AllowedCorsOrigins = request.AllowedCorsOrigins;
+                client.AllowedIdentityProviders = request.AllowedIdentityProviders;
+
+                client.ProtocolType = request.ProtocolType;
+                client.EnableDetailedErrors = request.EnableDetailedErrors;
+                client.LogSensitiveData = request.LogSensitiveData;
+                client.EnableLocalLogin = request.EnableLocalLogin;
+
+                client.CustomLoginPageUrl = request.CustomLoginPageUrl;
+                client.CustomLogoutPageUrl = request.CustomLogoutPageUrl;
+                client.CustomErrorPageUrl = request.CustomErrorPageUrl;
+
                 client.UpdatedAt = DateTime.UtcNow;
                 client.UpdatedBy = User.Identity?.Name;
 
