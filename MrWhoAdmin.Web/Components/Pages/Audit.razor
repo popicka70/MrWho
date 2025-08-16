@@ -2,8 +2,10 @@
 @attribute [Authorize]
 @rendermode InteractiveServer
 @using MrWho.Shared.Models
+@using MrWhoAdmin.Web.Components.Dialogs
 @inject IAuditLogsApiService AuditApi
 @inject NotificationService NotificationService
+@inject DialogService DialogService
 @inject ILogger<Audit> Logger
 
 <PageTitle>Audit Log - MrWho Admin</PageTitle>
@@ -117,27 +119,14 @@
     {
         try
         {
-            // Pretty print JSON changes if possible
-            var json = item.Changes ?? "";
-            string pretty = json;
-            try
-            {
-                var doc = System.Text.Json.JsonDocument.Parse(json);
-                pretty = System.Text.Json.JsonSerializer.Serialize(doc, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
-            }
-            catch { }
-
-            NotificationService.Notify(new NotificationMessage
-            {
-                Severity = NotificationSeverity.Info,
-                Summary = $"Changes for {item.EntityType} ({item.Action})",
-                Detail = pretty,
-                Duration = 8000
-            });
+            await DialogService.OpenAsync<AuditChangesDialog>(
+                $"Changes: {item.EntityType} ({item.Action})",
+                new Dictionary<string, object?> { [nameof(AuditChangesDialog.Item)] = item },
+                new DialogOptions { Width = "900px", Resizable = true, Draggable = true });
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Failed to show audit details");
+            Logger.LogError(ex, "Failed to open changes dialog");
         }
     }
 

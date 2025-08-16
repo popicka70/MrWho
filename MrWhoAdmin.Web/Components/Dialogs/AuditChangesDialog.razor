@@ -1,0 +1,81 @@
+@using MrWho.Shared.Models
+@inject DialogService DialogService
+
+@if (Item != null)
+{
+    <RadzenStack Gap="1rem" Style="min-height: 400px;">
+        <RadzenStack Orientation="Orientation.Horizontal" Gap="2rem">
+            <RadzenStack>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">When</RadzenText>
+                <RadzenText>@Item.OccurredAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")</RadzenText>
+            </RadzenStack>
+            <RadzenStack>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">User</RadzenText>
+                <RadzenText>@(Item.UserName ?? Item.UserId ?? "-")</RadzenText>
+            </RadzenStack>
+            <RadzenStack>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">IP</RadzenText>
+                <RadzenText>@(Item.IpAddress ?? "-")</RadzenText>
+            </RadzenStack>
+        </RadzenStack>
+
+        <RadzenRow>
+            <RadzenColumn Size="12" SizeMD="6">
+                <RadzenFormField Text="Entity" Variant="Variant.Outlined" Style="width:100%;">
+                    <RadzenTextBox Value="@Item.EntityType" ReadOnly="true" Style="width:100%;" />
+                </RadzenFormField>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="6">
+                <RadzenFormField Text="Entity ID" Variant="Variant.Outlined" Style="width:100%;">
+                    <RadzenTextBox Value="@Item.EntityId" ReadOnly="true" Style="width:100%;" />
+                </RadzenFormField>
+            </RadzenColumn>
+        </RadzenRow>
+
+        <RadzenRow>
+            <RadzenColumn Size="12" SizeMD="4">
+                <RadzenFormField Text="Action" Variant="Variant.Outlined">
+                    <RadzenTextBox Value="@Item.Action" ReadOnly="true" Style="width:100%;" />
+                </RadzenFormField>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="4">
+                <RadzenFormField Text="Client" Variant="Variant.Outlined">
+                    <RadzenTextBox Value="@Item.ClientId" ReadOnly="true" Style="width:100%;" />
+                </RadzenFormField>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="4">
+                <RadzenFormField Text="Realm" Variant="Variant.Outlined">
+                    <RadzenTextBox Value="@Item.RealmId" ReadOnly="true" Style="width:100%;" />
+                </RadzenFormField>
+            </RadzenColumn>
+        </RadzenRow>
+
+        <RadzenFormField Text="Changes (JSON)" Variant="Variant.Outlined">
+            <RadzenTextArea Value="@PrettyJson" ReadOnly="true" Style="width:100%; min-height: 260px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;" />
+        </RadzenFormField>
+
+        <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
+            <RadzenButton Text="Close" Icon="close" ButtonStyle="ButtonStyle.Light" Click="@(() => DialogService.Close())" />
+        </RadzenStack>
+    </RadzenStack>
+}
+
+@code {
+    [Parameter] public AuditLogDto Item { get; set; } = default!;
+
+    private string PrettyJson => GetPrettyJson(Item?.Changes);
+
+    private static string GetPrettyJson(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return string.Empty;
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            return System.Text.Json.JsonSerializer.Serialize(doc, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+        }
+        catch
+        {
+            return json!; // fallback to raw
+        }
+    }
+}
