@@ -2,6 +2,7 @@
 @attribute [Authorize]
 @rendermode InteractiveServer
 @using MrWho.Shared
+@using Microsoft.AspNetCore.WebUtilities
 @inject NavigationManager Navigation
 @inject NotificationService NotificationService
 @inject ILogger<Clients> Logger
@@ -20,7 +21,7 @@
         <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem">
             <RadzenTextBox @bind-Value="@searchTerm" Placeholder="Search clients..." Style="width: 300px;" />
             <RadzenDropDown @bind-Value="@selectedRealmId" Data="@realms" TextProperty="DisplayName" ValueProperty="Id" 
-                           Placeholder="Filter by realm..." Style="width: 200px;" AllowClear="true" />
+                           Placeholder="Filter by realm..." Style="width: 300px;" AllowClear="true" />
             <RadzenButton Click="@LoadClients" Icon="search" ButtonStyle="ButtonStyle.Secondary" />
         </RadzenStack>
         <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
@@ -122,6 +123,15 @@
 
     protected override async Task OnInitializedAsync()
     {
+        // Preselect realm from query string if provided
+        var uri = Navigation.ToAbsoluteUri(Navigation.Uri);
+        var query = QueryHelpers.ParseQuery(uri.Query);
+        if (query.TryGetValue("realmId", out var realmIdValues))
+        {
+            selectedRealmId = realmIdValues.FirstOrDefault();
+            Logger.LogInformation("Preselected realm filter from query: {RealmId}", selectedRealmId);
+        }
+
         await LoadRealms();
         await LoadClients();
     }

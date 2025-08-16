@@ -165,4 +165,22 @@ public class RealmsApiService : IRealmsApiService
             return null;
         }
     }
+
+    public async Task<RealmDto?> UpdateRealmDefaultsAsync(string id, UpdateRealmDefaultsRequest request)
+    {
+        try
+        {
+            var json = JsonSerializer.Serialize(request, _jsonOptions);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var response = await _httpClient.PutAsync($"api/realms/{id}/defaults", content);
+            response.EnsureSuccessStatusCode();
+            var responseJson = await response.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<RealmDto>(responseJson, _jsonOptions);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error updating realm defaults {RealmId}", id);
+            return null;
+        }
+    }
 }

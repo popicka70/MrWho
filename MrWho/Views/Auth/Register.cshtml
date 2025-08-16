@@ -2,6 +2,7 @@
 @{
     ViewData["Title"] = "Create an account";
     var success = TempData["RegistrationSuccess"] as bool? ?? false;
+    var recaptchaSiteKey = ViewData["RecaptchaSiteKey"] as string; // Provided by controller
 }
 
 <div class="row justify-content-center">
@@ -19,8 +20,9 @@
                 }
                 else
                 {
-                    <form method="post" action="/connect/register">
+                    <form id="registerForm" method="post" action="/connect/register">
                         @Html.AntiForgeryToken()
+                        <input type="hidden" id="recaptchaToken" name="recaptchaToken" />
                         <div class="mb-3">
                             <label class="form-label">Email</label>
                             <input asp-for="Email" class="form-control" />
@@ -48,7 +50,7 @@
                             </div>
                         </div>
                         <div class="d-grid">
-                            <button type="submit" class="btn btn-primary"><i class="bi bi-person-plus"></i> Register</button>
+                            <button id="btnRegister" type="submit" class="btn btn-primary"><i class="bi bi-person-plus"></i> Register</button>
                         </div>
                     </form>
                 }
@@ -59,3 +61,33 @@
         </div>
     </div>
 </div>
+
+@section Scripts {
+    @* Load and execute reCAPTCHA v3 only if a site key is configured *@
+    @if (!string.IsNullOrWhiteSpace(recaptchaSiteKey))
+    {
+        <script src="https://www.google.com/recaptcha/api.js?render=@recaptchaSiteKey"></script>
+        <script>
+            (function(){
+                const form = document.getElementById('registerForm');
+                if(!form || !window.grecaptcha) return;
+                form.addEventListener('submit', function(e){
+                    // If token already present (e.g., re-submit), let it go
+                    const existing = document.getElementById('recaptchaToken').value;
+                    if(existing) return;
+                    e.preventDefault();
+                    const btn = document.getElementById('btnRegister');
+                    if(btn){ btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Verifying...'; }
+                    grecaptcha.ready(function(){
+                        grecaptcha.execute('@recaptchaSiteKey', { action: 'register' }).then(function(token){
+                            document.getElementById('recaptchaToken').value = token;
+                            form.submit();
+                        }).catch(function(){
+                            if(btn){ btn.disabled = false; btn.innerHTML = '<i class="bi bi-person-plus"></i> Register'; }
+                        });
+                    });
+                });
+            })();
+        </script>
+    }
+}

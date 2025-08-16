@@ -6,6 +6,8 @@
 @inject IRealmsApiService RealmsApi
 @inject IClientsApiService ClientsApi
 @inject IUsersApiService UsersApi
+@inject IRegistrationsApiService RegistrationsApi
+@inject ISessionsApiService SessionsApi
 
 <PageTitle>Dashboard - MrWho Administration</PageTitle>
 
@@ -72,9 +74,18 @@ else
                 <RadzenIcon Icon="people" class="rz-color-info" Style="font-size: 3rem;" />
                 <RadzenText TextStyle="TextStyle.H4" class="rz-mt-2">@totalUsers</RadzenText>
                 <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Registered Users</RadzenText>
-                <RadzenButton Click="@(() => Navigation.NavigateTo("/users"))" 
-                             ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" 
-                             Text="Manage" class="rz-mt-2" />
+                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" JustifyContent="JustifyContent.Center" class="rz-mt-2">
+                    <RadzenButton Click="@(() => Navigation.NavigateTo("/users"))" 
+                                 ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" 
+                                 Text="Manage" />
+                    <RadzenButton Click="@(() => Navigation.NavigateTo("/users/registrations"))" 
+                                 Icon="how_to_reg" ButtonStyle="ButtonStyle.Secondary" Size="ButtonSize.Small" 
+                                 Text="Pending" />
+                </RadzenStack>
+                @if (pendingRegistrationsCount > 0)
+                {
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-warning rz-mt-1">@pendingRegistrationsCount pending</RadzenText>
+                }
             </RadzenCard>
         </RadzenColumn>
         
@@ -86,6 +97,40 @@ else
                 <RadzenButton Click="@(() => Navigation.NavigateTo("/debug-api"))" 
                              ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" 
                              Text="Debug API" class="rz-mt-2" />
+            </RadzenCard>
+        </RadzenColumn>
+    </RadzenRow>
+
+    <!-- Quick Access Row -->
+    <RadzenRow Gap="2rem" class="rz-mt-2">
+        <RadzenColumn Size="12" SizeMD="6">
+            <RadzenCard class="rz-p-4">
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                        <RadzenIcon Icon="how_to_reg" class="rz-color-primary" Style="font-size: 2rem;" />
+                        <RadzenStack>
+                            <RadzenText TextStyle="TextStyle.Subtitle1">Pending User Registrations</RadzenText>
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">@pendingRegistrationsCount pending</RadzenText>
+                        </RadzenStack>
+                    </RadzenStack>
+                    <RadzenButton Text="Review" Icon="open_in_new" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Small"
+                                  Click="@(() => Navigation.NavigateTo("/users/registrations"))" />
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeMD="6">
+            <RadzenCard class="rz-p-4">
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                        <RadzenIcon Icon="people_outline" class="rz-color-success" Style="font-size: 2rem;" />
+                        <RadzenStack>
+                            <RadzenText TextStyle="TextStyle.Subtitle1">Active Sessions</RadzenText>
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">@activeSessionsCount active</RadzenText>
+                        </RadzenStack>
+                    </RadzenStack>
+                    <RadzenButton Text="View" Icon="visibility" ButtonStyle="ButtonStyle.Secondary" Size="ButtonSize.Small"
+                                  Click="@(() => Navigation.NavigateTo("/monitoring/sessions"))" />
+                </RadzenStack>
             </RadzenCard>
         </RadzenColumn>
     </RadzenRow>
@@ -168,6 +213,8 @@ else
     private int totalRealms = 0;
     private int totalClients = 0;
     private int totalUsers = 0;
+    private int pendingRegistrationsCount = 0;
+    private int activeSessionsCount = 0;
     private bool isLoadingActivity = true;
     private bool hasApiError = false;
     private List<ActivityItem> recentActivity = new();
@@ -197,16 +244,20 @@ else
         {
             Logger.LogInformation("Starting to load dashboard data");
             
-            // Load dashboard statistics from APIs
+            // Load dashboard statistics from APIs (parallel)
             var realmsTask = RealmsApi.GetRealmsAsync(page: 1, pageSize: 1);
             var clientsTask = ClientsApi.GetClientsAsync(page: 1, pageSize: 1);
             var usersTask = UsersApi.GetUsersAsync(page: 1, pageSize: 1);
+            var pendingTask = RegistrationsApi.GetPendingAsync();
+            var sessionsStatsTask = SessionsApi.GetSessionStatisticsAsync();
 
-            await Task.WhenAll(realmsTask, clientsTask, usersTask);
+            await Task.WhenAll(realmsTask, clientsTask, usersTask, pendingTask, sessionsStatsTask);
 
             var realmsResult = await realmsTask;
             var clientsResult = await clientsTask;
             var usersResult = await usersTask;
+            var pendingList = await pendingTask;
+            var sessionsStats = await sessionsStatsTask;
 
             if (realmsResult != null)
                 totalRealms = realmsResult.TotalCount;
@@ -223,6 +274,9 @@ else
             else
                 hasApiError = true;
 
+            pendingRegistrationsCount = pendingList?.Count ?? 0;
+            activeSessionsCount = sessionsStats?.TotalActiveSessions ?? 0;
+
             // Generate some mock recent activity for now
             recentActivity = new List<ActivityItem>
             {
@@ -232,8 +286,8 @@ else
                 new() { Icon = "login", Color = "var(--rz-warning)", Description = "Admin user logged in", Timestamp = DateTime.Now.AddMinutes(-20) }
             };
 
-            Logger.LogInformation("Dashboard loaded successfully - Realms: {Realms}, Clients: {Clients}, Users: {Users}, HasError: {HasError}", 
-                totalRealms, totalClients, totalUsers, hasApiError);
+            Logger.LogInformation("Dashboard loaded successfully - Realms: {Realms}, Clients: {Clients}, Users: {Users}, Pending: {Pending}, Sessions: {Sessions}, HasError: {HasError}", 
+                totalRealms, totalClients, totalUsers, pendingRegistrationsCount, activeSessionsCount, hasApiError);
         }
         catch (HttpRequestException httpEx) when (httpEx.Message.Contains("Unauthorized") || httpEx.Message.Contains("401"))
         {
@@ -250,6 +304,8 @@ else
             totalRealms = 0;
             totalClients = 0;
             totalUsers = 0;
+            pendingRegistrationsCount = 0;
+            activeSessionsCount = 0;
             
             recentActivity = new List<ActivityItem>
             {

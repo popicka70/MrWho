@@ -7,6 +7,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="Migrations\**" />
+    <Content Remove="Migrations\**" />
+    <EmbeddedResource Remove="Migrations\**" />
+    <None Remove="Migrations\**" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="Aspire.Microsoft.EntityFrameworkCore.SqlServer" Version="9.4.0" />
     <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
     <PackageReference Include="Microsoft.AspNetCore.DataProtection.EntityFrameworkCore" Version="9.0.8" />
@@ -53,9 +60,5 @@
     </ItemGroup>
     <Copy SourceFiles="@(_ProviderMigrationsToPublish)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
   </Target>
-
-  <ItemGroup>
-    <Folder Include="Migrations\" />
-  </ItemGroup>
 
 </Project>
