@@ -7,14 +7,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="Migrations\**" />
-    <Content Remove="Migrations\**" />
-    <EmbeddedResource Remove="Migrations\**" />
-    <None Remove="Migrations\**" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Aspire.Microsoft.EntityFrameworkCore.SqlServer" Version="9.4.0" />
     <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
     <PackageReference Include="Microsoft.AspNetCore.DataProtection.EntityFrameworkCore" Version="9.0.8" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="9.0.8" />
@@ -23,12 +15,10 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.EntityFrameworkCore.InMemory" Version="9.0.8" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="9.0.8" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="9.0.8">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="9.0.0-rc.1.efcore.9.0.0" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
     <PackageReference Include="OpenIddict.AspNetCore" Version="7.0.0" />
     <PackageReference Include="OpenIddict.EntityFrameworkCore" Version="7.0.0" />
@@ -41,24 +31,5 @@
     <ProjectReference Include="..\MrWho.Shared\MrWho.Shared.csproj" />
     <ProjectReference Include="..\MrWhoAdmin.ServiceDefaults\MrWhoAdmin.ServiceDefaults.csproj" />
   </ItemGroup>
-
-  <!-- Copy provider-specific migrations DLLs to this project's output when present without propagating them to referencing projects -->
-  <Target Name="CopyProviderMigrations" AfterTargets="Build">
-    <ItemGroup>
-      <_ProviderMigrations Include="..\MrWho.Migrations.SqlServer\bin\$(Configuration)\$(TargetFramework)\MrWho.Migrations.SqlServer.dll" Condition="Exists('..\\MrWho.Migrations.SqlServer\\bin\\$(Configuration)\\$(TargetFramework)\\MrWho.Migrations.SqlServer.dll')" />
-      <_ProviderMigrations Include="..\MrWho.Migrations.PostgreSql\bin\$(Configuration)\$(TargetFramework)\MrWho.Migrations.PostgreSql.dll" Condition="Exists('..\\MrWho.Migrations.PostgreSql\\bin\\$(Configuration)\\$(TargetFramework)\\MrWho.Migrations.PostgreSql.dll')" />
-      <_ProviderMigrations Include="..\MrWho.Migrations.MySql\bin\$(Configuration)\$(TargetFramework)\MrWho.Migrations.MySql.dll" Condition="Exists('..\\MrWho.Migrations.MySql\\bin\\$(Configuration)\\$(TargetFramework)\\MrWho.Migrations.MySql.dll')" />
-    </ItemGroup>
-    <Copy SourceFiles="@(_ProviderMigrations)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
-  </Target>
-
-  <Target Name="CopyProviderMigrationsOnPublish" AfterTargets="Publish">
-    <ItemGroup>
-      <_ProviderMigrationsToPublish Include="..\MrWho.Migrations.SqlServer\bin\$(Configuration)\$(TargetFramework)\MrWho.Migrations.SqlServer.dll" Condition="Exists('..\\MrWho.Migrations.SqlServer\\bin\\$(Configuration)\\$(TargetFramework)\\MrWho.Migrations.SqlServer.dll')" />
-      <_ProviderMigrationsToPublish Include="..\MrWho.Migrations.PostgreSql\bin\$(Configuration)\$(TargetFramework)\MrWho.Migrations.PostgreSql.dll" Condition="Exists('..\\MrWho.Migrations.PostgreSql\\bin\\$(Configuration)\\$(TargetFramework)\\MrWho.Migrations.PostgreSql.dll')" />
-      <_ProviderMigrationsToPublish Include="..\MrWho.Migrations.MySql\bin\$(Configuration)\$(TargetFramework)\MrWho.Migrations.MySql.dll" Condition="Exists('..\\MrWho.Migrations.MySql\\bin\\$(Configuration)\\$(TargetFramework)\\MrWho.Migrations.MySql.dll')" />
-    </ItemGroup>
-    <Copy SourceFiles="@(_ProviderMigrationsToPublish)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
-  </Target>
 
 </Project>

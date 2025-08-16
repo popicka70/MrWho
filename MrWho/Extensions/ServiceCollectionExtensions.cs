@@ -101,118 +101,29 @@ public static class ServiceCollectionExtensions
 
     public static IServiceCollection AddMrWhoDatabase(this WebApplicationBuilder builder)
     {
-        // Multi-provider database configuration (SqlServer/MySql/Postgres)
+        // PostgreSQL-only database configuration; migrations live in this assembly
         var config = builder.Configuration;
         var services = builder.Services;
         var isDevelopment = builder.Environment.IsDevelopment();
 
-        var provider = (config["Database:Provider"] ?? "SqlServer").Trim().ToLowerInvariant();
         var connectionName = config["Database:ConnectionName"] ?? "mrwhodb";
         var connectionString = config.GetConnectionString(connectionName) ?? config[$"ConnectionStrings:{connectionName}"];
-        var migrationsAssembly = config["Database:MigrationsAssembly"]; // optional
 
-        // Auto-detect provider-specific migrations assembly when not explicitly configured
-        if (string.IsNullOrWhiteSpace(migrationsAssembly))
-        {
-            migrationsAssembly = provider switch
-            {
-                "postgres" or "postgresql" => "MrWho.Migrations.PostgreSql",
-                "mysql" or "mariadb" => "MrWho.Migrations.MySql",
-                _ => "MrWho.Migrations.SqlServer"
-            };
-        }
-
-        // Proactively load the migrations assembly if present alongside the app
-        try
-        {
-            var alreadyLoaded = AppDomain.CurrentDomain.GetAssemblies()
-                .Any(a => string.Equals(a.GetName().Name, migrationsAssembly, StringComparison.OrdinalIgnoreCase));
-            if (!alreadyLoaded)
-            {
-                var baseDir = AppContext.BaseDirectory;
-                var candidate = Path.Combine(baseDir, $"{migrationsAssembly}.dll");
-                if (File.Exists(candidate))
-                {
-                    AssemblyLoadContext.Default.LoadFromAssemblyPath(candidate);
-                }
-                else
-                {
-                    // Fallback: attempt by name (may succeed if on probing paths)
-                    Assembly.Load(new AssemblyName(migrationsAssembly));
-                }
-            }
-        }
-        catch
-        {
-            // Ignore and let EF try its default resolution which may still work locally
-        }
-
+        // Provide a sensible local default for tooling/migrations if not configured
         if (string.IsNullOrWhiteSpace(connectionString))
         {
-            throw new InvalidOperationException($"Missing connection string '{connectionName}'. Set ConnectionStrings:{connectionName} or provide Database:ConnectionName.");
+            connectionString = "Host=localhost;Database=MrWho;Username=postgres;Password=ChangeMe123!";
         }
 
         services.AddDbContext<ApplicationDbContext>(options =>
         {
-            switch (provider)
-            {
-                case "mysql":
-                case "mariadb":
-                {
-                    // Read flavor and version from config to avoid runtime autodetect issues
-                    var flavor = (config["Database:MySql:Flavor"] ?? provider).Trim().ToLowerInvariant();
-                    var versionText = config["Database:MySql:Version"] ?? (flavor == "mariadb" ? "11.2.0" : "8.0.36");
-                    if (!Version.TryParse(versionText, out var parsedVersion))
-                    {
-                        parsedVersion = flavor == "mariadb" ? new Version(11, 2, 0) : new Version(8, 0, 36);
-                    }
+            options.UseNpgsql(connectionString);
 
-                    if (flavor == "mariadb")
-                    {
-                        var serverVersion = new MariaDbServerVersion(parsedVersion);
-                        options.UseMySql(connectionString, serverVersion, b =>
-                        {
-                            b.MigrationsAssembly(migrationsAssembly);
-                        });
-                    }
-                    else
-                    {
-                        var serverVersion = new MySqlServerVersion(parsedVersion);
-                        options.UseMySql(connectionString, serverVersion, b =>
-                        {
-                            b.MigrationsAssembly(migrationsAssembly);
-                        });
-                    }
-
-                    // In development, enable EF detailed errors and sensitive data logging for MySQL troubleshooting
-                    if (isDevelopment)
-                    {
-                        options.EnableDetailedErrors();
-                        options.EnableSensitiveDataLogging();
-                    }
-
-                    break;
-                }
-                case "postgres":
-                case "postgresql":
-                    options.UseNpgsql(connectionString, b =>
-                    {
-                        b.MigrationsAssembly(migrationsAssembly);
-                    });
-                    break;
-                case "sqlserver":
-                default:
-                    options.UseSqlServer(connectionString, b =>
-                    {
-                        b.MigrationsAssembly(migrationsAssembly);
-                    });
-                    break;
-            }
-
-            // In development, log (do not throw) when EF detects pending model changes so the app can migrate/apply.
             if (isDevelopment)
             {
                 options.ConfigureWarnings(w => w.Log(RelationalEventId.PendingModelChangesWarning));
+                options.EnableDetailedErrors();
+                options.EnableSensitiveDataLogging();
             }
 
             // Required by OpenIddict EF stores

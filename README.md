@@ -18,6 +18,7 @@ A complete OpenID Connect (OIDC) authentication service built with ASP.NET Core 
 - [.NET 9 SDK](https://dotnet.microsoft.com/download/dotnet/9.0)
 - [Visual Studio 2022](https://visualstudio.microsoft.com/) or [Visual Studio Code](https://code.visualstudio.com/)
 - PowerShell (for running commands)
+- Docker Desktop (for local PostgreSQL)
 
 ## 📦 Installation & Setup
 
@@ -31,23 +32,55 @@ Set-Location MrWho
 dotnet restore
 ```
 
-### 3. Initialize Database
-```powershell
-# Create initial migration (if not already done)
-dotnet ef migrations add InitialCreate
+### 3. Start local PostgreSQL with Docker Compose
+This repo ships a simple compose file for a persistent local PostgreSQL database.
 
-# Apply migrations to create database
-dotnet ef database update
+- Credentials:
+  - Host: localhost
+  - Port: 5432
+  - Database: mrwho
+  - Username: mrwho
+  - Password: ChangeMe123!
+
+Start/stop database:
+```powershell
+docker compose -f "docker-compose.db.yml" up -d; echo ""
+# To stop: docker compose -f "docker-compose.db.yml" down; echo ""
 ```
 
-### 4. Run the Application
+Connection string to use in development:
+```
+Host=localhost;Port=5432;Database=mrwho;Username=mrwho;Password=ChangeMe123!
+```
+
+> appsettings.Development.json in MrWho is already updated to use this connection string.
+
+### 4. Initialize Database Schema (EF Migrations)
 ```powershell
-dotnet run
+# Ensure the PostgreSQL provider is selected via appsettings.Development.json / code
+# Apply migrations
+cd "MrWho"; dotnet ef database update; cd ..; echo ""
+```
+
+### 5. Run the Application
+```powershell
+dotnet run --project "MrWho/MrWho.csproj"; echo ""
 ```
 
 The application will start and be available at:
-- **HTTPS**: `https://localhost:7000`
-- **HTTP**: `http://localhost:5000`
+- **HTTPS**: `https://localhost:7113`
+
+## 🐘 Run with PostgreSQL via Docker Compose (Full stack examples)
+
+This repository also previously included compose variants. For local DB only, use `docker-compose.db.yml` above.
+
+Key settings when targeting Postgres:
+- Database provider: `PostgreSql`
+- Migrations assembly: `MrWho.Migrations.PostgreSql`
+- Connection string: `Host=localhost;Port=5432;Database=mrwho;Username=mrwho;Password=ChangeMe123!`
+
+Validate OIDC discovery endpoint (note the hyphen):
+- https://localhost:7113/.well-known/openid-configuration
 
 ## 🧪 Testing the OIDC Service
 
@@ -90,7 +123,7 @@ $clientCredentialsBody = @{
     scope = "email profile"
 }
 
-$response = Invoke-RestMethod -Uri "https://localhost:7000/connect/token" -Method POST -ContentType "application/x-www-form-urlencoded" -Body $clientCredentialsBody
+$response = Invoke-RestMethod -Uri "https://localhost:7113/connect/token" -Method POST -ContentType "application/x-www-form-urlencoded" -Body $clientCredentialsBody
 
 # Display the token
 $response | ConvertTo-Json -Depth 3
@@ -107,7 +140,7 @@ $passwordGrantBody = @{
     scope = "email profile"
 }
 
-$response = Invoke-RestMethod -Uri "https://localhost:7000/connect/token" -Method POST -ContentType "application/x-www-form-urlencoded" -Body $passwordGrantBody
+$response = Invoke-RestMethod -Uri "https://localhost:7113/connect/token" -Method POST -ContentType "application/x-www-form-urlencoded" -Body $passwordGrantBody
 
 # Display the token
 $response | ConvertTo-Json -Depth 3
@@ -123,7 +156,7 @@ $headers = @{
     Authorization = "Bearer $token"
 }
 
-$userInfo = Invoke-RestMethod -Uri "https://localhost:7000/connect/userinfo" -Method GET -Headers $headers
+$userInfo = Invoke-RestMethod -Uri "https://localhost:7113/connect/userinfo" -Method GET -Headers $headers
 $userInfo | ConvertTo-Json -Depth 3
 ```
 
@@ -131,14 +164,14 @@ $userInfo | ConvertTo-Json -Depth 3
 
 #### Client Credentials Grant
 ```bash
-curl -X POST https://localhost:7000/connect/token \
+curl -X POST https://localhost:7113/connect/token \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "grant_type=client_credentials&client_id=postman_client&client_secret=postman_secret&scope=email profile"
 ```
 
 #### Password Grant
 ```bash
-curl -X POST https://localhost:7000/connect/token \
+curl -X POST https://localhost:7113/connect/token \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "grant_type=password&client_id=postman_client&client_secret=postman_secret&username=test@example.com&password=Test123!&scope=email profile"
 ```
@@ -149,7 +182,7 @@ curl -X POST https://localhost:7000/connect/token \
 
 2. **Add Token Endpoint Request**:
    - **Method**: POST
-   - **URL**: `https://localhost:7000/connect/token`
+   - **URL**: `https://localhost:7113/connect/token`
    - **Headers**: `Content-Type: application/x-www-form-urlencoded`
    - **Body** (x-www-form-urlencoded):
      ```
@@ -184,66 +217,9 @@ curl -X POST https://localhost:7000/connect/token \
 
 ## 🔍 Troubleshooting
 
-### Common Issues
-
-#### Missing Token Endpoint Implementation
-If you get 404 errors on `/connect/token`, you need to add the token endpoint to Program.cs:
-
-```csharp
-// Add this before app.Run()
-app.MapPost("/connect/token", async (HttpContext context) =>
-{
-    var request = context.GetOpenIddictServerRequest() ??
-                  throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
-
-    if (request.IsPasswordGrantType())
-    {
-        var userManager = context.RequestServices.GetRequiredService<UserManager<IdentityUser>>();
-        var user = await userManager.FindByNameAsync(request.Username!);
-
-        if (user != null && await userManager.CheckPasswordAsync(user, request.Password!))
-        {
-            var identity = new ClaimsIdentity(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
-            identity.AddClaim(OpenIddictConstants.Claims.Subject, user.Id);
-            identity.AddClaim(OpenIddictConstants.Claims.Email, user.Email!);
-            identity.AddClaim(OpenIddictConstants.Claims.Name, user.UserName!);
-
-            var principal = new ClaimsPrincipal(identity);
-            principal.SetScopes(request.GetScopes());
-
-            return Results.SignIn(principal, authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
-        }
-
-        return Results.Forbid(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
-    }
-
-    if (request.IsClientCredentialsGrantType())
-    {
-        var identity = new ClaimsIdentity(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
-        identity.AddClaim(OpenIddictConstants.Claims.Subject, request.ClientId!);
-
-        var principal = new ClaimsPrincipal(identity);
-        principal.SetScopes(request.GetScopes());
-
-        return Results.SignIn(principal, authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
-    }
-
-    throw new InvalidOperationException("The specified grant type is not supported.");
-});
-```
-
-#### Database Issues
-```powershell
-# Reset database if needed
-Remove-Item MrWho.db -ErrorAction SilentlyContinue
-dotnet ef database update
-```
-
-#### SSL Certificate Issues
-```powershell
-# Trust development certificate
-dotnet dev-certs https --trust
-```
+- If migrations fail, ensure the Postgres container is healthy: `docker ps`, `docker logs mrwho-postgres`.
+- Ensure your connection string matches the credentials above.
+- Validate discovery endpoint path uses hyphen: `/.well-known/openid-configuration`.
 
 ## 📚 Additional Resources
 
@@ -251,79 +227,3 @@ dotnet dev-certs https --trust
 - [OAuth 2.0 RFC](https://tools.ietf.org/html/rfc6749)
 - [OpenID Connect Specification](https://openid.net/connect/)
 - [ASP.NET Core Identity Documentation](https://docs.microsoft.com/en-us/aspnet/core/security/authentication/identity)
-
-## 🐘 Run with PostgreSQL via Docker Compose
-
-This repository includes an alternative Docker Compose file to run the stack with PostgreSQL instead of SQL Server.
-
-Prerequisites environment variables (example values):
-
-```powershell
-$env:POSTGRES_PASSWORD = "YourStrong!Passw0rd"; echo ""
-$env:ASPNETCORE_Kestrel__Certificates__Default__Password = "your-cert-password"; echo ""
-$env:LOCAL_HTTPS_CERT_DIR = (Resolve-Path "./certs").Path; echo ""
-```
-
-Start the Postgres-based stack:
-
-```powershell
-docker compose -f "docker-compose.postgres.yml" up --build -d; echo ""
-```
-
-Key settings used by the Postgres compose:
-- Database provider: `Database:Provider=PostgreSql`
-- Migrations assembly: `MrWho.Migrations.PostgreSql`
-- Connection string: `Host=postgres;Database=MrWho;Username=postgres;Password=${POSTGRES_PASSWORD}`
-
-Validate OIDC discovery endpoint (note the hyphen):
-- https://localhost:7113/.well-known/openid-configuration
-
-## 🐬 Run with MySQL via Docker Compose
-
-Prerequisites environment variables (example values):
-
-```powershell
-$env:MYSQL_ROOT_PASSWORD = "YourStrong!Passw0rd"; echo ""
-$env:ASPNETCORE_Kestrel__Certificates__Default__Password = "your-cert-password"; echo ""
-$env:LOCAL_HTTPS_CERT_DIR = (Resolve-Path "./certs").Path; echo ""
-```
-
-Start the MySQL-based stack:
-
-```powershell
-docker compose -f "docker-compose.mysql.yml" up --build -d; echo ""
-```
-
-Key settings used by the MySQL compose:
-- Database provider: `Database:Provider=MySql`
-- Migrations assembly: `MrWho.Migrations.MySql`
-- Connection string: `Server=mysql;Database=MrWho;User ID=root;Password=${MYSQL_ROOT_PASSWORD};`
-- Optional: set `Database:MySql:Flavor` to `MariaDb` and `Database:MySql:Version` (e.g., `11.2.0`) if targeting MariaDB
-
-Note: Compose files bind only HTTPS ports to the host. Internal service-to-service HTTP remains available within the Docker network.
-
-## 🦭 Run with MariaDB via Docker Compose
-
-Prerequisites environment variables (example values):
-
-```powershell
-$env:MARIADB_ROOT_PASSWORD = "YourStrong!Passw0rd"; echo ""
-$env:ASPNETCORE_Kestrel__Certificates__Default__Password = "your-cert-password"; echo ""
-$env:LOCAL_HTTPS_CERT_DIR = (Resolve-Path "./certs").Path; echo ""
-```
-
-Start the MariaDB-based stack:
-
-```powershell
-docker compose -f "docker-compose.mariadb.yml" up --build -d; echo ""
-```
-
-Key settings used by the MariaDB compose:
-- Database provider: `Database:Provider=MySql`
-- MariaDB flavor/version: `Database:MySql:Flavor=MariaDb`, `Database:MySql:Version=11.2.0`
-- Migrations assembly: `MrWho.Migrations.MySql`
-- Connection string: `Server=mariadb;Database=MrWho;User ID=root;Password=${MARIADB_ROOT_PASSWORD};`
-
-Troubleshooting:
-- If the MariaDB container logs: "Database is uninitialized and password option is not specified", set `MARIADB_ROOT_PASSWORD`.
-- Easiest: copy `.env.example` to `.env`, set strong values, then rerun compose.
