@@ -3,14 +3,19 @@ using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using MrWho.Models;
+using Microsoft.AspNetCore.Http;
+using System.Text.Json;
 
 namespace MrWho.Data;
 
 public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtectionKeyContext
 {
-    public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
+    private readonly IHttpContextAccessor? _httpContextAccessor;
+
+    public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options, IHttpContextAccessor? httpContextAccessor = null)
         : base(options)
     {
+        _httpContextAccessor = httpContextAccessor;
     }
 
     // Realm and Client management entities
@@ -41,6 +46,9 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
     public DbSet<UserDevice> UserDevices { get; set; }
     public DbSet<PersistentQrSession> PersistentQrSessions { get; set; }
     public DbSet<DeviceAuthenticationLog> DeviceAuthenticationLogs { get; set; }
+
+    // Audit logging
+    public DbSet<AuditLog> AuditLogs { get; set; }
 
     // User profile
     public DbSet<UserProfile> UserProfiles { get; set; }
@@ -304,6 +312,16 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
         });
 
         // =========================================================================
+        // AUDIT LOG CONFIGURATION
+        // =========================================================================
+        builder.Entity<AuditLog>(entity =>
+        {
+            entity.HasKey(a => a.Id);
+            entity.HasIndex(a => new { a.EntityType, a.EntityId, a.OccurredAt });
+            entity.Property(a => a.Changes).HasMaxLength(8000);
+        });
+
+        // =========================================================================
         // WEBAUTHN CONFIGURATION
         // =========================================================================
         builder.Entity<WebAuthnCredential>(entity =>
@@ -366,5 +384,133 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
                 entity.Property(p => p.ReturnUrl).HasColumnType("longtext");
             });
         }
+    }
+
+    public override int SaveChanges()
+    {
+        ApplyTimestampsAndAuditEntries();
+        return base.SaveChanges();
+    }
+
+    public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        ApplyTimestampsAndAuditEntries();
+        return await base.SaveChangesAsync(cancellationToken);
+    }
+
+    private void ApplyTimestampsAndAuditEntries()
+    {
+        var now = DateTime.UtcNow;
+        var http = _httpContextAccessor?.HttpContext;
+        var userId = http?.User?.FindFirst(OpenIddict.Abstractions.OpenIddictConstants.Claims.Subject)?.Value
+                     ?? http?.User?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        var userName = http?.User?.Identity?.Name;
+        var ip = http?.Connection?.RemoteIpAddress?.ToString();
+
+        ChangeTracker.DetectChanges();
+        var entries = ChangeTracker.Entries()
+            .Where(e => e.State == EntityState.Added || e.State == EntityState.Modified || e.State == EntityState.Deleted)
+            .ToList();
+
+        foreach (var entry in entries)
+        {
+            // Set CreatedAt/UpdatedAt/CreatedBy/UpdatedBy if present on the entity
+            if (entry.State == EntityState.Added)
+            {
+                SetPropertyIfExists(entry, nameof(Client.CreatedAt), now);
+                SetPropertyIfExists(entry, nameof(Client.UpdatedAt), now);
+                if (!string.IsNullOrEmpty(userId)) SetPropertyIfExists(entry, nameof(Client.CreatedBy), userId);
+                if (!string.IsNullOrEmpty(userId)) SetPropertyIfExists(entry, nameof(Client.UpdatedBy), userId);
+            }
+            else if (entry.State == EntityState.Modified)
+            {
+                SetPropertyIfExists(entry, nameof(Client.UpdatedAt), now);
+                if (!string.IsNullOrEmpty(userId)) SetPropertyIfExists(entry, nameof(Client.UpdatedBy), userId);
+            }
+
+            // Build audit log for entity if not AuditLog itself
+            if (entry.Entity is AuditLog)
+                continue;
+
+            var audit = new AuditLog
+            {
+                OccurredAt = now,
+                UserId = userId,
+                UserName = userName,
+                IpAddress = ip,
+                EntityType = entry.Entity.GetType().Name,
+                EntityId = GetPrimaryKeyValue(entry),
+                Action = entry.State switch
+                {
+                    EntityState.Added => AuditAction.Added.ToString(),
+                    EntityState.Modified => AuditAction.Modified.ToString(),
+                    EntityState.Deleted => AuditAction.Deleted.ToString(),
+                    _ => AuditAction.Modified.ToString()
+                }
+            };
+
+            // Capture property-level changes for Modified and Deleted. For Added, only new values are interesting.
+            var changes = new List<object>();
+            foreach (var prop in entry.Properties)
+            {
+                if (!prop.Metadata.IsPrimaryKey())
+                {
+                    object? oldVal = null;
+                    object? newVal = null;
+
+                    if (entry.State == EntityState.Added)
+                    {
+                        newVal = prop.CurrentValue;
+                    }
+                    else if (entry.State == EntityState.Deleted)
+                    {
+                        oldVal = prop.OriginalValue;
+                    }
+                    else if (entry.State == EntityState.Modified && prop.IsModified)
+                    {
+                        oldVal = prop.OriginalValue;
+                        newVal = prop.CurrentValue;
+                    }
+
+                    if (oldVal != null || newVal != null)
+                    {
+                        changes.Add(new
+                        {
+                            Property = prop.Metadata.Name,
+                            Old = oldVal,
+                            New = newVal
+                        });
+                    }
+                }
+            }
+
+            if (changes.Count > 0)
+            {
+                audit.Changes = JsonSerializer.Serialize(changes, new JsonSerializerOptions
+                {
+                    WriteIndented = false,
+                    DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+                });
+            }
+
+            AuditLogs.Add(audit);
+        }
+    }
+
+    private static void SetPropertyIfExists(Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry entry, string propertyName, object value)
+    {
+        var prop = entry.Metadata.FindProperty(propertyName);
+        if (prop != null)
+        {
+            entry.CurrentValues[propertyName] = value;
+        }
+    }
+
+    private static string GetPrimaryKeyValue(Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry entry)
+    {
+        var key = entry.Metadata.FindPrimaryKey();
+        if (key == null) return string.Empty;
+        var values = key.Properties.Select(p => entry.CurrentValues[p] ?? entry.OriginalValues[p]).ToArray();
+        return string.Join("|", values.Select(v => v?.ToString()));
     }
 }

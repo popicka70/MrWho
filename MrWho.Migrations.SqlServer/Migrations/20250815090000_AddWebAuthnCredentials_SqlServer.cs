@@ -1,10 +1,14 @@
 using Microsoft.EntityFrameworkCore.Migrations;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using MrWho.Data;
 
 #nullable disable
 
 namespace MrWho.Migrations.SqlServer.Migrations
 {
     /// <inheritdoc />
+    [DbContext(typeof(ApplicationDbContext))]
+    [Migration("20250815090000_AddWebAuthnCredentials_SqlServer")]
     public partial class AddWebAuthnCredentials_SqlServer : Migration
     {
         /// <inheritdoc />

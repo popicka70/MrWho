@@ -33,6 +33,9 @@ public static class ServiceCollectionExtensions
 {
     public static IServiceCollection AddMrWhoServices(this IServiceCollection services)
     {
+        // Register shared accessors
+        services.AddHttpContextAccessor();
+
         // Register database access layer
         services.AddScoped<ISeedingService, SeedingService>();
         services.AddScoped<IScopeSeederService, ScopeSeederService>();
