@@ -12,6 +12,7 @@ using static OpenIddict.Abstractions.OpenIddictConstants;
 using MrWho.Shared.Models;
 using MrWho.Data;
 using MrWho.Models;
+using Microsoft.AspNetCore.RateLimiting; // added
 
 namespace MrWho.Controllers;
 
@@ -50,6 +51,7 @@ public class AuthController : Controller
     // REMOVED: [HttpGet("authorize")] - Now handled by minimal API with client-specific cookies
 
     [HttpGet("login")]
+    [EnableRateLimiting("rl.login")] // limit login page fetches
     public async Task<IActionResult> Login(string? returnUrl = null, string? clientId = null, string? mode = null)
     {
         _logger.LogDebug("Login page requested, returnUrl = {ReturnUrl}, clientId = {ClientId}", returnUrl, clientId);
@@ -97,6 +99,7 @@ public class AuthController : Controller
 
     [HttpPost("login")]
     [ValidateAntiForgeryToken]
+    [EnableRateLimiting("rl.login")] // limit login attempts
     public async Task<IActionResult> Login(LoginViewModel model, string? returnUrl = null, string? clientId = null)
     {
         // If clientId not explicitly passed, attempt extraction from returnUrl
@@ -699,6 +702,7 @@ public class AuthController : Controller
 
     [HttpGet("register")]
     [AllowAnonymous]
+    [EnableRateLimiting("rl.register")] // limit registration page fetches
     public IActionResult Register()
     {
         return View("Register", new RegisterUserRequest());
@@ -707,6 +711,7 @@ public class AuthController : Controller
     [HttpPost("register")]
     [AllowAnonymous]
     [ValidateAntiForgeryToken]
+    [EnableRateLimiting("rl.register")] // limit registration attempts
     public async Task<IActionResult> Register([FromForm] RegisterUserRequest input)
     {
         if (!ModelState.IsValid)

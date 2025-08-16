@@ -21,6 +21,7 @@ using MrWho.Shared;
 using Microsoft.AspNetCore.HttpOverrides;
 using MrWho.Models; // added for UserProfile, UserState
 using System.Data;
+using Microsoft.AspNetCore.RateLimiting; // added for RequireRateLimiting
 
 namespace MrWho.Extensions;
 
@@ -49,6 +50,9 @@ public static class WebApplicationExtensions
         }
         app.UseStaticFiles();
         app.UseRouting();
+
+        // Enable ASP.NET Core rate limiting middleware
+        app.UseRateLimiter();
 
         // Add client cookie middleware before authentication
         app.UseMiddleware<ClientCookieMiddleware>();
@@ -103,6 +107,9 @@ public static class WebApplicationExtensions
         // Enable session support for client tracking
         app.UseSession();
 
+        // Enable ASP.NET Core rate limiting middleware
+        app.UseRateLimiter();
+
         // Add client cookie middleware before authentication - CRITICAL for client-specific cookies
         app.UseMiddleware<ClientCookieMiddleware>();
 
@@ -132,18 +139,21 @@ public static class WebApplicationExtensions
         app.MapGet("/connect/authorize", async (HttpContext context, IMediator mediator) =>
         {
             return await mediator.Send(new OidcAuthorizeRequest(context));
-        });
+        })
+        .RequireRateLimiting("rl.authorize");
 
         app.MapPost("/connect/authorize", async (HttpContext context, IMediator mediator) =>
         {
             return await mediator.Send(new OidcAuthorizeRequest(context));
-        });
+        })
+        .RequireRateLimiting("rl.authorize");
 
         // Token endpoint via mediator
         app.MapPost("/connect/token", async (HttpContext context, IMediator mediator) =>
         {
             return await mediator.Send(new OidcTokenRequest(context));
-        });
+        })
+        .RequireRateLimiting("rl.token");
 
         // NOTE: Logout endpoint removed from minimal API to avoid conflict with AuthController
         // The AuthController.Logout method handles both GET and POST /connect/logout
@@ -153,12 +163,16 @@ public static class WebApplicationExtensions
         app.MapGet("/connect/userinfo", async (HttpContext context, IMediator mediator) =>
         {
             return await mediator.Send(new UserInfoRequest(context));
-        }).RequireAuthorization("UserInfoPolicy");
+        })
+        .RequireAuthorization("UserInfoPolicy")
+        .RequireRateLimiting("rl.userinfo");
 
         app.MapPost("/connect/userinfo", async (HttpContext context, IMediator mediator) =>
         {
             return await mediator.Send(new UserInfoRequest(context));
-        }).RequireAuthorization("UserInfoPolicy");
+        })
+        .RequireAuthorization("UserInfoPolicy")
+        .RequireRateLimiting("rl.userinfo");
 
         // REDIRECT: Handle legacy /Account/AccessDenied to correct route
         app.MapGet("/Account/AccessDenied", (HttpContext context) =>

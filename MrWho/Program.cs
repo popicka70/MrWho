@@ -5,6 +5,8 @@ using MrWho.Services;
 using Microsoft.AspNetCore.HttpOverrides;
 using Fido2NetLib;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -90,11 +92,96 @@ builder.Services.AddSession(options =>
     }
 });
 
+// Configure per-IP rate limiting for sensitive endpoints (login, register, token, etc.)
+// Limits are configurable via appsettings: RateLimiting:LoginPerHour, RegisterPerHour, TokenPerHour, AuthorizePerHour, UserInfoPerHour
+var rlSection = builder.Configuration.GetSection("RateLimiting");
+int loginPerHour = rlSection.GetValue<int?>("LoginPerHour") ?? 20;
+int registerPerHour = rlSection.GetValue<int?>("RegisterPerHour") ?? 5;
+int tokenPerHour = rlSection.GetValue<int?>("TokenPerHour") ?? 60;
+int authorizePerHour = rlSection.GetValue<int?>("AuthorizePerHour") ?? 120;
+int userInfoPerHour = rlSection.GetValue<int?>("UserInfoPerHour") ?? 240;
+
+static string GetIp(HttpContext context)
+{
+    var ip = context.Connection.RemoteIpAddress?.ToString();
+    if (string.IsNullOrWhiteSpace(ip)) return "unknown";
+    return ip;
+}
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.OnRejected = (context, token) =>
+    {
+        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        return ValueTask.CompletedTask;
+    };
+
+    // Fixed 1-hour windows per IP
+    options.AddPolicy("rl.login", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: GetIp(httpContext),
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = Math.Max(1, loginPerHour),
+                Window = TimeSpan.FromHours(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+
+    options.AddPolicy("rl.register", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: GetIp(httpContext),
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = Math.Max(1, registerPerHour),
+                Window = TimeSpan.FromHours(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+
+    options.AddPolicy("rl.token", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: GetIp(httpContext),
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = Math.Max(1, tokenPerHour),
+                Window = TimeSpan.FromHours(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+
+    options.AddPolicy("rl.authorize", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: GetIp(httpContext),
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = Math.Max(1, authorizePerHour),
+                Window = TimeSpan.FromHours(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+
+    options.AddPolicy("rl.userinfo", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: GetIp(httpContext),
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = Math.Max(1, userInfoPerHour),
+                Window = TimeSpan.FromHours(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+});
+
 // Authorization policies
 builder.Services.AddAuthorization(options =>
 {
-    options.AddPolicy("RequireMfa", policy =>
-        policy.RequireClaim("amr", "mfa"));
+    options.AddPolicy("RequireMfa", policy => policy.RequireClaim("amr", "mfa"));
 });
 
 // Register claims transformation service
@@ -116,7 +203,10 @@ logger.LogInformation("?? Device Management: Enhanced QR login with persistent d
 
 // Configure the HTTP request pipeline using the new client-cookie-aware method
 await app.ConfigureMrWhoPipelineWithClientCookiesAsync();
+
+// Map OIDC minimal endpoints and debug endpoints
 app.AddMrWhoEndpoints();
 app.AddMrWhoDebugEndpoints();
 
+// Run the app
 app.Run();

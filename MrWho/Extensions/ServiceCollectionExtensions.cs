@@ -1,25 +1,31 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies; // added
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics; // added for RelationalEventId
+using Microsoft.Extensions.Options;
 using MrWho.Data;
 using MrWho.Handlers;
-using MrWho.Handlers.Users;
+using MrWho.Handlers.Users; // added for user handler interfaces/implementations
 using MrWho.Services;
-using MrWho.Shared;
+using MrWho.Services.Mediator;
+using MrWho.Endpoints;
+using MrWho.Middleware;
 using OpenIddict.Abstractions;
 using OpenIddict.Server.AspNetCore;
-using OpenIddict.Validation.AspNetCore;
-using static OpenIddict.Abstractions.OpenIddictConstants;
-using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.Extensions.Options;
-using Microsoft.Extensions.Configuration;
-using Pomelo.EntityFrameworkCore.MySql.Infrastructure;
-using Npgsql.EntityFrameworkCore.PostgreSQL;
-using System.Reflection;
-using System.Runtime.Loader;
-using System.IO;
+using Microsoft.AspNetCore;
 using System.Linq;
-using Microsoft.EntityFrameworkCore.Diagnostics; // Added for ConfigureWarnings/RelationalEventId
+using System.Reflection;
+using System.Runtime.Loader; // added for AssemblyLoadContext
+using System.Security.Claims;
+using Microsoft.AspNetCore.Mvc;
+using static OpenIddict.Abstractions.OpenIddictConstants;
+using MrWho.Shared;
+using Microsoft.AspNetCore.HttpOverrides;
+using MrWho.Models; // added for UserProfile, UserState
+using System.Data;
+using Microsoft.AspNetCore.RateLimiting; // added
 
 namespace MrWho.Extensions;
 
@@ -65,7 +71,7 @@ public static class ServiceCollectionExtensions
 
         // Register authorization and token handlers
         services.AddScoped<IOidcAuthorizationHandler, OidcAuthorizationHandler>();
-        services.AddScoped<IUserInfoHandler, UserInfoHandler>();
+        services.AddScoped<IUserInfoHandler, MrWho.Handlers.UserInfoHandler>(); // disambiguate
 
         // Register back-channel logout service
         services.AddScoped<IBackChannelLogoutService, BackChannelLogoutService>();

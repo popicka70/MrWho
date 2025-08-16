@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using MrWho.Data;
 using MrWho.Models;
 using MrWho.Shared.Models;
+using Microsoft.AspNetCore.RateLimiting; // added
 
 namespace MrWho.Controllers;
 
@@ -24,6 +25,7 @@ public class PublicRegistrationController : ControllerBase
     }
 
     [HttpPost]
+    [EnableRateLimiting("rl.register")] // rate limit public registrations per IP
     public async Task<ActionResult<RegisterUserResponse>> Register([FromBody] RegisterUserRequest input)
     {
         if (!ModelState.IsValid)
