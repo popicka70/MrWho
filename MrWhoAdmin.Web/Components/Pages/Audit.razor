@@ -1,0 +1,143 @@
+@page "/monitoring/audit"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using MrWho.Shared.Models
+@using MrWhoAdmin.Web.Components.Dialogs
+@inject IAuditLogsApiService AuditApi
+@inject NotificationService NotificationService
+@inject DialogService DialogService
+@inject ILogger<Audit> Logger
+
+<PageTitle>Audit Log - MrWho Admin</PageTitle>
+
+<RadzenStack Gap="1rem">
+    <RadzenText TextStyle="TextStyle.H2" class="rz-mb-2">
+        <RadzenIcon Icon="history" class="rz-me-2" />
+        Audit Log
+    </RadzenText>
+
+    <RadzenCard class="rz-p-4">
+        <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" AlignItems="AlignItems.End">
+            <RadzenTextBox @bind-Value="search" Placeholder="Search (user, entity, client, realm)" Style="width: 280px;" />
+            <RadzenDropDown Data="@entityTypes" @bind-Value="selectedEntityType" Placeholder="Entity Type" Style="width: 220px;" AllowClear="true" />
+            <RadzenDropDown Data="@actions" @bind-Value="selectedAction" Placeholder="Action" Style="width: 160px;" AllowClear="true" />
+            <RadzenDatePicker @bind-Value="fromUtc" DateFormat="yyyy-MM-dd" Placeholder="From date" Style="width: 180px;" />
+            <RadzenDatePicker @bind-Value="toUtc" DateFormat="yyyy-MM-dd" Placeholder="To date" Style="width: 180px;" />
+            <RadzenButton Icon="search" Text="Search" ButtonStyle="ButtonStyle.Secondary" Click="@(async () => await LoadAsync(1))" />
+            <RadzenButton Icon="refresh" Text="Refresh" ButtonStyle="ButtonStyle.Light" Click="@(async () => await LoadAsync(currentPage))" />
+        </RadzenStack>
+    </RadzenCard>
+
+    <RadzenCard class="rz-p-0">
+        <RadzenDataGrid Data="@logs" TItem="AuditLogDto" AllowPaging="true" PageSize="@pageSize" Count="@totalCount"
+                        LoadData="@OnLoadData" AllowSorting="true">
+            <Columns>
+                <RadzenDataGridColumn TItem="AuditLogDto" Property="OccurredAt" Title="When" Width="200px">
+                    <Template Context="item">
+                        <RadzenText>@item.OccurredAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")</RadzenText>
+                    </Template>
+                </RadzenDataGridColumn>
+                <RadzenDataGridColumn TItem="AuditLogDto" Property="UserName" Title="User" Width="200px" />
+                <RadzenDataGridColumn TItem="AuditLogDto" Property="EntityType" Title="Entity" Width="180px" />
+                <RadzenDataGridColumn TItem="AuditLogDto" Property="EntityId" Title="Entity ID" Width="240px" />
+                <RadzenDataGridColumn TItem="AuditLogDto" Property="Action" Title="Action" Width="120px">
+                    <Template Context="item">
+                        <RadzenBadge Text="@item.Action" BadgeStyle="@GetActionStyle(item.Action)" />
+                    </Template>
+                </RadzenDataGridColumn>
+                <RadzenDataGridColumn TItem="AuditLogDto" Property="ClientId" Title="Client" Width="160px" />
+                <RadzenDataGridColumn TItem="AuditLogDto" Property="RealmId" Title="Realm" Width="160px" />
+                <RadzenDataGridColumn TItem="AuditLogDto" Title="Details">
+                    <Template Context="item">
+                        @if (!string.IsNullOrEmpty(item.Changes))
+                        {
+                            <RadzenButton Text="View" Icon="visibility" Size="ButtonSize.Small" Click="@(async () => await ShowDetails(item))" />
+                        }
+                        else
+                        {
+                            <RadzenText class="rz-color-secondary">No changes captured</RadzenText>
+                        }
+                    </Template>
+                </RadzenDataGridColumn>
+            </Columns>
+        </RadzenDataGrid>
+    </RadzenCard>
+</RadzenStack>
+
+@code {
+    private List<AuditLogDto> logs = new();
+    private List<string> entityTypes = new();
+    private List<string> actions = new();
+    private string? selectedEntityType;
+    private string? selectedAction;
+    private string? search;
+    private DateTime? fromUtc;
+    private DateTime? toUtc;
+    private int totalCount;
+    private int pageSize = 25;
+    private int currentPage = 1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        actions = await AuditApi.GetActionsAsync();
+        entityTypes = await AuditApi.GetEntityTypesAsync();
+        await LoadAsync(1);
+    }
+
+    private async Task LoadAsync(int page)
+    {
+        currentPage = page;
+        var result = await AuditApi.GetAuditLogsAsync(page: currentPage, pageSize: pageSize, search: search, entityType: selectedEntityType, action: selectedAction, fromUtc: fromUtc, toUtc: toUtc);
+        if (result != null)
+        {
+            logs = result.Items;
+            totalCount = result.TotalCount;
+        }
+        else
+        {
+            logs = new();
+            totalCount = 0;
+            NotificationService.Notify(new NotificationMessage { Severity = NotificationSeverity.Warning, Summary = "Audit", Detail = "Failed to load audit logs." });
+        }
+        StateHasChanged();
+    }
+
+    private async Task OnLoadData(LoadDataArgs args)
+    {
+        if (args.Skip.HasValue && args.Top.HasValue)
+        {
+            var page = (args.Skip.Value / args.Top.Value) + 1;
+            if (args.Top.Value != pageSize)
+            {
+                pageSize = args.Top.Value;
+            }
+            await LoadAsync(page);
+        }
+    }
+
+    private async Task ShowDetails(AuditLogDto item)
+    {
+        try
+        {
+            await DialogService.OpenAsync<AuditChangesDialog>(
+                $"Changes: {item.EntityType} ({item.Action})",
+                new Dictionary<string, object?> { [nameof(AuditChangesDialog.Item)] = item },
+                new DialogOptions { Width = "900px", Resizable = true, Draggable = true });
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to open changes dialog");
+        }
+    }
+
+    private BadgeStyle GetActionStyle(string? action)
+    {
+        return action?.ToLowerInvariant() switch
+        {
+            "added" => BadgeStyle.Success,
+            "modified" => BadgeStyle.Info,
+            "deleted" => BadgeStyle.Danger,
+            _ => BadgeStyle.Secondary
+        };
+    }
+}

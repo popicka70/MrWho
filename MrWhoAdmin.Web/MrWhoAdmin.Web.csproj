@@ -28,4 +28,8 @@
 	  <Folder Include="Models\" />
 	</ItemGroup>
 
+	<ItemGroup>
+	  <Content Include="Components\Dialogs\AuditChangesDialog.razor" />
+	</ItemGroup>
+
 </Project>
