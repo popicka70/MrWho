@@ -27,7 +27,7 @@ namespace MrWho.Migrations.PostgreSql.Migrations
                     EntityType = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
                     EntityId = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false),
                     Action = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
-                    Changes = table.Column<string>(type: "text", nullable: true),
+                    Changes = table.Column<string>(type: "character varying(8000)", maxLength: 8000, nullable: true),
                     RealmId = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
                     ClientId = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true)
                 },
