@@ -64,8 +64,7 @@
                         </RadzenAlert>
                     }
                     <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem">
-                        @* <RadzenButton Icon="key" ButtonStyle="ButtonStyle.Primary" Text="Set up Authenticator" Click="@MafSetup" /> *@
-                        <RadzenLink Path="@OidcMfaSetupUrl">Set up MFA</RadzenLink>
+                        <RadzenButton Icon="key" ButtonStyle="ButtonStyle.Primary" Text="Set up MFA" Click="@MafSetup" />
                         <RadzenButton Icon="refresh" ButtonStyle="ButtonStyle.Secondary" Text="Refresh" Click="@RefreshPage" />
                         <RadzenButton Icon="logout" ButtonStyle="ButtonStyle.Danger" Text="Logout" Click="@Logout" />
                     </RadzenStack>
@@ -128,4 +127,4 @@
     {
         Navigation.NavigateTo("/logout");
     }
-}
+}}
