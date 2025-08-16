@@ -1016,9 +1016,16 @@
     private List<DropdownItem<bool?>> triStateOptions = new();
     private List<DropdownItem<string>> availableMfaMethods = new();
 
+    // Selections
+    private List<string> selectedScopes = new();
+    private List<string> selectedPermissions = new();
+
     // Multi-line text backing for URIs
     private string redirectUrisText = string.Empty;
     private string postLogoutUrisText = string.Empty;
+
+    // Convenience binding for MFA methods serialization (use model's value)
+    private string? allowedMfaMethodsSerialized => model.AllowedMfaMethods;
 
     private bool IsEdit => !string.IsNullOrEmpty(Id);
 
@@ -1147,15 +1154,11 @@
             IsEnabled = client.IsEnabled,
             RealmId = client.RealmId,
             ClientType = client.ClientType,
-
-            // Session & cookie
             SessionTimeoutHours = client.SessionTimeoutHours,
             UseSlidingSessionExpiration = client.UseSlidingSessionExpiration,
             RememberMeDurationDays = client.RememberMeDurationDays,
             RequireHttpsForCookies = client.RequireHttpsForCookies,
             CookieSameSitePolicy = client.CookieSameSitePolicy,
-
-            // Token lifecycle
             IdTokenLifetimeMinutes = client.IdTokenLifetimeMinutes,
             DeviceCodeLifetimeMinutes = client.DeviceCodeLifetimeMinutes,
             AccessTokenType = client.AccessTokenType,
@@ -1163,8 +1166,6 @@
             MaxRefreshTokensPerUser = client.MaxRefreshTokensPerUser,
             HashAccessTokens = client.HashAccessTokens,
             UpdateAccessTokenClaimsOnRefresh = client.UpdateAccessTokenClaimsOnRefresh,
-
-            // Security & compliance
             RequireConsent = client.RequireConsent,
             AllowRememberConsent = client.AllowRememberConsent,
             AllowAccessToUserInfoEndpoint = client.AllowAccessToUserInfoEndpoint,
@@ -1174,19 +1175,13 @@
             AlwaysSendClientClaims = client.AlwaysSendClientClaims,
             AlwaysIncludeUserClaimsInIdToken = client.AlwaysIncludeUserClaimsInIdToken,
             ClientClaimsPrefix = client.ClientClaimsPrefix,
-
-            // MFA
             RequireMfa = client.RequireMfa,
             MfaGracePeriodMinutes = client.MfaGracePeriodMinutes,
             AllowedMfaMethods = client.AllowedMfaMethods,
             RememberMfaForSession = client.RememberMfaForSession,
-            
-            // Rate limits
             RateLimitRequestsPerMinute = client.RateLimitRequestsPerMinute,
             RateLimitRequestsPerHour = client.RateLimitRequestsPerHour,
             RateLimitRequestsPerDay = client.RateLimitRequestsPerDay,
-            
-            // Branding & endpoints
             ThemeName = client.ThemeName,
             CustomCssUrl = client.CustomCssUrl,
             CustomJavaScriptUrl = client.CustomJavaScriptUrl,
@@ -1195,14 +1190,12 @@
             ClientUri = client.ClientUri,
             PolicyUri = client.PolicyUri,
             TosUri = client.TosUri,
-
             BackChannelLogoutUri = client.BackChannelLogoutUri,
             BackChannelLogoutSessionRequired = client.BackChannelLogoutSessionRequired,
             FrontChannelLogoutUri = client.FrontChannelLogoutUri,
             FrontChannelLogoutSessionRequired = client.FrontChannelLogoutSessionRequired,
             AllowedCorsOrigins = client.AllowedCorsOrigins,
             AllowedIdentityProviders = client.AllowedIdentityProviders,
-
             ProtocolType = client.ProtocolType,
             EnableDetailedErrors = client.EnableDetailedErrors,
             LogSensitiveData = client.LogSensitiveData,
@@ -1259,152 +1252,164 @@
             : null;
     }
 
-    private async Task OnSave(CreateClientRequest formModel)
+    private async Task OnSave(CreateClientRequest args)
     {
-        try
+        ClientDto? result;
+        if (IsEdit)
         {
-            // Sync URI lists from multi-line text boxes
-            formModel.RedirectUris = SplitLines(redirectUrisText).ToList();
-            formModel.PostLogoutUris = SplitLines(postLogoutUrisText).ToList();
-
-            if (IsEdit)
+            var update = BuildUpdateRequestFromModel();
+            result = await ClientsApiService.UpdateClientAsync(Id!, update);
+            if (result != null)
             {
-                var update = new UpdateClientRequest
+                var fresh = await ClientsApiService.GetClientAsync(result.Id);
+                if (fresh != null)
                 {
-                    Name = formModel.Name,
-                    Description = formModel.Description,
-                    IsEnabled = formModel.IsEnabled,
-                    ClientType = formModel.ClientType,
-                    AllowAuthorizationCodeFlow = formModel.AllowAuthorizationCodeFlow,
-                    AllowClientCredentialsFlow = formModel.AllowClientCredentialsFlow,
-                    AllowPasswordFlow = formModel.AllowPasswordFlow,
-                    AllowRefreshTokenFlow = formModel.AllowRefreshTokenFlow,
-                    RequirePkce = formModel.RequirePkce,
-                    RequireClientSecret = formModel.RequireClientSecret,
-                    AccessTokenLifetime = formModel.AccessTokenLifetime,
-                    RefreshTokenLifetime = formModel.RefreshTokenLifetime,
-                    AuthorizationCodeLifetime = formModel.AuthorizationCodeLifetime,
-                    RedirectUris = formModel.RedirectUris,
-                    PostLogoutUris = formModel.PostLogoutUris,
-
-                    // dynamic config
-                    SessionTimeoutHours = formModel.SessionTimeoutHours,
-                    UseSlidingSessionExpiration = formModel.UseSlidingSessionExpiration,
-                    RememberMeDurationDays = formModel.RememberMeDurationDays,
-                    RequireHttpsForCookies = formModel.RequireHttpsForCookies,
-                    CookieSameSitePolicy = formModel.CookieSameSitePolicy,
-                    IdTokenLifetimeMinutes = formModel.IdTokenLifetimeMinutes,
-                    DeviceCodeLifetimeMinutes = formModel.DeviceCodeLifetimeMinutes,
-                    AccessTokenType = formModel.AccessTokenType,
-                    UseOneTimeRefreshTokens = formModel.UseOneTimeRefreshTokens,
-                    MaxRefreshTokensPerUser = formModel.MaxRefreshTokensPerUser,
-                    HashAccessTokens = formModel.HashAccessTokens,
-                    UpdateAccessTokenClaimsOnRefresh = formModel.UpdateAccessTokenClaimsOnRefresh,
-                    RequireConsent = formModel.RequireConsent,
-                    AllowRememberConsent = formModel.AllowRememberConsent,
-                    AllowAccessToUserInfoEndpoint = formModel.AllowAccessToUserInfoEndpoint,
-                    AllowAccessToIntrospectionEndpoint = formModel.AllowAccessToIntrospectionEndpoint,
-                    AllowAccessToRevocationEndpoint = formModel.AllowAccessToRevocationEndpoint,
-                    IncludeJwtId = formModel.IncludeJwtId,
-                    AlwaysSendClientClaims = formModel.AlwaysSendClientClaims,
-                    AlwaysIncludeUserClaimsInIdToken = formModel.AlwaysIncludeUserClaimsInIdToken,
-
-                    // MFA & limits & branding & integrations
-                    RequireMfa = formModel.RequireMfa,
-                    MfaGracePeriodMinutes = formModel.MfaGracePeriodMinutes,
-                    AllowedMfaMethods = formModel.AllowedMfaMethods,
-                    RememberMfaForSession = formModel.RememberMfaForSession,
-                    RateLimitRequestsPerMinute = formModel.RateLimitRequestsPerMinute,
-                    RateLimitRequestsPerHour = formModel.RateLimitRequestsPerHour,
-                    RateLimitRequestsPerDay = formModel.RateLimitRequestsPerDay,
-                    ThemeName = formModel.ThemeName,
-                    CustomCssUrl = formModel.CustomCssUrl,
-                    CustomJavaScriptUrl = formModel.CustomJavaScriptUrl,
-                    PageTitlePrefix = formModel.PageTitlePrefix,
-                    LogoUri = formModel.LogoUri,
-                    ClientUri = formModel.ClientUri,
-                    PolicyUri = formModel.PolicyUri,
-                    TosUri = formModel.TosUri,
-                    BackChannelLogoutUri = formModel.BackChannelLogoutUri,
-                    BackChannelLogoutSessionRequired = formModel.BackChannelLogoutSessionRequired,
-                    FrontChannelLogoutUri = formModel.FrontChannelLogoutUri,
-                    FrontChannelLogoutSessionRequired = formModel.FrontChannelLogoutSessionRequired,
-                    AllowedCorsOrigins = formModel.AllowedCorsOrigins,
-                    AllowedIdentityProviders = formModel.AllowedIdentityProviders,
-                    ProtocolType = formModel.ProtocolType,
-                    EnableDetailedErrors = formModel.EnableDetailedErrors,
-                    LogSensitiveData = formModel.LogSensitiveData,
-                    EnableLocalLogin = formModel.EnableLocalLogin,
-                    CustomLoginPageUrl = formModel.CustomLoginPageUrl,
-                    CustomLogoutPageUrl = formModel.CustomLogoutPageUrl,
-                    CustomErrorPageUrl = formModel.CustomErrorPageUrl
-                };
-
-                var result = await ClientsApiService.UpdateClientAsync(Id!, update);
-                if (result != null)
-                {
-                    NotificationService.Notify(NotificationSeverity.Success, "Success", "Client updated successfully");
-                    Navigation.NavigateTo("/clients");
-                }
-            }
-            else
-            {
-                var result = await ClientsApiService.CreateClientAsync(formModel);
-                if (result != null)
-                {
-                    NotificationService.Notify(NotificationSeverity.Success, "Success", "Client created successfully");
-                    Navigation.NavigateTo("/clients");
+                    result = fresh;
                 }
             }
         }
-        catch (Exception ex)
+        else
         {
-            Logger.LogError(ex, "Error saving client");
+            result = await ClientsApiService.CreateClientAsync(BuildCreateRequestFromModel());
+        }
+
+        if (result != null)
+        {
+            NotificationService.Notify(NotificationSeverity.Success, "Success", $"Client '{result.Name}' has been {(IsEdit ? "updated" : "created")} successfully");
+            Navigation.NavigateTo("/clients");
+        }
+        else
+        {
             NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to save client");
         }
     }
 
-    private async Task ResetToDefaults()
+    private UpdateClientRequest BuildUpdateRequestFromModel()
     {
-        var result = await DialogService.Confirm("Reset all dynamic configuration to realm/system defaults?", "Reset Configuration", new ConfirmOptions() { OkButtonText = "Reset", CancelButtonText = "Cancel" });
-        if (result == true)
+        var update = new UpdateClientRequest
         {
-            // Reset nullable dynamic parameters to null (will use defaults)
-            model.SessionTimeoutHours = null;
-            model.RememberMeDurationDays = null;
-            model.IdTokenLifetimeMinutes = null;
-            model.DeviceCodeLifetimeMinutes = null;
-            model.MaxRefreshTokensPerUser = null;
-            model.MfaGracePeriodMinutes = null;
-            model.RateLimitRequestsPerMinute = null;
-            model.RateLimitRequestsPerHour = null;
-            model.RateLimitRequestsPerDay = null;
+            // map fields from 'model' to update request
+            Name = model.Name,
+            Description = model.Description,
+            IsEnabled = model.IsEnabled,
+            ClientType = model.ClientType,
+            AllowAuthorizationCodeFlow = true,
+            AllowClientCredentialsFlow = model.ClientType == ClientType.Machine,
+            AllowPasswordFlow = false,
+            AllowRefreshTokenFlow = true,
+            RequirePkce = model.ClientType != ClientType.Machine,
+            RequireClientSecret = model.ClientType != ClientType.Public,
+            RedirectUris = redirectUrisText?.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList() ?? new(),
+            PostLogoutUris = postLogoutUrisText?.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList() ?? new(),
+            Scopes = selectedScopes,
+            Permissions = selectedPermissions,
 
-            // Reset strings to null
-            model.CookieSameSitePolicy = null;
-            model.AccessTokenType = null;
-            model.AllowedMfaMethods = null;
-            model.ThemeName = null;
-            model.CustomCssUrl = null;
-            model.CustomJavaScriptUrl = null;
-            model.PageTitlePrefix = null;
-            model.ClientClaimsPrefix = null;
+            // dynamic fields mapping
+            SessionTimeoutHours = model.SessionTimeoutHours,
+            UseSlidingSessionExpiration = model.UseSlidingSessionExpiration,
+            RememberMeDurationDays = model.RememberMeDurationDays,
+            RequireHttpsForCookies = model.RequireHttpsForCookies,
+            CookieSameSitePolicy = model.CookieSameSitePolicy,
+            IdTokenLifetimeMinutes = model.IdTokenLifetimeMinutes,
+            DeviceCodeLifetimeMinutes = model.DeviceCodeLifetimeMinutes,
+            AccessTokenType = model.AccessTokenType,
+            UseOneTimeRefreshTokens = model.UseOneTimeRefreshTokens,
+            MaxRefreshTokensPerUser = model.MaxRefreshTokensPerUser,
+            HashAccessTokens = model.HashAccessTokens,
+            UpdateAccessTokenClaimsOnRefresh = model.UpdateAccessTokenClaimsOnRefresh,
+            RequireConsent = model.RequireConsent,
+            AllowRememberConsent = model.AllowRememberConsent,
+            AllowAccessToUserInfoEndpoint = model.AllowAccessToUserInfoEndpoint,
+            AllowAccessToIntrospectionEndpoint = model.AllowAccessToIntrospectionEndpoint,
+            AllowAccessToRevocationEndpoint = model.AllowAccessToRevocationEndpoint,
+            IncludeJwtId = model.IncludeJwtId,
+            AlwaysSendClientClaims = model.AlwaysSendClientClaims,
+            AlwaysIncludeUserClaimsInIdToken = model.AlwaysIncludeUserClaimsInIdToken,
+            ClientClaimsPrefix = model.ClientClaimsPrefix,
+            RequireMfa = model.RequireMfa,
+            MfaGracePeriodMinutes = model.MfaGracePeriodMinutes,
+            AllowedMfaMethods = allowedMfaMethodsSerialized,
+            RememberMfaForSession = model.RememberMfaForSession,
+            RateLimitRequestsPerMinute = model.RateLimitRequestsPerMinute,
+            RateLimitRequestsPerHour = model.RateLimitRequestsPerHour,
+            RateLimitRequestsPerDay = model.RateLimitRequestsPerDay,
+            ThemeName = model.ThemeName,
+            CustomCssUrl = model.CustomCssUrl,
+            CustomJavaScriptUrl = model.CustomJavaScriptUrl,
+            PageTitlePrefix = model.PageTitlePrefix,
+            LogoUri = model.LogoUri,
+            ClientUri = model.ClientUri,
+            PolicyUri = model.PolicyUri,
+            TosUri = model.TosUri,
+            BackChannelLogoutUri = model.BackChannelLogoutUri,
+            BackChannelLogoutSessionRequired = model.BackChannelLogoutSessionRequired,
+            FrontChannelLogoutUri = model.FrontChannelLogoutUri,
+            FrontChannelLogoutSessionRequired = model.FrontChannelLogoutSessionRequired,
+            AllowedCorsOrigins = model.AllowedCorsOrigins,
+            AllowedIdentityProviders = model.AllowedIdentityProviders,
+            ProtocolType = model.ProtocolType,
+            EnableDetailedErrors = model.EnableDetailedErrors,
+            LogSensitiveData = model.LogSensitiveData,
+            EnableLocalLogin = model.EnableLocalLogin,
+            CustomLoginPageUrl = model.CustomLoginPageUrl,
+            CustomLogoutPageUrl = model.CustomLogoutPageUrl,
+            CustomErrorPageUrl = model.CustomErrorPageUrl
+        };
 
-            NotificationService.Notify(NotificationSeverity.Info, "Reset", "Configuration reset to defaults");
-            StateHasChanged();
-        }
+        return update;
     }
 
-    private void CancelEdit()
-    {
-        Navigation.NavigateTo("/clients");
-    }
+    private CreateClientRequest BuildCreateRequestFromModel() => model;
 
-    private IEnumerable<string> SplitLines(string? multi)
+    private void CancelEdit() => Navigation.NavigateTo("/clients");
+
+    private Task ResetToDefaults()
     {
-        if (string.IsNullOrWhiteSpace(multi)) yield break;
-        var parts = multi.Replace("\r", "").Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        foreach (var p in parts) yield return p;
+        // Reset dynamic fields to use realm defaults (nulls)
+        model.SessionTimeoutHours = null;
+        model.UseSlidingSessionExpiration = null;
+        model.RememberMeDurationDays = null;
+        model.RequireHttpsForCookies = null;
+        model.CookieSameSitePolicy = null;
+        model.IdTokenLifetimeMinutes = null;
+        model.DeviceCodeLifetimeMinutes = null;
+        model.AccessTokenType = null;
+        model.UseOneTimeRefreshTokens = null;
+        model.MaxRefreshTokensPerUser = null;
+        model.HashAccessTokens = null;
+        model.UpdateAccessTokenClaimsOnRefresh = null;
+        model.RequireConsent = null;
+        model.AllowRememberConsent = null;
+        model.AllowAccessToUserInfoEndpoint = null;
+        model.AllowAccessToIntrospectionEndpoint = null;
+        model.AllowAccessToRevocationEndpoint = null;
+        model.IncludeJwtId = null;
+        model.AlwaysSendClientClaims = null;
+        model.AlwaysIncludeUserClaimsInIdToken = null;
+        model.ClientClaimsPrefix = null;
+        model.RequireMfa = null;
+        model.MfaGracePeriodMinutes = null;
+        model.AllowedMfaMethods = null;
+        model.RememberMfaForSession = null;
+        model.RateLimitRequestsPerMinute = null;
+        model.RateLimitRequestsPerHour = null;
+        model.RateLimitRequestsPerDay = null;
+        model.ThemeName = null;
+        model.CustomCssUrl = null;
+        model.CustomJavaScriptUrl = null;
+        model.PageTitlePrefix = null;
+        model.LogoUri = null;
+        model.ClientUri = null;
+        model.PolicyUri = null;
+        model.TosUri = null;
+        model.BackChannelLogoutUri = null;
+        model.BackChannelLogoutSessionRequired = null;
+        model.FrontChannelLogoutUri = null;
+        model.FrontChannelLogoutSessionRequired = null;
+        model.AllowedCorsOrigins = null;
+        model.AllowedIdentityProviders = null;
+        StateHasChanged();
+        return Task.CompletedTask;
     }
 
     private record DropdownItem<T>(string Text, T Value);

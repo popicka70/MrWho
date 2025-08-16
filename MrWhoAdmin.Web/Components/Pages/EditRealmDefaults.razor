@@ -39,10 +39,9 @@
     else
     {
         <RadzenTemplateForm Data="@model" TItem="UpdateRealmDefaultsRequest" Submit="@OnSave">
-            <RadzenTabs @bind-SelectedIndex="@selectedTabIndex" TabPosition="TabPosition.Top" RenderMode="TabRenderMode.Client" 
-                       Style="width: 100%; min-height: 600px;">
+            <RadzenTabs @bind-SelectedIndex="selectedTabIndex" TabPosition="TabPosition.Top" RenderMode="TabRenderMode.Client" 
+                        Style="width: 100%; min-height: 600px;">
                 <Tabs>
-                    <!-- Session & Cookie Defaults -->
                     <RadzenTabsItem Text="Session & Cookies" Icon="schedule">
                         <div style="padding: 1rem; max-height: 550px; overflow-y: auto;">
                             <RadzenStack Gap="0.75rem" class="rz-mb-4">
@@ -52,9 +51,7 @@
                                         <RadzenColumn Size="12" SizeMD="6">
                                             <RadzenFormField Text="Default Session Timeout (Hours)" Variant="Variant.Outlined">
                                                 <ChildContent>
-                                                    <RadzenNumeric @bind-Value="@model.DefaultSessionTimeoutHours" 
-                                                              Min="1" Max="168" 
-                                                              Style="width: 100%;" />
+                                                    <RadzenNumeric @bind-Value="model.DefaultSessionTimeoutHours" Min="1" Max="168" Style="width: 100%;" />
                                                 </ChildContent>
                                                 <Helper>
                                                     <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
@@ -66,9 +63,7 @@
                                         <RadzenColumn Size="12" SizeMD="6">
                                             <RadzenFormField Text="Default Remember Me Duration (Days)" Variant="Variant.Outlined">
                                                 <ChildContent>
-                                                    <RadzenNumeric @bind-Value="@model.DefaultRememberMeDurationDays" 
-                                                              Min="1" Max="365" 
-                                                              Style="width: 100%;" />
+                                                    <RadzenNumeric @bind-Value="model.DefaultRememberMeDurationDays" Min="1" Max="365" Style="width: 100%;" />
                                                 </ChildContent>
                                                 <Helper>
                                                     <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
@@ -81,7 +76,7 @@
 
                                     <RadzenFormField Text="Default Session Behavior" Variant="Variant.Outlined">
                                         <Start>
-                                            <RadzenCheckBox @bind-Value="@model.DefaultUseSlidingSessionExpiration" Name="defaultUseSliding" />
+                                            <RadzenCheckBox @bind-Value="model.DefaultUseSlidingSessionExpiration" Name="defaultUseSliding" />
                                         </Start>
                                         <ChildContent>
                                             <RadzenLabel Text="Use sliding expiration by default (extend session on user activity)" Component="defaultUseSliding" />
@@ -100,11 +95,7 @@
                                 <RadzenStack Gap="1rem">
                                     <RadzenFormField Text="Default Cookie SameSite Policy" Variant="Variant.Outlined">
                                         <ChildContent>
-                                            <RadzenDropDown @bind-Value="@model.DefaultCookieSameSitePolicy" 
-                                                       Data="@sameSitePolicies" 
-                                                       TextProperty="Text" 
-                                                       ValueProperty="Value" 
-                                                       Style="width: 100%;" />
+                                            <RadzenDropDown @bind-Value="model.DefaultCookieSameSitePolicy" Data="@sameSitePolicies" TextProperty="Text" ValueProperty="Value" Style="width: 100%;" />
                                         </ChildContent>
                                         <Helper>
                                             <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
@@ -115,7 +106,7 @@
 
                                     <RadzenFormField Text="Default HTTPS Requirement" Variant="Variant.Outlined">
                                         <Start>
-                                            <RadzenCheckBox @bind-Value="@model.DefaultRequireHttpsForCookies" Name="defaultRequireHttpsCookies" />
+                                            <RadzenCheckBox @bind-Value="model.DefaultRequireHttpsForCookies" Name="defaultRequireHttpsCookies" />
                                         </Start>
                                         <ChildContent>
                                             <RadzenLabel Text="Require HTTPS for cookies by default (secure flag)" Component="defaultRequireHttpsCookies" />
@@ -131,7 +122,6 @@
                         </div>
                     </RadzenTabsItem>
 
-                    <!-- Security & Compliance Defaults -->
                     <RadzenTabsItem Text="Security Defaults" Icon="security">
                         <div style="padding: 1rem; max-height: 550px; overflow-y: auto;">
                             <RadzenStack Gap="0.75rem" class="rz-mb-4">
@@ -139,7 +129,7 @@
                                 <RadzenStack Gap="1rem">
                                     <RadzenFormField Text="Default Consent Requirement" Variant="Variant.Outlined">
                                         <Start>
-                                            <RadzenCheckBox @bind-Value="@model.DefaultRequireConsent" Name="defaultRequireConsent" />
+                                            <RadzenCheckBox @bind-Value="model.DefaultRequireConsent" Name="defaultRequireConsent" />
                                         </Start>
                                         <ChildContent>
                                             <RadzenLabel Text="Require user consent by default" Component="defaultRequireConsent" />
@@ -147,7 +137,7 @@
                                     </RadzenFormField>
                                     <RadzenFormField Text="Remember Consent Option" Variant="Variant.Outlined">
                                         <Start>
-                                            <RadzenCheckBox @bind-Value="@model.DefaultAllowRememberConsent" Name="defaultAllowRememberConsent" />
+                                            <RadzenCheckBox @bind-Value="model.DefaultAllowRememberConsent" Name="defaultAllowRememberConsent" />
                                         </Start>
                                         <ChildContent>
                                             <RadzenLabel Text="Allow remembering consent by default" Component="defaultAllowRememberConsent" />
@@ -163,10 +153,7 @@
                                         <RadzenColumn Size="12" SizeMD="6">
                                             <RadzenFormField Text="Max Refresh Tokens Per User" Variant="Variant.Outlined">
                                                 <ChildContent>
-                                                    <RadzenNumeric @bind-Value="@model.DefaultMaxRefreshTokensPerUser" 
-                                                              Min="0" Max="100" 
-                                                              Style="width: 100%;" 
-                                                              Placeholder="Leave empty for unlimited" />
+                                                    <RadzenNumeric @bind-Value="model.DefaultMaxRefreshTokensPerUser" Min="0" Max="100" Style="width: 100%;" Placeholder="Leave empty for unlimited" />
                                                 </ChildContent>
                                                 <Helper>
                                                     <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
@@ -178,7 +165,7 @@
                                         <RadzenColumn Size="12" SizeMD="6">
                                             <RadzenFormField Text="Token Behavior Defaults" Variant="Variant.Outlined">
                                                 <Start>
-                                                    <RadzenCheckBox @bind-Value="@model.DefaultUseOneTimeRefreshTokens" Name="defaultUseOneTimeRefreshTokens" />
+                                                    <RadzenCheckBox @bind-Value="model.DefaultUseOneTimeRefreshTokens" Name="defaultUseOneTimeRefreshTokens" />
                                                 </Start>
                                                 <ChildContent>
                                                     <RadzenLabel Text="Use one-time refresh tokens by default (rotation)" Component="defaultUseOneTimeRefreshTokens" />
@@ -189,7 +176,7 @@
                                                     </RadzenText>
                                                 </Helper>
                                                 <Start>
-                                                    <RadzenCheckBox @bind-Value="@model.DefaultIncludeJwtId" Name="defaultIncludeJwtId" />
+                                                    <RadzenCheckBox @bind-Value="model.DefaultIncludeJwtId" Name="defaultIncludeJwtId" />
                                                 </Start>
                                                 <ChildContent>
                                                     <RadzenLabel Text="Include JWT ID (jti) in tokens by default" Component="defaultIncludeJwtId" />
@@ -202,7 +189,6 @@
                         </div>
                     </RadzenTabsItem>
 
-                    <!-- MFA Defaults -->
                     <RadzenTabsItem Text="MFA Defaults" Icon="verified_user">
                         <div style="padding: 1rem; max-height: 550px; overflow-y: auto;">
                             <RadzenStack Gap="0.75rem" class="rz-mb-4">
@@ -210,7 +196,7 @@
                                 <RadzenStack Gap="1rem">
                                     <RadzenFormField Text="MFA Enforcement Default" Variant="Variant.Outlined">
                                         <Start>
-                                            <RadzenCheckBox @bind-Value="@model.DefaultRequireMfa" Name="defaultRequireMfa" />
+                                            <RadzenCheckBox @bind-Value="model.DefaultRequireMfa" Name="defaultRequireMfa" />
                                         </Start>
                                         <ChildContent>
                                             <RadzenLabel Text="Require MFA by default for all clients" Component="defaultRequireMfa" />
@@ -226,10 +212,7 @@
                                         <RadzenColumn Size="12" SizeMD="6">
                                             <RadzenFormField Text="MFA Grace Period (Minutes)" Variant="Variant.Outlined">
                                                 <ChildContent>
-                                                    <RadzenNumeric @bind-Value="@model.DefaultMfaGracePeriodMinutes" 
-                                                              Min="0" Max="1440" 
-                                                              Style="width: 100%;" 
-                                                              Placeholder="Leave empty for no grace period" />
+                                                    <RadzenNumeric @bind-Value="model.DefaultMfaGracePeriodMinutes" Min="0" Max="1440" Style="width: 100%;" Placeholder="Leave empty for no grace period" />
                                                 </ChildContent>
                                                 <Helper>
                                                     <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
@@ -241,7 +224,7 @@
                                         <RadzenColumn Size="12" SizeMD="6">
                                             <RadzenFormField Text="Session MFA Memory" Variant="Variant.Outlined">
                                                 <Start>
-                                                    <RadzenCheckBox @bind-Value="@model.DefaultRememberMfaForSession" Name="defaultRememberMfaForSession" />
+                                                    <RadzenCheckBox @bind-Value="model.DefaultRememberMfaForSession" Name="defaultRememberMfaForSession" />
                                                 </Start>
                                                 <ChildContent>
                                                     <RadzenLabel Text="Remember MFA for session by default" Component="defaultRememberMfaForSession" />
@@ -278,7 +261,6 @@
                         </div>
                     </RadzenTabsItem>
 
-                    <!-- Rate Limiting Defaults -->
                     <RadzenTabsItem Text="Rate Limiting" Icon="speed">
                         <div style="padding: 1rem; max-height: 550px; overflow-y: auto;">
                             <RadzenStack Gap="0.75rem" class="rz-mb-4">
@@ -292,10 +274,7 @@
                                         <RadzenColumn Size="12" SizeMD="4">
                                             <RadzenFormField Text="Default Per Minute Limit" Variant="Variant.Outlined">
                                                 <ChildContent>
-                                                    <RadzenNumeric @bind-Value="@model.DefaultRateLimitRequestsPerMinute" 
-                                                              Min="0" Max="10000" 
-                                                              Style="width: 100%;" 
-                                                              Placeholder="Requests per minute" />
+                                                    <RadzenNumeric @bind-Value="model.DefaultRateLimitRequestsPerMinute" Min="0" Max="10000" Style="width: 100%;" Placeholder="Requests per minute" />
                                                 </ChildContent>
                                                 <Helper>
                                                     <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
@@ -307,10 +286,7 @@
                                         <RadzenColumn Size="12" SizeMD="4">
                                             <RadzenFormField Text="Default Per Hour Limit" Variant="Variant.Outlined">
                                                 <ChildContent>
-                                                    <RadzenNumeric @bind-Value="@model.DefaultRateLimitRequestsPerHour" 
-                                                              Min="0" Max="1000000" 
-                                                              Style="width: 100%;" 
-                                                              Placeholder="Requests per hour" />
+                                                    <RadzenNumeric @bind-Value="model.DefaultRateLimitRequestsPerHour" Min="0" Max="1000000" Style="width: 100%;" Placeholder="Requests per hour" />
                                                 </ChildContent>
                                                 <Helper>
                                                     <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
@@ -322,10 +298,7 @@
                                         <RadzenColumn Size="12" SizeMD="4">
                                             <RadzenFormField Text="Default Per Day Limit" Variant="Variant.Outlined">
                                                 <ChildContent>
-                                                    <RadzenNumeric @bind-Value="@model.DefaultRateLimitRequestsPerDay" 
-                                                              Min="0" Max="10000000" 
-                                                              Style="width: 100%;" 
-                                                              Placeholder="Requests per day" />
+                                                    <RadzenNumeric @bind-Value="model.DefaultRateLimitRequestsPerDay" Min="0" Max="10000000" Style="width: 100%;" Placeholder="Requests per day" />
                                                 </ChildContent>
                                                 <Helper>
                                                     <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
@@ -340,7 +313,6 @@
                         </div>
                     </RadzenTabsItem>
 
-                    <!-- Error Handling & Logging Defaults -->
                     <RadzenTabsItem Text="Logging & Errors" Icon="bug_report">
                         <div style="padding: 1rem; max-height: 550px; overflow-y: auto;">
                             <RadzenStack Gap="0.75rem" class="rz-mb-4">
@@ -348,13 +320,13 @@
                                 <RadzenStack Gap="1rem">
                                     <RadzenFormField Text="Default Error Response Settings" Variant="Variant.Outlined">
                                         <Start>
-                                            <RadzenCheckBox @bind-Value="@model.DefaultEnableDetailedErrors" Name="defaultEnableDetailedErrors" />
+                                            <RadzenCheckBox @bind-Value="model.DefaultEnableDetailedErrors" Name="defaultEnableDetailedErrors" />
                                         </Start>
                                         <ChildContent>
                                             <RadzenLabel Text="Enable detailed error responses by default" Component="defaultEnableDetailedErrors" />
                                         </ChildContent>
                                         <Start>
-                                            <RadzenCheckBox @bind-Value="@model.DefaultLogSensitiveData" Name="defaultLogSensitiveData" />
+                                            <RadzenCheckBox @bind-Value="model.DefaultLogSensitiveData" Name="defaultLogSensitiveData" />
                                         </Start>
                                         <ChildContent>
                                             <RadzenLabel Text="Log sensitive data by default (development only)" Component="defaultLogSensitiveData" />
@@ -375,9 +347,7 @@
                                 <RadzenStack Gap="1rem">
                                     <RadzenFormField Text="Default Theme" Variant="Variant.Outlined">
                                         <ChildContent>
-                                            <RadzenTextBox @bind-Value="@model.DefaultThemeName" 
-                                                      Style="width: 100%;" 
-                                                      Placeholder="e.g., dark, light, corporate" />
+                                            <RadzenTextBox @bind-Value="model.DefaultThemeName" Style="width: 100%;" Placeholder="e.g., dark, light, corporate" />
                                         </ChildContent>
                                         <Helper>
                                             <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
@@ -388,9 +358,7 @@
 
                                     <RadzenFormField Text="Realm Custom CSS URL" Variant="Variant.Outlined">
                                         <ChildContent>
-                                            <RadzenTextBox @bind-Value="@model.RealmCustomCssUrl" 
-                                                      Style="width: 100%;" 
-                                                      Placeholder="https://cdn.example.com/realm-theme.css" />
+                                            <RadzenTextBox @bind-Value="model.RealmCustomCssUrl" Style="width: 100%;" Placeholder="https://cdn.example.com/realm-theme.css" />
                                         </ChildContent>
                                         <Helper>
                                             <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
@@ -408,9 +376,7 @@
                                         <RadzenColumn Size="12" SizeMD="6">
                                             <RadzenFormField Text="Realm Logo URI" Variant="Variant.Outlined">
                                                 <ChildContent>
-                                                    <RadzenTextBox @bind-Value="@model.RealmLogoUri" 
-                                                              Style="width: 100%;" 
-                                                              Placeholder="https://example.com/realm-logo.png" />
+                                                    <RadzenTextBox @bind-Value="model.RealmLogoUri" Style="width: 100%;" Placeholder="https://example.com/realm-logo.png" />
                                                 </ChildContent>
                                                 <Helper>
                                                     <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
@@ -422,9 +388,7 @@
                                         <RadzenColumn Size="12" SizeMD="6">
                                             <RadzenFormField Text="Realm Homepage URI" Variant="Variant.Outlined">
                                                 <ChildContent>
-                                                    <RadzenTextBox @bind-Value="@model.RealmUri" 
-                                                              Style="width: 100%;" 
-                                                              Placeholder="https://example.com" />
+                                                    <RadzenTextBox @bind-Value="model.RealmUri" Style="width: 100%;" Placeholder="https://example.com" />
                                                 </ChildContent>
                                                 <Helper>
                                                     <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
@@ -439,9 +403,7 @@
                                         <RadzenColumn Size="12" SizeMD="6">
                                             <RadzenFormField Text="Realm Privacy Policy URI" Variant="Variant.Outlined">
                                                 <ChildContent>
-                                                    <RadzenTextBox @bind-Value="@model.RealmPolicyUri" 
-                                                              Style="width: 100%;" 
-                                                              Placeholder="https://example.com/privacy" />
+                                                    <RadzenTextBox @bind-Value="model.RealmPolicyUri" Style="width: 100%;" Placeholder="https://example.com/privacy" />
                                                 </ChildContent>
                                                 <Helper>
                                                     <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
@@ -453,9 +415,7 @@
                                         <RadzenColumn Size="12" SizeMD="6">
                                             <RadzenFormField Text="Realm Terms of Service URI" Variant="Variant.Outlined">
                                                 <ChildContent>
-                                                    <RadzenTextBox @bind-Value="@model.RealmTosUri" 
-                                                              Style="width: 100%;" 
-                                                              Placeholder="https://example.com/terms" />
+                                                    <RadzenTextBox @bind-Value="model.RealmTosUri" Style="width: 100%;" Placeholder="https://example.com/terms" />
                                                 </ChildContent>
                                                 <Helper>
                                                     <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
@@ -474,16 +434,11 @@
 
             <!-- Action Buttons -->
             <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" class="rz-mt-4" JustifyContent="JustifyContent.SpaceBetween">
-                <RadzenButton Text="Back to Realm" Icon="arrow_back" ButtonStyle="ButtonStyle.Light" 
-                            Click="@BackToRealm" />
+                <RadzenButton Text="Back to Realm" Icon="arrow_back" ButtonStyle="ButtonStyle.Light" Click="@BackToRealm" />
                 
                 <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
-                    <RadzenButton Text="Reset to System Defaults" Icon="restore" ButtonStyle="ButtonStyle.Warning" 
-                                Click="@(async () => await ResetToSystemDefaults())" />
-                    <RadzenButton Text="Save Default Configuration" 
-                                Icon="save" 
-                                ButtonStyle="ButtonStyle.Primary" 
-                                ButtonType="ButtonType.Submit" />
+                    <RadzenButton Text="Reset to System Defaults" Icon="restore" ButtonStyle="ButtonStyle.Warning" Click="@(async () => await ResetToSystemDefaults())" />
+                    <RadzenButton Text="Save Default Configuration" Icon="save" ButtonStyle="ButtonStyle.Primary" ButtonType="ButtonType.Submit" />
                 </RadzenStack>
             </RadzenStack>
         </RadzenTemplateForm>
@@ -553,28 +508,23 @@
     {
         return new UpdateRealmDefaultsRequest
         {
-            // Map all realm default properties from the realm DTO
             DefaultSessionTimeoutHours = realm.DefaultSessionTimeoutHours,
             DefaultRememberMeDurationDays = realm.DefaultRememberMeDurationDays,
             DefaultUseSlidingSessionExpiration = realm.DefaultUseSlidingSessionExpiration,
             DefaultCookieSameSitePolicy = realm.DefaultCookieSameSitePolicy,
             DefaultRequireHttpsForCookies = realm.DefaultRequireHttpsForCookies,
-            
             DefaultRequireConsent = realm.DefaultRequireConsent,
             DefaultAllowRememberConsent = realm.DefaultAllowRememberConsent,
             DefaultMaxRefreshTokensPerUser = realm.DefaultMaxRefreshTokensPerUser,
             DefaultUseOneTimeRefreshTokens = realm.DefaultUseOneTimeRefreshTokens,
             DefaultIncludeJwtId = realm.DefaultIncludeJwtId,
-            
             DefaultRequireMfa = realm.DefaultRequireMfa,
             DefaultMfaGracePeriodMinutes = realm.DefaultMfaGracePeriodMinutes,
             DefaultAllowedMfaMethods = realm.DefaultAllowedMfaMethods,
             DefaultRememberMfaForSession = realm.DefaultRememberMfaForSession,
-            
             DefaultRateLimitRequestsPerMinute = realm.DefaultRateLimitRequestsPerMinute,
             DefaultRateLimitRequestsPerHour = realm.DefaultRateLimitRequestsPerHour,
             DefaultRateLimitRequestsPerDay = realm.DefaultRateLimitRequestsPerDay,
-            
             DefaultEnableDetailedErrors = realm.DefaultEnableDetailedErrors,
             DefaultLogSensitiveData = realm.DefaultLogSensitiveData,
             DefaultThemeName = realm.DefaultThemeName,
@@ -590,7 +540,6 @@
     {
         if (string.IsNullOrEmpty(model.DefaultAllowedMfaMethods))
             return false;
-            
         try
         {
             var methods = System.Text.Json.JsonSerializer.Deserialize<string[]>(model.DefaultAllowedMfaMethods);
@@ -605,7 +554,6 @@
     private void ToggleMfaMethod(string method, bool selected)
     {
         var methods = new List<string>();
-        
         if (!string.IsNullOrEmpty(model.DefaultAllowedMfaMethods))
         {
             try
@@ -627,21 +575,23 @@
             methods.Remove(method);
         }
 
-        model.DefaultAllowedMfaMethods = methods.Any() ? 
-            System.Text.Json.JsonSerializer.Serialize(methods.ToArray()) : 
-            null;
+        model.DefaultAllowedMfaMethods = methods.Any() ? System.Text.Json.JsonSerializer.Serialize(methods.ToArray()) : null;
     }
 
     private async Task OnSave(UpdateRealmDefaultsRequest formModel)
     {
-        await Task.Delay(1); // Satisfy async requirement
-        
         try
         {
-            // For now, we'll show a success message but note this functionality needs API implementation
-            NotificationService.Notify(NotificationSeverity.Info, "Feature Coming Soon", 
-                "Realm default configuration will be implemented in a future update");
-            Navigation.NavigateTo($"/realms/edit/{Id}");
+            var updated = await RealmsApiService.UpdateRealmDefaultsAsync(Id!, formModel);
+            if (updated != null)
+            {
+                NotificationService.Notify(NotificationSeverity.Success, "Success", "Realm defaults saved");
+                Navigation.NavigateTo($"/realms/edit/{Id}");
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to save realm defaults");
+            }
         }
         catch (Exception ex)
         {
@@ -652,38 +602,29 @@
 
     private async Task ResetToSystemDefaults()
     {
-        var result = await DialogService.Confirm("Reset all realm defaults to system-wide defaults?", 
-            "Reset to System Defaults", 
-            new ConfirmOptions() { OkButtonText = "Reset", CancelButtonText = "Cancel" });
-        
+        var result = await DialogService.Confirm("Reset all realm defaults to system-wide defaults?", "Reset to System Defaults", new ConfirmOptions() { OkButtonText = "Reset", CancelButtonText = "Cancel" });
         if (result == true)
         {
-            // Reset to system defaults
             model.DefaultSessionTimeoutHours = 8;
             model.DefaultRememberMeDurationDays = 30;
             model.DefaultUseSlidingSessionExpiration = true;
             model.DefaultCookieSameSitePolicy = "Lax";
             model.DefaultRequireHttpsForCookies = false;
-            
             model.DefaultRequireConsent = false;
             model.DefaultAllowRememberConsent = true;
             model.DefaultMaxRefreshTokensPerUser = null;
             model.DefaultUseOneTimeRefreshTokens = false;
             model.DefaultIncludeJwtId = true;
-            
             model.DefaultRequireMfa = false;
             model.DefaultMfaGracePeriodMinutes = null;
             model.DefaultAllowedMfaMethods = System.Text.Json.JsonSerializer.Serialize(new[] { "totp", "sms" });
             model.DefaultRememberMfaForSession = true;
-            
             model.DefaultRateLimitRequestsPerMinute = null;
             model.DefaultRateLimitRequestsPerHour = null;
             model.DefaultRateLimitRequestsPerDay = null;
-            
             model.DefaultEnableDetailedErrors = false;
             model.DefaultLogSensitiveData = false;
             model.DefaultThemeName = null;
-            
             NotificationService.Notify(NotificationSeverity.Info, "Reset", "Configuration reset to system defaults");
             StateHasChanged();
         }
@@ -694,40 +635,5 @@
         Navigation.NavigateTo($"/realms/edit/{Id}");
     }
 
-    // Helper class for dropdown items
     private record DropdownItem<T>(string Text, T Value);
-
-    // Model for realm defaults update
-    public class UpdateRealmDefaultsRequest
-    {
-        public int DefaultSessionTimeoutHours { get; set; }
-        public int DefaultRememberMeDurationDays { get; set; }
-        public bool DefaultUseSlidingSessionExpiration { get; set; }
-        public string DefaultCookieSameSitePolicy { get; set; } = string.Empty;
-        public bool DefaultRequireHttpsForCookies { get; set; }
-        
-        public bool DefaultRequireConsent { get; set; }
-        public bool DefaultAllowRememberConsent { get; set; }
-        public int? DefaultMaxRefreshTokensPerUser { get; set; }
-        public bool DefaultUseOneTimeRefreshTokens { get; set; }
-        public bool DefaultIncludeJwtId { get; set; }
-        
-        public bool DefaultRequireMfa { get; set; }
-        public int? DefaultMfaGracePeriodMinutes { get; set; }
-        public string? DefaultAllowedMfaMethods { get; set; }
-        public bool DefaultRememberMfaForSession { get; set; }
-        
-        public int? DefaultRateLimitRequestsPerMinute { get; set; }
-        public int? DefaultRateLimitRequestsPerHour { get; set; }
-        public int? DefaultRateLimitRequestsPerDay { get; set; }
-        
-        public bool DefaultEnableDetailedErrors { get; set; }
-        public bool DefaultLogSensitiveData { get; set; }
-        public string? DefaultThemeName { get; set; }
-        public string? RealmCustomCssUrl { get; set; }
-        public string? RealmLogoUri { get; set; }
-        public string? RealmUri { get; set; }
-        public string? RealmPolicyUri { get; set; }
-        public string? RealmTosUri { get; set; }
-    }
 }

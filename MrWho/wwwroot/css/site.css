@@ -11,6 +11,23 @@ body {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
+/* Muted hero header (less striking than solid primary) */
+.hero-muted {
+    background: linear-gradient(180deg, #f8fbff 0%, #f3f6f9 100%);
+    border: 1px solid #dee2e6;
+    box-shadow: 0 6px 18px rgba(33, 37, 41, 0.06);
+}
+.hero-muted .display-4 {
+    color: #2b2f32;
+    font-weight: 600;
+}
+.hero-muted .lead {
+    color: #6c757d;
+}
+.hero-muted .mrwho-logo {
+    box-shadow: 0 4px 16px rgba(33, 37, 41, 0.08);
+}
+
 /* Responsive logo sizing */
 @media (max-width: 576px) {
     .mrwho-logo {

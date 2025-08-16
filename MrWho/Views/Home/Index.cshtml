@@ -37,7 +37,7 @@
             </div>
         }
         
-        <div class="jumbotron bg-primary text-white p-5 rounded mb-4">
+        <div class="jumbotron hero-muted p-5 rounded mb-4">
             <div class="text-center mb-3">
                 <img src="~/images/AuthMrWho.jpeg" alt="MrWho Identity Server" class="mrwho-logo" style="max-width: 120px;" />
             </div>
@@ -46,18 +46,24 @@
         </div>
 
         <div class="row">
-            <div class="col-md-6 mb-3">
+            <div class="col-12 mb-3">
                 <div class="card">
                     <div class="card-header">
                         <h5>Authentication</h5>
                     </div>
                     <div class="card-body">
                         <p>Secure login and logout functionality.</p>
-                        <a href="@Url.Action("Login", "Auth")" class="btn btn-primary">Login</a>
-                        <a href="/connect/register" class="btn btn-outline-primary ms-2">Register</a>
+                        <a href="@Url.Action("Login", "Auth")" class="btn btn-primary">
+                            <i class="bi bi-box-arrow-in-right me-1"></i> Login
+                        </a>
+                        <a href="/connect/register" class="btn btn-outline-primary ms-2">
+                            <i class="bi bi-person-plus me-1"></i> Register
+                        </a>
                         @if (User.Identity?.IsAuthenticated == true)
                         {
-                            <a href="/connect/logout" class="btn btn-outline-secondary ms-2">Logout</a>
+                            <a href="/connect/logout" class="btn btn-outline-secondary ms-2">
+                                <i class="bi bi-box-arrow-right me-1"></i> Logout
+                            </a>
                         }
                         else if (!logoutSuccess)
                         {
@@ -69,7 +75,7 @@
             
             @if (logoutSuccess)
             {
-                <div class="col-md-6 mb-3">
+                <div class="col-12 mb-3">
                     <div class="card">
                         <div class="card-header bg-info text-white">
                             <h5>What's Next?</h5>
