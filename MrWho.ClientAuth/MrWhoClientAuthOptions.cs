@@ -33,7 +33,7 @@ public sealed class MrWhoClientAuthOptions
     public string? ClientSecret { get; set; }
 
     /// <summary>
-    /// Scopes to request. Defaults to the recommended set used by MrWho for user apps.
+    /// Scopes to request. Defaults to a minimal, broadly allowed set. Add API scopes explicitly when needed.
     /// </summary>
     public IList<string> Scopes { get; } = new List<string>
     {
@@ -41,10 +41,9 @@ public sealed class MrWhoClientAuthOptions
         "profile",
         "email",
         "roles",
-        "offline_access",
-        "api.read",
-        "api.write"
-        // NOTE: admin-only scope "mrwho.use" is intentionally not included by default
+        "offline_access"
+        // Add "api.read"/"api.write" explicitly in apps that need API access
+        // Admin-only scope "mrwho.use" is intentionally not included by default
     };
 
     /// <summary>
