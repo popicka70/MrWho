@@ -1,0 +1,23 @@
+@page
+@model MrWhoDemoNuget.Pages.IndexModel
+@{
+    ViewData["Title"] = "Home";
+}
+
+<div class="text-center">
+    <h1 class="display-4">MrWho Demo (NuGet configured)</h1>
+    <p class="lead">This demo app uses the MrWho.ClientAuth NuGet to configure OIDC.</p>
+
+    @if (User?.Identity?.IsAuthenticated == true)
+    {
+        <div class="alert alert-success">Authenticated as <strong>@User.Identity.Name</strong></div>
+        <p>
+            <a class="btn btn-outline-secondary" href="/Secure">Secure Page</a>
+            <a class="btn btn-outline-danger" href="/Account/Logout">Logout</a>
+        </p>
+    }
+    else
+    {
+        <a class="btn btn-primary" href="/Account/Login">Login with MrWho</a>
+    }
+</div>

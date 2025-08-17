@@ -1,0 +1,15 @@
+@page
+@attribute [Microsoft.AspNetCore.Authorization.Authorize]
+@model MrWhoDemoNuget.Pages.SecureModel
+@{
+    ViewData["Title"] = "Secure";
+}
+
+<h2>Secure Page</h2>
+<p>You are authenticated. Claims:</p>
+<ul>
+@foreach (var c in User.Claims)
+{
+    <li><code>@c.Type</code> = @c.Value</li>
+}
+</ul>

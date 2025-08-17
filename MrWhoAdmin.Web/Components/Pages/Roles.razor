@@ -112,11 +112,17 @@
             <RadzenFormField Text="Description">
                 <RadzenTextArea @bind-Value="@editRoleDescription" Style="width: 100%;" />
             </RadzenFormField>
-            <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" AlignItems="AlignItems.Center" class="rz-my-2">
-                <RadzenText>Status:</RadzenText>
-                <RadzenCheckBox @bind-Value="@editRoleEnabled" />
-                <RadzenLabel Text="Role is enabled" />
-            </RadzenStack>
+            
+            <!-- Updated boolean input to follow standard RadzenFormField pattern -->
+            <RadzenFormField Text="Status" Variant="Variant.Outlined">
+                <Start>
+                    <RadzenCheckBox @bind-Value="@editRoleEnabled" Name="editRoleEnabled" />
+                </Start>
+                <ChildContent>
+                    <RadzenLabel Text="Role is enabled" Component="editRoleEnabled" />
+                </ChildContent>
+            </RadzenFormField>
+            
             <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem">
                 <RadzenButton Click="@UpdateRole" Icon="save" ButtonStyle="ButtonStyle.Primary" Text="Update Role" IsBusy="@isUpdating" />
                 <RadzenButton Click="@CancelEdit" Icon="cancel" ButtonStyle="ButtonStyle.Secondary" Text="Cancel" />
