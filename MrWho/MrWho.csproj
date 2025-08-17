@@ -22,6 +22,9 @@
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
     <PackageReference Include="OpenIddict.AspNetCore" Version="7.0.0" />
     <PackageReference Include="OpenIddict.EntityFrameworkCore" Version="7.0.0" />
+    <PackageReference Include="OpenIddict.Client" Version="7.0.0" />
+    <PackageReference Include="OpenIddict.Client.AspNetCore" Version="7.0.0" />
+    <PackageReference Include="OpenIddict.Client.WebIntegration" Version="7.0.0" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.13.1" />
     <PackageReference Include="QRCoder" Version="1.6.0" />
     <PackageReference Include="Fido2" Version="4.0.0-beta.17" />
@@ -34,6 +37,10 @@
 
   <ItemGroup>
     <Folder Include="Migrations\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Update="OpenIddict.Client.WebIntegration" PrivateAssets="all" />
   </ItemGroup>
 
 </Project>

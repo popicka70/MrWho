@@ -27,6 +27,10 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
     public DbSet<ClientPermission> ClientPermissions { get; set; }
     public DbSet<ClientUser> ClientUsers { get; set; }
     
+    // NEW: Identity brokering entities
+    public DbSet<IdentityProvider> IdentityProviders { get; set; }
+    public DbSet<ClientIdentityProvider> ClientIdentityProviders { get; set; }
+    
     // Scope management entities
     public DbSet<Scope> Scopes { get; set; }
     public DbSet<ScopeClaim> ScopeClaims { get; set; }
@@ -124,6 +128,29 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
             entity.HasOne(cu => cu.User)
                   .WithMany()
                   .HasForeignKey(cu => cu.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Configure IdentityProvider entity
+        builder.Entity<IdentityProvider>(entity =>
+        {
+            entity.HasKey(ip => ip.Id);
+            entity.HasIndex(ip => new { ip.RealmId, ip.Name }).IsUnique();
+            entity.Property(ip => ip.ClaimMappingsJson).HasMaxLength(4000);
+        });
+
+        // Configure ClientIdentityProvider entity
+        builder.Entity<ClientIdentityProvider>(entity =>
+        {
+            entity.HasKey(cip => cip.Id);
+            entity.HasIndex(cip => new { cip.ClientId, cip.IdentityProviderId }).IsUnique();
+            entity.HasOne(cip => cip.Client)
+                  .WithMany(c => c.IdentityProviders)
+                  .HasForeignKey(cip => cip.ClientId)
+                  .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(cip => cip.IdentityProvider)
+                  .WithMany(ip => ip.ClientLinks)
+                  .HasForeignKey(cip => cip.IdentityProviderId)
                   .OnDelete(DeleteBehavior.Cascade);
         });
 
@@ -257,7 +284,7 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
 
         // =========================================================================
         // DEVICE MANAGEMENT CONFIGURATION
-        // ============================================================================
+        // =========================================================================
 
         // Configure UserDevice entity
         builder.Entity<UserDevice>(entity =>
@@ -377,6 +404,18 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
                 entity.Property(c => c.CustomJavaScriptUrl).HasColumnType("longtext");
                 entity.Property(c => c.CustomLoginPageUrl).HasColumnType("longtext");
                 entity.Property(c => c.CustomLogoutPageUrl).HasColumnType("longtext");
+            });
+
+            // Adjust long text fields for IdentityProvider and ClientIdentityProvider as well
+            builder.Entity<IdentityProvider>(entity =>
+            {
+                entity.Property(ip => ip.ClaimMappingsJson).HasColumnType("longtext");
+                entity.Property(ip => ip.SamlCertificate).HasColumnType("longtext");
+            });
+
+            builder.Entity<ClientIdentityProvider>(entity =>
+            {
+                entity.Property(cip => cip.OptionsJson).HasColumnType("longtext");
             });
 
             builder.Entity<Realm>(entity =>

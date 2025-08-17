@@ -7,6 +7,10 @@ using Fido2NetLib;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
+using OpenIddict.Client;
+using OpenIddict.Client.AspNetCore;
+using OpenIddict.Client.WebIntegration;
+using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,6 +30,30 @@ builder.Services.AddMrWhoIdentityWithClientCookies();
 builder.Services.AddMrWhoServices(); // This now includes device management services
 builder.Services.AddMrWhoClientCookies(); // Add client-specific cookies
 builder.Services.AddMrWhoOpenIddict();
+
+// Add OpenIddict client for upstream OIDC brokering
+builder.Services.AddOpenIddict()
+    .AddClient(options =>
+    {
+        // Enable the authorization code flow and map the redirection URIs
+        options.AllowAuthorizationCodeFlow();
+        options.SetRedirectionEndpointUris("/connect/external/callback");
+        options.SetPostLogoutRedirectionEndpointUris("/connect/external/signout-callback");
+
+        // Enable the ASP.NET Core host integration
+        options.UseAspNetCore()
+               .EnableRedirectionEndpointPassthrough()
+               .EnablePostLogoutRedirectionEndpointPassthrough();
+
+        // Register the web provider integrations container
+        options.UseWebProviders();
+
+        // Registrations will be added later from DB via the configurator
+    });
+
+// Register dynamic client registrations from database
+builder.Services.AddSingleton<IConfigureOptions<OpenIddictClientOptions>, ExternalIdpClientOptionsConfigurator>();
+
 builder.Services.AddMrWhoAuthorizationWithClientCookies(); // Use authorization with client cookie support
 builder.Services.AddMrWhoMediator(); // Lightweight mediator + endpoint handlers
 
@@ -203,10 +231,6 @@ logger.LogInformation("?? Device Management: Enhanced QR login with persistent d
 
 // Configure the HTTP request pipeline using the new client-cookie-aware method
 await app.ConfigureMrWhoPipelineWithClientCookiesAsync();
-
-// Map OIDC minimal endpoints and debug endpoints
-app.AddMrWhoEndpoints();
-app.AddMrWhoDebugEndpoints();
 
 // Run the app
 app.Run();
