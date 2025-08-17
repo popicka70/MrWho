@@ -9,7 +9,7 @@ on:
   workflow_dispatch: {}
 
 permissions:
-  contents: write  # Zm�n�no z read na write kv�li tagov�n�
+  contents: write  # Zmï¿½nï¿½no z read na write kvï¿½li tagovï¿½nï¿½
   packages: write
 
 concurrency:
@@ -36,7 +36,9 @@ jobs:
       - name: Calculate next tag
         id: next_tag
         run: |
-          IFS='.' read -r major minor patch <<<"${{ steps.get_tag.outputs.latest_tag#v }}"
+          latest="${{ steps.get_tag.outputs.latest_tag }}"
+          version="${latest#v}"  # odstranÃ­ prefix 'v'
+          IFS='.' read -r major minor patch <<<"$version"
           patch=$((patch + 1))
           new_tag="v$major.$minor.$patch"
           echo "new_tag=$new_tag" >> $GITHUB_OUTPUT
