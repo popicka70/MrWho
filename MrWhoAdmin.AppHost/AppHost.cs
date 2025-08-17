@@ -20,4 +20,10 @@ var demo1 = builder.AddProject<Projects.MrWhoDemo1>("mrwhodemo1")
     .WithReference(mrWho)
     .WaitFor(mrWho);
 
+var demoNuget = builder.AddProject<Projects.MrWhoDemoNuget>("mrwhodemonuget")
+    .WithExternalHttpEndpoints()
+    .WithHttpHealthCheck("/health")
+    .WithReference(mrWho)
+    .WaitFor(mrWho);
+
 builder.Build().Run();
