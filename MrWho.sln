@@ -28,6 +28,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MrWhoDemo1", "MrWhoDemo1\Mr
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MrWho.ClientAuth", "MrWho.ClientAuth\MrWho.ClientAuth.csproj", "{A46FCB24-8AF3-493B-9AE3-3EFFBB090E54}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MrWhoDemoNuget", "MrWhoDemoNuget\MrWhoDemoNuget.csproj", "{9EE5FF8B-BCD6-A849-1B4C-B71591F7F031}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -134,6 +136,18 @@ Global
 		{A46FCB24-8AF3-493B-9AE3-3EFFBB090E54}.Release|x64.Build.0 = Release|Any CPU
 		{A46FCB24-8AF3-493B-9AE3-3EFFBB090E54}.Release|x86.ActiveCfg = Release|Any CPU
 		{A46FCB24-8AF3-493B-9AE3-3EFFBB090E54}.Release|x86.Build.0 = Release|Any CPU
+		{9EE5FF8B-BCD6-A849-1B4C-B71591F7F031}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9EE5FF8B-BCD6-A849-1B4C-B71591F7F031}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9EE5FF8B-BCD6-A849-1B4C-B71591F7F031}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{9EE5FF8B-BCD6-A849-1B4C-B71591F7F031}.Debug|x64.Build.0 = Debug|Any CPU
+		{9EE5FF8B-BCD6-A849-1B4C-B71591F7F031}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{9EE5FF8B-BCD6-A849-1B4C-B71591F7F031}.Debug|x86.Build.0 = Debug|Any CPU
+		{9EE5FF8B-BCD6-A849-1B4C-B71591F7F031}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9EE5FF8B-BCD6-A849-1B4C-B71591F7F031}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9EE5FF8B-BCD6-A849-1B4C-B71591F7F031}.Release|x64.ActiveCfg = Release|Any CPU
+		{9EE5FF8B-BCD6-A849-1B4C-B71591F7F031}.Release|x64.Build.0 = Release|Any CPU
+		{9EE5FF8B-BCD6-A849-1B4C-B71591F7F031}.Release|x86.ActiveCfg = Release|Any CPU
+		{9EE5FF8B-BCD6-A849-1B4C-B71591F7F031}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
