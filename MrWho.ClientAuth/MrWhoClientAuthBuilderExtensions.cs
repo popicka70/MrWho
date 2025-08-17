@@ -6,6 +6,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
+using System.Security.Claims;
+using Microsoft.IdentityModel.Tokens;
 
 namespace MrWho.ClientAuth;
 
@@ -67,6 +69,13 @@ public static class MrWhoClientAuthBuilderExtensions
             oidc.CallbackPath = options.CallbackPath;
             oidc.SignedOutCallbackPath = options.SignedOutCallbackPath;
             oidc.RemoteSignOutPath = options.RemoteSignOutPath;
+
+            // Ensure Identity.Name and roles resolve using standard OIDC claims by default
+            oidc.TokenValidationParameters = new TokenValidationParameters
+            {
+                NameClaimType = "name",
+                RoleClaimType = "role"
+            };
 
             // Scopes
             oidc.Scope.Clear();
@@ -145,6 +154,27 @@ public static class MrWhoClientAuthBuilderExtensions
                     logger.LogInformation("Token response received. HasAccessToken={HasAT}, HasRefreshToken={HasRT}",
                         !string.IsNullOrEmpty(ctx.TokenEndpointResponse.AccessToken),
                         !string.IsNullOrEmpty(ctx.TokenEndpointResponse.RefreshToken));
+                    return Task.CompletedTask;
+                },
+                OnTokenValidated = ctx =>
+                {
+                    // Ensure a usable display name so HttpContext.User.Identity.Name is never null
+                    var identity = ctx.Principal?.Identities?.FirstOrDefault();
+                    if (identity != null)
+                    {
+                        // If there's no "name" claim, try to synthesize one from preferred_username, email, then sub
+                        bool hasName = identity.HasClaim(c => c.Type == "name");
+                        if (!hasName)
+                        {
+                            var value = identity.FindFirst("preferred_username")?.Value
+                                        ?? identity.FindFirst("email")?.Value
+                                        ?? identity.FindFirst("sub")?.Value;
+                            if (!string.IsNullOrWhiteSpace(value))
+                            {
+                                identity.AddClaim(new Claim("name", value));
+                            }
+                        }
+                    }
                     return Task.CompletedTask;
                 },
                 OnAuthenticationFailed = ctx =>
