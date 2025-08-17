@@ -1,4 +1,6 @@
 @page "/identity-providers"
+@attribute [Authorize]
+@rendermode InteractiveServer
 @using System.Net.Http.Json
 @using MrWho.Shared.Models
 @using MrWho.Shared
@@ -8,7 +10,6 @@
 @inject Radzen.NotificationService NotificationService
 @inject MrWhoAdmin.Web.Services.IIdentityProvidersApiService IdentityProvidersApi
 
-<RadzenComponents @rendermode="InteractiveServer" />
 <RadzenStack Gap="1rem">
     <RadzenHeading Size="HeadingSize.H3" Text="Identity Providers" />
 

@@ -5,6 +5,7 @@
 @inject Radzen.DialogService DialogService
 @inject Radzen.NotificationService NotificationService
 @inject NavigationManager Nav
+@inject MrWhoAdmin.Web.Services.IIdentityProvidersApiService IdentityProvidersApi
 
 <RadzenComponents @rendermode="InteractiveServer" />
 
@@ -214,25 +215,24 @@
             _model.UsePkce = _usePkce;
             _model.GetClaimsFromUserInfoEndpoint = _getClaimsFromUserInfo;
 
-            HttpResponseMessage resp;
+            IdentityProviderDto? saved;
             if (_isNew)
             {
-                resp = await Http.PostAsJsonAsync("api/IdentityProviders", _model);
+                saved = await IdentityProvidersApi.CreateIdentityProviderAsync(_model);
             }
             else
             {
-                resp = await Http.PutAsJsonAsync($"api/IdentityProviders/{_model.Id}", _model);
+                saved = await IdentityProvidersApi.UpdateIdentityProviderAsync(_model.Id, _model);
             }
 
-            if (resp.IsSuccessStatusCode)
+            if (saved is not null)
             {
                 NotificationService.Notify(new Radzen.NotificationMessage { Severity = Radzen.NotificationSeverity.Success, Summary = "Saved" });
                 DialogService.Close(true);
             }
             else
             {
-                var detail = await resp.Content.ReadAsStringAsync();
-                NotificationService.Notify(new Radzen.NotificationMessage { Severity = Radzen.NotificationSeverity.Error, Summary = "Save failed", Detail = detail });
+                NotificationService.Notify(new Radzen.NotificationMessage { Severity = Radzen.NotificationSeverity.Error, Summary = "Save failed" });
             }
         }
         catch (Exception ex)
