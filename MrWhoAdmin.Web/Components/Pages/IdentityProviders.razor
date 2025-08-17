@@ -25,7 +25,7 @@
             <RadzenDataGridColumn TItem="IdentityProviderDto" Property="Type" Title="Type" />
             <RadzenDataGridColumn TItem="IdentityProviderDto" Property="IsEnabled" Title="Enabled" />
             <RadzenDataGridColumn TItem="IdentityProviderDto" Property="Authority" Title="Authority / SSO URL" />
-            <RadzenDataGridColumn TItem="IdentityProviderDto" Context="it" Title="Actions" Width="380px">
+            <RadzenDataGridColumn TItem="IdentityProviderDto" Context="it" Title="Actions" Width="500px">
                 <Template Context="it">
                     <RadzenButton Icon="visibility" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" Text="Edit" Click="@(async ()=> await OpenEditDialog(it))" />
                     <RadzenButton Icon="toggle_on" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" Click="@(async ()=> await ToggleEnabled(it))" Text="Toggle" Style="margin-left:.5rem" />
@@ -47,7 +47,6 @@
 
     private async Task Load()
     {
-        // Use typed API client to ensure BaseAddress is set
         _items = await IdentityProvidersApi.GetIdentityProvidersAsync() ?? new();
         StateHasChanged();
     }
@@ -94,8 +93,14 @@
 
     private async Task ManageLinks(IdentityProviderDto ip)
     {
-        // Placeholder: could navigate to /identity-providers/{id}/clients page later
-        await Task.CompletedTask;
+        var result = await DialogService.OpenAsync<IdentityProviderLinksDialog>($"Manage Links - {ip.DisplayName ?? ip.Name}",
+            new Dictionary<string, object> { { "Provider", ip } },
+            new DialogOptions { Width = "900px", Height = "620px", Resizable = true, Draggable = true });
+
+        if (result is bool b && b)
+        {
+            await Load();
+        }
     }
 
     private Task TestLogin(IdentityProviderDto ip)

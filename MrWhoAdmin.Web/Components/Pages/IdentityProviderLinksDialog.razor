@@ -1,0 +1,137 @@
+@using MrWho.Shared.Models
+@inject MrWhoAdmin.Web.Services.IIdentityProvidersApiService IdentityProvidersApi
+@inject MrWhoAdmin.Web.Services.IClientsApiService ClientsApi
+@inject Radzen.DialogService DialogService
+@inject Radzen.NotificationService NotificationService
+
+<RadzenStack Gap="1rem" Style="min-width: 820px;">
+    <RadzenText TextStyle="TextStyle.H6">Manage Links for @Provider.DisplayName (@Provider.Name)</RadzenText>
+
+    <RadzenCard>
+        <RadzenText TextStyle="TextStyle.Subtitle2">Add Link</RadzenText>
+        <RadzenRow Gap="1rem" class="rz-mt-2">
+            <RadzenColumn Size="12" SizeMD="6">
+                <RadzenFormField Text="Client" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenDropDown Data="_clients" @bind-Value="_selectedClientId" Style="width:100%"
+                                        TextProperty="Name" ValueProperty="Id" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive" AllowClear="true" />
+                    </ChildContent>
+                </RadzenFormField>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="6">
+                <RadzenFormField Text="Search Clients" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenTextBox @bind-Value="_clientSearch" Style="width:100%" Placeholder="type to search..." Change="@(async _ => await LoadClients())" />
+                    </ChildContent>
+                </RadzenFormField>
+            </RadzenColumn>
+        </RadzenRow>
+        <RadzenRow Gap="1rem">
+            <RadzenColumn Size="12" SizeMD="6">
+                <RadzenFormField Text="Display Name Override" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenTextBox @bind-Value="_displayNameOverride" Style="width:100%" />
+                    </ChildContent>
+                </RadzenFormField>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="3">
+                <RadzenFormField Text="Order" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenNumeric TValue="int" @bind-Value="_order" Style="width:100%" />
+                    </ChildContent>
+                </RadzenFormField>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="3" class="rz-display-flex rz-justify-content-end rz-align-items-end">
+                <RadzenButton Icon="link" Text="Add Link" ButtonStyle="ButtonStyle.Primary" Click="@(async ()=> await AddLink())" Disabled="@string.IsNullOrEmpty(_selectedClientId)" />
+            </RadzenColumn>
+        </RadzenRow>
+    </RadzenCard>
+
+    <RadzenCard>
+        <RadzenText TextStyle="TextStyle.Subtitle2">Linked Clients</RadzenText>
+        <RadzenDataGrid TItem="ClientIdentityProviderDto" Data="_links" AllowPaging="true" PageSize="10" class="rz-mt-2">
+            <Columns>
+                <RadzenDataGridColumn TItem="ClientIdentityProviderDto" Property="ClientId" Title="Client Id" />
+                <RadzenDataGridColumn TItem="ClientIdentityProviderDto" Property="DisplayNameOverride" Title="Display Name" />
+                <RadzenDataGridColumn TItem="ClientIdentityProviderDto" Property="Order" Title="Order" />
+                <RadzenDataGridColumn TItem="ClientIdentityProviderDto" Context="row" Title="Actions" Width="150px">
+                    <Template Context="row">
+                        <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.Small" Text="Remove"
+                                      Click="@(async ()=> await RemoveLink(row))" />
+                    </Template>
+                </RadzenDataGridColumn>
+            </Columns>
+        </RadzenDataGrid>
+    </RadzenCard>
+
+    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" JustifyContent="JustifyContent.End">
+        <RadzenButton Icon="close" ButtonStyle="ButtonStyle.Secondary" Text="Close" Click="@(async ()=> DialogService.Close(true))" />
+    </RadzenStack>
+</RadzenStack>
+
+@code {
+    [Parameter] public IdentityProviderDto Provider { get; set; } = default!;
+
+    private List<ClientIdentityProviderDto> _links = new();
+    private List<ClientDto> _clients = new();
+    private string? _selectedClientId;
+    private string _clientSearch = string.Empty;
+    private string? _displayNameOverride;
+    private int? _order;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadLinks();
+        await LoadClients();
+    }
+
+    private async Task LoadLinks()
+    {
+        _links = await IdentityProvidersApi.GetLinksAsync(Provider.Id) ?? new();
+    }
+
+    private async Task LoadClients()
+    {
+        var page = await ClientsApi.GetClientsAsync(page: 1, pageSize: 25, search: _clientSearch);
+        _clients = page?.Items ?? new();
+        StateHasChanged();
+    }
+
+    private async Task AddLink()
+    {
+        if (string.IsNullOrEmpty(_selectedClientId)) return;
+        var dto = new ClientIdentityProviderDto
+        {
+            DisplayNameOverride = _displayNameOverride,
+            Order = _order,
+            IsEnabled = true
+        };
+        var created = await IdentityProvidersApi.AddLinkAsync(Provider.Id, _selectedClientId, dto);
+        if (created is not null)
+        {
+            NotificationService.Notify(new Radzen.NotificationMessage { Severity = Radzen.NotificationSeverity.Success, Summary = "Linked" });
+            _displayNameOverride = null;
+            _order = null;
+            _selectedClientId = null;
+            await LoadLinks();
+        }
+        else
+        {
+            NotificationService.Notify(new Radzen.NotificationMessage { Severity = Radzen.NotificationSeverity.Error, Summary = "Link failed" });
+        }
+    }
+
+    private async Task RemoveLink(ClientIdentityProviderDto link)
+    {
+        var ok = await IdentityProvidersApi.RemoveLinkAsync(Provider.Id, link.Id);
+        if (ok)
+        {
+            NotificationService.Notify(new Radzen.NotificationMessage { Severity = Radzen.NotificationSeverity.Info, Summary = "Removed" });
+            await LoadLinks();
+        }
+        else
+        {
+            NotificationService.Notify(new Radzen.NotificationMessage { Severity = Radzen.NotificationSeverity.Error, Summary = "Remove failed" });
+        }
+    }
+}
