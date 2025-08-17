@@ -200,6 +200,15 @@ public static class ServiceCollectionExtensions
         })
         .AddHttpMessageHandler<AuthenticationDelegatingHandler>();
 
+        // Add API Usage API service
+        services.AddHttpClient<IApiUsageApiService, ApiUsageApiService>(client =>
+        {
+            client.BaseAddress = new Uri(mrWhoApiBaseUrl);
+            client.DefaultRequestHeaders.Add("Accept", "application/json");
+            client.Timeout = defaultTimeout;
+        })
+        .AddHttpMessageHandler<AuthenticationDelegatingHandler>();
+
         return services;
     }
 

@@ -1,0 +1,153 @@
+@page "/monitoring/api-usage"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using MrWho.Shared.Models
+@inject IApiUsageApiService UsageApi
+@inject NotificationService Notifications
+@inject ILogger<ApiUsage> Logger
+
+<PageTitle>API Usage - MrWho Admin</PageTitle>
+
+<RadzenStack Gap="1rem">
+    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween">
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+            <RadzenIcon Icon="api" Style="font-size: 2rem;" />
+            <RadzenText TextStyle="TextStyle.H4" Text="API Usage" />
+        </RadzenStack>
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.75rem">
+            <RadzenFormField Text="Days" Variant="Variant.Outlined">
+                <RadzenNumeric @bind-Value="days" Min="1" Max="90" Style="width: 120px;" />
+            </RadzenFormField>
+            <RadzenButton Icon="refresh" Text="Refresh" ButtonStyle="ButtonStyle.Secondary" Click="@(async () => await LoadAsync())" IsBusy="@isLoading" />
+        </RadzenStack>
+    </RadzenStack>
+
+    @if (overview != null)
+    {
+        <RadzenRow Gap="1rem">
+            <RadzenColumn Size="12" SizeMD="3">
+                <RadzenCard Style="text-align: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                    <RadzenStack Gap="0.25rem">
+                        <RadzenIcon Icon="analytics" Style="font-size: 2.5rem;" />
+                        <RadzenText TextStyle="TextStyle.H3" Text="@overview.TotalRequests.ToString()" />
+                        <RadzenText TextStyle="TextStyle.Subtitle2" Text="Total Requests" />
+                    </RadzenStack>
+                </RadzenCard>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="3">
+                <RadzenCard Style="text-align: center; background: linear-gradient(135deg, #34e89e 0%, #0f3443 100%); color: white;">
+                    <RadzenStack Gap="0.25rem">
+                        <RadzenIcon Icon="group_work" Style="font-size: 2.5rem;" />
+                        <RadzenText TextStyle="TextStyle.H3" Text="@overview.UniqueClients.ToString()" />
+                        <RadzenText TextStyle="TextStyle.Subtitle2" Text="Unique Clients" />
+                    </RadzenStack>
+                </RadzenCard>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="3">
+                <RadzenCard Style="text-align: center; background: linear-gradient(135deg, #f7971e 0%, #ffd200 100%); color: white;">
+                    <RadzenStack Gap="0.25rem">
+                        <RadzenIcon Icon="schedule" Style="font-size: 2.5rem;" />
+                        <RadzenText TextStyle="TextStyle.H3" Text="@overview.RequestsLast24H.ToString()" />
+                        <RadzenText TextStyle="TextStyle.Subtitle2" Text="Last 24h" />
+                    </RadzenStack>
+                </RadzenCard>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="3">
+                <RadzenCard Style="text-align: center; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: white;">
+                    <RadzenStack Gap="0.25rem">
+                        <RadzenIcon Icon="date_range" Style="font-size: 2.5rem;" />
+                        <RadzenText TextStyle="TextStyle.H3" Text="@overview.RequestsLast7D.ToString()" />
+                        <RadzenText TextStyle="TextStyle.Subtitle2" Text="Last 7 days" />
+                    </RadzenStack>
+                </RadzenCard>
+            </RadzenColumn>
+        </RadzenRow>
+    }
+
+    <RadzenRow Gap="1rem">
+        <RadzenColumn Size="12" SizeMD="8">
+            <RadzenCard>
+                <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">Requests over time</RadzenText>
+                @if (series.Count == 0)
+                {
+                    <RadzenText class="rz-color-secondary">No data</RadzenText>
+                }
+                else
+                {
+                    <RadzenChart Style="height: 260px;">
+                        <RadzenAreaSeries Data="@series" CategoryProperty="Date" ValueProperty="Requests" />
+                        <RadzenCategoryAxis Formatter="@(v => ((DateTime)v).ToString("MM-dd"))" />
+                        <RadzenValueAxis />
+                        <RadzenLegend Visible="false" />
+                    </RadzenChart>
+                }
+            </RadzenCard>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeMD="4">
+            <RadzenCard>
+                <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">Top Clients</RadzenText>
+                <RadzenDataGrid Data="@topClients" TItem="ApiUsageTopClientDto" PageSize="10" AllowPaging="true">
+                    <Columns>
+                        <RadzenDataGridColumn TItem="ApiUsageTopClientDto" Property="ClientId" Title="Client" />
+                        <RadzenDataGridColumn TItem="ApiUsageTopClientDto" Property="Requests" Title="Requests" Width="120px" />
+                    </Columns>
+                </RadzenDataGrid>
+            </RadzenCard>
+        </RadzenColumn>
+    </RadzenRow>
+
+    <RadzenCard>
+        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">Top Endpoints</RadzenText>
+        <RadzenDataGrid Data="@topEndpoints" TItem="ApiEndpointUsageDto" PageSize="10" AllowPaging="true">
+            <Columns>
+                <RadzenDataGridColumn TItem="ApiEndpointUsageDto" Property="Endpoint" Title="Endpoint" />
+                <RadzenDataGridColumn TItem="ApiEndpointUsageDto" Property="Requests" Title="Requests" Width="120px" />
+            </Columns>
+        </RadzenDataGrid>
+    </RadzenCard>
+</RadzenStack>
+
+@code {
+    private bool isLoading = false;
+    private int days = 14;
+    private ApiUsageOverviewDto? overview;
+    private List<ApiUsageTimeSeriesPointDto> series = new();
+    private List<ApiUsageTopClientDto> topClients = new();
+    private List<ApiEndpointUsageDto> topEndpoints = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            isLoading = true;
+            StateHasChanged();
+
+            var oTask = UsageApi.GetOverviewAsync();
+            var sTask = UsageApi.GetTimeSeriesAsync(days);
+            var cTask = UsageApi.GetTopClientsAsync(20);
+            var eTask = UsageApi.GetTopEndpointsAsync(20);
+
+            await Task.WhenAll(oTask, sTask, cTask, eTask);
+
+            overview = await oTask;
+            series = await sTask;
+            topClients = await cTask;
+            topEndpoints = await eTask;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load API usage");
+            Notifications.Notify(NotificationSeverity.Error, "API Usage", "Failed to load data");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+}
