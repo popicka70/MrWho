@@ -49,6 +49,9 @@ app.UseAuthorization();
 // Health endpoint for Aspire
 app.MapGet("/health", () => Results.Ok("OK"));
 
+// Map the back-channel logout endpoint provided by MrWho.ClientAuth
+app.MapMrWhoBackChannelLogoutEndpoint();
+
 app.MapRazorPages();
 
 app.Run();
