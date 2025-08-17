@@ -1,0 +1,35 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageId>MrWho.ClientAuth</PackageId>
+    <Version>0.1.0</Version>
+    <Authors>MrWho</Authors>
+    <Company>MrWho</Company>
+    <Product>MrWho Client Authentication</Product>
+    <Description>Client-side configuration helpers for authenticating ASP.NET Core apps with the MrWho OIDC server.</Description>
+    <PackageTags>OpenID Connect;OIDC;Authentication;MrWho;Blazor;ASP.NET Core</PackageTags>
+    <RepositoryUrl>https://example.com/mrwho</RepositoryUrl>
+    <PackageReadmeFile>Readme.md</PackageReadmeFile>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="Readme.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="9.0.0" />
+    <PackageReference Include="Microsoft.IdentityModel.Protocols.OpenIdConnect" Version="8.0.1" />
+  </ItemGroup>
+
+</Project>
