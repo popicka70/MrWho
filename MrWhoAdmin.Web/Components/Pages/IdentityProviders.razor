@@ -6,6 +6,7 @@
 @inject NavigationManager Nav
 @inject Radzen.DialogService DialogService
 @inject Radzen.NotificationService NotificationService
+@inject MrWhoAdmin.Web.Services.IIdentityProvidersApiService IdentityProvidersApi
 
 <RadzenComponents @rendermode="InteractiveServer" />
 <RadzenStack Gap="1rem">
@@ -45,7 +46,8 @@
 
     private async Task Load()
     {
-        _items = await Http.GetFromJsonAsync<List<IdentityProviderDto>>("api/IdentityProviders") ?? new();
+        // Use typed API client to ensure BaseAddress is set
+        _items = await IdentityProvidersApi.GetIdentityProvidersAsync() ?? new();
         StateHasChanged();
     }
 
@@ -77,8 +79,8 @@
     private async Task ToggleEnabled(IdentityProviderDto ip)
     {
         ip.IsEnabled = !ip.IsEnabled;
-        var resp = await Http.PutAsJsonAsync($"api/IdentityProviders/{ip.Id}", ip);
-        if (resp.IsSuccessStatusCode)
+        var updated = await IdentityProvidersApi.UpdateIdentityProviderAsync(ip.Id, ip);
+        if (updated is not null)
         {
             NotificationService?.Notify(new Radzen.NotificationMessage { Severity = Radzen.NotificationSeverity.Info, Summary = ip.IsEnabled ? "Enabled" : "Disabled" });
             await Load();
