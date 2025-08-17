@@ -190,31 +190,61 @@
                     <!-- Scopes Tab -->
                     <RadzenTabsItem Text="Scopes" Icon="policy">
                         <div style="padding: 1rem; max-height: 550px; overflow-y: auto;">
-                            <RadzenStack Gap="0.75rem" class="rz-mb-4">
+                            <RadzenStack Gap="0.75rem" class="rz-mb-3">
                                 <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Allowed Scopes</RadzenText>
-                                <RadzenFormField Text="Scopes" Variant="Variant.Outlined">
-                                    <ChildContent>
-                                        <RadzenDropDown @bind-Value="@selectedScopes"
-                                                        Data="@availableScopes"
-                                                        TextProperty="Name"
-                                                        ValueProperty="Name"
-                                                        Multiple="true"
-                                                        FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
-                                                        AllowClear="true"
-                                                        Placeholder="Select one or more scopes..."
-                                                        Style="width: 100%;" />
-                                    </ChildContent>
-                                    <Helper>
-                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                            Select which scopes this client is allowed to request. Include API scopes when needed.
-                                        </RadzenText>
-                                    </Helper>
-                                </RadzenFormField>
+
+                                <RadzenRow class="rz-mb-2">
+                                    <RadzenColumn Size="12" SizeMD="6">
+                                        <RadzenFormField Text="Search" Variant="Variant.Outlined">
+                                            <ChildContent>
+                                                <RadzenTextBox @bind-Value="scopeSearch" Placeholder="Filter by name or description" Style="width: 100%;" Change="@(args => ApplyScopeFilter())" />
+                                            </ChildContent>
+                                        </RadzenFormField>
+                                    </RadzenColumn>
+                                    <RadzenColumn Size="12" SizeMD="6">
+                                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" JustifyContent="JustifyContent.End">
+                                            <RadzenButton Text="Select All (filtered)" Icon="playlist_add_check" Click="@(() => SelectAllFilteredScopes(true))" />
+                                            <RadzenButton Text="Clear All (filtered)" Icon="playlist_remove" ButtonStyle="ButtonStyle.Secondary" Click="@(() => SelectAllFilteredScopes(false))" />
+                                        </RadzenStack>
+                                    </RadzenColumn>
+                                </RadzenRow>
+
+                                <RadzenDataGrid TItem="ScopeSelection" Data="@FilteredScopeItems" AllowFiltering="false" AllowSorting="true" AllowPaging="true" PageSize="10" Responsive="true">
+                                    <Columns>
+                                        <RadzenDataGridColumn TItem="ScopeSelection" Title="Allow" Width="90px">
+                                            <Template Context="s">
+                                                <RadzenCheckBox Value="@s.Selected" ValueChanged="@((bool v) => ToggleScopeSelection(s.Name, v))" />
+                                            </Template>
+                                        </RadzenDataGridColumn>
+                                        <RadzenDataGridColumn TItem="ScopeSelection" Property="Name" Title="Scope" Width="220px" />
+                                        <RadzenDataGridColumn TItem="ScopeSelection" Property="DisplayName" Title="Display Name" Width="220px" />
+                                        <RadzenDataGridColumn TItem="ScopeSelection" Property="Type" Title="Type" Width="120px">
+                                            <Template Context="s">
+                                                <RadzenBadge Text="@s.Type.ToString()" BadgeStyle="@(s.Type == ScopeType.Identity ? BadgeStyle.Info : BadgeStyle.Primary)" />
+                                            </Template>
+                                        </RadzenDataGridColumn>
+                                        <RadzenDataGridColumn TItem="ScopeSelection" Property="IsStandard" Title="Std" Width="80px">
+                                            <Template Context="s">
+                                                <RadzenBadge Text="@(s.IsStandard ? "Yes" : "No")" BadgeStyle="@(s.IsStandard ? BadgeStyle.Info : BadgeStyle.Light)" />
+                                            </Template>
+                                        </RadzenDataGridColumn>
+                                        <RadzenDataGridColumn TItem="ScopeSelection" Property="IsEnabled" Title="Status" Width="100px">
+                                            <Template Context="s">
+                                                <RadzenBadge Text="@(s.IsEnabled ? "Enabled" : "Disabled")" BadgeStyle="@(s.IsEnabled ? BadgeStyle.Success : BadgeStyle.Danger)" />
+                                            </Template>
+                                        </RadzenDataGridColumn>
+                                        <RadzenDataGridColumn TItem="ScopeSelection" Property="Description" Title="Description">
+                                            <Template Context="s">
+                                                <RadzenText Text="@(s.Description ?? "-")" Style="max-width: 400px; overflow: hidden; text-overflow: ellipsis; display: inline-block; white-space: nowrap;" />
+                                            </Template>
+                                        </RadzenDataGridColumn>
+                                    </Columns>
+                                </RadzenDataGrid>
 
                                 @if (selectedScopes?.Any() == true)
                                 {
-                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                        Selected: @string.Join(", ", selectedScopes)
+                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary rz-mt-2">
+                                        Selected (@selectedScopes.Count): @string.Join(", ", selectedScopes)
                                     </RadzenText>
                                 }
                             </RadzenStack>
@@ -632,61 +662,31 @@
                     <!-- Rate Limiting Tab -->
                     <RadzenTabsItem Text="Rate Limiting" Icon="speed">
                         <div style="padding: 1rem; max-height: 550px; overflow-y: auto;">
-                            <RadzenStack Gap="0.75rem" class="rz-mb-4">
+                            <RadzenStack Gap="0.75rem">
                                 <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">API Rate Limits</RadzenText>
-                                <RadzenAlert AlertStyle="AlertStyle.Info" ShowIcon="true" class="rz-mb-4">
-                                    <RadzenText>Configure rate limits to prevent abuse and ensure fair usage. Leave empty to use realm defaults.</RadzenText>
-                                </RadzenAlert>
-
-                                <RadzenStack Gap="1rem">
-                                    <RadzenRow>
-                                        <RadzenColumn Size="12" SizeMD="4">
-                                            <RadzenFormField Text="Per Minute Limit" Variant="Variant.Outlined">
-                                                <ChildContent>
-                                                    <RadzenNumeric @bind-Value="@model.RateLimitRequestsPerMinute" 
-                                                                  Min="0" Max="10000" 
-                                                                  Style="width: 100%;" 
-                                                                  Placeholder="Requests per minute" />
-                                                </ChildContent>
-                                                <Helper>
-                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                        Maximum requests per minute (0 = unlimited)
-                                                    </RadzenText>
-                                                </Helper>
-                                            </RadzenFormField>
-                                        </RadzenColumn>
-                                        <RadzenColumn Size="12" SizeMD="4">
-                                            <RadzenFormField Text="Per Hour Limit" Variant="Variant.Outlined">
-                                                <ChildContent>
-                                                    <RadzenNumeric @bind-Value="@model.RateLimitRequestsPerHour" 
-                                                                  Min="0" Max="1000000" 
-                                                                  Style="width: 100%;" 
-                                                                  Placeholder="Requests per hour" />
-                                                </ChildContent>
-                                                <Helper>
-                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                        Maximum requests per hour (0 = unlimited)
-                                                    </RadzenText>
-                                                </Helper>
-                                            </RadzenFormField>
-                                        </RadzenColumn>
-                                        <RadzenColumn Size="12" SizeMD="4">
-                                            <RadzenFormField Text="Per Day Limit" Variant="Variant.Outlined">
-                                                <ChildContent>
-                                                    <RadzenNumeric @bind-Value="@model.RateLimitRequestsPerDay" 
-                                                                  Min="0" Max="10000000" 
-                                                                  Style="width: 100%;" 
-                                                                  Placeholder="Requests per day" />
-                                                </ChildContent>
-                                                <Helper>
-                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                        Maximum requests per day (0 = unlimited)
-                                                    </RadzenText>
-                                                </Helper>
-                                            </RadzenFormField>
-                                        </RadzenColumn>
-                                    </RadzenRow>
-                                </RadzenStack>
+                                <RadzenRow>
+                                    <RadzenColumn Size="12" SizeMD="4">
+                                        <RadzenFormField Text="Per Minute Limit" Variant="Variant.Outlined">
+                                            <ChildContent>
+                                                <RadzenNumeric @bind-Value="@model.RateLimitRequestsPerMinute" Min="0" Max="10000" Style="width: 100%;" />
+                                            </ChildContent>
+                                        </RadzenFormField>
+                                    </RadzenColumn>
+                                    <RadzenColumn Size="12" SizeMD="4">
+                                        <RadzenFormField Text="Per Hour Limit" Variant="Variant.Outlined">
+                                            <ChildContent>
+                                                <RadzenNumeric @bind-Value="@model.RateLimitRequestsPerHour" Min="0" Max="1000000" Style="width: 100%;" />
+                                            </ChildContent>
+                                        </RadzenFormField>
+                                    </RadzenColumn>
+                                    <RadzenColumn Size="12" SizeMD="4">
+                                        <RadzenFormField Text="Per Day Limit" Variant="Variant.Outlined">
+                                            <ChildContent>
+                                                <RadzenNumeric @bind-Value="@model.RateLimitRequestsPerDay" Min="0" Max="10000000" Style="width: 100%;" />
+                                            </ChildContent>
+                                        </RadzenFormField>
+                                    </RadzenColumn>
+                                </RadzenRow>
                             </RadzenStack>
                         </div>
                     </RadzenTabsItem>
@@ -1040,6 +1040,8 @@
     private CreateClientRequest model = new();
     private List<RealmDto> realms = new();
     private List<ScopeDto> availableScopes = new();
+    private List<ScopeSelection> scopeItems = new();
+    private string? scopeSearch;
     private bool isLoading = false;
     private int selectedTabIndex = 0;
 
@@ -1147,6 +1149,7 @@
         {
             var result = await ScopesApiService.GetScopesAsync(1, 1000);
             availableScopes = result?.Items ?? new List<ScopeDto>();
+            BuildScopeSelections();
         }
         catch (Exception ex)
         {
@@ -1169,6 +1172,7 @@
                 postLogoutUrisText = string.Join("\n", client.PostLogoutUris ?? new());
                 selectedScopes = client.Scopes?.ToList() ?? new();
                 selectedPermissions = client.Permissions?.ToList() ?? new();
+                BuildScopeSelections();
             }
         }
         catch (Exception ex)
@@ -1241,6 +1245,156 @@
             CustomLoginPageUrl = client.CustomLoginPageUrl,
             CustomLogoutPageUrl = client.CustomLogoutPageUrl,
             CustomErrorPageUrl = client.CustomErrorPageUrl
+        };
+    }
+
+    private UpdateClientRequest BuildUpdateRequestFromModel()
+    {
+        var update = new UpdateClientRequest
+        {
+            // map fields from 'model' to update request
+            Name = model.Name,
+            Description = model.Description,
+            IsEnabled = model.IsEnabled,
+            ClientType = model.ClientType,
+            AllowAuthorizationCodeFlow = true,
+            AllowClientCredentialsFlow = model.ClientType == ClientType.Machine,
+            AllowPasswordFlow = false,
+            AllowRefreshTokenFlow = true,
+            RequirePkce = model.ClientType != ClientType.Machine,
+            RequireClientSecret = model.ClientType != ClientType.Public,
+            RedirectUris = redirectUrisText?.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList() ?? new(),
+            PostLogoutUris = postLogoutUrisText?.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList() ?? new(),
+            Scopes = selectedScopes,
+            Permissions = selectedPermissions,
+
+            // dynamic fields mapping
+            SessionTimeoutHours = model.SessionTimeoutHours,
+            UseSlidingSessionExpiration = model.UseSlidingSessionExpiration,
+            RememberMeDurationDays = model.RememberMeDurationDays,
+            RequireHttpsForCookies = model.RequireHttpsForCookies,
+            CookieSameSitePolicy = model.CookieSameSitePolicy,
+            IdTokenLifetimeMinutes = model.IdTokenLifetimeMinutes,
+            DeviceCodeLifetimeMinutes = model.DeviceCodeLifetimeMinutes,
+            AccessTokenType = model.AccessTokenType,
+            UseOneTimeRefreshTokens = model.UseOneTimeRefreshTokens,
+            MaxRefreshTokensPerUser = model.MaxRefreshTokensPerUser,
+            HashAccessTokens = model.HashAccessTokens,
+            UpdateAccessTokenClaimsOnRefresh = model.UpdateAccessTokenClaimsOnRefresh,
+            RequireConsent = model.RequireConsent,
+            AllowRememberConsent = model.AllowRememberConsent,
+            AllowAccessToUserInfoEndpoint = model.AllowAccessToUserInfoEndpoint,
+            AllowAccessToIntrospectionEndpoint = model.AllowAccessToIntrospectionEndpoint,
+            AllowAccessToRevocationEndpoint = model.AllowAccessToRevocationEndpoint,
+            IncludeJwtId = model.IncludeJwtId,
+            AlwaysSendClientClaims = model.AlwaysSendClientClaims,
+            AlwaysIncludeUserClaimsInIdToken = model.AlwaysIncludeUserClaimsInIdToken,
+            ClientClaimsPrefix = model.ClientClaimsPrefix,
+            RequireMfa = model.RequireMfa,
+            MfaGracePeriodMinutes = model.MfaGracePeriodMinutes,
+            AllowedMfaMethods = model.AllowedMfaMethods,
+            RememberMfaForSession = model.RememberMfaForSession,
+            RateLimitRequestsPerMinute = model.RateLimitRequestsPerMinute,
+            RateLimitRequestsPerHour = model.RateLimitRequestsPerHour,
+            RateLimitRequestsPerDay = model.RateLimitRequestsPerDay,
+            ThemeName = model.ThemeName,
+            CustomCssUrl = model.CustomCssUrl,
+            CustomJavaScriptUrl = model.CustomJavaScriptUrl,
+            PageTitlePrefix = model.PageTitlePrefix,
+            LogoUri = model.LogoUri,
+            ClientUri = model.ClientUri,
+            PolicyUri = model.PolicyUri,
+            TosUri = model.TosUri,
+            BackChannelLogoutUri = model.BackChannelLogoutUri,
+            BackChannelLogoutSessionRequired = model.BackChannelLogoutSessionRequired,
+            FrontChannelLogoutUri = model.FrontChannelLogoutUri,
+            FrontChannelLogoutSessionRequired = model.FrontChannelLogoutSessionRequired,
+            AllowedCorsOrigins = model.AllowedCorsOrigins,
+            AllowedIdentityProviders = model.AllowedIdentityProviders,
+            ProtocolType = model.ProtocolType,
+            EnableDetailedErrors = model.EnableDetailedErrors,
+            LogSensitiveData = model.LogSensitiveData,
+            EnableLocalLogin = model.EnableLocalLogin,
+            CustomLoginPageUrl = model.CustomLoginPageUrl,
+            CustomLogoutPageUrl = model.CustomLogoutPageUrl,
+            CustomErrorPageUrl = model.CustomErrorPageUrl
+        };
+
+        return update;
+    }
+
+    private CreateClientRequest BuildCreateRequestFromModel()
+    {
+        return new CreateClientRequest
+        {
+            ClientId = model.ClientId,
+            ClientSecret = model.ClientSecret,
+            Name = model.Name,
+            Description = model.Description,
+            RealmId = model.RealmId,
+            IsEnabled = model.IsEnabled,
+            ClientType = model.ClientType,
+            AllowAuthorizationCodeFlow = true,
+            AllowClientCredentialsFlow = model.ClientType == ClientType.Machine,
+            AllowPasswordFlow = false,
+            AllowRefreshTokenFlow = true,
+            RequirePkce = model.ClientType != ClientType.Machine,
+            RequireClientSecret = model.ClientType != ClientType.Public,
+            RedirectUris = redirectUrisText?.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList() ?? new(),
+            PostLogoutUris = postLogoutUrisText?.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList() ?? new(),
+            Scopes = selectedScopes,
+            Permissions = selectedPermissions,
+
+            // dynamic fields
+            SessionTimeoutHours = model.SessionTimeoutHours,
+            UseSlidingSessionExpiration = model.UseSlidingSessionExpiration,
+            RememberMeDurationDays = model.RememberMeDurationDays,
+            RequireHttpsForCookies = model.RequireHttpsForCookies,
+            CookieSameSitePolicy = model.CookieSameSitePolicy,
+            IdTokenLifetimeMinutes = model.IdTokenLifetimeMinutes,
+            DeviceCodeLifetimeMinutes = model.DeviceCodeLifetimeMinutes,
+            AccessTokenType = model.AccessTokenType,
+            UseOneTimeRefreshTokens = model.UseOneTimeRefreshTokens,
+            MaxRefreshTokensPerUser = model.MaxRefreshTokensPerUser,
+            HashAccessTokens = model.HashAccessTokens,
+            UpdateAccessTokenClaimsOnRefresh = model.UpdateAccessTokenClaimsOnRefresh,
+            RequireConsent = model.RequireConsent,
+            AllowRememberConsent = model.AllowRememberConsent,
+            AllowAccessToUserInfoEndpoint = model.AllowAccessToUserInfoEndpoint,
+            AllowAccessToIntrospectionEndpoint = model.AllowAccessToIntrospectionEndpoint,
+            AllowAccessToRevocationEndpoint = model.AllowAccessToRevocationEndpoint,
+            IncludeJwtId = model.IncludeJwtId,
+            AlwaysSendClientClaims = model.AlwaysSendClientClaims,
+            AlwaysIncludeUserClaimsInIdToken = model.AlwaysIncludeUserClaimsInIdToken,
+            ClientClaimsPrefix = model.ClientClaimsPrefix,
+            RequireMfa = model.RequireMfa,
+            MfaGracePeriodMinutes = model.MfaGracePeriodMinutes,
+            AllowedMfaMethods = model.AllowedMfaMethods,
+            RememberMfaForSession = model.RememberMfaForSession,
+            RateLimitRequestsPerMinute = model.RateLimitRequestsPerMinute,
+            RateLimitRequestsPerHour = model.RateLimitRequestsPerHour,
+            RateLimitRequestsPerDay = model.RateLimitRequestsPerDay,
+            ThemeName = model.ThemeName,
+            CustomCssUrl = model.CustomCssUrl,
+            CustomJavaScriptUrl = model.CustomJavaScriptUrl,
+            PageTitlePrefix = model.PageTitlePrefix,
+            LogoUri = model.LogoUri,
+            ClientUri = model.ClientUri,
+            PolicyUri = model.PolicyUri,
+            TosUri = model.TosUri,
+            BackChannelLogoutUri = model.BackChannelLogoutUri,
+            BackChannelLogoutSessionRequired = model.BackChannelLogoutSessionRequired,
+            FrontChannelLogoutUri = model.FrontChannelLogoutUri,
+            FrontChannelLogoutSessionRequired = model.FrontChannelLogoutSessionRequired,
+            AllowedCorsOrigins = model.AllowedCorsOrigins,
+            AllowedIdentityProviders = model.AllowedIdentityProviders,
+            ProtocolType = model.ProtocolType,
+            EnableDetailedErrors = model.EnableDetailedErrors,
+            LogSensitiveData = model.LogSensitiveData,
+            EnableLocalLogin = model.EnableLocalLogin,
+            CustomLoginPageUrl = model.CustomLoginPageUrl,
+            CustomLogoutPageUrl = model.CustomLogoutPageUrl,
+            CustomErrorPageUrl = model.CustomErrorPageUrl
         };
     }
 
@@ -1322,156 +1476,6 @@
         }
     }
 
-    private UpdateClientRequest BuildUpdateRequestFromModel()
-    {
-        var update = new UpdateClientRequest
-        {
-            // map fields from 'model' to update request
-            Name = model.Name,
-            Description = model.Description,
-            IsEnabled = model.IsEnabled,
-            ClientType = model.ClientType,
-            AllowAuthorizationCodeFlow = true,
-            AllowClientCredentialsFlow = model.ClientType == ClientType.Machine,
-            AllowPasswordFlow = false,
-            AllowRefreshTokenFlow = true,
-            RequirePkce = model.ClientType != ClientType.Machine,
-            RequireClientSecret = model.ClientType != ClientType.Public,
-            RedirectUris = redirectUrisText?.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList() ?? new(),
-            PostLogoutUris = postLogoutUrisText?.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList() ?? new(),
-            Scopes = selectedScopes,
-            Permissions = selectedPermissions,
-
-            // dynamic fields mapping
-            SessionTimeoutHours = model.SessionTimeoutHours,
-            UseSlidingSessionExpiration = model.UseSlidingSessionExpiration,
-            RememberMeDurationDays = model.RememberMeDurationDays,
-            RequireHttpsForCookies = model.RequireHttpsForCookies,
-            CookieSameSitePolicy = model.CookieSameSitePolicy,
-            IdTokenLifetimeMinutes = model.IdTokenLifetimeMinutes,
-            DeviceCodeLifetimeMinutes = model.DeviceCodeLifetimeMinutes,
-            AccessTokenType = model.AccessTokenType,
-            UseOneTimeRefreshTokens = model.UseOneTimeRefreshTokens,
-            MaxRefreshTokensPerUser = model.MaxRefreshTokensPerUser,
-            HashAccessTokens = model.HashAccessTokens,
-            UpdateAccessTokenClaimsOnRefresh = model.UpdateAccessTokenClaimsOnRefresh,
-            RequireConsent = model.RequireConsent,
-            AllowRememberConsent = model.AllowRememberConsent,
-            AllowAccessToUserInfoEndpoint = model.AllowAccessToUserInfoEndpoint,
-            AllowAccessToIntrospectionEndpoint = model.AllowAccessToIntrospectionEndpoint,
-            AllowAccessToRevocationEndpoint = model.AllowAccessToRevocationEndpoint,
-            IncludeJwtId = model.IncludeJwtId,
-            AlwaysSendClientClaims = model.AlwaysSendClientClaims,
-            AlwaysIncludeUserClaimsInIdToken = model.AlwaysIncludeUserClaimsInIdToken,
-            ClientClaimsPrefix = model.ClientClaimsPrefix,
-            RequireMfa = model.RequireMfa,
-            MfaGracePeriodMinutes = model.MfaGracePeriodMinutes,
-            AllowedMfaMethods = allowedMfaMethodsSerialized,
-            RememberMfaForSession = model.RememberMfaForSession,
-            RateLimitRequestsPerMinute = model.RateLimitRequestsPerMinute,
-            RateLimitRequestsPerHour = model.RateLimitRequestsPerHour,
-            RateLimitRequestsPerDay = model.RateLimitRequestsPerDay,
-            ThemeName = model.ThemeName,
-            CustomCssUrl = model.CustomCssUrl,
-            CustomJavaScriptUrl = model.CustomJavaScriptUrl,
-            PageTitlePrefix = model.PageTitlePrefix,
-            LogoUri = model.LogoUri,
-            ClientUri = model.ClientUri,
-            PolicyUri = model.PolicyUri,
-            TosUri = model.TosUri,
-            BackChannelLogoutUri = model.BackChannelLogoutUri,
-            BackChannelLogoutSessionRequired = model.BackChannelLogoutSessionRequired,
-            FrontChannelLogoutUri = model.FrontChannelLogoutUri,
-            FrontChannelLogoutSessionRequired = model.FrontChannelLogoutSessionRequired,
-            AllowedCorsOrigins = model.AllowedCorsOrigins,
-            AllowedIdentityProviders = model.AllowedIdentityProviders,
-            ProtocolType = model.ProtocolType,
-            EnableDetailedErrors = model.EnableDetailedErrors,
-            LogSensitiveData = model.LogSensitiveData,
-            EnableLocalLogin = model.EnableLocalLogin,
-            CustomLoginPageUrl = model.CustomLoginPageUrl,
-            CustomLogoutPageUrl = model.CustomLogoutPageUrl,
-            CustomErrorPageUrl = model.CustomErrorPageUrl
-        };
-
-        return update;
-    }
-
-    private CreateClientRequest BuildCreateRequestFromModel()
-    {
-        return new CreateClientRequest
-        {
-            ClientId = model.ClientId,
-            ClientSecret = model.ClientSecret,
-            Name = model.Name,
-            Description = model.Description,
-            RealmId = model.RealmId,
-            IsEnabled = model.IsEnabled,
-            ClientType = model.ClientType,
-            AllowAuthorizationCodeFlow = true,
-            AllowClientCredentialsFlow = model.ClientType == ClientType.Machine,
-            AllowPasswordFlow = false,
-            AllowRefreshTokenFlow = true,
-            RequirePkce = model.ClientType != ClientType.Machine,
-            RequireClientSecret = model.ClientType != ClientType.Public,
-            RedirectUris = redirectUrisText?.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList() ?? new(),
-            PostLogoutUris = postLogoutUrisText?.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList() ?? new(),
-            Scopes = selectedScopes,
-            Permissions = selectedPermissions,
-
-            // dynamic fields
-            SessionTimeoutHours = model.SessionTimeoutHours,
-            UseSlidingSessionExpiration = model.UseSlidingSessionExpiration,
-            RememberMeDurationDays = model.RememberMeDurationDays,
-            RequireHttpsForCookies = model.RequireHttpsForCookies,
-            CookieSameSitePolicy = model.CookieSameSitePolicy,
-            IdTokenLifetimeMinutes = model.IdTokenLifetimeMinutes,
-            DeviceCodeLifetimeMinutes = model.DeviceCodeLifetimeMinutes,
-            AccessTokenType = model.AccessTokenType,
-            UseOneTimeRefreshTokens = model.UseOneTimeRefreshTokens,
-            MaxRefreshTokensPerUser = model.MaxRefreshTokensPerUser,
-            HashAccessTokens = model.HashAccessTokens,
-            UpdateAccessTokenClaimsOnRefresh = model.UpdateAccessTokenClaimsOnRefresh,
-            RequireConsent = model.RequireConsent,
-            AllowRememberConsent = model.AllowRememberConsent,
-            AllowAccessToUserInfoEndpoint = model.AllowAccessToUserInfoEndpoint,
-            AllowAccessToIntrospectionEndpoint = model.AllowAccessToIntrospectionEndpoint,
-            AllowAccessToRevocationEndpoint = model.AllowAccessToRevocationEndpoint,
-            IncludeJwtId = model.IncludeJwtId,
-            AlwaysSendClientClaims = model.AlwaysSendClientClaims,
-            AlwaysIncludeUserClaimsInIdToken = model.AlwaysIncludeUserClaimsInIdToken,
-            ClientClaimsPrefix = model.ClientClaimsPrefix,
-            RequireMfa = model.RequireMfa,
-            MfaGracePeriodMinutes = model.MfaGracePeriodMinutes,
-            AllowedMfaMethods = allowedMfaMethodsSerialized,
-            RememberMfaForSession = model.RememberMfaForSession,
-            RateLimitRequestsPerMinute = model.RateLimitRequestsPerMinute,
-            RateLimitRequestsPerHour = model.RateLimitRequestsPerHour,
-            RateLimitRequestsPerDay = model.RateLimitRequestsPerDay,
-            ThemeName = model.ThemeName,
-            CustomCssUrl = model.CustomCssUrl,
-            CustomJavaScriptUrl = model.CustomJavaScriptUrl,
-            PageTitlePrefix = model.PageTitlePrefix,
-            LogoUri = model.LogoUri,
-            ClientUri = model.ClientUri,
-            PolicyUri = model.PolicyUri,
-            TosUri = model.TosUri,
-            BackChannelLogoutUri = model.BackChannelLogoutUri,
-            BackChannelLogoutSessionRequired = model.BackChannelLogoutSessionRequired,
-            FrontChannelLogoutUri = model.FrontChannelLogoutUri,
-            FrontChannelLogoutSessionRequired = model.FrontChannelLogoutSessionRequired,
-            AllowedCorsOrigins = model.AllowedCorsOrigins,
-            AllowedIdentityProviders = model.AllowedIdentityProviders,
-            ProtocolType = model.ProtocolType,
-            EnableDetailedErrors = model.EnableDetailedErrors,
-            LogSensitiveData = model.LogSensitiveData,
-            EnableLocalLogin = model.EnableLocalLogin,
-            CustomLoginPageUrl = model.CustomLoginPageUrl,
-            CustomLogoutPageUrl = model.CustomLogoutPageUrl,
-            CustomErrorPageUrl = model.CustomErrorPageUrl
-        };
-    }
-
     private void CancelEdit() => Navigation.NavigateTo("/clients");
 
     private Task ResetToDefaults()
@@ -1523,5 +1527,81 @@
         return Task.CompletedTask;
     }
 
+    private void BuildScopeSelections()
+    {
+        scopeItems = availableScopes
+            .OrderBy(s => s.IsStandard ? 0 : 1)
+            .ThenBy(s => s.Name)
+            .Select(s => new ScopeSelection
+            {
+                Name = s.Name,
+                DisplayName = s.DisplayName,
+                Description = s.Description,
+                Type = s.Type,
+                IsEnabled = s.IsEnabled,
+                IsStandard = s.IsStandard,
+                Selected = selectedScopes?.Contains(s.Name) == true
+            })
+            .ToList();
+    }
+
+    private void ApplyScopeFilter()
+    {
+        StateHasChanged();
+    }
+
+    private void ToggleScopeSelection(string scopeName, bool selected)
+    {
+        var item = scopeItems.FirstOrDefault(i => i.Name == scopeName);
+        if (item != null)
+        {
+            item.Selected = selected;
+        }
+
+        if (selected)
+        {
+            if (!selectedScopes.Contains(scopeName))
+                selectedScopes.Add(scopeName);
+        }
+        else
+        {
+            selectedScopes.Remove(scopeName);
+        }
+    }
+
+    private void SelectAllFilteredScopes(bool select)
+    {
+        foreach (var item in FilteredScopeItems.ToList())
+        {
+            item.Selected = select;
+            if (select)
+            {
+                if (!selectedScopes.Contains(item.Name))
+                    selectedScopes.Add(item.Name);
+            }
+            else
+            {
+                selectedScopes.Remove(item.Name);
+            }
+        }
+    }
+
+    private IEnumerable<ScopeSelection> FilteredScopeItems => string.IsNullOrWhiteSpace(scopeSearch)
+        ? scopeItems
+        : scopeItems.Where(s => (s.Name?.Contains(scopeSearch, StringComparison.OrdinalIgnoreCase) ?? false)
+                             || (s.DisplayName?.Contains(scopeSearch, StringComparison.OrdinalIgnoreCase) ?? false)
+                             || (s.Description?.Contains(scopeSearch, StringComparison.OrdinalIgnoreCase) ?? false));
+
     private record DropdownItem<T>(string Text, T Value);
+
+    private class ScopeSelection
+     {
+         public string Name { get; set; } = string.Empty;
+         public string? DisplayName { get; set; }
+         public string? Description { get; set; }
+         public ScopeType Type { get; set; }
+         public bool IsEnabled { get; set; }
+         public bool IsStandard { get; set; }
+         public bool Selected { get; set; }
+     }
 }
