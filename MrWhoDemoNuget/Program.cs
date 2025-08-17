@@ -12,6 +12,13 @@ builder.Services.AddMrWhoAuthentication(options =>
     options.ClientId = builder.Configuration["Authentication:ClientId"] ?? "mrwho_demo_nuget";
     options.ClientSecret = builder.Configuration["Authentication:ClientSecret"]; // null for public
 
+    options.Scopes.Clear();
+    options.Scopes.Add("openid");
+    options.Scopes.Add("profile");
+    options.Scopes.Add("email");
+    options.Scopes.Add("roles");
+    options.Scopes.Add("offline_access");
+
     // Optional: trust self-signed in dev
     if (builder.Environment.IsDevelopment())
     {

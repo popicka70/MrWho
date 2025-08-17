@@ -444,6 +444,82 @@ public class OidcClientService : IOidcClientService
             await _context.SaveChangesAsync();
             _logger.LogInformation("Created demo1 client 'mrwho_demo1'");
         }
+        else
+        {
+            // Ensure required redirects/post-logout URIs, scopes, and permissions exist for existing demo1 client
+            var requiredRedirects = new[]
+            {
+                "https://localhost:7037/signin-oidc",
+                "https://localhost:7037/callback"
+            };
+            var requiredPostLogout = new[]
+            {
+                "https://localhost:7037/",
+                "https://localhost:7037/signout-callback-oidc"
+            };
+            var requiredScopes = new[] { "openid", "email", "profile", "roles", "offline_access" };
+            var requiredPermissions = new[]
+            {
+                OpenIddictConstants.Permissions.Endpoints.Authorization,
+                OpenIddictConstants.Permissions.Endpoints.Token,
+                OpenIddictConstants.Permissions.Endpoints.EndSession,
+                OpenIddictConstants.Permissions.GrantTypes.AuthorizationCode,
+                OpenIddictConstants.Permissions.GrantTypes.RefreshToken,
+                OpenIddictConstants.Permissions.ResponseTypes.Code,
+                "scp:openid",
+                OpenIddictConstants.Permissions.Scopes.Email,
+                OpenIddictConstants.Permissions.Scopes.Profile,
+                OpenIddictConstants.Permissions.Scopes.Roles,
+                "scp:offline_access"
+            };
+
+            var added = false;
+
+            var missingRedirects = requiredRedirects.Where(u => !demo1Client.RedirectUris.Any(r => r.Uri == u)).ToList();
+            foreach (var uri in missingRedirects)
+            {
+                _context.ClientRedirectUris.Add(new ClientRedirectUri { ClientId = demo1Client.Id, Uri = uri });
+                added = true;
+            }
+
+            var missingPostLogout = requiredPostLogout.Where(u => !demo1Client.PostLogoutUris.Any(r => r.Uri == u)).ToList();
+            foreach (var uri in missingPostLogout)
+            {
+                _context.ClientPostLogoutUris.Add(new ClientPostLogoutUri { ClientId = demo1Client.Id, Uri = uri });
+                added = true;
+            }
+
+            var missingScopes = requiredScopes.Where(s => !demo1Client.Scopes.Any(cs => cs.Scope == s)).ToList();
+            foreach (var s in missingScopes)
+            {
+                _context.ClientScopes.Add(new ClientScope { ClientId = demo1Client.Id, Scope = s });
+                added = true;
+            }
+
+            var existingPerms = demo1Client.Permissions.Select(p => p.Permission).ToHashSet();
+            foreach (var p in requiredPermissions)
+            {
+                if (!existingPerms.Contains(p))
+                {
+                    _context.ClientPermissions.Add(new ClientPermission { ClientId = demo1Client.Id, Permission = p });
+                    added = true;
+                }
+            }
+
+            if (added)
+            {
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Updated existing demo1 client with missing URIs/scopes/permissions");
+
+                // Reload the client
+                demo1Client = await _context.Clients
+                    .Include(c => c.RedirectUris)
+                    .Include(c => c.PostLogoutUris)
+                    .Include(c => c.Scopes)
+                    .Include(c => c.Permissions)
+                    .FirstOrDefaultAsync(c => c.ClientId == "mrwho_demo1");
+            }
+        }
 
         // 3. Create admin user if it doesn't exist
         var adminUser = await _userManager.FindByNameAsync("admin@mrwho.local");
