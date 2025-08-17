@@ -13,6 +13,7 @@ public static class MrWhoClientAuthBuilderExtensions
 {
     /// <summary>
     /// Adds cookie + OpenIdConnect authentication configured for the MrWho OIDC server.
+    /// Supports multiple named clients by generating per-name schemes.
     /// </summary>
     public static AuthenticationBuilder AddMrWhoAuthentication(
         this IServiceCollection services,
@@ -21,18 +22,27 @@ public static class MrWhoClientAuthBuilderExtensions
         var options = new MrWhoClientAuthOptions();
         configure(options);
 
+        // Compute scheme names based on provided Name
+        var cookieScheme = string.IsNullOrWhiteSpace(options.Name)
+            ? options.CookieScheme
+            : MrWhoClientAuthDefaults.BuildCookieScheme(options.Name);
+
+        var oidcScheme = string.IsNullOrWhiteSpace(options.Name)
+            ? MrWhoClientAuthDefaults.OpenIdConnectScheme
+            : MrWhoClientAuthDefaults.BuildOidcScheme(options.Name);
+
         // Decide default require-https if not set
         bool requireHttps = options.RequireHttpsMetadata ?? options.Authority.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
 
         // Configure authentication with a local cookie scheme and OIDC challenge scheme
         var builder = services.AddAuthentication(auth =>
         {
-            auth.DefaultScheme = options.CookieScheme;
-            auth.DefaultChallengeScheme = MrWhoClientAuthDefaults.OpenIdConnectScheme;
+            auth.DefaultScheme = cookieScheme;
+            auth.DefaultChallengeScheme = oidcScheme;
         })
-        .AddCookie(options.CookieScheme, cookie =>
+        .AddCookie(cookieScheme, cookie =>
         {
-            cookie.Cookie.Name = $".{options.CookieScheme}";
+            cookie.Cookie.Name = $".{cookieScheme}";
             cookie.Cookie.Path = "/";
             cookie.Cookie.HttpOnly = true;
             cookie.Cookie.SecurePolicy = Microsoft.AspNetCore.Http.CookieSecurePolicy.SameAsRequest;
@@ -42,9 +52,9 @@ public static class MrWhoClientAuthBuilderExtensions
         });
 
         // OpenIdConnect resides in AspNetCore shared framework. Register via extension method from package ref.
-        OpenIdConnectExtensions.AddOpenIdConnect(builder, MrWhoClientAuthDefaults.OpenIdConnectScheme, oidc =>
+        OpenIdConnectExtensions.AddOpenIdConnect(builder, oidcScheme, oidc =>
         {
-            oidc.SignInScheme = options.CookieScheme;
+            oidc.SignInScheme = cookieScheme;
             oidc.Authority = options.Authority.TrimEnd('/') + "/";
             oidc.ClientId = options.ClientId;
             oidc.ClientSecret = options.ClientSecret;

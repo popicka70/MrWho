@@ -8,6 +8,12 @@ namespace MrWho.ClientAuth;
 public sealed class MrWhoClientAuthOptions
 {
     /// <summary>
+    /// Optional logical client name used to generate distinct cookie and OIDC scheme names.
+    /// When set, the middleware registers schemes as MrWho.{Name}.Cookies and MrWho.{Name}.OIDC.
+    /// </summary>
+    public string? Name { get; set; }
+
+    /// <summary>
     /// The authority (base URL) of the MrWho Identity Server, e.g. https://localhost:7113
     /// Must be the externally reachable address for browser redirects.
     /// </summary>
