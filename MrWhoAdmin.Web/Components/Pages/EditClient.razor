@@ -187,6 +187,40 @@
                         </div>
                     </RadzenTabsItem>
 
+                    <!-- Scopes Tab -->
+                    <RadzenTabsItem Text="Scopes" Icon="policy">
+                        <div style="padding: 1rem; max-height: 550px; overflow-y: auto;">
+                            <RadzenStack Gap="0.75rem" class="rz-mb-4">
+                                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Allowed Scopes</RadzenText>
+                                <RadzenFormField Text="Scopes" Variant="Variant.Outlined">
+                                    <ChildContent>
+                                        <RadzenDropDown @bind-Value="@selectedScopes"
+                                                        Data="@availableScopes"
+                                                        TextProperty="Name"
+                                                        ValueProperty="Name"
+                                                        Multiple="true"
+                                                        FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                                        AllowClear="true"
+                                                        Placeholder="Select one or more scopes..."
+                                                        Style="width: 100%;" />
+                                    </ChildContent>
+                                    <Helper>
+                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                            Select which scopes this client is allowed to request. Include API scopes when needed.
+                                        </RadzenText>
+                                    </Helper>
+                                </RadzenFormField>
+
+                                @if (selectedScopes?.Any() == true)
+                                {
+                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                        Selected: @string.Join(", ", selectedScopes)
+                                    </RadzenText>
+                                }
+                            </RadzenStack>
+                        </div>
+                    </RadzenTabsItem>
+
                     <!-- Session & Cookie Configuration Tab -->
                     <RadzenTabsItem Text="Session & Cookies" Icon="schedule">
                         <div style="padding: 1rem; max-height: 550px; overflow-y: auto;">
@@ -1048,6 +1082,8 @@
             model.AllowAccessToRevocationEndpoint = true;
             model.RememberMfaForSession = true;
             model.EnableLocalLogin = true;
+            // Reasonable default scopes for new client
+            selectedScopes = new() { "openid", "profile", "email", "roles", "offline_access" };
         }
     }
 
@@ -1109,7 +1145,7 @@
     {
         try
         {
-            var result = await ScopesApiService.GetScopesAsync(1, 100);
+            var result = await ScopesApiService.GetScopesAsync(1, 1000);
             availableScopes = result?.Items ?? new List<ScopeDto>();
         }
         catch (Exception ex)
@@ -1131,6 +1167,8 @@
                 model = MapClientToRequest(client);
                 redirectUrisText = string.Join("\n", client.RedirectUris ?? new());
                 postLogoutUrisText = string.Join("\n", client.PostLogoutUris ?? new());
+                selectedScopes = client.Scopes?.ToList() ?? new();
+                selectedPermissions = client.Permissions?.ToList() ?? new();
             }
         }
         catch (Exception ex)
@@ -1359,7 +1397,80 @@
         return update;
     }
 
-    private CreateClientRequest BuildCreateRequestFromModel() => model;
+    private CreateClientRequest BuildCreateRequestFromModel()
+    {
+        return new CreateClientRequest
+        {
+            ClientId = model.ClientId,
+            ClientSecret = model.ClientSecret,
+            Name = model.Name,
+            Description = model.Description,
+            RealmId = model.RealmId,
+            IsEnabled = model.IsEnabled,
+            ClientType = model.ClientType,
+            AllowAuthorizationCodeFlow = true,
+            AllowClientCredentialsFlow = model.ClientType == ClientType.Machine,
+            AllowPasswordFlow = false,
+            AllowRefreshTokenFlow = true,
+            RequirePkce = model.ClientType != ClientType.Machine,
+            RequireClientSecret = model.ClientType != ClientType.Public,
+            RedirectUris = redirectUrisText?.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList() ?? new(),
+            PostLogoutUris = postLogoutUrisText?.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList() ?? new(),
+            Scopes = selectedScopes,
+            Permissions = selectedPermissions,
+
+            // dynamic fields
+            SessionTimeoutHours = model.SessionTimeoutHours,
+            UseSlidingSessionExpiration = model.UseSlidingSessionExpiration,
+            RememberMeDurationDays = model.RememberMeDurationDays,
+            RequireHttpsForCookies = model.RequireHttpsForCookies,
+            CookieSameSitePolicy = model.CookieSameSitePolicy,
+            IdTokenLifetimeMinutes = model.IdTokenLifetimeMinutes,
+            DeviceCodeLifetimeMinutes = model.DeviceCodeLifetimeMinutes,
+            AccessTokenType = model.AccessTokenType,
+            UseOneTimeRefreshTokens = model.UseOneTimeRefreshTokens,
+            MaxRefreshTokensPerUser = model.MaxRefreshTokensPerUser,
+            HashAccessTokens = model.HashAccessTokens,
+            UpdateAccessTokenClaimsOnRefresh = model.UpdateAccessTokenClaimsOnRefresh,
+            RequireConsent = model.RequireConsent,
+            AllowRememberConsent = model.AllowRememberConsent,
+            AllowAccessToUserInfoEndpoint = model.AllowAccessToUserInfoEndpoint,
+            AllowAccessToIntrospectionEndpoint = model.AllowAccessToIntrospectionEndpoint,
+            AllowAccessToRevocationEndpoint = model.AllowAccessToRevocationEndpoint,
+            IncludeJwtId = model.IncludeJwtId,
+            AlwaysSendClientClaims = model.AlwaysSendClientClaims,
+            AlwaysIncludeUserClaimsInIdToken = model.AlwaysIncludeUserClaimsInIdToken,
+            ClientClaimsPrefix = model.ClientClaimsPrefix,
+            RequireMfa = model.RequireMfa,
+            MfaGracePeriodMinutes = model.MfaGracePeriodMinutes,
+            AllowedMfaMethods = allowedMfaMethodsSerialized,
+            RememberMfaForSession = model.RememberMfaForSession,
+            RateLimitRequestsPerMinute = model.RateLimitRequestsPerMinute,
+            RateLimitRequestsPerHour = model.RateLimitRequestsPerHour,
+            RateLimitRequestsPerDay = model.RateLimitRequestsPerDay,
+            ThemeName = model.ThemeName,
+            CustomCssUrl = model.CustomCssUrl,
+            CustomJavaScriptUrl = model.CustomJavaScriptUrl,
+            PageTitlePrefix = model.PageTitlePrefix,
+            LogoUri = model.LogoUri,
+            ClientUri = model.ClientUri,
+            PolicyUri = model.PolicyUri,
+            TosUri = model.TosUri,
+            BackChannelLogoutUri = model.BackChannelLogoutUri,
+            BackChannelLogoutSessionRequired = model.BackChannelLogoutSessionRequired,
+            FrontChannelLogoutUri = model.FrontChannelLogoutUri,
+            FrontChannelLogoutSessionRequired = model.FrontChannelLogoutSessionRequired,
+            AllowedCorsOrigins = model.AllowedCorsOrigins,
+            AllowedIdentityProviders = model.AllowedIdentityProviders,
+            ProtocolType = model.ProtocolType,
+            EnableDetailedErrors = model.EnableDetailedErrors,
+            LogSensitiveData = model.LogSensitiveData,
+            EnableLocalLogin = model.EnableLocalLogin,
+            CustomLoginPageUrl = model.CustomLoginPageUrl,
+            CustomLogoutPageUrl = model.CustomLogoutPageUrl,
+            CustomErrorPageUrl = model.CustomErrorPageUrl
+        };
+    }
 
     private void CancelEdit() => Navigation.NavigateTo("/clients");
 
