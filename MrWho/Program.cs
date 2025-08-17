@@ -40,6 +40,18 @@ builder.Services.AddOpenIddict()
         options.SetRedirectionEndpointUris("/connect/external/callback");
         options.SetPostLogoutRedirectionEndpointUris("/connect/external/signout-callback");
 
+        // Register development or ephemeral keys required for interactive flows
+        if (builder.Environment.IsDevelopment())
+        {
+            options.AddDevelopmentEncryptionCertificate()
+                   .AddDevelopmentSigningCertificate();
+        }
+        else
+        {
+            options.AddEphemeralEncryptionKey()
+                   .AddEphemeralSigningKey();
+        }
+
         // Enable the ASP.NET Core host integration
         options.UseAspNetCore()
                .EnableRedirectionEndpointPassthrough()
