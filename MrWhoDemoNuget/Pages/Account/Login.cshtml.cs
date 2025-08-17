@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
@@ -9,7 +8,7 @@ public class LoginModel : PageModel
 {
     public IActionResult OnGet()
     {
-        return new ChallengeResult(OpenIdConnectDefaults.AuthenticationScheme,
-            new AuthenticationProperties { RedirectUri = Url.Content("~/") });
+        // Use default challenge scheme configured by MrWho.ClientAuth (MrWho.{ClientId}.OIDC)
+        return Challenge(new AuthenticationProperties { RedirectUri = Url.Content("~/") });
     }
 }
