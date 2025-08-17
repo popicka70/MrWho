@@ -13,7 +13,7 @@ public static class MrWhoClientAuthBuilderExtensions
 {
     /// <summary>
     /// Adds cookie + OpenIdConnect authentication configured for the MrWho OIDC server.
-    /// Supports multiple named clients by generating per-name schemes.
+    /// Supports per-clientId scheme names so apps can maintain isolated sessions per client.
     /// </summary>
     public static AuthenticationBuilder AddMrWhoAuthentication(
         this IServiceCollection services,
@@ -22,14 +22,14 @@ public static class MrWhoClientAuthBuilderExtensions
         var options = new MrWhoClientAuthOptions();
         configure(options);
 
-        // Compute scheme names based on provided Name
-        var cookieScheme = string.IsNullOrWhiteSpace(options.Name)
-            ? options.CookieScheme
-            : MrWhoClientAuthDefaults.BuildCookieScheme(options.Name);
+        var key = options.ClientId;
+        var cookieScheme = !string.IsNullOrWhiteSpace(options.CookieScheme)
+            ? options.CookieScheme!
+            : (string.IsNullOrWhiteSpace(key) ? MrWhoClientAuthDefaults.CookieScheme : MrWhoClientAuthDefaults.BuildCookieScheme(key));
 
-        var oidcScheme = string.IsNullOrWhiteSpace(options.Name)
+        var oidcScheme = string.IsNullOrWhiteSpace(key)
             ? MrWhoClientAuthDefaults.OpenIdConnectScheme
-            : MrWhoClientAuthDefaults.BuildOidcScheme(options.Name);
+            : MrWhoClientAuthDefaults.BuildOidcScheme(key);
 
         // Decide default require-https if not set
         bool requireHttps = options.RequireHttpsMetadata ?? options.Authority.StartsWith("https://", StringComparison.OrdinalIgnoreCase);

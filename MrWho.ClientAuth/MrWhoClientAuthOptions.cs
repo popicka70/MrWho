@@ -8,10 +8,11 @@ namespace MrWho.ClientAuth;
 public sealed class MrWhoClientAuthOptions
 {
     /// <summary>
-    /// Optional logical client name used to generate distinct cookie and OIDC scheme names.
-    /// When set, the middleware registers schemes as MrWho.{Name}.Cookies and MrWho.{Name}.OIDC.
+    /// Client identifier registered at the MrWho Identity Server.
+    /// Also used to derive distinct cookie and OIDC scheme names:
+    /// MrWho.{ClientId}.Cookies and MrWho.{ClientId}.OIDC
     /// </summary>
-    public string? Name { get; set; }
+    public string ClientId { get; set; } = string.Empty;
 
     /// <summary>
     /// The authority (base URL) of the MrWho Identity Server, e.g. https://localhost:7113
@@ -25,11 +26,6 @@ public sealed class MrWhoClientAuthOptions
     /// Authority + "/.well-known/openid-configuration".
     /// </summary>
     public string? MetadataAddress { get; set; }
-
-    /// <summary>
-    /// Client identifier registered at the MrWho Identity Server.
-    /// </summary>
-    public string ClientId { get; set; } = "";
 
     /// <summary>
     /// Client secret (for confidential clients). Leave null for public clients.
@@ -68,9 +64,10 @@ public sealed class MrWhoClientAuthOptions
     public bool AllowSelfSignedCertificates { get; set; }
 
     /// <summary>
-    /// The cookie scheme name to use for the local sign-in cookie. Defaults to MrWhoClientAuthDefaults.CookieScheme.
+    /// Override for the cookie scheme name. If not set, defaults to MrWho.{ClientId}.Cookies (or
+    /// MrWho.ClientAuth.Cookies when ClientId is empty).
     /// </summary>
-    public string CookieScheme { get; set; } = MrWhoClientAuthDefaults.CookieScheme;
+    public string? CookieScheme { get; set; }
 
     /// <summary>
     /// Whether to save tokens in the auth session (access/refresh/id tokens). Enabled by default.

@@ -28,7 +28,7 @@ Notes and defaults
 ------------------
 - Uses cookie authentication for local session storage and OpenIdConnect challenge.
 - Saves tokens to the auth session by default.
-- Requests recommended scopes: openid, profile, email, roles, offline_access, api.read, api.write, mrwho.use.
+- Requests recommended scopes: openid, profile, email, roles, offline_access, api.read, api.write.
 - Always uses the correct discovery endpoint path: /.well-known/openid-configuration
 - Supports explicit MetadataAddress override for containerized deployments.
 - Supports trusting self-signed certificates for development.

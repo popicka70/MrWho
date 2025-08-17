@@ -20,7 +20,7 @@
     <!-- MinVer: Git tag driven versioning -->
     <MinVerTagPrefix>v</MinVerTagPrefix>
     <MinVerAutoIncrement>patch</MinVerAutoIncrement>
-    <MinVerMinimumMajorMinor>0.1</MinVerMinimumMajorMinor>
+    <MinVerMinimumMajorMinor>1.0</MinVerMinimumMajorMinor>
   </PropertyGroup>
 
   <ItemGroup>

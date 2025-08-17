@@ -144,3 +144,9 @@ Besides the essential admin data, the system also creates:
 - Sample realms and clients (if seeding is enabled)
 
 This ensures the system is ready for immediate use and testing.
+
+
+#NuGet API Key
+
+oy2kqy4s5f7gqnlbshcqzexqljnaaulengy4cfjzomvzzq
+
