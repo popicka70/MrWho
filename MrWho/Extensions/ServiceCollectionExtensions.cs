@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Cookies; // added
+using Microsoft.AspNetCore.Authentication.Cookies; // ensure CookieAuthenticationOptions is available
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics; // added for RelationalEventId
 using Microsoft.Extensions.Options;
@@ -291,12 +291,9 @@ public static class ServiceCollectionExtensions
                 options.AddDevelopmentEncryptionCertificate()
                        .AddDevelopmentSigningCertificate();
 
-                // Register the ASP.NET Core host and configure the ASP.NET Core options
+                // Register the ASP.NET Core host and enable passthrough for the authorization endpoint
                 options.UseAspNetCore()
-                       .EnableAuthorizationEndpointPassthrough()
-                       .EnableTokenEndpointPassthrough()
-                       .EnableEndSessionEndpointPassthrough()
-                       .EnableUserInfoEndpointPassthrough();
+                       .EnableAuthorizationEndpointPassthrough();
             })
             .AddValidation(options =>
             {

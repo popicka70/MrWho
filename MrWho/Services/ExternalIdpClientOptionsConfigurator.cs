@@ -93,18 +93,30 @@ public sealed class ExternalIdpClientOptionsConfigurator : IConfigureOptions<Ope
             // Ensure we can connect
             if (!db.Database.CanConnect()) return false;
 
-            // Check table existence via information_schema to avoid throwing when the table doesn't exist
-            using var connection = db.Database.GetDbConnection();
+            // Use the context-managed connection but don't dispose it here
+            var connection = db.Database.GetDbConnection();
+            var shouldClose = false;
             if (connection.State != System.Data.ConnectionState.Open)
             {
                 connection.Open();
+                shouldClose = true;
             }
 
-            using var cmd = connection.CreateCommand();
-            cmd.CommandText = "select count(1) from information_schema.tables where table_schema = 'public' and lower(table_name) = 'identityproviders'";
-            var result = cmd.ExecuteScalar();
-            var count = Convert.ToInt32(result);
-            return count > 0;
+            try
+            {
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "select count(1) from information_schema.tables where table_schema = 'public' and lower(table_name) = 'identityproviders'";
+                var result = cmd.ExecuteScalar();
+                var count = Convert.ToInt32(result);
+                return count > 0;
+            }
+            finally
+            {
+                if (shouldClose)
+                {
+                    connection.Close();
+                }
+            }
         }
         catch
         {

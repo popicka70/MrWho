@@ -55,6 +55,9 @@ public static class WebApplicationExtensions
         // Enable ASP.NET Core rate limiting middleware
         app.UseRateLimiter();
 
+        // Enable session before custom middleware that uses it
+        app.UseSession();
+
         // Add client cookie middleware before authentication
         app.UseMiddleware<ClientCookieMiddleware>();
 
@@ -84,6 +87,12 @@ public static class WebApplicationExtensions
             };
             props.Items[OpenIddictClientAspNetCoreConstants.Properties.ProviderName] = provider;
             await http.ChallengeAsync(OpenIddictClientAspNetCoreDefaults.AuthenticationScheme, props);
+        }).AllowAnonymous();
+
+        // Map OIDC authorize endpoint for OpenIddict passthrough
+        app.MapMethods("/connect/authorize", new[] { "GET", "POST" }, async (HttpContext http, IMediator mediator) =>
+        {
+            return await mediator.Send(new OidcAuthorizeRequest(http));
         }).AllowAnonymous();
 
         return app;
@@ -116,6 +125,10 @@ public static class WebApplicationExtensions
         app.UseRouting();
 
         app.UseRateLimiter();
+
+        // Enable session before custom middleware that uses it
+        app.UseSession();
+
         app.UseMiddleware<ClientCookieMiddleware>();
         app.UseAntiforgery();
 
@@ -139,6 +152,12 @@ public static class WebApplicationExtensions
             };
             props.Items[OpenIddictClientAspNetCoreConstants.Properties.ProviderName] = provider;
             await http.ChallengeAsync(OpenIddictClientAspNetCoreDefaults.AuthenticationScheme, props);
+        }).AllowAnonymous();
+
+        // Map OIDC authorize endpoint for OpenIddict passthrough
+        app.MapMethods("/connect/authorize", new[] { "GET", "POST" }, async (HttpContext http, IMediator mediator) =>
+        {
+            return await mediator.Send(new OidcAuthorizeRequest(http));
         }).AllowAnonymous();
 
         return app;

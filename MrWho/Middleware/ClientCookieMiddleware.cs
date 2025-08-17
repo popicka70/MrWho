@@ -1,4 +1,5 @@
 using MrWho.Services;
+using Microsoft.AspNetCore.Http.Features;
 
 namespace MrWho.Middleware;
 
@@ -35,12 +36,16 @@ public class ClientCookieMiddleware
                 _logger.LogDebug("Using cookie scheme {Scheme} (cookie: {CookieName}) for client {ClientId} on path {Path}", 
                     cookieScheme, cookieName, clientId, context.Request.Path);
 
-                // Store client_id in session for callback scenarios
-                if (context.Session.IsAvailable && 
+                // Store client_id in session for callback scenarios (only if session is configured)
+                var hasSession = context.Features.Get<ISessionFeature>() is not null;
+                if (hasSession && 
                     (context.Request.Path.StartsWithSegments("/connect/authorize") ||
                      context.Request.Path.StartsWithSegments("/login")))
                 {
-                    context.Session.SetString("oidc_client_id", clientId);
+                    if (context.Session.IsAvailable)
+                    {
+                        context.Session.SetString("oidc_client_id", clientId);
+                    }
                 }
             }
         }

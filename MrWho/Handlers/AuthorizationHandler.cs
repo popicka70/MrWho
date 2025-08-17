@@ -123,12 +123,17 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
             }
         }
 
-        // 3) If we still don't have a user, redirect to login
+        // 3) If we still don't have a user, issue an authentication challenge to the client-specific cookie scheme
         if (authUser == null)
         {
-            _logger.LogDebug("No authenticated user found for client {ClientId}, redirecting to login", clientId);
-            var loginUrl = $"/connect/login?clientId={Uri.EscapeDataString(clientId)}&returnUrl={Uri.EscapeDataString(context.Request.GetDisplayUrl())}";
-            return Results.Redirect(loginUrl);
+            _logger.LogDebug("No authenticated user found for client {ClientId}, issuing challenge to login", clientId);
+            var cookieScheme = _cookieService.GetCookieSchemeForClient(clientId);
+            var props = new AuthenticationProperties
+            {
+                RedirectUri = context.Request.GetDisplayUrl()
+            };
+            // Challenge will redirect to options.LoginPath (configured to /connect/login) and mark the request as handled
+            return Results.Challenge(props, new[] { cookieScheme });
         }
 
         // 4) Realm and profile checks
@@ -139,14 +144,24 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
             {
                 _logger.LogWarning("Access denied for user {UserName} to client {ClientId}. Reason: {Reason}", authUser.UserName, clientId, realmValidation.Reason);
                 await SafeSignOutClientAsync(clientId);
-                return Results.Forbid();
+                var forbidProps = new AuthenticationProperties(new Dictionary<string, string?>
+                {
+                    [OpenIddictServerAspNetCoreConstants.Properties.Error] = OpenIddictConstants.Errors.AccessDenied,
+                    [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = realmValidation.Reason
+                });
+                return Results.Forbid(forbidProps, new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
             }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during realm validation for user {UserId} and client {ClientId}", authUser.Id, clientId);
             await SafeSignOutClientAsync(clientId);
-            return Results.Forbid();
+            var forbidProps = new AuthenticationProperties(new Dictionary<string, string?>
+            {
+                [OpenIddictServerAspNetCoreConstants.Properties.Error] = OpenIddictConstants.Errors.ServerError,
+                [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = "Realm validation error"
+            });
+            return Results.Forbid(forbidProps, new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
         }
 
         try
@@ -156,14 +171,24 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
             {
                 _logger.LogWarning("User {UserName} has invalid/missing profile for client {ClientId}", authUser.UserName, clientId);
                 await SafeSignOutClientAsync(clientId);
-                return Results.Forbid();
+                var forbidProps = new AuthenticationProperties(new Dictionary<string, string?>
+                {
+                    [OpenIddictServerAspNetCoreConstants.Properties.Error] = OpenIddictConstants.Errors.AccessDenied,
+                    [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = "Inactive user profile"
+                });
+                return Results.Forbid(forbidProps, new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
             }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error checking user profile state for user {UserId}", authUser.Id);
             await SafeSignOutClientAsync(clientId);
-            return Results.Forbid();
+            var forbidProps = new AuthenticationProperties(new Dictionary<string, string?>
+            {
+                [OpenIddictServerAspNetCoreConstants.Properties.Error] = OpenIddictConstants.Errors.ServerError,
+                [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = "Profile validation error"
+            });
+            return Results.Forbid(forbidProps, new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
         }
 
         // 5) Build authorization principal
