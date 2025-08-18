@@ -3,6 +3,7 @@
     Layout = "_Layout";
     var clientName = ViewData["ClientName"] as string;
     var returnUrl = ViewData["ReturnUrl"] as string;
+    var error = ViewData["LogoutError"] as string;
 }
 
 <div class="container mt-4">
@@ -30,6 +31,14 @@
                         <p class="text-muted mb-3">
                             Your MrWho session has been terminated and all authentication cookies have been cleared.
                         </p>
+                    }
+
+                    @if (!string.IsNullOrWhiteSpace(error))
+                    {
+                        <div class="alert alert-warning text-start" role="alert">
+                            <i class="bi bi-exclamation-triangle me-1"></i>
+                            @error
+                        </div>
                     }
                     
                     <div class="alert alert-info text-start">
