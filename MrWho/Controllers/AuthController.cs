@@ -15,6 +15,7 @@ using MrWho.Models;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Net.Http;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore; // added
 
 namespace MrWho.Controllers;
 
@@ -114,6 +115,47 @@ public class AuthController : Controller
         }
 
         ViewData["ClientName"] = clientName;
+
+        // Load enabled external IdPs for UI buttons
+        try
+        {
+            // Base query: enabled OIDC providers
+            var query = _db.IdentityProviders
+                .AsNoTracking()
+                .Where(p => p.IsEnabled && p.Type == MrWho.Shared.IdentityProviderType.Oidc);
+
+            var providers = await query
+                .OrderBy(p => p.Order)
+                .ThenBy(p => p.Name)
+                .Select(p => new { Name = p.Name, DisplayName = p.DisplayName ?? p.Name, IconUri = p.IconUri })
+                .ToListAsync();
+
+            // If client restricts IdPs, filter accordingly (AllowedIdentityProviders is a space/comma-separated list)
+            if (!string.IsNullOrEmpty(clientId))
+            {
+                var client = await _db.Clients.AsNoTracking().FirstOrDefaultAsync(c => c.ClientId == clientId);
+                var allowedRaw = client?.AllowedIdentityProviders;
+                if (!string.IsNullOrWhiteSpace(allowedRaw))
+                {
+                    var allowed = allowedRaw
+                        .Split(new[] { ' ', ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
+                        .Select(s => s.Trim().ToLowerInvariant())
+                        .ToHashSet();
+
+                    providers = providers
+                        .Where(p => allowed.Contains((p.Name ?? string.Empty).ToLowerInvariant()))
+                        .ToList();
+                }
+            }
+
+            ViewBag.ExternalProviders = providers;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to load external identity providers for login page");
+            ViewBag.ExternalProviders = Array.Empty<object>();
+        }
+
         var useCode = string.Equals(mode, "code", StringComparison.OrdinalIgnoreCase);
         return View(new LoginViewModel { UseCode = useCode });
     }

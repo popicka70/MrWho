@@ -4,6 +4,7 @@
     var clientId = ViewData["ClientId"] as string;
     var clientName = ViewData["ClientName"] as string;
     var recaptchaSiteKey = ViewData["RecaptchaSiteKey"] as string; // Provided by controller
+    var externalProviders = ViewBag.ExternalProviders as IEnumerable<dynamic> ?? Array.Empty<object>();
 }
 
 <div class="row justify-content-center">
@@ -163,6 +164,34 @@
                                 <small class="text-muted">Device management • Enhanced security • Audit trail</small>
                             </div>
                         </a>
+
+                        <!-- External Identity Providers -->
+                        @if (externalProviders.Any())
+                        {
+                            <hr class="my-3">
+                            <h6 class="text-center text-muted mb-3">
+                                <i class="bi bi-box-arrow-in-right me-1"></i>Or sign in with
+                            </h6>
+                            <div class="d-grid gap-2">
+                                @foreach (var p in externalProviders)
+                                {
+                                    var name = (string)p.Name;
+                                    var display = (string)p.DisplayName;
+                                    var icon = p.IconUri as string;
+                                    <a href="@($"/connect/external/login/{Uri.EscapeDataString(name)}")" class="btn btn-outline-dark d-flex align-items-center justify-content-center">
+                                        @if (!string.IsNullOrWhiteSpace(icon))
+                                        {
+                                            <img src="@icon" alt="@display" style="height: 18px; width: 18px; object-fit: contain;" class="me-2" />
+                                        }
+                                        else
+                                        {
+                                            <i class="bi bi-shield-lock me-2"></i>
+                                        }
+                                        <span>Sign in with @display</span>
+                                    </a>
+                                }
+                            </div>
+                        }
                         
                         <div class="mt-2">
                             <small class="text-muted">
