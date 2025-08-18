@@ -293,7 +293,8 @@ public static class ServiceCollectionExtensions
 
                 // Register the ASP.NET Core host and enable passthrough for the authorization endpoint
                 options.UseAspNetCore()
-                       .EnableAuthorizationEndpointPassthrough();
+                       .EnableAuthorizationEndpointPassthrough()
+                       .EnableEndSessionEndpointPassthrough();
             })
             .AddValidation(options =>
             {
