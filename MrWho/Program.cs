@@ -11,10 +11,14 @@ using OpenIddict.Client;
 using OpenIddict.Client.AspNetCore;
 using OpenIddict.Client.SystemNetHttp;
 using Microsoft.Extensions.Options;
+using MrWho.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
+
+// Bind global MrWho options from configuration
+builder.Services.Configure<MrWhoOptions>(builder.Configuration.GetSection("MrWho"));
 
 // Add services to the container using extension methods
 builder.Services.AddControllersWithViews();
