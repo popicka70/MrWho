@@ -3,6 +3,11 @@ using MrWho.Services;
 using OpenIddict.Abstractions;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore;
+using Microsoft.Extensions.Options;
+using MrWho.Options;
+using MrWho.Data;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity;
 
 namespace MrWho.Services;
 
@@ -13,8 +18,22 @@ public class ClientCookieConfigurationService : IClientCookieConfigurationServic
 {
     private readonly ILogger<ClientCookieConfigurationService> _logger;
     private readonly IOidcClientService _oidcClientService;
+    private readonly IOptions<MrWhoOptions> _options;
+    private readonly ApplicationDbContext _db;
 
-    // Static mapping of known clients to their cookie configurations
+    public ClientCookieConfigurationService(
+        ILogger<ClientCookieConfigurationService> logger,
+        IOidcClientService oidcClientService,
+        IOptions<MrWhoOptions> options,
+        ApplicationDbContext db)
+    {
+        _logger = logger;
+        _oidcClientService = oidcClientService;
+        _options = options;
+        _db = db;
+    }
+
+    // Static mapping of known clients to their cookie configurations (used only in ByClient mode)
     private static readonly Dictionary<string, ClientCookieConfiguration> ClientCookieConfigurations = new()
     {
         { 
@@ -46,40 +65,57 @@ public class ClientCookieConfigurationService : IClientCookieConfigurationServic
         }
     };
 
-    public ClientCookieConfigurationService(
-        ILogger<ClientCookieConfigurationService> logger,
-        IOidcClientService oidcClientService)
-    {
-        _logger = logger;
-        _oidcClientService = oidcClientService;
-    }
-
     public string GetCookieSchemeForClient(string clientId)
     {
-        if (ClientCookieConfigurations.TryGetValue(clientId, out var config))
+        var mode = _options.Value.CookieSeparationMode;
+        switch (mode)
         {
-            return config.SchemeName;
-        }
+            case CookieSeparationMode.None:
+                // Use default Identity application scheme
+                return IdentityConstants.ApplicationScheme;
 
-        // FIXED: For dynamic clients, return the client-specific scheme name
-        // This matches what DynamicClientCookieService creates: "Identity.Application.{clientId}"
-        var dynamicSchemeName = $"Identity.Application.{clientId}";
-        _logger.LogDebug("?? Client {ClientId} using dynamic authentication scheme: {SchemeName}", clientId, dynamicSchemeName);
-        return dynamicSchemeName;
+            case CookieSeparationMode.ByRealm:
+                var realmKey = GetRealmKeyForClient(clientId);
+                return $"Identity.Application.Realm.{realmKey}";
+
+            case CookieSeparationMode.ByClient:
+            default:
+                if (ClientCookieConfigurations.TryGetValue(clientId, out var config))
+                {
+                    return config.SchemeName;
+                }
+
+                // Dynamic per-client scheme
+                var dynamicSchemeName = $"Identity.Application.{clientId}";
+                _logger.LogDebug("Using dynamic authentication scheme for client {ClientId}: {SchemeName}", clientId, dynamicSchemeName);
+                return dynamicSchemeName;
+        }
     }
 
     public string GetCookieNameForClient(string clientId)
     {
-        if (ClientCookieConfigurations.TryGetValue(clientId, out var config))
+        var mode = _options.Value.CookieSeparationMode;
+        switch (mode)
         {
-            return config.CookieName;
-        }
+            case CookieSeparationMode.None:
+                // Default identity cookie name
+                return ".AspNetCore.Identity.Application";
 
-        // Dynamic cookie naming - each client gets its own cookie name
-        // This allows session isolation without requiring separate authentication schemes
-        var dynamicCookieName = $".MrWho.{clientId}";
-        _logger.LogDebug("Client {ClientId} using dynamic cookie name: {CookieName}", clientId, dynamicCookieName);
-        return dynamicCookieName;
+            case CookieSeparationMode.ByRealm:
+                var realmKey = GetRealmKeyForClient(clientId);
+                return $".MrWho.Realm.{realmKey}";
+
+            case CookieSeparationMode.ByClient:
+            default:
+                if (ClientCookieConfigurations.TryGetValue(clientId, out var config))
+                {
+                    return config.CookieName;
+                }
+
+                var dynamicCookieName = $".MrWho.{clientId}";
+                _logger.LogDebug("Using dynamic cookie name for client {ClientId}: {CookieName}", clientId, dynamicCookieName);
+                return dynamicCookieName;
+        }
     }
 
     /// <summary>
@@ -87,8 +123,9 @@ public class ClientCookieConfigurationService : IClientCookieConfigurationServic
     /// </summary>
     public bool HasStaticConfiguration(string clientId)
     {
-        var hasStatic = ClientCookieConfigurations.ContainsKey(clientId);
-        _logger.LogDebug("?? Static Configuration Check: Client {ClientId} has static config: {HasStatic}", 
+        // Only meaningful in ByClient mode
+        var hasStatic = _options.Value.CookieSeparationMode == CookieSeparationMode.ByClient && ClientCookieConfigurations.ContainsKey(clientId);
+        _logger.LogDebug("Static Configuration Check: Client {ClientId} has static config: {HasStatic}", 
             clientId, hasStatic);
         return hasStatic;
     }
@@ -98,7 +135,16 @@ public class ClientCookieConfigurationService : IClientCookieConfigurationServic
     /// </summary>
     public bool UsesDynamicCookies(string clientId)
     {
-        return !HasStaticConfiguration(clientId);
+        var mode = _options.Value.CookieSeparationMode;
+        if (mode == CookieSeparationMode.None)
+        {
+            return false; // default scheme/cookie
+        }
+        if (mode == CookieSeparationMode.ByRealm)
+        {
+            return true; // dynamic per-realm scheme
+        }
+        return !HasStaticConfiguration(clientId); // ByClient
     }
 
     public async Task<string?> GetClientIdFromRequestAsync(HttpContext context)
@@ -141,23 +187,27 @@ public class ClientCookieConfigurationService : IClientCookieConfigurationServic
         }
 
         // Method 4: Try to determine from existing authentication cookies
-        foreach (var (clientId, config) in ClientCookieConfigurations)
+        var mode = _options.Value.CookieSeparationMode;
+        if (mode == CookieSeparationMode.ByClient)
         {
-            if (context.Request.Cookies.ContainsKey(config.CookieName))
+            foreach (var (clientId, config) in ClientCookieConfigurations)
             {
-                try
+                if (context.Request.Cookies.ContainsKey(config.CookieName))
                 {
-                    var authResult = await context.AuthenticateAsync(config.SchemeName);
-                    if (authResult.Succeeded && authResult.Principal?.Identity?.IsAuthenticated == true)
+                    try
                     {
-                        _logger.LogDebug("Found active session for client {ClientId} via cookie {CookieName}", 
-                            clientId, config.CookieName);
-                        return clientId;
+                        var authResult = await context.AuthenticateAsync(config.SchemeName);
+                        if (authResult.Succeeded && authResult.Principal?.Identity?.IsAuthenticated == true)
+                        {
+                            _logger.LogDebug("Found active session for client {ClientId} via cookie {CookieName}", 
+                                clientId, config.CookieName);
+                            return clientId;
+                        }
                     }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogDebug("Could not authenticate with scheme {Scheme}: {Error}", config.SchemeName, ex.Message);
+                    catch (Exception ex)
+                    {
+                        _logger.LogDebug("Could not authenticate with scheme {Scheme}: {Error}", config.SchemeName, ex.Message);
+                    }
                 }
             }
         }
@@ -181,6 +231,42 @@ public class ClientCookieConfigurationService : IClientCookieConfigurationServic
 
     public IDictionary<string, ClientCookieConfiguration> GetAllClientConfigurations()
     {
-        return new Dictionary<string, ClientCookieConfiguration>(ClientCookieConfigurations);
+        // Expose only meaningful static configs in ByClient mode
+        return _options.Value.CookieSeparationMode == CookieSeparationMode.ByClient
+            ? new Dictionary<string, ClientCookieConfiguration>(ClientCookieConfigurations)
+            : new Dictionary<string, ClientCookieConfiguration>();
+    }
+
+    private string GetRealmKeyForClient(string clientId)
+    {
+        try
+        {
+            // Look up the client's realm name; fallback to Default
+            var realmName = _db.Clients
+                .Include(c => c.Realm)
+                .Where(c => c.ClientId == clientId && c.IsEnabled)
+                .Select(c => c.Realm.Name)
+                .FirstOrDefault();
+
+            realmName ??= "Default";
+            return Sanitize(realmName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Failed to resolve realm for client {ClientId}", clientId);
+            return "Default";
+        }
+    }
+
+    private static string Sanitize(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "Default";
+        Span<char> buffer = stackalloc char[name.Length];
+        var i = 0;
+        foreach (var ch in name)
+        {
+            buffer[i++] = char.IsLetterOrDigit(ch) || ch is '.' or '_' or '-' ? ch : '_';
+        }
+        return new string(buffer[..i]);
     }
 }
