@@ -53,23 +53,16 @@ public class AuthController : Controller
 
             if (clearAll)
             {
-                // Clear all authentication completely
-                await HttpContext.SignOutAsync(AdminCookieScheme);
-                await HttpContext.SignOutAsync(OpenIdConnectDefaults.AuthenticationScheme);
-                
-                // Clear all cookies for a complete clean slate
-                foreach (var cookie in HttpContext.Request.Cookies.Keys)
+                // Perform a proper OIDC sign-out roundtrip to the local OP, while also clearing the local cookie scheme
+                var properties = new AuthenticationProperties
                 {
-                    if (cookie.StartsWith(".AspNetCore") || cookie.StartsWith(".MrWho"))
-                    {
-                        Response.Cookies.Delete(cookie);
-                    }
-                }
-                
-                _logger.LogInformation("Complete authentication clear performed for admin app");
-                
-                var clearAllRedirectUrl = !string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl) ? returnUrl : "/";
-                return Redirect(clearAllRedirectUrl);
+                    RedirectUri = !string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl) ? returnUrl : "/"
+                };
+
+                _logger.LogInformation("ClearAll: returning OIDC sign-out so OP can cascade external sign-out if needed");
+
+                // IMPORTANT: return SignOut result (do not issue a Redirect here), so middleware can redirect to OP end-session
+                return SignOut(properties, OpenIdConnectDefaults.AuthenticationScheme, AdminCookieScheme);
             }
             else
             {

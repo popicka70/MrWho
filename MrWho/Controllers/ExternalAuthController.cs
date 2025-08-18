@@ -41,6 +41,33 @@ public class ExternalAuthController : ControllerBase
             return Unauthorized(new { error = result.Failure?.Message });
         }
 
+        // Persist the RegistrationId of the external provider in session for future sign-out
+        try
+        {
+            string? regId = null;
+            if (result.Properties?.Items != null)
+            {
+                // Prefer custom roundtripped id if present
+                if (result.Properties.Items.TryGetValue("extRegistrationId", out var regIdCustom) && !string.IsNullOrWhiteSpace(regIdCustom))
+                {
+                    regId = regIdCustom;
+                }
+                else if (result.Properties.Items.TryGetValue(OpenIddictClientAspNetCoreConstants.Properties.RegistrationId, out var regIdStd) && !string.IsNullOrWhiteSpace(regIdStd))
+                {
+                    regId = regIdStd;
+                }
+            }
+            if (!string.IsNullOrWhiteSpace(regId))
+            {
+                HttpContext.Session.SetString("ExternalRegistrationId", regId);
+                _logger.LogDebug("Stored external RegistrationId in session: {RegistrationId}", regId);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Failed to store external RegistrationId in session");
+        }
+
         // Extract returnUrl/clientId from properties if carried over, otherwise from query
         string? returnUrl = null;
         string? clientId = null;
@@ -128,8 +155,20 @@ public class ExternalAuthController : ControllerBase
 
     [HttpGet("signout-callback")]
     [IgnoreAntiforgeryToken]
-    public IActionResult SignoutCallback()
+    public IActionResult SignoutCallback([FromQuery] string? returnUrl = null)
     {
+        // Clear the external registration marker so we don't attempt sign-out again
+        try
+        {
+            HttpContext.Session.Remove("ExternalRegistrationId");
+        }
+        catch { /* ignore */ }
+
+        if (!string.IsNullOrEmpty(returnUrl))
+        {
+            return Redirect(returnUrl);
+        }
+
         return Ok(new { Message = "External sign-out completed" });
     }
 }

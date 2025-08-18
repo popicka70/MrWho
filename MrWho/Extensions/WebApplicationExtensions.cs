@@ -103,13 +103,14 @@ public static class WebApplicationExtensions
             if (registration is null)
             {
                 http.Response.StatusCode = StatusCodes.Status400BadRequest;
-                await http.Response.WriteAsync($"Unknown external provider '{provider}'.");
+                await http.Response.WriteAsync($"Unknown external provider '{provider}'."); // updated error message
                 return;
             }
 
             // Carry original authorize request context so callback can resume the flow
             var returnUrl = http.Request.Query["returnUrl"].ToString();
             var clientId = http.Request.Query["clientId"].ToString();
+            var force = http.Request.Query["force"].ToString();
 
             var props = new AuthenticationProperties
             {
@@ -125,9 +126,56 @@ public static class WebApplicationExtensions
                 props.Items["clientId"] = clientId;
             }
 
+            // Preserve registration id in a custom item that roundtrips in state
+            props.Items["extRegistrationId"] = registration.RegistrationId;
+
             // Use RegistrationId to unambiguously select the configured client
             props.Items[OpenIddictClientAspNetCoreConstants.Properties.RegistrationId] = registration.RegistrationId;
+
+            // Optional: force re-auth at the external provider
+            if (!string.IsNullOrEmpty(force) && (force == "1" || force.Equals("true", StringComparison.OrdinalIgnoreCase)))
+            {
+                props.Parameters["prompt"] = "login";
+                props.Parameters["max_age"] = 0;
+            }
+
             await http.ChallengeAsync(OpenIddictClientAspNetCoreDefaults.AuthenticationScheme, props);
+        }).AllowAnonymous();
+
+        // Endpoint to sign out from the last-used external provider
+        app.MapGet("/connect/external/signout", async (HttpContext http) =>
+        {
+            var logger = http.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("ExternalSignout");
+            var regId = http.Session.GetString("ExternalRegistrationId");
+            if (string.IsNullOrWhiteSpace(regId))
+            {
+                logger.LogDebug("No external RegistrationId in session; skipping external sign-out");
+                http.Response.StatusCode = StatusCodes.Status204NoContent;
+                return;
+            }
+
+            var props = new AuthenticationProperties
+            {
+                // After provider sign-out completes, return here and clear the session marker
+                RedirectUri = "/connect/external/signout-callback"
+            };
+            props.Items[OpenIddictClientAspNetCoreConstants.Properties.RegistrationId] = regId;
+
+            // Ask the OpenIddict client to sign the user out from the remote provider
+            await http.SignOutAsync(OpenIddictClientAspNetCoreDefaults.AuthenticationScheme, props);
+        }).AllowAnonymous();
+
+        app.MapGet("/connect/external/signout-callback", async (HttpContext http) =>
+        {
+            try { http.Session.Remove("ExternalRegistrationId"); } catch { }
+            var resume = http.Session.GetString("ExternalSignoutResumeUrl");
+            if (!string.IsNullOrWhiteSpace(resume))
+            {
+                http.Session.Remove("ExternalSignoutResumeUrl");
+                http.Response.Redirect(resume);
+                return;
+            }
+            http.Response.StatusCode = StatusCodes.Status204NoContent;
         }).AllowAnonymous();
 
         // Map OIDC authorize endpoint for OpenIddict passthrough
@@ -208,13 +256,14 @@ public static class WebApplicationExtensions
             if (registration is null)
             {
                 http.Response.StatusCode = StatusCodes.Status400BadRequest;
-                await http.Response.WriteAsync($"Unknown external provider '{provider}'.");
+                await http.Response.WriteAsync($"Unknown external provider '{provider}'."); // updated error message
                 return;
             }
 
             // Carry original authorize request context so callback can resume the flow
             var returnUrl = http.Request.Query["returnUrl"].ToString();
             var clientId = http.Request.Query["clientId"].ToString();
+            var force = http.Request.Query["force"].ToString();
 
             var props = new AuthenticationProperties
             {
@@ -230,9 +279,56 @@ public static class WebApplicationExtensions
                 props.Items["clientId"] = clientId;
             }
 
+            // Preserve registration id in a custom item that roundtrips in state
+            props.Items["extRegistrationId"] = registration.RegistrationId;
+
             // Use RegistrationId to unambiguously select the configured client
             props.Items[OpenIddictClientAspNetCoreConstants.Properties.RegistrationId] = registration.RegistrationId;
+
+            // Optional: force re-auth at the external provider
+            if (!string.IsNullOrEmpty(force) && (force == "1" || force.Equals("true", StringComparison.OrdinalIgnoreCase)))
+            {
+                props.Parameters["prompt"] = "login";
+                props.Parameters["max_age"] = 0;
+            }
+
             await http.ChallengeAsync(OpenIddictClientAspNetCoreDefaults.AuthenticationScheme, props);
+        }).AllowAnonymous();
+
+        // Endpoint to sign out from the last-used external provider
+        app.MapGet("/connect/external/signout", async (HttpContext http) =>
+        {
+            var logger = http.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger("ExternalSignout");
+            var regId = http.Session.GetString("ExternalRegistrationId");
+            if (string.IsNullOrWhiteSpace(regId))
+            {
+                logger.LogDebug("No external RegistrationId in session; skipping external sign-out");
+                http.Response.StatusCode = StatusCodes.Status204NoContent;
+                return;
+            }
+
+            var props = new AuthenticationProperties
+            {
+                // After provider sign-out completes, return here and clear the session marker
+                RedirectUri = "/connect/external/signout-callback"
+            };
+            props.Items[OpenIddictClientAspNetCoreConstants.Properties.RegistrationId] = regId;
+
+            // Ask the OpenIddict client to sign the user out from the remote provider
+            await http.SignOutAsync(OpenIddictClientAspNetCoreDefaults.AuthenticationScheme, props);
+        }).AllowAnonymous();
+
+        app.MapGet("/connect/external/signout-callback", async (HttpContext http) =>
+        {
+            try { http.Session.Remove("ExternalRegistrationId"); } catch { }
+            var resume = http.Session.GetString("ExternalSignoutResumeUrl");
+            if (!string.IsNullOrWhiteSpace(resume))
+            {
+                http.Session.Remove("ExternalSignoutResumeUrl");
+                http.Response.Redirect(resume);
+                return;
+            }
+            http.Response.StatusCode = StatusCodes.Status204NoContent;
         }).AllowAnonymous();
 
         // Map OIDC authorize endpoint for OpenIddict passthrough
