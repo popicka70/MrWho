@@ -15,6 +15,7 @@ using MrWho.Models;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Net.Http;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore; // added
 
 namespace MrWho.Controllers;
 
@@ -114,6 +115,47 @@ public class AuthController : Controller
         }
 
         ViewData["ClientName"] = clientName;
+
+        // Load enabled external IdPs for UI buttons
+        try
+        {
+            // Base query: enabled OIDC providers
+            var query = _db.IdentityProviders
+                .AsNoTracking()
+                .Where(p => p.IsEnabled && p.Type == MrWho.Shared.IdentityProviderType.Oidc);
+
+            var providers = await query
+                .OrderBy(p => p.Order)
+                .ThenBy(p => p.Name)
+                .Select(p => new { Name = p.Name, DisplayName = p.DisplayName ?? p.Name, IconUri = p.IconUri })
+                .ToListAsync();
+
+            // If client restricts IdPs, filter accordingly (AllowedIdentityProviders is a space/comma-separated list)
+            if (!string.IsNullOrEmpty(clientId))
+            {
+                var client = await _db.Clients.AsNoTracking().FirstOrDefaultAsync(c => c.ClientId == clientId);
+                var allowedRaw = client?.AllowedIdentityProviders;
+                if (!string.IsNullOrWhiteSpace(allowedRaw))
+                {
+                    var allowed = allowedRaw
+                        .Split(new[] { ' ', ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
+                        .Select(s => s.Trim().ToLowerInvariant())
+                        .ToHashSet();
+
+                    providers = providers
+                        .Where(p => allowed.Contains((p.Name ?? string.Empty).ToLowerInvariant()))
+                        .ToList();
+                }
+            }
+
+            ViewBag.ExternalProviders = providers;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to load external identity providers for login page");
+            ViewBag.ExternalProviders = Array.Empty<object>();
+        }
+
         var useCode = string.Equals(mode, "code", StringComparison.OrdinalIgnoreCase);
         return View(new LoginViewModel { UseCode = useCode });
     }
@@ -337,6 +379,20 @@ public class AuthController : Controller
             _logger.LogInformation("OIDC logout request detected with proper parameters, processing normally");
             return await ProcessLogout(clientId, post_logout_redirect_uri);
         }
+
+        // If we used an external IdP, sign out there first and then resume this GET
+        var externalRegId = HttpContext.Session.GetString("ExternalRegistrationId");
+        if (!string.IsNullOrWhiteSpace(externalRegId))
+        {
+            _logger.LogInformation("External RegistrationId found in session during GET logout. Initiating external provider sign-out before local logout.");
+            var returnAfterExternal = Url.ActionLink(nameof(Logout), values: new { clientId, post_logout_redirect_uri });
+            HttpContext.Session.SetString("ExternalSignoutResumeUrl", returnAfterExternal ?? "/");
+
+            var props = new AuthenticationProperties { RedirectUri = "/connect/external/signout-callback" };
+            props.Items[OpenIddict.Client.AspNetCore.OpenIddictClientAspNetCoreConstants.Properties.RegistrationId] = externalRegId;
+            await HttpContext.SignOutAsync(OpenIddict.Client.AspNetCore.OpenIddictClientAspNetCoreDefaults.AuthenticationScheme, props);
+            return new EmptyResult();
+        }
         
         // For direct browser access without OIDC parameters, perform logout and redirect to home
         _logger.LogInformation("Direct browser logout access detected (no OIDC parameters)");
@@ -403,6 +459,20 @@ public class AuthController : Controller
             return await ProcessLogout(clientId, post_logout_redirect_uri);
         }
         
+        // If we used an external IdP, sign out there first and then resume this POST
+        var externalRegId = HttpContext.Session.GetString("ExternalRegistrationId");
+        if (!string.IsNullOrWhiteSpace(externalRegId))
+        {
+            _logger.LogInformation("External RegistrationId found in session during POST logout. Initiating external provider sign-out before local logout.");
+            var returnAfterExternal = Url.ActionLink(nameof(LogoutPost), values: new { clientId, post_logout_redirect_uri });
+            HttpContext.Session.SetString("ExternalSignoutResumeUrl", returnAfterExternal ?? "/");
+
+            var props = new AuthenticationProperties { RedirectUri = "/connect/external/signout-callback" };
+            props.Items[OpenIddict.Client.AspNetCore.OpenIddictClientAspNetCoreConstants.Properties.RegistrationId] = externalRegId;
+            await HttpContext.SignOutAsync(OpenIddict.Client.AspNetCore.OpenIddictClientAspNetCoreDefaults.AuthenticationScheme, props);
+            return new EmptyResult();
+        }
+        
         // For regular UI POST requests (like from our logout buttons)
         _logger.LogInformation("UI logout POST request detected (no OIDC parameters)");
         
@@ -453,6 +523,25 @@ public class AuthController : Controller
         _logger.LogDebug("Processing OIDC logout. Method: {Method}, ClientId parameter: {ClientId}, Detected ClientId: {DetectedClientId}, Post logout URI: {PostLogoutUri}", 
             HttpContext.Request.Method, clientId, detectedClientId, post_logout_redirect_uri ?? request?.PostLogoutRedirectUri);
 
+        // If we used an external IdP recently, sign out there first, then continue
+        var externalRegId = HttpContext.Session.GetString("ExternalRegistrationId");
+        if (!string.IsNullOrWhiteSpace(externalRegId))
+        {
+            _logger.LogInformation("External RegistrationId found in session. Initiating external provider sign-out before local logout.");
+            var returnAfterExternal = Url.ActionLink(nameof(Logout), values: new { clientId, post_logout_redirect_uri });
+            var props = new AuthenticationProperties
+            {
+                RedirectUri = "/connect/external/signout-callback"
+            };
+            props.Items[OpenIddict.Client.AspNetCore.OpenIddictClientAspNetCoreConstants.Properties.RegistrationId] = externalRegId;
+
+            // Store a resume URL so our signout-callback can redirect back here
+            HttpContext.Session.SetString("ExternalSignoutResumeUrl", returnAfterExternal ?? "/");
+
+            await HttpContext.SignOutAsync(OpenIddict.Client.AspNetCore.OpenIddictClientAspNetCoreDefaults.AuthenticationScheme, props);
+            return new EmptyResult(); // Pipeline will be short-circuited by the challenge
+        }
+
         // CRITICAL FIX: Sign out from all possible authentication schemes
         await SignOutFromAllSchemesAsync(detectedClientId);
         
@@ -463,7 +552,7 @@ public class AuthController : Controller
                 request.PostLogoutRedirectUri);
             
             // Return a SignOut result to complete the OIDC logout flow
-            return SignOut(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+            return SignOut(OpenIddict.Server.AspNetCore.OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
         }
         
         // Fallback - this shouldn't happen anymore since UI requests now redirect directly

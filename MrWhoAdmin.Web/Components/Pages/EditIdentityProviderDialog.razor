@@ -1,0 +1,251 @@
+@using System.Net.Http.Json
+@using MrWho.Shared
+@using MrWho.Shared.Models
+@inject HttpClient Http
+@inject Radzen.DialogService DialogService
+@inject Radzen.NotificationService NotificationService
+@inject NavigationManager Nav
+@inject MrWhoAdmin.Web.Services.IIdentityProvidersApiService IdentityProvidersApi
+
+<RadzenComponents @rendermode="InteractiveServer" />
+
+<RadzenStack Gap="1rem" Style="min-width: 700px;">
+    <RadzenText TextStyle="TextStyle.H5">@(_isNew ? "Create Identity Provider" : "Edit Identity Provider")</RadzenText>
+
+    <RadzenTemplateForm TItem="IdentityProviderDto" Data="_model" Submit="@(async () => await Save())">
+        <RadzenStack Gap="1rem">
+            <RadzenRow Gap="1rem">
+                <RadzenColumn Size="6">
+                    <RadzenFormField Text="Display Name" Variant="Variant.Outlined">
+                        <ChildContent>
+                            <RadzenTextBox @bind-Value="_model.DisplayName" Style="width:100%" />
+                        </ChildContent>
+                    </RadzenFormField>
+                </RadzenColumn>
+                <RadzenColumn Size="6">
+                    <RadzenFormField Text="System Name (unique)" Variant="Variant.Outlined">
+                        <ChildContent>
+                            <RadzenTextBox @bind-Value="_model.Name" Style="width:100%" />
+                        </ChildContent>
+                    </RadzenFormField>
+                </RadzenColumn>
+            </RadzenRow>
+
+            <RadzenRow Gap="1rem">
+                <RadzenColumn Size="6">
+                    <RadzenFormField Text="Type" Variant="Variant.Outlined">
+                        <ChildContent>
+                            <RadzenDropDown TValue="IdentityProviderType" @bind-Value="_model.Type" Data="@_typeOptions" Style="width:100%" />
+                        </ChildContent>
+                    </RadzenFormField>
+                </RadzenColumn>
+                <RadzenColumn Size="6">
+                    <RadzenFormField Text="Status" Variant="Variant.Outlined">
+                        <Start>
+                            <RadzenSwitch @bind-Value="_model.IsEnabled" OnLabel="Enabled" OffLabel="Disabled" />
+                        </Start>
+                        <ChildContent>
+                            <RadzenLabel Text="Provider is enabled" />
+                        </ChildContent>
+                    </RadzenFormField>
+                </RadzenColumn>
+            </RadzenRow>
+
+            @if (_model.Type == IdentityProviderType.Oidc)
+            {
+                <RadzenCard Class="rz-mb-2">
+                    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-mb-2">OpenID Connect Settings</RadzenText>
+
+                    <RadzenFormField Text="Authority (Issuer)" Variant="Variant.Outlined">
+                        <ChildContent>
+                            <RadzenTextBox @bind-Value="_model.Authority" Style="width:100%" Placeholder="https://accounts.google.com" />
+                        </ChildContent>
+                        <Helper>
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                Discovery endpoint must be /.well-known/openid-configuration (with hyphen)
+                            </RadzenText>
+                        </Helper>
+                    </RadzenFormField>
+
+                    <RadzenRow Gap="1rem">
+                        <RadzenColumn Size="6">
+                            <RadzenFormField Text="Client ID" Variant="Variant.Outlined">
+                                <ChildContent>
+                                    <RadzenTextBox @bind-Value="_model.ClientId" Style="width:100%" />
+                                </ChildContent>
+                            </RadzenFormField>
+                        </RadzenColumn>
+                        <RadzenColumn Size="6">
+                            <RadzenFormField Text="Client Secret" Variant="Variant.Outlined">
+                                <ChildContent>
+                                    <RadzenPassword @bind-Value="_model.ClientSecret" Style="width:100%" ToggleMask="true" />
+                                </ChildContent>
+                            </RadzenFormField>
+                        </RadzenColumn>
+                    </RadzenRow>
+
+                    <RadzenFormField Text="Scopes" Variant="Variant.Outlined">
+                        <ChildContent>
+                            <RadzenTextBox @bind-Value="_model.Scopes" Style="width:100%" Placeholder="openid profile email" />
+                        </ChildContent>
+                        <Helper>
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                Space-separated or JSON array, e.g. ["openid","profile","email"]
+                            </RadzenText>
+                        </Helper>
+                    </RadzenFormField>
+
+                    <RadzenRow Gap="1rem">
+                        <RadzenColumn Size="6">
+                            <RadzenFormField Text="Response Type" Variant="Variant.Outlined">
+                                <ChildContent>
+                                    <RadzenTextBox @bind-Value="_model.ResponseType" Style="width:100%" Placeholder="code" />
+                                </ChildContent>
+                            </RadzenFormField>
+                        </RadzenColumn>
+                        <RadzenColumn Size="6">
+                            <RadzenFormField Text="PKCE" Variant="Variant.Outlined">
+                                <Start>
+                                    <RadzenSwitch @bind-Value="_usePkce" />
+                                </Start>
+                                <ChildContent>
+                                    <RadzenLabel Text="Use Proof Key for Code Exchange (recommended)" />
+                                </ChildContent>
+                            </RadzenFormField>
+                        </RadzenColumn>
+                    </RadzenRow>
+
+                    <RadzenFormField Text="UserInfo Claims" Variant="Variant.Outlined">
+                        <Start>
+                            <RadzenSwitch @bind-Value="_getClaimsFromUserInfo" />
+                        </Start>
+                        <ChildContent>
+                            <RadzenLabel Text="Fetch additional claims from UserInfo endpoint" />
+                        </ChildContent>
+                    </RadzenFormField>
+
+                    <RadzenFormField Text="Claim Mappings (JSON)" Variant="Variant.Outlined">
+                        <ChildContent>
+                            <RadzenTextArea @bind-Value="_model.ClaimMappingsJson" Rows="4" Style="width:100%" />
+                        </ChildContent>
+                    </RadzenFormField>
+                </RadzenCard>
+            }
+
+            <RadzenRow Gap="1rem">
+                <RadzenColumn Size="6">
+                    <RadzenFormField Text="Icon URL" Variant="Variant.Outlined">
+                        <ChildContent>
+                            <RadzenTextBox @bind-Value="_model.IconUri" Style="width:100%" />
+                        </ChildContent>
+                    </RadzenFormField>
+                </RadzenColumn>
+                <RadzenColumn Size="6">
+                    <RadzenFormField Text="Order" Variant="Variant.Outlined">
+                        <ChildContent>
+                            <RadzenNumeric TValue="int" @bind-Value="_model.Order" Style="width:100%" />
+                        </ChildContent>
+                    </RadzenFormField>
+                </RadzenColumn>
+            </RadzenRow>
+
+            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" JustifyContent="JustifyContent.End">
+                @if (_model.Type == IdentityProviderType.Oidc && !string.IsNullOrWhiteSpace(_model.Name))
+                {
+                    <RadzenButton Icon="open_in_new" ButtonStyle="ButtonStyle.Light" Text="Test Login" Click="@(async () => await TestLogin())" />
+                }
+                <RadzenButton Icon="close" ButtonStyle="ButtonStyle.Secondary" Text="Cancel" Click="@(async ()=> DialogService.Close(false))" />
+                <RadzenButton Icon="save" ButtonStyle="ButtonStyle.Primary" Text="Save" ButtonType="ButtonType.Submit" />
+            </RadzenStack>
+        </RadzenStack>
+    </RadzenTemplateForm>
+</RadzenStack>
+
+@code {
+    [Parameter] public IdentityProviderDto? Provider { get; set; }
+
+    private IdentityProviderDto _model = new();
+    private bool _isNew;
+    private IdentityProviderType[] _typeOptions = Array.Empty<IdentityProviderType>();
+    private bool _usePkce;
+    private bool _getClaimsFromUserInfo;
+
+    protected override void OnInitialized()
+    {
+        _typeOptions = Enum.GetValues<IdentityProviderType>();
+        _isNew = Provider == null || string.IsNullOrWhiteSpace(Provider.Id);
+        _model = Provider != null ? Clone(Provider) : new IdentityProviderDto
+        {
+            Type = IdentityProviderType.Oidc,
+            IsEnabled = true,
+            ResponseType = "code",
+            UsePkce = true,
+            Scopes = "openid profile email"
+        };
+        _usePkce = _model.UsePkce ?? true;
+        _getClaimsFromUserInfo = _model.GetClaimsFromUserInfoEndpoint ?? false;
+    }
+
+    private static IdentityProviderDto Clone(IdentityProviderDto src) => new()
+    {
+        Id = src.Id,
+        Name = src.Name,
+        DisplayName = src.DisplayName,
+        Type = src.Type,
+        IsEnabled = src.IsEnabled,
+        RealmId = src.RealmId,
+        IconUri = src.IconUri,
+        Order = src.Order,
+        Authority = src.Authority,
+        MetadataAddress = src.MetadataAddress,
+        ClientId = src.ClientId,
+        ClientSecret = src.ClientSecret,
+        Scopes = src.Scopes,
+        ResponseType = src.ResponseType,
+        UsePkce = src.UsePkce,
+        GetClaimsFromUserInfoEndpoint = src.GetClaimsFromUserInfoEndpoint,
+        ClaimMappingsJson = src.ClaimMappingsJson
+    };
+
+    private async Task Save()
+    {
+        try
+        {
+            // push local switches back to DTO nullable fields
+            _model.UsePkce = _usePkce;
+            _model.GetClaimsFromUserInfoEndpoint = _getClaimsFromUserInfo;
+
+            IdentityProviderDto? saved;
+            if (_isNew)
+            {
+                saved = await IdentityProvidersApi.CreateIdentityProviderAsync(_model);
+            }
+            else
+            {
+                saved = await IdentityProvidersApi.UpdateIdentityProviderAsync(_model.Id, _model);
+            }
+
+            if (saved is not null)
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage { Severity = Radzen.NotificationSeverity.Success, Summary = "Saved" });
+                DialogService.Close(true);
+            }
+            else
+            {
+                NotificationService.Notify(new Radzen.NotificationMessage { Severity = Radzen.NotificationSeverity.Error, Summary = "Save failed" });
+            }
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(new Radzen.NotificationMessage { Severity = Radzen.NotificationSeverity.Error, Summary = "Error", Detail = ex.Message });
+        }
+    }
+
+    private Task TestLogin()
+    {
+        var baseUri = Http.BaseAddress?.ToString()?.TrimEnd('/') ?? "https://localhost:7113";
+        var url = $"{baseUri}/connect/external/login/{Uri.EscapeDataString(_model.Name ?? string.Empty)}";
+        Nav.NavigateTo(url, forceLoad: true);
+        return Task.CompletedTask;
+    }
+}
