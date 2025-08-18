@@ -178,7 +178,13 @@
                                     var name = (string)p.Name;
                                     var display = (string)p.DisplayName;
                                     var icon = p.IconUri as string;
-                                    <a href="@($"/connect/external/login/{Uri.EscapeDataString(name)}")" class="btn btn-outline-dark d-flex align-items-center justify-content-center">
+                                    var extQuery = string.Join("&", new[]{ ViewData["ReturnUrl"] as string is string er && !string.IsNullOrEmpty(er) ? ($"returnUrl={Uri.EscapeDataString(er)}") : null,
+                                                                           ViewData["ClientId"] as string is string ec && !string.IsNullOrEmpty(ec) ? ($"clientId={Uri.EscapeDataString(ec)}") : null }
+                                                                           .Where(s => s != null));
+                                    var extHref = string.IsNullOrEmpty(extQuery)
+                                        ? $"/connect/external/login/{Uri.EscapeDataString(name)}"
+                                        : $"/connect/external/login/{Uri.EscapeDataString(name)}?{extQuery}";
+                                    <a href="@extHref" class="btn btn-outline-dark d-flex align-items-center justify-content-center">
                                         @if (!string.IsNullOrWhiteSpace(icon))
                                         {
                                             <img src="@icon" alt="@display" style="height: 18px; width: 18px; object-fit: contain;" class="me-2" />

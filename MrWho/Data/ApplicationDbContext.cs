@@ -348,7 +348,7 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
         {
             entity.HasKey(a => a.Id);
             entity.HasIndex(a => new { a.EntityType, a.EntityId, a.OccurredAt });
-            entity.Property(a => a.Changes).HasMaxLength(8000);
+            // Do not impose a fixed max length here; provider-specific mapping below
         });
 
         // =========================================================================
@@ -431,6 +431,30 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
             builder.Entity<PersistentQrSession>(entity =>
             {
                 entity.Property(p => p.ReturnUrl).HasColumnType("longtext");
+            });
+
+            // Ensure audit log can store large payloads
+            builder.Entity<AuditLog>(entity =>
+            {
+                entity.Property(a => a.Changes).HasColumnType("longtext");
+            });
+        }
+
+        // Provider-specific tuning: PostgreSQL -> use text for large strings
+        if (Database.ProviderName?.Contains("Npgsql", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            builder.Entity<AuditLog>(entity =>
+            {
+                entity.Property(a => a.Changes).HasColumnType("text");
+            });
+        }
+
+        // Provider-specific tuning: SQL Server -> nvarchar(max)
+        if (Database.ProviderName?.Contains("SqlServer", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            builder.Entity<AuditLog>(entity =>
+            {
+                entity.Property(a => a.Changes).HasColumnType("nvarchar(max)");
             });
         }
     }
@@ -535,11 +559,13 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
 
             if (changes.Count > 0)
             {
-                audit.Changes = JsonSerializer.Serialize(changes, new JsonSerializerOptions
+                var json = JsonSerializer.Serialize(changes, new JsonSerializerOptions
                 {
                     WriteIndented = false,
                     DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
                 });
+
+                audit.Changes = json;
             }
 
             AuditLogs.Add(audit);

@@ -107,10 +107,23 @@ public static class WebApplicationExtensions
                 return;
             }
 
+            // Carry original authorize request context so callback can resume the flow
+            var returnUrl = http.Request.Query["returnUrl"].ToString();
+            var clientId = http.Request.Query["clientId"].ToString();
+
             var props = new AuthenticationProperties
             {
                 RedirectUri = "/connect/external/callback"
             };
+
+            if (!string.IsNullOrWhiteSpace(returnUrl))
+            {
+                props.Items["returnUrl"] = returnUrl;
+            }
+            if (!string.IsNullOrWhiteSpace(clientId))
+            {
+                props.Items["clientId"] = clientId;
+            }
 
             // Use RegistrationId to unambiguously select the configured client
             props.Items[OpenIddictClientAspNetCoreConstants.Properties.RegistrationId] = registration.RegistrationId;
@@ -199,10 +212,23 @@ public static class WebApplicationExtensions
                 return;
             }
 
+            // Carry original authorize request context so callback can resume the flow
+            var returnUrl = http.Request.Query["returnUrl"].ToString();
+            var clientId = http.Request.Query["clientId"].ToString();
+
             var props = new AuthenticationProperties
             {
                 RedirectUri = "/connect/external/callback"
             };
+
+            if (!string.IsNullOrWhiteSpace(returnUrl))
+            {
+                props.Items["returnUrl"] = returnUrl;
+            }
+            if (!string.IsNullOrWhiteSpace(clientId))
+            {
+                props.Items["clientId"] = clientId;
+            }
 
             // Use RegistrationId to unambiguously select the configured client
             props.Items[OpenIddictClientAspNetCoreConstants.Properties.RegistrationId] = registration.RegistrationId;
