@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using System.Threading.RateLimiting;
 using OpenIddict.Client;
 using OpenIddict.Client.AspNetCore;
-using OpenIddict.Client.WebIntegration;
+using OpenIddict.Client.SystemNetHttp;
 using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -52,13 +52,13 @@ builder.Services.AddOpenIddict()
                    .AddEphemeralSigningKey();
         }
 
+        // Register the System.Net.Http integration for discovery/back-channel
+        options.UseSystemNetHttp();
+
         // Enable the ASP.NET Core host integration
         options.UseAspNetCore()
                .EnableRedirectionEndpointPassthrough()
                .EnablePostLogoutRedirectionEndpointPassthrough();
-
-        // Register the web provider integrations container
-        options.UseWebProviders();
 
         // Registrations will be added later from DB via the configurator
     });
