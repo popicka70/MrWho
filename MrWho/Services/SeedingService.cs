@@ -65,8 +65,53 @@ public class SeedingService : ISeedingService
         // Seed standard Identity resources
         await _identityResourceSeederService.SeedStandardIdentityResourcesAsync();
         
+        // Seed predefined external identity providers (disabled by default)
+        await SeedPredefinedIdentityProvidersAsync();
+        
         // Seed default OIDC applications
         await SeedDefaultApplications();
+    }
+
+    private async Task SeedPredefinedIdentityProvidersAsync()
+    {
+        try
+        {
+            if (!await _context.Database.CanConnectAsync())
+            {
+                return;
+            }
+
+            foreach (var t in MrWho.Shared.PredefinedIdentityProviders.Templates)
+            {
+                if (!await _context.IdentityProviders.AnyAsync(x => x.Name == t.Key))
+                {
+                    _context.IdentityProviders.Add(new IdentityProvider
+                    {
+                        Name = t.Key,
+                        DisplayName = t.DisplayName,
+                        Type = IdentityProviderType.Oidc,
+                        IsEnabled = false,
+                        Authority = t.Authority,
+                        Scopes = t.DefaultScopes,
+                        ResponseType = "code",
+                        UsePkce = true,
+                        GetClaimsFromUserInfoEndpoint = true,
+                        Order = t.Order,
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow,
+                        CreatedBy = "SeedingService",
+                        UpdatedBy = "SeedingService"
+                    });
+                    _logger.LogInformation("Seeded predefined IdP: {Name}", t.Key);
+                }
+            }
+
+            await _context.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error seeding predefined identity providers");
+        }
     }
 
     private async Task SeedDefaultRealm()

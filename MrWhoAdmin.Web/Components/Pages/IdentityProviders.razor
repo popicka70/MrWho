@@ -1,0 +1,113 @@
+@page "/identity-providers"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using System.Net.Http.Json
+@using MrWho.Shared.Models
+@using MrWho.Shared
+@inject HttpClient Http
+@inject NavigationManager Nav
+@inject Radzen.DialogService DialogService
+@inject Radzen.NotificationService NotificationService
+@inject MrWhoAdmin.Web.Services.IIdentityProvidersApiService IdentityProvidersApi
+
+<RadzenStack Gap="1rem">
+    <RadzenHeading Size="HeadingSize.H3" Text="Identity Providers" />
+
+    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+        <RadzenButton Icon="add" Text="New Provider" Click="@(async ()=> await OpenCreateDialog())" ButtonStyle="ButtonStyle.Primary" />
+        <RadzenButton Icon="refresh" Text="Refresh" Click="@(async ()=> await Load())" ButtonStyle="ButtonStyle.Light" />
+    </RadzenStack>
+
+    <RadzenDataGrid TItem="IdentityProviderDto" Data="_items" RowSelect="OnRowSelect" ColumnWidth="200px" AllowFiltering="true" AllowSorting="true" AllowPaging="true">
+        <Columns>
+            <RadzenDataGridColumn TItem="IdentityProviderDto" Property="DisplayName" Title="Display" />
+            <RadzenDataGridColumn TItem="IdentityProviderDto" Property="Name" Title="Name" />
+            <RadzenDataGridColumn TItem="IdentityProviderDto" Property="Type" Title="Type" />
+            <RadzenDataGridColumn TItem="IdentityProviderDto" Property="IsEnabled" Title="Enabled" />
+            <RadzenDataGridColumn TItem="IdentityProviderDto" Property="Authority" Title="Authority / SSO URL" />
+            <RadzenDataGridColumn TItem="IdentityProviderDto" Context="it" Title="Actions" Width="500px">
+                <Template Context="it">
+                    <RadzenButton Icon="visibility" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" Text="Edit" Click="@(async ()=> await OpenEditDialog(it))" />
+                    <RadzenButton Icon="toggle_on" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" Click="@(async ()=> await ToggleEnabled(it))" Text="Toggle" Style="margin-left:.5rem" />
+                    <RadzenButton Icon="link" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" Click="@(async ()=> await ManageLinks(it))" Style="margin-left: .5rem" Text="Links" />
+                    <RadzenButton Icon="open_in_new" ButtonStyle="ButtonStyle.Secondary" Size="ButtonSize.Small" Style="margin-left: .5rem" Click="@(async ()=> await TestLogin(it))" Text="Test" />
+                </Template>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+</RadzenStack>
+
+@code {
+    private List<IdentityProviderDto> _items = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        _items = await IdentityProvidersApi.GetIdentityProvidersAsync() ?? new();
+        StateHasChanged();
+    }
+
+    private Task OnRowSelect(IdentityProviderDto ip) => Task.CompletedTask;
+
+    private async Task OpenCreateDialog()
+    {
+        var result = await DialogService.OpenAsync<EditIdentityProviderDialog>("Create Identity Provider",
+            new Dictionary<string, object> { { "Provider", null! } },
+            new DialogOptions { Width = "900px", Height = "720px", Resizable = true, Draggable = true });
+
+        if (result is bool b && b)
+        {
+            await Load();
+        }
+    }
+
+    private async Task OpenEditDialog(IdentityProviderDto ip)
+    {
+        var result = await DialogService.OpenAsync<EditIdentityProviderDialog>("Edit Identity Provider",
+            new Dictionary<string, object> { { "Provider", ip } },
+            new DialogOptions { Width = "900px", Height = "720px", Resizable = true, Draggable = true });
+        if (result is bool b && b)
+        {
+            await Load();
+        }
+    }
+
+    private async Task ToggleEnabled(IdentityProviderDto ip)
+    {
+        ip.IsEnabled = !ip.IsEnabled;
+        var updated = await IdentityProvidersApi.UpdateIdentityProviderAsync(ip.Id, ip);
+        if (updated is not null)
+        {
+            NotificationService?.Notify(new Radzen.NotificationMessage { Severity = Radzen.NotificationSeverity.Info, Summary = ip.IsEnabled ? "Enabled" : "Disabled" });
+            await Load();
+        }
+        else
+        {
+            NotificationService?.Notify(new Radzen.NotificationMessage { Severity = Radzen.NotificationSeverity.Error, Summary = "Update failed" });
+        }
+    }
+
+    private async Task ManageLinks(IdentityProviderDto ip)
+    {
+        var result = await DialogService.OpenAsync<IdentityProviderLinksDialog>($"Manage Links - {ip.DisplayName ?? ip.Name}",
+            new Dictionary<string, object> { { "Provider", ip } },
+            new DialogOptions { Width = "900px", Height = "620px", Resizable = true, Draggable = true });
+
+        if (result is bool b && b)
+        {
+            await Load();
+        }
+    }
+
+    private Task TestLogin(IdentityProviderDto ip)
+    {
+        var baseUri = Http.BaseAddress?.ToString()?.TrimEnd('/') ?? "https://localhost:7113";
+        var url = $"{baseUri}/connect/external/login/{Uri.EscapeDataString(ip.Name)}";
+        Nav.NavigateTo(url, forceLoad: true);
+        return Task.CompletedTask;
+    }
+}

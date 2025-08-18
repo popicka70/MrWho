@@ -7,6 +7,8 @@ using MrWho.Services;
 using MrWho.Services.Mediator;
 using OpenIddict.Server.AspNetCore;
 using Microsoft.AspNetCore; // for extension visibility
+using Microsoft.AspNetCore.Authentication;
+using OpenIddict.Client.AspNetCore;
 
 namespace MrWho.Endpoints;
 
@@ -31,6 +33,27 @@ public sealed class OidcLogoutHandler : IRequestHandler<OidcLogoutRequest, IResu
 
         try
         {
+            // If this OP session was established via an external IdP, cascade sign-out first
+            var externalRegId = context.Session.GetString("ExternalRegistrationId");
+            if (!string.IsNullOrWhiteSpace(externalRegId))
+            {
+                // Save a resume URL so that when external sign-out finishes, we re-enter this endpoint
+                var resume = context.Request.Path + context.Request.QueryString.Value;
+                context.Session.SetString("ExternalSignoutResumeUrl", resume);
+
+                _logger.LogInformation("Cascading logout: initiating external sign-out for registration {RegistrationId} before OP end-session", externalRegId);
+                var props = new AuthenticationProperties
+                {
+                    RedirectUri = "/connect/external/signout-callback"
+                };
+                props.Items[OpenIddictClientAspNetCoreConstants.Properties.RegistrationId] = externalRegId;
+
+                await context.SignOutAsync(OpenIddictClientAspNetCoreDefaults.AuthenticationScheme, props);
+
+                // Short-circuit: the response is a redirect to the external end-session
+                return Results.Empty;
+            }
+
             var clientId = oidcRequest.ClientId ??
                            context.Items["ClientId"]?.ToString() ??
                            context.Request.Query["client_id"].FirstOrDefault() ??
