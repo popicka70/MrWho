@@ -1,5 +1,8 @@
 using MrWho.Services;
 using Microsoft.AspNetCore.Http.Features;
+using Microsoft.Extensions.Options;
+using MrWho.Options;
+using Microsoft.AspNetCore.Identity;
 
 namespace MrWho.Middleware;
 
@@ -10,11 +13,13 @@ public class ClientCookieMiddleware
 {
     private readonly RequestDelegate _next;
     private readonly ILogger<ClientCookieMiddleware> _logger;
+    private readonly MrWhoOptions _options;
 
-    public ClientCookieMiddleware(RequestDelegate next, ILogger<ClientCookieMiddleware> logger)
+    public ClientCookieMiddleware(RequestDelegate next, ILogger<ClientCookieMiddleware> logger, IOptions<MrWhoOptions> options)
     {
         _next = next;
         _logger = logger;
+        _options = options.Value;
     }
 
     public async Task InvokeAsync(HttpContext context, IClientCookieConfigurationService cookieService)
@@ -47,6 +52,12 @@ public class ClientCookieMiddleware
                         context.Session.SetString("oidc_client_id", clientId);
                     }
                 }
+            }
+            else if (_options.CookieSeparationMode == MrWho.Options.CookieSeparationMode.None)
+            {
+                // In None mode, set standard scheme and cookie name to ensure consistent behavior
+                context.Items["ClientCookieScheme"] = IdentityConstants.ApplicationScheme;
+                context.Items["ClientCookieName"] = ".AspNetCore.Identity.Application";
             }
         }
 

@@ -1,12 +1,15 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.Extensions.Options;
+using MrWho.Options;
+using MrWho.Data;
+using Microsoft.EntityFrameworkCore;
 
 namespace MrWho.Services;
 
 /// <summary>
-/// Service that dynamically registers authentication schemes for database-configured clients
-/// This provides true runtime registration of client-specific cookie authentication schemes
+/// Service that dynamically registers authentication schemes for database-configured clients or realms
+/// This provides runtime registration of cookie authentication schemes based on the global separation mode
 /// </summary>
 public class DynamicClientCookieService : IHostedService
 {
@@ -29,78 +32,148 @@ public class DynamicClientCookieService : IHostedService
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        _logger.LogInformation("?? Starting dynamic client cookie registration...");
+        _logger.LogInformation("Starting dynamic cookie scheme registration...");
 
         try
         {
             using var scope = _serviceScopeFactory.CreateScope();
-            var oidcClientService = scope.ServiceProvider.GetRequiredService<IOidcClientService>();
-            var authSchemeProvider = scope.ServiceProvider.GetRequiredService<IAuthenticationSchemeProvider>();
-            var cookieConfigService = scope.ServiceProvider.GetRequiredService<IClientCookieConfigurationService>();
+            var config = scope.ServiceProvider.GetRequiredService<IOptions<MrWhoOptions>>().Value;
+            var mode = config.CookieSeparationMode;
 
-            // Load all enabled clients from database
-            var enabledClients = await oidcClientService.GetEnabledClientsAsync();
-            var registeredCount = 0;
-            
-            foreach (var client in enabledClients)
+            if (mode == CookieSeparationMode.None)
             {
-                var schemeName = $"Identity.Application.{client.ClientId}";
-                var cookieName = $".MrWho.{client.Name?.Replace(" ", "").Replace("-", "")}";
-                
-                // Check if scheme already exists (avoid duplicates with static registration)
-                var existingScheme = await authSchemeProvider.GetSchemeAsync(schemeName);
-                if (existingScheme != null)
-                {
-                    _logger.LogDebug("?? Scheme {SchemeName} already exists (static registration), skipping dynamic registration", schemeName);
-                    continue;
-                }
-
-                // Additional check: verify this client doesn't have static configuration
-                if (cookieConfigService.HasStaticConfiguration(client.ClientId))
-                {
-                    _logger.LogDebug("?? Client {ClientId} has static cookie configuration, skipping dynamic registration", client.ClientId);
-                    continue;
-                }
-
-                try
-                {
-                    // Create and register the authentication scheme with full configuration
-                    var scheme = new AuthenticationScheme(schemeName, schemeName, typeof(CookieAuthenticationHandler));
-                    
-                    // Register the scheme
-                    authSchemeProvider.AddScheme(scheme);
-
-                    // Create and cache the options for this scheme
-                    var cookieOptions = CreateCookieOptions(client, cookieName);
-                    _optionsCache.TryAdd(schemeName, cookieOptions);
-
-                    registeredCount++;
-                    _logger.LogInformation("? Dynamically registered authentication scheme: {ClientId} ? {CookieName} (Scheme: {SchemeName})", 
-                        client.ClientId, cookieName, schemeName);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "? Failed to register scheme for client {ClientId}", client.ClientId);
-                }
+                _logger.LogInformation("CookieSeparationMode=None. Skipping dynamic scheme registration.");
+                return;
             }
 
-            _logger.LogInformation("?? Dynamic client cookie registration completed. Registered: {RegisteredCount}/{TotalCount} clients", 
-                registeredCount, enabledClients.Count());
+            if (mode == CookieSeparationMode.ByRealm)
+            {
+                await RegisterRealmSchemesAsync(scope, cancellationToken);
+                return;
+            }
+
+            // Default/ByClient registration path
+            await RegisterClientSchemesAsync(scope, cancellationToken);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "? Failed to complete dynamic client cookie registration");
+            _logger.LogError(ex, "Failed to complete dynamic cookie scheme registration");
             throw;
         }
     }
 
     public Task StopAsync(CancellationToken cancellationToken)
     {
-        _logger.LogInformation("?? Stopping dynamic client cookie service...");
+        _logger.LogInformation("Stopping dynamic client cookie service...");
         return Task.CompletedTask;
     }
 
-    private static CookieAuthenticationOptions CreateCookieOptions(Models.Client client, string cookieName)
+    private async Task RegisterClientSchemesAsync(IServiceScope scope, CancellationToken cancellationToken)
+    {
+        var oidcClientService = scope.ServiceProvider.GetRequiredService<IOidcClientService>();
+        var authSchemeProvider = scope.ServiceProvider.GetRequiredService<IAuthenticationSchemeProvider>();
+        var cookieConfigService = scope.ServiceProvider.GetRequiredService<IClientCookieConfigurationService>();
+
+        var enabledClients = await oidcClientService.GetEnabledClientsAsync();
+        var registeredCount = 0;
+
+        foreach (var client in enabledClients)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var schemeName = $"Identity.Application.{client.ClientId}";
+            var cookieName = $".MrWho.{client.Name?.Replace(" ", string.Empty).Replace("-", string.Empty)}";
+
+            var existingScheme = await authSchemeProvider.GetSchemeAsync(schemeName);
+            if (existingScheme != null)
+            {
+                _logger.LogDebug("Scheme {SchemeName} already exists (static registration), skipping dynamic registration", schemeName);
+                continue;
+            }
+
+            if (cookieConfigService.HasStaticConfiguration(client.ClientId))
+            {
+                _logger.LogDebug("Client {ClientId} has static cookie configuration, skipping dynamic registration", client.ClientId);
+                continue;
+            }
+
+            try
+            {
+                var scheme = new AuthenticationScheme(schemeName, schemeName, typeof(CookieAuthenticationHandler));
+                authSchemeProvider.AddScheme(scheme);
+
+                var cookieOptions = CreateClientCookieOptions(client, cookieName);
+                _optionsCache.TryAdd(schemeName, cookieOptions);
+
+                registeredCount++;
+                _logger.LogInformation("Registered client scheme: {ClientId} -> {CookieName} (Scheme: {SchemeName})", 
+                    client.ClientId, cookieName, schemeName);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to register scheme for client {ClientId}", client.ClientId);
+            }
+        }
+
+        _logger.LogInformation("Dynamic client cookie registration completed. Registered: {RegisteredCount}/{TotalCount} clients", 
+            registeredCount, enabledClients.Count());
+    }
+
+    private async Task RegisterRealmSchemesAsync(IServiceScope scope, CancellationToken cancellationToken)
+    {
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var authSchemeProvider = scope.ServiceProvider.GetRequiredService<IAuthenticationSchemeProvider>();
+
+        // Get enabled realms that have at least one enabled client
+        var realms = await db.Realms
+            .Where(r => r.IsEnabled)
+            .Select(r => new { Realm = r, HasClients = r.Clients.Any(c => c.IsEnabled) })
+            .ToListAsync(cancellationToken);
+
+        var registered = 0;
+        foreach (var item in realms)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (!item.HasClients)
+            {
+                continue;
+            }
+
+            var realm = item.Realm;
+            var realmKey = Sanitize(realm.Name);
+            var schemeName = $"Identity.Application.Realm.{realmKey}";
+            var cookieName = $".MrWho.Realm.{realmKey}";
+
+            var existingScheme = await authSchemeProvider.GetSchemeAsync(schemeName);
+            if (existingScheme != null)
+            {
+                _logger.LogDebug("Realm scheme {SchemeName} already exists, skipping", schemeName);
+                continue;
+            }
+
+            try
+            {
+                var scheme = new AuthenticationScheme(schemeName, schemeName, typeof(CookieAuthenticationHandler));
+                authSchemeProvider.AddScheme(scheme);
+
+                var cookieOptions = CreateRealmCookieOptions(realm, cookieName);
+                _optionsCache.TryAdd(schemeName, cookieOptions);
+
+                registered++;
+                _logger.LogInformation("Registered realm scheme: {RealmName} -> {CookieName} (Scheme: {SchemeName})", 
+                    realm.Name, cookieName, schemeName);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to register scheme for realm {RealmName}", realm.Name);
+            }
+        }
+
+        _logger.LogInformation("Dynamic realm cookie registration completed. Registered: {RegisteredCount} realms", registered);
+    }
+
+    private static CookieAuthenticationOptions CreateClientCookieOptions(Models.Client client, string cookieName)
     {
         return new CookieAuthenticationOptions
         {
@@ -111,41 +184,75 @@ public class DynamicClientCookieService : IHostedService
                 SecurePolicy = CookieSecurePolicy.SameAsRequest,
                 SameSite = SameSiteMode.Lax,
                 Path = "/",
-                Domain = null // Same domain only
+                Domain = null
             },
             ExpireTimeSpan = TimeSpan.FromHours(GetSessionTimeoutHours(client)),
             SlidingExpiration = true,
             LoginPath = "/connect/login",
             LogoutPath = "/connect/logout",
             AccessDeniedPath = "/connect/access-denied",
-            
-            // Configure events for debugging and logging
             Events = new CookieAuthenticationEvents
             {
                 OnSigningIn = context =>
                 {
                     var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<DynamicClientCookieService>>();
-                    logger.LogDebug("?? Dynamic cookie sign-in for client: {ClientId}", client.ClientId);
+                    logger.LogDebug("Dynamic cookie sign-in for client: {ClientId}", client.ClientId);
                     return Task.CompletedTask;
                 },
                 OnSigningOut = context =>
                 {
                     var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<DynamicClientCookieService>>();
-                    logger.LogDebug("?? Dynamic cookie sign-out for client: {ClientId}", client.ClientId);
+                    logger.LogDebug("Dynamic cookie sign-out for client: {ClientId}", client.ClientId);
                     return Task.CompletedTask;
                 },
                 OnRedirectToAccessDenied = context =>
                 {
                     var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<DynamicClientCookieService>>();
-                    logger.LogWarning("?? REDIRECTING TO ACCESS DENIED for dynamic client {ClientId}: RedirectUri={RedirectUri}, ReturnUrl={ReturnUrl}", 
+                    logger.LogWarning("REDIRECTING TO ACCESS DENIED for dynamic client {ClientId}: RedirectUri={RedirectUri}, ReturnUrl={ReturnUrl}", 
                         client.ClientId, context.RedirectUri, context.Request.Query["ReturnUrl"].ToString());
                     return Task.CompletedTask;
                 },
                 OnValidatePrincipal = context =>
                 {
                     var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<DynamicClientCookieService>>();
-                    logger.LogDebug("?? Validating principal for dynamic client {ClientId}: IsAuthenticated={IsAuthenticated}, Name={Name}", 
+                    logger.LogDebug("Validating principal for dynamic client {ClientId}: IsAuthenticated={IsAuthenticated}, Name={Name}", 
                         client.ClientId, context.Principal?.Identity?.IsAuthenticated, context.Principal?.Identity?.Name);
+                    return Task.CompletedTask;
+                }
+            }
+        };
+    }
+
+    private static CookieAuthenticationOptions CreateRealmCookieOptions(Models.Realm realm, string cookieName)
+    {
+        return new CookieAuthenticationOptions
+        {
+            Cookie = new CookieBuilder
+            {
+                Name = cookieName,
+                HttpOnly = true,
+                SecurePolicy = CookieSecurePolicy.SameAsRequest,
+                SameSite = realm.GetEffectiveCookieSameSitePolicy(),
+                Path = "/",
+                Domain = null
+            },
+            ExpireTimeSpan = TimeSpan.FromHours(realm.DefaultSessionTimeoutHours > 0 ? realm.DefaultSessionTimeoutHours : 8),
+            SlidingExpiration = realm.DefaultUseSlidingSessionExpiration,
+            LoginPath = "/connect/login",
+            LogoutPath = "/connect/logout",
+            AccessDeniedPath = "/connect/access-denied",
+            Events = new CookieAuthenticationEvents
+            {
+                OnSigningIn = context =>
+                {
+                    var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<DynamicClientCookieService>>();
+                    logger.LogDebug("Dynamic cookie sign-in for realm: {Realm}", realm.Name);
+                    return Task.CompletedTask;
+                },
+                OnSigningOut = context =>
+                {
+                    var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<DynamicClientCookieService>>();
+                    logger.LogDebug("Dynamic cookie sign-out for realm: {Realm}", realm.Name);
                     return Task.CompletedTask;
                 }
             }
@@ -154,8 +261,19 @@ public class DynamicClientCookieService : IHostedService
 
     private static int GetSessionTimeoutHours(Models.Client client)
     {
-        // Use the new database-driven session timeout with fallback to hardcoded logic
         return client.GetEffectiveSessionTimeoutHours();
+    }
+
+    private static string Sanitize(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return "Default";
+        Span<char> buffer = stackalloc char[name.Length];
+        var i = 0;
+        foreach (var ch in name)
+        {
+            buffer[i++] = char.IsLetterOrDigit(ch) || ch is '.' or '_' or '-' ? ch : '_';
+        }
+        return new string(buffer[..i]);
     }
 }
 
@@ -184,18 +302,15 @@ public class DynamicCookieOptionsConfigurator : IConfigureNamedOptions<CookieAut
             return;
         }
 
-        // This method is called when the authentication system needs options for a dynamic scheme
-        _logger.LogDebug("?? Configuring dynamic cookie options for scheme: {SchemeName}", name);
-        
-        // The options should already be configured by DynamicClientCookieService
-        // This is a safety net in case they weren't properly cached
+        _logger.LogDebug("Configuring dynamic cookie options for scheme: {SchemeName}", name);
+
         if (options.Cookie.Name == null)
         {
-            _logger.LogWarning("?? Cookie options not properly configured for scheme {SchemeName}, applying defaults", name);
-            
-            // Extract client ID from scheme name and apply default configuration
-            var clientId = name.Replace("Identity.Application.", "");
-            options.Cookie.Name = $".MrWho.{clientId}";
+            _logger.LogWarning("Cookie options not properly configured for scheme {SchemeName}, applying defaults", name);
+
+            // Extract key from scheme name and apply default configuration
+            var key = name.Replace("Identity.Application.", "");
+            options.Cookie.Name = $".MrWho.{key}";
             options.ExpireTimeSpan = TimeSpan.FromHours(8);
             options.SlidingExpiration = true;
             options.Cookie.HttpOnly = true;
