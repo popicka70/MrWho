@@ -39,4 +39,8 @@
     <Folder Include="Migrations\" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Update="OpenIddict.Client.WebIntegration" PrivateAssets="all" />
+  </ItemGroup>
+
 </Project>

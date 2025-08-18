@@ -60,6 +60,9 @@ builder.Services.AddOpenIddict()
                .EnableRedirectionEndpointPassthrough()
                .EnablePostLogoutRedirectionEndpointPassthrough();
 
+        // Register the web provider integrations container
+        options.UseWebProviders();
+
         // Registrations will be added later from DB via the configurator
     });
 
