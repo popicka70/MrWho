@@ -44,6 +44,7 @@ public class AuthController : Controller
     /// <param name="clearAll">Whether to clear all authentication completely</param>
     /// <returns>SignOut result</returns>
     [HttpGet("/auth/logout")]
+    [AllowAnonymous]
     public async Task<IActionResult> Logout(string? returnUrl = null, bool clearAll = false)
     {
         try
