@@ -162,6 +162,16 @@ public static class ServiceCollectionExtensions
             options.ClaimsIdentity.EmailClaimType = OpenIddictConstants.Claims.Email;
         });
 
+        // Ensure default Identity cookie uses our connect/* routes (important in None mode)
+        services.ConfigureApplicationCookie(options =>
+        {
+            options.LoginPath = "/connect/login";
+            options.LogoutPath = "/connect/logout";
+            options.AccessDeniedPath = "/connect/access-denied";
+            options.SlidingExpiration = true;
+            // Keep SameSite=Lax for OIDC redirects; domain/secure overrides are applied via PostConfigureAll in Program.cs
+        });
+
         // Add support for multiple cookie configurations
         services.AddScoped<IClientCookieConfigurationService, ClientCookieConfigurationService>();
 
