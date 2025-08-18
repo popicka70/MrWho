@@ -65,6 +65,8 @@ builder.Services.AddOpenIddict()
 
 // Register dynamic client registrations from database
 builder.Services.AddSingleton<IConfigureOptions<OpenIddictClientOptions>, ExternalIdpClientOptionsConfigurator>();
+// Ensure redirect URIs are absolute if missing in registrations
+builder.Services.AddSingleton<IPostConfigureOptions<OpenIddictClientOptions>, OpenIddictClientOptionsPostConfigurator>();
 
 builder.Services.AddMrWhoAuthorizationWithClientCookies(); // Use authorization with client cookie support
 builder.Services.AddMrWhoMediator(); // Lightweight mediator + endpoint handlers
