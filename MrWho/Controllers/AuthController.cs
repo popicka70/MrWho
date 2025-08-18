@@ -542,10 +542,44 @@ public class AuthController : Controller
             return new EmptyResult(); // Pipeline will be short-circuited by the challenge
         }
 
-        // CRITICAL FIX: Sign out from all possible authentication schemes
+        // CRITICAL FIX: Sign out from all possible authentication schemes FIRST
         await SignOutFromAllSchemesAsync(detectedClientId);
         
-        // This should only be called for OIDC logout requests now
+        // Validate post_logout_redirect_uri if present; if invalid, do NOT redirect, just show confirmation/error
+        var candidateUri = post_logout_redirect_uri ?? request?.PostLogoutRedirectUri;
+        var candidateClientId = clientId ?? request?.ClientId ?? detectedClientId;
+        if (!string.IsNullOrEmpty(candidateUri))
+        {
+            var isValid = await IsPostLogoutRedirectUriValidAsync(candidateClientId, candidateUri);
+            if (!isValid)
+            {
+                _logger.LogWarning("Invalid post_logout_redirect_uri detected during logout. ClientId={ClientId}, Uri={Uri}", candidateClientId ?? "NULL", candidateUri);
+
+                // Prepare optional UI data
+                string? clientName = null;
+                try
+                {
+                    if (!string.IsNullOrEmpty(candidateClientId))
+                    {
+                        var app = await _applicationManager.FindByClientIdAsync(candidateClientId);
+                        if (app is not null)
+                        {
+                            clientName = await _applicationManager.GetDisplayNameAsync(app);
+                        }
+                    }
+                }
+                catch { /* ignore */ }
+
+                ViewData["ClientName"] = clientName;
+                ViewData["ReturnUrl"] = null; // do not offer redirect to invalid target
+                ViewData["LogoutError"] = "You have been signed out, but the redirect URL provided by the application is invalid or not allowed.";
+
+                // Show a friendly confirmation page instead of redirecting anywhere
+                return View("LoggedOut");
+            }
+        }
+        
+        // For valid requests, let OpenIddict complete the OIDC logout flow (handles state, etc.)
         if (request != null)
         {
             _logger.LogDebug("Processing OIDC logout request with post_logout_redirect_uri: {PostLogoutRedirectUri}", 
@@ -558,6 +592,49 @@ public class AuthController : Controller
         // Fallback - this shouldn't happen anymore since UI requests now redirect directly
         _logger.LogWarning("ProcessLogout called without OIDC request - redirecting to home");
         return RedirectToAction("Index", "Home", new { logout = "success" });
+    }
+
+    /// <summary>
+    /// Attempts to validate the post_logout_redirect_uri against the client's registered URIs.
+    /// Returns false when the client cannot be resolved or the URI is not allowed.
+    /// </summary>
+    private async Task<bool> IsPostLogoutRedirectUriValidAsync(string? clientId, string? uri)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(uri)) return true; // nothing to validate
+
+            // If no clientId can be determined, treat as invalid to avoid open redirect
+            if (string.IsNullOrWhiteSpace(clientId)) return false;
+
+            var application = await _applicationManager.FindByClientIdAsync(clientId);
+            if (application is null)
+                return false;
+
+            // Try to use OpenIddict's manager to get the post-logout redirect URIs
+            // If the API is not available at runtime, fall back to a strict false result
+            try
+            {
+                // Using dynamic to avoid compile-time binding to optional extension APIs across versions
+                dynamic dynManager = _applicationManager;
+                var uris = await dynManager.GetPostLogoutRedirectUrisAsync(application);
+                if (uris is IEnumerable<string> list)
+                {
+                    return list.Any(allowed => string.Equals(allowed?.TrimEnd('/'), uri.TrimEnd('/'), StringComparison.OrdinalIgnoreCase));
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Could not retrieve post-logout redirect URIs via manager API; treating as invalid");
+                return false;
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error validating post_logout_redirect_uri");
+        }
+
+        return false;
     }
 
     /// <summary>
