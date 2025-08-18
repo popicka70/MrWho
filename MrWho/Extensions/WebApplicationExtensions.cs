@@ -23,6 +23,7 @@ using MrWho.Models; // added for UserProfile, UserState
 using System.Data;
 using Microsoft.AspNetCore.RateLimiting; // added for RequireRateLimiting
 using OpenIddict.Client.AspNetCore;
+using OpenIddict.Client; // added for OpenIddictClientOptions/Registration
 
 namespace MrWho.Extensions;
 
@@ -79,13 +80,40 @@ public static class WebApplicationExtensions
         app.MapControllers();
 
         // Map OpenIddict client redirection endpoints
-        app.MapGet("/connect/external/login/{provider}", async (HttpContext http, string provider) =>
+        app.MapGet("/connect/external/login/{provider}", async (HttpContext http, string provider, IOptionsMonitor<OpenIddictClientOptions> options) =>
         {
+            var registrations = options.CurrentValue.Registrations;
+
+            // Try resolve by ProviderName (case-insensitive)
+            var registration = registrations.FirstOrDefault(r =>
+                !string.IsNullOrWhiteSpace(r.ProviderName) &&
+                string.Equals(r.ProviderName, provider, StringComparison.OrdinalIgnoreCase));
+
+            // Fallback: try resolve by Issuer host or absolute URI text
+            registration ??= registrations.FirstOrDefault(r =>
+                r.Issuer is not null && (
+                    string.Equals(r.Issuer.Host, provider, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(r.Issuer.AbsoluteUri.TrimEnd('/'), provider.TrimEnd('/'), StringComparison.OrdinalIgnoreCase)));
+
+            // Fallback: try resolve by RegistrationId
+            registration ??= registrations.FirstOrDefault(r =>
+                !string.IsNullOrWhiteSpace(r.RegistrationId) &&
+                string.Equals(r.RegistrationId, provider, StringComparison.OrdinalIgnoreCase));
+
+            if (registration is null)
+            {
+                http.Response.StatusCode = StatusCodes.Status400BadRequest;
+                await http.Response.WriteAsync($"Unknown external provider '{provider}'.");
+                return;
+            }
+
             var props = new AuthenticationProperties
             {
                 RedirectUri = "/connect/external/callback"
             };
-            props.Items[OpenIddictClientAspNetCoreConstants.Properties.ProviderName] = provider;
+
+            // Use RegistrationId to unambiguously select the configured client
+            props.Items[OpenIddictClientAspNetCoreConstants.Properties.RegistrationId] = registration.RegistrationId;
             await http.ChallengeAsync(OpenIddictClientAspNetCoreDefaults.AuthenticationScheme, props);
         }).AllowAnonymous();
 
@@ -144,13 +172,40 @@ public static class WebApplicationExtensions
         app.MapControllers();
 
         // Map OpenIddict client redirection endpoints
-        app.MapGet("/connect/external/login/{provider}", async (HttpContext http, string provider) =>
+        app.MapGet("/connect/external/login/{provider}", async (HttpContext http, string provider, IOptionsMonitor<OpenIddictClientOptions> options) =>
         {
+            var registrations = options.CurrentValue.Registrations;
+
+            // Try resolve by ProviderName (case-insensitive)
+            var registration = registrations.FirstOrDefault(r =>
+                !string.IsNullOrWhiteSpace(r.ProviderName) &&
+                string.Equals(r.ProviderName, provider, StringComparison.OrdinalIgnoreCase));
+
+            // Fallback: try resolve by Issuer host or absolute URI text
+            registration ??= registrations.FirstOrDefault(r =>
+                r.Issuer is not null && (
+                    string.Equals(r.Issuer.Host, provider, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(r.Issuer.AbsoluteUri.TrimEnd('/'), provider.TrimEnd('/'), StringComparison.OrdinalIgnoreCase)));
+
+            // Fallback: try resolve by RegistrationId
+            registration ??= registrations.FirstOrDefault(r =>
+                !string.IsNullOrWhiteSpace(r.RegistrationId) &&
+                string.Equals(r.RegistrationId, provider, StringComparison.OrdinalIgnoreCase));
+
+            if (registration is null)
+            {
+                http.Response.StatusCode = StatusCodes.Status400BadRequest;
+                await http.Response.WriteAsync($"Unknown external provider '{provider}'.");
+                return;
+            }
+
             var props = new AuthenticationProperties
             {
                 RedirectUri = "/connect/external/callback"
             };
-            props.Items[OpenIddictClientAspNetCoreConstants.Properties.ProviderName] = provider;
+
+            // Use RegistrationId to unambiguously select the configured client
+            props.Items[OpenIddictClientAspNetCoreConstants.Properties.RegistrationId] = registration.RegistrationId;
             await http.ChallengeAsync(OpenIddictClientAspNetCoreDefaults.AuthenticationScheme, props);
         }).AllowAnonymous();
 
