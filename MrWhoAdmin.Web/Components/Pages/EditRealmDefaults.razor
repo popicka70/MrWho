@@ -313,48 +313,33 @@
                         </div>
                     </RadzenTabsItem>
 
-                    <RadzenTabsItem Text="Logging & Errors" Icon="bug_report">
+                    <RadzenTabsItem Text="Branding & Theme" Icon="palette">
                         <div style="padding: 1rem; max-height: 550px; overflow-y: auto;">
                             <RadzenStack Gap="0.75rem" class="rz-mb-4">
-                                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Default Error Handling</RadzenText>
-                                <RadzenStack Gap="1rem">
-                                    <RadzenFormField Text="Default Error Response Settings" Variant="Variant.Outlined">
-                                        <Start>
-                                            <RadzenCheckBox @bind-Value="model.DefaultEnableDetailedErrors" Name="defaultEnableDetailedErrors" />
-                                        </Start>
-                                        <ChildContent>
-                                            <RadzenLabel Text="Enable detailed error responses by default" Component="defaultEnableDetailedErrors" />
-                                        </ChildContent>
-                                        <Start>
-                                            <RadzenCheckBox @bind-Value="model.DefaultLogSensitiveData" Name="defaultLogSensitiveData" />
-                                        </Start>
-                                        <ChildContent>
-                                            <RadzenLabel Text="Log sensitive data by default (development only)" Component="defaultLogSensitiveData" />
-                                        </ChildContent>
-                                        <Helper>
-                                            <RadzenAlert AlertStyle="AlertStyle.Warning" ShowIcon="true" class="rz-mt-2">
-                                                <RadzenText TextStyle="TextStyle.Caption">
-                                                    Warning: Detailed errors and sensitive data logging should not be enabled in production environments.
-                                                </RadzenText>
-                                            </RadzenAlert>
-                                        </Helper>
-                                    </RadzenFormField>
-                                </RadzenStack>
-                            </RadzenStack>
-
-                            <RadzenStack Gap="0.75rem" class="rz-mt-4 rz-mb-4">
                                 <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Default Branding Configuration</RadzenText>
                                 <RadzenStack Gap="1rem">
                                     <RadzenFormField Text="Default Theme" Variant="Variant.Outlined">
                                         <ChildContent>
-                                            <RadzenTextBox @bind-Value="model.DefaultThemeName" Style="width: 100%;" Placeholder="e.g., dark, light, corporate" />
+                                            <RadzenDropDown @bind-Value="model.DefaultThemeName" Data="@availableThemes" TextProperty="Text" ValueProperty="Value" Style="width: 100%;" Placeholder="Select a theme..." />
                                         </ChildContent>
                                         <Helper>
                                             <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                Default UI theme for clients in this realm
+                                                Applies to all clients unless they set their own theme. Precedence: Client ? Realm ? Server.
                                             </RadzenText>
                                         </Helper>
                                     </RadzenFormField>
+
+                                    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" Wrap="Radzen.FlexWrap.Wrap">
+                                        @foreach (var t in availableThemes)
+                                        {
+                                            <RadzenButton ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" Click="@(() => PickTheme(t.Value))">
+                                                <RadzenIcon Icon="palette" class="rz-me-1" /> @t.Text
+                                            </RadzenButton>
+                                        }
+                                        <RadzenButton ButtonStyle="ButtonStyle.Secondary" Size="ButtonSize.Small" Click="@(() => PickTheme((string?)null))">
+                                            <RadzenIcon Icon="restore" class="rz-me-1" /> Use server default
+                                        </RadzenButton>
+                                    </RadzenStack>
 
                                     <RadzenFormField Text="Realm Custom CSS URL" Variant="Variant.Outlined">
                                         <ChildContent>
@@ -362,7 +347,7 @@
                                         </ChildContent>
                                         <Helper>
                                             <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                Realm-wide custom CSS that applies to all clients unless overridden
+                                                Optional: realm-wide custom CSS loaded after theme to override details.
                                             </RadzenText>
                                         </Helper>
                                     </RadzenFormField>
@@ -429,6 +414,37 @@
                             </RadzenStack>
                         </div>
                     </RadzenTabsItem>
+
+                    <RadzenTabsItem Text="Logging & Errors" Icon="bug_report">
+                        <div style="padding: 1rem; max-height: 550px; overflow-y: auto;">
+                            <RadzenStack Gap="0.75rem" class="rz-mb-4">
+                                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Default Error Handling</RadzenText>
+                                <RadzenStack Gap="1rem">
+                                    <RadzenFormField Text="Default Error Response Settings" Variant="Variant.Outlined">
+                                        <Start>
+                                            <RadzenCheckBox @bind-Value="model.DefaultEnableDetailedErrors" Name="defaultEnableDetailedErrors" />
+                                        </Start>
+                                        <ChildContent>
+                                            <RadzenLabel Text="Enable detailed error responses by default" Component="defaultEnableDetailedErrors" />
+                                        </ChildContent>
+                                        <Start>
+                                            <RadzenCheckBox @bind-Value="model.DefaultLogSensitiveData" Name="defaultLogSensitiveData" />
+                                        </Start>
+                                        <ChildContent>
+                                            <RadzenLabel Text="Log sensitive data by default (development only)" Component="defaultLogSensitiveData" />
+                                        </ChildContent>
+                                        <Helper>
+                                            <RadzenAlert AlertStyle="AlertStyle.Warning" ShowIcon="true" class="rz-mt-2">
+                                                <RadzenText TextStyle="TextStyle.Caption">
+                                                    Warning: Detailed errors and sensitive data logging should not be enabled in production environments.
+                                                </RadzenText>
+                                            </RadzenAlert>
+                                        </Helper>
+                                    </RadzenFormField>
+                                </RadzenStack>
+                            </RadzenStack>
+                        </div>
+                    </RadzenTabsItem>
                 </Tabs>
             </RadzenTabs>
 
@@ -455,6 +471,16 @@
     // Dropdown data
     private List<DropdownItem<string>> sameSitePolicies = new();
     private List<DropdownItem<string>> availableMfaMethods = new();
+    private List<DropdownItem<string>> availableThemes = new()
+    {
+        new("Light", "light"),
+        new("Dark", "dark"),
+        new("Ocean", "ocean"),
+        new("Forest", "forest"),
+        new("Corporate", "corporate"),
+        new("Sunset", "sunset"),
+        new("Purple", "purple")
+    };
 
     protected override async Task OnInitializedAsync()
     {
@@ -633,6 +659,11 @@
     private void BackToRealm()
     {
         Navigation.NavigateTo($"/realms/edit/{Id}");
+    }
+
+    private void PickTheme(string? name)
+    {
+        model.DefaultThemeName = name;
     }
 
     private record DropdownItem<T>(string Text, T Value);
