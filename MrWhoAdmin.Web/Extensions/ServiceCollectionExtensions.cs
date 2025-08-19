@@ -321,6 +321,9 @@ public static class ServiceCollectionExtensions
         options.CallbackPath = "/signin-oidc";
         options.SignedOutCallbackPath = "/signout-callback-oidc";
         
+        // IMPORTANT: Set the post sign-out redirect target to an anonymous page to avoid immediate re-login
+        options.SignedOutRedirectUri = "/signed-out";
+        
         // IMPORTANT: Set the correct remote signout path
         options.RemoteSignOutPath = "/signout-oidc";
 

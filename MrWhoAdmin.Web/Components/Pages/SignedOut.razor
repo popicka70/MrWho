@@ -1,0 +1,25 @@
+@page "/signed-out"
+@rendermode InteractiveServer
+@using Radzen
+
+<PageTitle>Signed out</PageTitle>
+
+<RadzenStack Gap="1rem" class="rz-mt-6">
+    <RadzenAlert AlertStyle="AlertStyle.Info" ShowIcon="true">
+        <RadzenText TextStyle="TextStyle.Subtitle1">
+            You have been signed out of the MrWho Administration app.
+        </RadzenText>
+        <RadzenText class="rz-color-secondary">
+            This page is anonymous to avoid automatic re-login. If you need to sign in again, use the button below.
+        </RadzenText>
+    </RadzenAlert>
+
+    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+        <RadzenButton Text="Sign in again" Icon="login" ButtonStyle="ButtonStyle.Primary" Click="@(() => Navigation.NavigateTo("/login", forceLoad: true))" />
+        <RadzenButton Text="Back to home" Icon="home" ButtonStyle="ButtonStyle.Light" Click="@(() => Navigation.NavigateTo("/"))" />
+    </RadzenStack>
+</RadzenStack>
+
+@code {
+    [Inject] NavigationManager Navigation { get; set; } = default!;
+}
