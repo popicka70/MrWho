@@ -259,6 +259,112 @@ public class ClientsController : ControllerBase
     }
 
     /// <summary>
+    /// List identity provider links for a given client (by client DB id).
+    /// </summary>
+    [HttpGet("{id}/identity-providers")]
+    public async Task<ActionResult<IEnumerable<ClientIdentityProviderDto>>> GetIdentityProviderLinksForClient(string id)
+    {
+        var exists = await _context.Clients.AnyAsync(c => c.Id == id);
+        if (!exists) return NotFound("Client not found");
+
+        var links = await _context.ClientIdentityProviders
+            .Where(l => l.ClientId == id)
+            .Include(l => l.IdentityProvider)
+            .OrderBy(l => l.Order)
+            .ThenBy(l => l.IdentityProvider.DisplayName ?? l.IdentityProvider.Name)
+            .ToListAsync();
+
+        var dtos = links.Select(l => new ClientIdentityProviderDto
+        {
+            Id = l.Id,
+            ClientId = l.ClientId,
+            IdentityProviderId = l.IdentityProviderId,
+            DisplayNameOverride = l.DisplayNameOverride,
+            IsEnabled = l.IsEnabled,
+            Order = l.Order,
+            OptionsJson = l.OptionsJson
+        }).ToList();
+
+        return Ok(dtos);
+    }
+
+    /// <summary>
+    /// Create a link between a client (by client DB id) and an identity provider (by IdP id or name).
+    /// </summary>
+    [HttpPost("{id}/identity-providers/{providerId}")]
+    public async Task<ActionResult<ClientIdentityProviderDto>> LinkIdentityProviderToClient(string id, string providerId, [FromBody] ClientIdentityProviderDto? dto)
+    {
+        var client = await _context.Clients.FirstOrDefaultAsync(c => c.Id == id || c.ClientId == id);
+        if (client is null) return NotFound("Client not found");
+
+        // Accept providerId as either IdentityProvider.Id or Name
+        var provider = await _context.IdentityProviders.FirstOrDefaultAsync(p => p.Id == providerId || p.Name == providerId);
+        if (provider is null) return NotFound("Identity provider not found");
+
+        // Prevent duplicate link
+        var exists = await _context.ClientIdentityProviders.AnyAsync(l => l.ClientId == client.Id && l.IdentityProviderId == provider.Id);
+        if (exists)
+        {
+            return Conflict("Link already exists");
+        }
+
+        var link = new ClientIdentityProvider
+        {
+            Id = Guid.NewGuid().ToString(),
+            ClientId = client.Id,
+            IdentityProviderId = provider.Id,
+            DisplayNameOverride = dto?.DisplayNameOverride,
+            IsEnabled = dto?.IsEnabled ?? true,
+            Order = dto?.Order,
+            OptionsJson = dto?.OptionsJson,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow,
+            CreatedBy = User.Identity?.Name,
+            UpdatedBy = User.Identity?.Name
+        };
+
+        _context.ClientIdentityProviders.Add(link);
+        await _context.SaveChangesAsync();
+
+        var result = new ClientIdentityProviderDto
+        {
+            Id = link.Id,
+            ClientId = link.ClientId,
+            IdentityProviderId = link.IdentityProviderId,
+            DisplayNameOverride = link.DisplayNameOverride,
+            IsEnabled = link.IsEnabled,
+            Order = link.Order,
+            OptionsJson = link.OptionsJson
+        };
+
+        return CreatedAtAction(nameof(GetIdentityProviderLinksForClient), new { id = client.Id }, result);
+    }
+
+    /// <summary>
+    /// Remove a link between a client and an identity provider by link id.
+    /// </summary>
+    [HttpDelete("{id}/identity-providers/{linkId}")]
+    public async Task<IActionResult> UnlinkIdentityProviderFromClient(string id, string linkId)
+    {
+        var clientExists = await _context.Clients.AnyAsync(c => c.Id == id || c.ClientId == id);
+        if (!clientExists) return NotFound("Client not found");
+
+        var link = await _context.ClientIdentityProviders.FirstOrDefaultAsync(l => l.Id == linkId && l.ClientId == id);
+        if (link is null)
+        {
+            // If "id" passed was ClientId (public id), try resolving client id first
+            var client = await _context.Clients.FirstOrDefaultAsync(c => c.Id == id || c.ClientId == id);
+            if (client is null) return NotFound("Client not found");
+            link = await _context.ClientIdentityProviders.FirstOrDefaultAsync(l => l.Id == linkId && l.ClientId == client.Id);
+        }
+        if (link is null) return NotFound();
+
+        _context.ClientIdentityProviders.Remove(link);
+        await _context.SaveChangesAsync();
+        return NoContent();
+    }
+
+    /// <summary>
     /// Export a client to JSON (no secrets/IDs). Includes assigned users by username/email for portability.
     /// </summary>
     [HttpGet("{id}/export")]

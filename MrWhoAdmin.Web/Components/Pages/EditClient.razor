@@ -11,6 +11,7 @@
 @inject IRealmsApiService RealmsApiService
 @inject IScopesApiService ScopesApiService
 @inject ILogger<EditClient> Logger
+@inject IIdentityProvidersApiService IdentityProvidersApi
 
 <PageTitle>@(IsEdit ? "Edit Client" : "Add Client") - MrWho Admin</PageTitle>
 
@@ -915,6 +916,97 @@
                         </div>
                     </RadzenTabsItem>
 
+                    <!-- Identity Providers (Links) Tab -->
+                    <RadzenTabsItem Text="Identity Providers" Icon="link">
+                        <div style="padding: 1rem; max-height: 550px; overflow-y: auto;">
+                            @if (!IsEdit)
+                            {
+                                <RadzenAlert AlertStyle="AlertStyle.Info" ShowIcon="true">
+                                    <RadzenText TextStyle="TextStyle.Body1">Save the client first to manage identity provider links.</RadzenText>
+                                </RadzenAlert>
+                            }
+                            else
+                            {
+                                <RadzenStack Gap="1rem">
+                                    <RadzenCard>
+                                        <RadzenText TextStyle="TextStyle.Subtitle2">Add Link</RadzenText>
+                                        <RadzenRow Gap="1rem" class="rz-mt-2">
+                                            <RadzenColumn Size="12" SizeMD="6">
+                                                <RadzenFormField Text="Provider" Variant="Variant.Outlined">
+                                                    <ChildContent>
+                                                        <RadzenDropDown Data="@FilteredProviders" @bind-Value="selectedProviderId" Style="width:100%"
+                                                                        TextProperty="DisplayName" ValueProperty="Id" AllowClear="true" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive" />
+                                                    </ChildContent>
+                                                </RadzenFormField>
+                                            </RadzenColumn>
+                                            <RadzenColumn Size="12" SizeMD="6">
+                                                <RadzenFormField Text="Search Providers" Variant="Variant.Outlined">
+                                                    <ChildContent>
+                                                        <RadzenTextBox @bind-Value="providerSearch" Style="width:100%" Placeholder="type to search..." Change="@(async _ => await ReloadProviders())" />
+                                                    </ChildContent>
+                                                </RadzenFormField>
+                                            </RadzenColumn>
+                                        </RadzenRow>
+                                        <RadzenRow Gap="1rem">
+                                            <RadzenColumn Size="12" SizeMD="6">
+                                                <RadzenFormField Text="Display Name Override" Variant="Variant.Outlined">
+                                                    <ChildContent>
+                                                        <RadzenTextBox @bind-Value="linkDisplayOverride" Style="width:100%" />
+                                                    </ChildContent>
+                                                </RadzenFormField>
+                                            </RadzenColumn>
+                                            <RadzenColumn Size="12" SizeMD="3">
+                                                <RadzenFormField Text="Order" Variant="Variant.Outlined">
+                                                    <ChildContent>
+                                                        <RadzenNumeric TValue="int?" @bind-Value="linkOrder" Style="width:100%" />
+                                                    </ChildContent>
+                                                </RadzenFormField>
+                                            </RadzenColumn>
+                                            <RadzenColumn Size="12" SizeMD="3">
+                                                <RadzenFormField Text="Enabled" Variant="Variant.Outlined">
+                                                    <Start>
+                                                        <RadzenSwitch @bind-Value="linkEnabled" OnLabel="Yes" OffLabel="No" />
+                                                    </Start>
+                                                </RadzenFormField>
+                                            </RadzenColumn>
+                                        </RadzenRow>
+                                        <RadzenRow>
+                                            <RadzenColumn Size="12" class="rz-display-flex rz-justify-content-end">
+                                                <RadzenButton Icon="link" Text="Add Link" ButtonStyle="ButtonStyle.Primary" Click="@(async ()=> await AddIdentityLink())" Disabled="@(!IsEdit || string.IsNullOrEmpty(selectedProviderId))" />
+                                            </RadzenColumn>
+                                        </RadzenRow>
+                                    </RadzenCard>
+
+                                    <RadzenCard>
+                                        <RadzenText TextStyle="TextStyle.Subtitle2">Linked Providers</RadzenText>
+                                        <RadzenDataGrid TItem="ClientIdentityProviderDto" Data="@identityLinks" AllowPaging="true" PageSize="10" class="rz-mt-2">
+                                            <Columns>
+                                                <RadzenDataGridColumn TItem="ClientIdentityProviderDto" Title="Provider">
+                                                    <Template Context="row">
+                                                        @GetProviderName(row.IdentityProviderId)
+                                                    </Template>
+                                                </RadzenDataGridColumn>
+                                                <RadzenDataGridColumn TItem="ClientIdentityProviderDto" Property="DisplayNameOverride" Title="Display Name" />
+                                                <RadzenDataGridColumn TItem="ClientIdentityProviderDto" Property="Order" Title="Order" Width="100px" />
+                                                <RadzenDataGridColumn TItem="ClientIdentityProviderDto" Title="Enabled" Width="120px">
+                                                    <Template Context="row">
+                                                        <RadzenBadge Text="@(row.IsEnabled == false ? "No" : "Yes")" BadgeStyle="@(row.IsEnabled == false ? BadgeStyle.Danger : BadgeStyle.Success)" />
+                                                    </Template>
+                                                </RadzenDataGridColumn>
+                                                <RadzenDataGridColumn TItem="ClientIdentityProviderDto" Context="row" Title="Actions" Width="160px">
+                                                    <Template Context="row">
+                                                        <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.Small" Text="Remove"
+                                                                      Click="@(async ()=> await RemoveIdentityLink(row))" />
+                                                    </Template>
+                                                </RadzenDataGridColumn>
+                                            </Columns>
+                                        </RadzenDataGrid>
+                                    </RadzenCard>
+                                </RadzenStack>
+                            }
+                        </div>
+                    </RadzenTabsItem>
+
                     <!-- Advanced Configuration Tab -->
                     <RadzenTabsItem Text="Advanced" Icon="settings_applications">
                         <div style="padding: 1rem; max-height: 550px; overflow-y: auto;">
@@ -1063,6 +1155,15 @@
     // Convenience binding for MFA methods serialization (use model's value)
     private string? allowedMfaMethodsSerialized => model.AllowedMfaMethods;
 
+    // Identity Provider links state
+    private List<ClientIdentityProviderDto> identityLinks = new();
+    private List<IdentityProviderDto> providers = new();
+    private string? selectedProviderId;
+    private string providerSearch = string.Empty;
+    private string? linkDisplayOverride;
+    private int? linkOrder;
+    private bool linkEnabled = true;
+
     private bool IsEdit => !string.IsNullOrEmpty(Id);
 
     protected override async Task OnInitializedAsync()
@@ -1074,6 +1175,8 @@
         if (IsEdit && !string.IsNullOrEmpty(Id))
         {
             await LoadClient();
+            await ReloadProviders();
+            await LoadIdentityLinksAsync();
         }
         else
         {
@@ -1183,6 +1286,100 @@
         finally
         {
             isLoading = false;
+        }
+    }
+
+    private async Task ReloadProviders()
+    {
+        try
+        {
+            // Load providers optionally filtered by realm
+            providers = await IdentityProvidersApi.GetIdentityProvidersAsync(model.RealmId) ?? new();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading identity providers for realm {RealmId}", model.RealmId);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to load identity providers");
+        }
+    }
+
+    private IEnumerable<IdentityProviderDto> FilteredProviders => string.IsNullOrWhiteSpace(providerSearch)
+        ? providers
+        : providers.Where(p => (p.DisplayName ?? p.Name).Contains(providerSearch, StringComparison.OrdinalIgnoreCase)
+                            || p.Name.Contains(providerSearch, StringComparison.OrdinalIgnoreCase));
+
+    private string GetProviderName(string providerId)
+    {
+        var p = providers.FirstOrDefault(x => x.Id == providerId);
+        return p?.DisplayName ?? p?.Name ?? providerId;
+    }
+
+    private async Task LoadIdentityLinksAsync()
+    {
+        try
+        {
+            identityLinks = await ClientsApiService.GetIdentityLinksAsync(Id!);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading identity links for client {ClientId}", Id);
+            identityLinks = new();
+        }
+    }
+
+    private async Task AddIdentityLink()
+    {
+        if (!IsEdit || string.IsNullOrEmpty(selectedProviderId)) return;
+        try
+        {
+            var dto = new ClientIdentityProviderDto
+            {
+                DisplayNameOverride = linkDisplayOverride,
+                Order = linkOrder,
+                IsEnabled = linkEnabled
+            };
+            var created = await ClientsApiService.AddIdentityLinkAsync(Id!, selectedProviderId!, dto);
+            if (created is not null)
+            {
+                NotificationService.Notify(new NotificationMessage { Severity = NotificationSeverity.Success, Summary = "Linked" });
+                linkDisplayOverride = null;
+                linkOrder = null;
+                linkEnabled = true;
+                selectedProviderId = null;
+                await LoadIdentityLinksAsync();
+            }
+            else
+            {
+                NotificationService.Notify(new NotificationMessage { Severity = NotificationSeverity.Error, Summary = "Link failed" });
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "AddIdentityLink failed for client {ClientId}", Id);
+            NotificationService.Notify(new NotificationMessage { Severity = NotificationSeverity.Error, Summary = "Link failed" });
+        }
+    }
+
+    private async Task RemoveIdentityLink(ClientIdentityProviderDto link)
+    {
+        try
+        {
+            var ok = await ClientsApiService.RemoveIdentityLinkAsync(Id!, link.Id);
+            if (ok)
+            {
+                NotificationService.Notify(new NotificationMessage { Severity = NotificationSeverity.Info, Summary = "Removed" });
+                await LoadIdentityLinksAsync();
+            }
+            else
+            {
+                NotificationService.Notify(new NotificationMessage { Severity = NotificationSeverity.Error, Summary = "Remove failed" });
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "RemoveIdentityLink failed for client {ClientId}", Id);
+            NotificationService.Notify(new NotificationMessage { Severity = NotificationSeverity.Error, Summary = "Remove failed" });
         }
     }
 

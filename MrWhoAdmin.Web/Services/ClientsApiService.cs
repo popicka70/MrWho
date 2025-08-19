@@ -196,4 +196,60 @@ public class ClientsApiService : IClientsApiService
             return null;
         }
     }
+
+    // Client-centric identity provider links
+    public async Task<List<ClientIdentityProviderDto>> GetIdentityLinksAsync(string clientId)
+    {
+        try
+        {
+            var resp = await _httpClient.GetAsync($"api/clients/{clientId}/identity-providers");
+            if (!resp.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("GetIdentityLinks failed for client {ClientId}. Status: {Status}", clientId, resp.StatusCode);
+                return new();
+            }
+            var json = await resp.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<List<ClientIdentityProviderDto>>(json, _jsonOptions) ?? new();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "GetIdentityLinksAsync failed for client {ClientId}", clientId);
+            return new();
+        }
+    }
+
+    public async Task<ClientIdentityProviderDto?> AddIdentityLinkAsync(string clientId, string providerId, ClientIdentityProviderDto? dto = null)
+    {
+        try
+        {
+            var resp = await _httpClient.PostAsJsonAsync($"api/clients/{clientId}/identity-providers/{providerId}", dto ?? new ClientIdentityProviderDto());
+            if (!resp.IsSuccessStatusCode)
+            {
+                var content = await resp.Content.ReadAsStringAsync();
+                _logger.LogWarning("AddIdentityLink failed for client {ClientId} provider {ProviderId}. Status: {Status} Content: {Content}", clientId, providerId, resp.StatusCode, content);
+                return null;
+            }
+            var json = await resp.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<ClientIdentityProviderDto>(json, _jsonOptions);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "AddIdentityLinkAsync failed for client {ClientId} -> provider {ProviderId}", clientId, providerId);
+            return null;
+        }
+    }
+
+    public async Task<bool> RemoveIdentityLinkAsync(string clientId, string linkId)
+    {
+        try
+        {
+            var resp = await _httpClient.DeleteAsync($"api/clients/{clientId}/identity-providers/{linkId}");
+            return resp.IsSuccessStatusCode;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "RemoveIdentityLinkAsync failed for client {ClientId} link {LinkId}", clientId, linkId);
+            return false;
+        }
+    }
 }
