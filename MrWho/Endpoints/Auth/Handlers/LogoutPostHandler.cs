@@ -16,13 +16,15 @@ public sealed class LogoutPostHandler : IRequestHandler<LogoutPostRequest, IActi
     private readonly SignInManager<IdentityUser> _signInManager;
     private readonly IClientCookieConfigurationService _cookieService;
     private readonly IDynamicCookieService _dynamicCookieService;
+    private readonly IConfiguration _configuration;
 
-    public LogoutPostHandler(ILogger<LogoutPostHandler> logger, SignInManager<IdentityUser> signInManager, IClientCookieConfigurationService cookieService, IDynamicCookieService dynamicCookieService)
+    public LogoutPostHandler(ILogger<LogoutPostHandler> logger, SignInManager<IdentityUser> signInManager, IClientCookieConfigurationService cookieService, IDynamicCookieService dynamicCookieService, IConfiguration configuration)
     {
         _logger = logger;
         _signInManager = signInManager;
         _cookieService = cookieService;
         _dynamicCookieService = dynamicCookieService;
+        _configuration = configuration;
     }
 
     public async Task<IActionResult> Handle(LogoutPostRequest request, CancellationToken cancellationToken)
@@ -36,6 +38,9 @@ public sealed class LogoutPostHandler : IRequestHandler<LogoutPostRequest, IActi
         bool isOidcLogoutRequest = oidcReq != null && (!string.IsNullOrEmpty(oidcReq.IdTokenHint) || !string.IsNullOrEmpty(oidcReq.PostLogoutRedirectUri) || !string.IsNullOrEmpty(oidcReq.ClientId) || !string.IsNullOrEmpty(oidcReq.State));
         if (isOidcLogoutRequest)
         {
+            // Ensure local cookies are cleared before delegating to OpenIddict
+            await SignOutLocalAsync(http, clientId);
+            DeleteAllKnownAuthCookies(http);
             return new SignOutResult(new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
         }
 
@@ -54,8 +59,16 @@ public sealed class LogoutPostHandler : IRequestHandler<LogoutPostRequest, IActi
             return new EmptyResult();
         }
 
+        await SignOutLocalAsync(http, clientId);
+        DeleteAllKnownAuthCookies(http);
+
+        return new RedirectToActionResult("Index", "Home", new { logout = "success" });
+    }
+
+    private async Task SignOutLocalAsync(HttpContext http, string? clientId)
+    {
         await _signInManager.SignOutAsync();
-        http.Response.Cookies.Delete(".AspNetCore.Identity.Application", new CookieOptions { Path = "/" });
+        DeleteCookieAcrossDomains(http, ".AspNetCore.Identity.Application");
 
         string? detectedClientId = clientId;
         if (!string.IsNullOrEmpty(detectedClientId))
@@ -64,19 +77,61 @@ public sealed class LogoutPostHandler : IRequestHandler<LogoutPostRequest, IActi
             {
                 await _dynamicCookieService.SignOutFromClientAsync(detectedClientId);
                 var cookieName = _cookieService.GetCookieNameForClient(detectedClientId);
-                http.Response.Cookies.Delete(cookieName, new CookieOptions { Path = "/" });
+                DeleteCookieAcrossDomains(http, cookieName);
             }
             catch (Exception ex) { _logger.LogWarning(ex, "Failed to sign out from client-specific cookie for client {ClientId}", detectedClientId); }
         }
         else
         {
-            foreach (var kvp in _cookieService.GetAllClientConfigurations())
+            // Best-effort clear of currently present cookies if client is unknown
+            DeleteAllKnownAuthCookies(http);
+        }
+    }
+
+    private void DeleteCookieAcrossDomains(HttpContext http, string cookieName)
+    {
+        if (string.IsNullOrWhiteSpace(cookieName)) return;
+        var configured = _configuration["Cookie:Domain"];
+        var host = http.Request.Host.Host;
+        var domains = new List<string?> { null };
+        if (!string.IsNullOrWhiteSpace(host))
+        {
+            domains.Add(host);
+            if (!host.StartsWith('.')) domains.Add("." + host);
+        }
+        if (!string.IsNullOrWhiteSpace(configured))
+        {
+            domains.Add(configured);
+            if (!configured.StartsWith('.')) domains.Add("." + configured);
+        }
+        foreach (var d in domains.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            try { http.Response.Cookies.Delete(cookieName, new CookieOptions { Path = "/", Domain = d }); }
+            catch (Exception ex) { _logger.LogDebug(ex, "Error deleting cookie {Cookie} for domain {Domain}", cookieName, d ?? "<null>"); }
+        }
+    }
+
+    private void DeleteAllKnownAuthCookies(HttpContext http)
+    {
+        try
+        {
+            DeleteCookieAcrossDomains(http, ".AspNetCore.Identity.Application");
+            DeleteCookieAcrossDomains(http, ".MrWho.Session");
+            foreach (var kv in http.Request.Cookies)
             {
-                try { await _dynamicCookieService.SignOutFromClientAsync(kvp.Key); } catch { }
-                http.Response.Cookies.Delete(kvp.Value.CookieName, new CookieOptions { Path = "/" });
+                var name = kv.Key;
+                if (name.StartsWith(".MrWho", StringComparison.OrdinalIgnoreCase) ||
+                    name.Contains("Identity.Application", StringComparison.OrdinalIgnoreCase) ||
+                    name.Contains("Identity.External", StringComparison.OrdinalIgnoreCase) ||
+                    name.StartsWith(".AspNetCore.Identity", StringComparison.OrdinalIgnoreCase))
+                {
+                    DeleteCookieAcrossDomains(http, name);
+                }
             }
         }
-
-        return new RedirectToActionResult("Index", "Home", new { logout = "success" });
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Failed to enumerate/delete known auth cookies");
+        }
     }
 }
