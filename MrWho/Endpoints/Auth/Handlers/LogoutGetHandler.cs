@@ -121,7 +121,10 @@ public sealed class LogoutGetHandler : IRequestHandler<LogoutGetRequest, IAction
 
         var candidateUri = postLogoutUri ?? request?.PostLogoutRedirectUri;
         var candidateClientId = clientId ?? request?.ClientId ?? detectedClientId;
-        if (!string.IsNullOrEmpty(candidateUri))
+
+        // IMPORTANT: Only perform our own validation when we know the client. If we don't,
+        // delegate to OpenIddict, which can infer the client from the id_token_hint.
+        if (!string.IsNullOrEmpty(candidateUri) && !string.IsNullOrEmpty(candidateClientId))
         {
             var isValid = await IsPostLogoutRedirectUriValidAsync(candidateClientId, candidateUri);
             if (!isValid)
@@ -140,6 +143,7 @@ public sealed class LogoutGetHandler : IRequestHandler<LogoutGetRequest, IAction
                 var vd = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary())
                 {
                     ["ClientName"] = clientName,
+                    ["ClientId"] = candidateClientId, // expose to view so it can preserve parameters
                     ["ReturnUrl"] = null,
                     ["LogoutError"] = "You have been signed out, but the redirect URL provided by the application is invalid or not allowed."
                 };
@@ -147,6 +151,7 @@ public sealed class LogoutGetHandler : IRequestHandler<LogoutGetRequest, IAction
             }
         }
 
+        // Delegate end-session processing (including redirect validation) to OpenIddict.
         if (request != null)
         {
             return new SignOutResult(new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
