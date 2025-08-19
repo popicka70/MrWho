@@ -95,7 +95,7 @@ public static class WebApplicationExtensions
         app.MapGet("/logout", async (HttpContext context, string? returnUrl = null) =>
         {
             var redirectUri = string.IsNullOrEmpty(returnUrl) || !Uri.IsWellFormedUriString(returnUrl, UriKind.Relative) 
-                ? "/" 
+                ? "/signed-out" 
                 : returnUrl;
 
             var properties = new AuthenticationProperties
