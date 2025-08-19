@@ -45,7 +45,9 @@ public class OidcClientService : IOidcClientService
                 AccessTokenLifetime = TimeSpan.FromMinutes(60),
                 RefreshTokenLifetime = TimeSpan.FromDays(30),
                 AuthorizationCodeLifetime = TimeSpan.FromMinutes(10),
-                CreatedBy = "System"
+                CreatedBy = "System",
+                // Theme: Corporate look for administration
+                DefaultThemeName = "corporate"
             };
             _context.Realms.Add(adminRealm);
             await _context.SaveChangesAsync();
@@ -65,7 +67,9 @@ public class OidcClientService : IOidcClientService
                 AccessTokenLifetime = TimeSpan.FromMinutes(60),
                 RefreshTokenLifetime = TimeSpan.FromDays(7),
                 AuthorizationCodeLifetime = TimeSpan.FromMinutes(10),
-                CreatedBy = "System"
+                CreatedBy = "System",
+                // Theme: Ocean look for demos
+                DefaultThemeName = "ocean"
             };
             _context.Realms.Add(demoRealm);
             await _context.SaveChangesAsync();

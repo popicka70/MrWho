@@ -1,6 +1,6 @@
 body { 
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    background-color: #f8f9fa;
+    background-color: var(--mr-body-bg);
 }
 
 /* MrWho Logo Styles */
@@ -55,48 +55,48 @@ body {
 }
 
 .auth-button.btn-outline-secondary:hover {
-    background-color: #6c757d;
-    border-color: #6c757d;
+    background-color: var(--mr-secondary);
+    border-color: var(--mr-secondary);
     color: white;
 }
 
 .auth-button.btn-outline-primary:hover {
-    background-color: #0d6efd;
-    border-color: #0d6efd;
+    background-color: var(--mr-primary);
+    border-color: var(--mr-primary);
     color: white;
 }
 
 .auth-button.btn-outline-success:hover {
-    background-color: #198754;
-    border-color: #198754;
+    background-color: var(--mr-success);
+    border-color: var(--mr-success);
     color: white;
 }
 
 /* QR Login Button Specific Styles */
 .qr-login-quick {
-    border-color: #0d6efd;
-    color: #0d6efd;
-    background: linear-gradient(45deg, rgba(13, 110, 253, 0.05), rgba(13, 110, 253, 0.1));
+    border-color: var(--mr-primary);
+    color: var(--mr-primary);
+    background: linear-gradient(45deg, color-mix(in srgb, var(--mr-primary) 5%, transparent), color-mix(in srgb, var(--mr-primary) 10%, transparent));
 }
 
 .qr-login-secure {
-    border-color: #198754;
-    color: #198754;
-    background: linear-gradient(45deg, rgba(25, 135, 84, 0.05), rgba(25, 135, 84, 0.1));
+    border-color: var(--mr-success);
+    color: var(--mr-success);
+    background: linear-gradient(45deg, color-mix(in srgb, var(--mr-success) 5%, transparent), color-mix(in srgb, var(--mr-success) 10%, transparent));
 }
 
 .qr-login-quick:hover {
-    background: #0d6efd;
-    border-color: #0d6efd;
+    background: var(--mr-primary);
+    border-color: var(--mr-primary);
     color: white;
-    box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--mr-primary) 30%, transparent);
 }
 
 .qr-login-secure:hover {
-    background: #198754;
-    border-color: #198754;
+    background: var(--mr-success);
+    border-color: var(--mr-success);
     color: white;
-    box-shadow: 0 4px 12px rgba(25, 135, 84, 0.3);
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--mr-success) 30%, transparent);
 }
 
 /* QR Badge Icons */
@@ -115,12 +115,12 @@ body {
 }
 
 .qr-mode-badge.quick {
-    background: #0d6efd;
+    background: var(--mr-primary);
     color: white;
 }
 
 .qr-mode-badge.secure {
-    background: #198754;
+    background: var(--mr-success);
     color: white;
 }
 
@@ -134,7 +134,7 @@ body {
 
 .btn-primary.btn-lg:hover {
     transform: translateY(-1px);
-    box-shadow: 0 6px 16px rgba(13, 110, 253, 0.3);
+    box-shadow: 0 6px 16px color-mix(in srgb, var(--mr-primary) 30%, transparent);
 }
 
 /* Icon spacing improvements */
@@ -144,13 +144,13 @@ body {
 
 /* QR Login Page Specific Styles */
 .qr-mode-header.quick {
-    border-left: 4px solid #0d6efd;
-    background: linear-gradient(90deg, rgba(13, 110, 253, 0.1), transparent);
+    border-left: 4px solid var(--mr-primary);
+    background: linear-gradient(90deg, color-mix(in srgb, var(--mr-primary) 10%, transparent), transparent);
 }
 
 .qr-mode-header.secure {
-    border-left: 4px solid #198754;
-    background: linear-gradient(90deg, rgba(25, 135, 84, 0.1), transparent);
+    border-left: 4px solid var(--mr-success);
+    background: linear-gradient(90deg, color-mix(in srgb, var(--mr-success) 10%, transparent), transparent);
 }
 
 .qr-switch-card {

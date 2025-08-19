@@ -9,6 +9,8 @@ using MrWho.Data;
 using MrWho.Services;
 using MrWho.Services.Mediator;
 using OpenIddict.Abstractions;
+using Microsoft.Extensions.Options;
+using MrWho.Options;
 
 namespace MrWho.Endpoints.Auth;
 
@@ -24,6 +26,7 @@ public sealed class LoginGetHandler : IRequestHandler<LoginGetRequest, IActionRe
     private readonly IConfiguration _configuration;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IHostEnvironment _env;
+    private readonly IOptions<MrWhoOptions> _mrWhoOptions;
 
     public LoginGetHandler(
         SignInManager<IdentityUser> signInManager,
@@ -35,7 +38,8 @@ public sealed class LoginGetHandler : IRequestHandler<LoginGetRequest, IActionRe
         ILogger<LoginGetHandler> logger,
         IConfiguration configuration,
         IHttpClientFactory httpClientFactory,
-        IHostEnvironment env)
+        IHostEnvironment env,
+        IOptions<MrWhoOptions> mrWhoOptions)
     {
         _signInManager = signInManager;
         _userManager = userManager;
@@ -47,6 +51,7 @@ public sealed class LoginGetHandler : IRequestHandler<LoginGetRequest, IActionRe
         _configuration = configuration;
         _httpClientFactory = httpClientFactory;
         _env = env;
+        _mrWhoOptions = mrWhoOptions;
     }
 
     public async Task<IActionResult> Handle(LoginGetRequest request, CancellationToken cancellationToken)
@@ -94,9 +99,61 @@ public sealed class LoginGetHandler : IRequestHandler<LoginGetRequest, IActionRe
 
         try
         {
-            var client = await _db.Clients.AsNoTracking().FirstOrDefaultAsync(c => c.ClientId == clientId, cancellationToken);
+            // Load client and compute dynamic branding (logo/theme) + external providers
+            var client = await _db.Clients
+                .AsNoTracking()
+                .Include(c => c.Realm)
+                .FirstOrDefaultAsync(c => c.ClientId == clientId, cancellationToken);
+
+            // Compute theme and custom CSS with precedence: client > realm > server
+            string? themeName = null;
+            string? customCssUrl = null;
             if (client != null)
             {
+                themeName = client.ThemeName ?? client.Realm?.DefaultThemeName ?? _mrWhoOptions.Value.DefaultThemeName;
+                customCssUrl = client.CustomCssUrl ?? client.Realm?.RealmCustomCssUrl;
+            }
+            else
+            {
+                themeName = _mrWhoOptions.Value.DefaultThemeName;
+            }
+            if (!string.IsNullOrWhiteSpace(themeName))
+            {
+                viewData["ThemeName"] = themeName;
+            }
+            if (!string.IsNullOrWhiteSpace(customCssUrl))
+            {
+                viewData["CustomCssUrl"] = customCssUrl;
+            }
+
+            // Compute logo URI if available (client-level preferred, realm-level fallback)
+            if (client != null)
+            {
+                string? logoUri = null;
+
+                try
+                {
+                    // Prefer explicit client logo when allowed
+                    var showClientLogo = (bool?)client.GetType().GetProperty("ShowClientLogo")?.GetValue(client) ?? true; // default to true when missing
+                    var clientLogo = (string?)client.GetType().GetProperty("LogoUri")?.GetValue(client);
+
+                    if (showClientLogo && !string.IsNullOrWhiteSpace(clientLogo))
+                    {
+                        logoUri = clientLogo;
+                    }
+                    else if (!string.IsNullOrWhiteSpace(client.Realm?.RealmLogoUri))
+                    {
+                        logoUri = client.Realm!.RealmLogoUri;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "Failed to compute client/realm logo for client {ClientId}", clientId);
+                }
+
+                viewData["LogoUri"] = logoUri; // may be null -> view will fallback to default logo
+
+                // External providers filtered by client assignment
                 var query = _db.IdentityProviders.Include(p => p.ClientLinks)
                     .AsSplitQuery()
                     .AsNoTracking()
@@ -118,12 +175,14 @@ public sealed class LoginGetHandler : IRequestHandler<LoginGetRequest, IActionRe
             {
                 _logger.LogWarning("No client found for clientId: {ClientId}", clientId);
                 viewData["ExternalProviders"] = Array.Empty<object>();
+                viewData["LogoUri"] = null; // ensure not set
             }
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to load external identity providers for login page");
             viewData["ExternalProviders"] = Array.Empty<object>();
+            viewData["LogoUri"] = null;
         }
 
         var useCode = string.Equals(mode, "code", StringComparison.OrdinalIgnoreCase);
