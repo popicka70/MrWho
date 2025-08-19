@@ -94,11 +94,8 @@ public sealed class LogoutGetHandler : IRequestHandler<LogoutGetRequest, IAction
         }
         else
         {
-            foreach (var kvp in _cookieService.GetAllClientConfigurations())
-            {
-                try { await _dynamicCookieService.SignOutFromClientAsync(kvp.Key); } catch { }
-                DeleteCookieAcrossDomains(http, kvp.Value.CookieName);
-            }
+            // Best-effort: clear any known auth cookies currently present on the request (works even if configuration list is empty)
+            DeleteAllKnownAuthCookies(http);
         }
 
         return new RedirectToActionResult("Index", "Home", new { logout = "success" });
@@ -124,6 +121,7 @@ public sealed class LogoutGetHandler : IRequestHandler<LogoutGetRequest, IAction
         }
 
         await SignOutFromAllSchemesAsync(http, detectedClientId);
+        DeleteAllKnownAuthCookies(http);
 
         // Delegate end-session redirect/sign-out to OpenIddict
         return new SignOutResult(new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
@@ -131,7 +129,62 @@ public sealed class LogoutGetHandler : IRequestHandler<LogoutGetRequest, IAction
 
     private void DeleteCookieAcrossDomains(HttpContext http, string cookieName)
     {
-        http.Response.Cookies.Delete(cookieName, new CookieOptions { Path = "/" });
+        if (string.IsNullOrWhiteSpace(cookieName)) return;
+
+        // Try multiple domain variants to ensure deletion in production where Cookie:Domain is set
+        var configured = _configuration["Cookie:Domain"];
+        var host = http.Request.Host.Host;
+
+        // Build a unique list of domain variants to try (null = current host only)
+        var domains = new List<string?> { null };
+        if (!string.IsNullOrWhiteSpace(host))
+        {
+            domains.Add(host);
+            if (!host.StartsWith('.')) domains.Add("." + host);
+        }
+        if (!string.IsNullOrWhiteSpace(configured))
+        {
+            domains.Add(configured);
+            if (!configured.StartsWith('.')) domains.Add("." + configured);
+        }
+
+        foreach (var d in domains.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            try
+            {
+                http.Response.Cookies.Delete(cookieName, new CookieOptions { Path = "/", Domain = d });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Error deleting cookie {Cookie} for domain {Domain}", cookieName, d ?? "<null>");
+            }
+        }
+    }
+
+    private void DeleteAllKnownAuthCookies(HttpContext http)
+    {
+        try
+        {
+            // Always try the default Identity cookie and session marker
+            DeleteCookieAcrossDomains(http, ".AspNetCore.Identity.Application");
+            DeleteCookieAcrossDomains(http, ".MrWho.Session");
+
+            foreach (var kv in http.Request.Cookies)
+            {
+                var name = kv.Key;
+                if (name.StartsWith(".MrWho", StringComparison.OrdinalIgnoreCase) ||
+                    name.Contains("Identity.Application", StringComparison.OrdinalIgnoreCase) ||
+                    name.Contains("Identity.External", StringComparison.OrdinalIgnoreCase) ||
+                    name.StartsWith(".AspNetCore.Identity", StringComparison.OrdinalIgnoreCase))
+                {
+                    DeleteCookieAcrossDomains(http, name);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Failed to enumerate/delete known auth cookies");
+        }
     }
 
     private async Task<string?> TryGetClientIdFromRequestAsync(HttpContext http)
@@ -164,11 +217,8 @@ public sealed class LogoutGetHandler : IRequestHandler<LogoutGetRequest, IAction
         }
         else
         {
-            foreach (var kvp in _cookieService.GetAllClientConfigurations())
-            {
-                try { await _dynamicCookieService.SignOutFromClientAsync(kvp.Key); } catch { }
-                DeleteCookieAcrossDomains(http, kvp.Value.CookieName);
-            }
+            // If we don't know the client, still attempt to clear any known cookies present on the request
+            DeleteAllKnownAuthCookies(http);
         }
     }
 }
