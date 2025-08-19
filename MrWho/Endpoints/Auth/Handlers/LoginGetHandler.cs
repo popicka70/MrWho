@@ -94,82 +94,110 @@ public sealed class LoginGetHandler : IRequestHandler<LoginGetRequest, IActionRe
 
         try
         {
-            var client = await _db.Clients.AsNoTracking().FirstOrDefaultAsync(c => c.ClientId == clientId, cancellationToken);
+            // Load client and compute dynamic branding (logo) + external providers
+            var client = await _db.Clients
+                .AsNoTracking()
+                .FirstOrDefaultAsync(c => c.ClientId == clientId, cancellationToken);
+
+            // Compute logo URI if available (client-level preferred, realm-level fallback)
             if (client != null)
             {
-                var query = _db.IdentityProviders.Include(p => p.ClientLinks)
-                    .AsSplitQuery()
-                    .AsNoTracking()
-                    .Where(p => p.IsEnabled && p.Type == MrWho.Shared.IdentityProviderType.Oidc);
+                string? logoUri = null;
 
-                var providers = await query
-                    .OrderBy(p => p.Order)
-                    .ThenBy(p => p.Name)
-                    .Select(p => new { p.Name, DisplayName = p.DisplayName ?? p.Name, p.IconUri, p.ClientLinks })
-                    .ToListAsync(cancellationToken);
-
-                if (!string.IsNullOrEmpty(clientId))
+                try
                 {
-                    providers = providers.Where(p => p.ClientLinks.Any(cl => cl.ClientId == client?.Id)).ToList();
-                }
-                viewData["ExternalProviders"] = providers;
-            }
-            else
-            {
-                _logger.LogWarning("No client found for clientId: {ClientId}", clientId);
-                viewData["ExternalProviders"] = Array.Empty<object>();
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to load external identity providers for login page");
-            viewData["ExternalProviders"] = Array.Empty<object>();
-        }
+                    // Prefer explicit client logo when allowed
+                    var showClientLogo = (bool?)client.GetType().GetProperty("ShowClientLogo")?.GetValue(client) ?? true; // default to true when missing
+                    var clientLogo = (string?)client.GetType().GetProperty("LogoUri")?.GetValue(client);
 
-        var useCode = string.Equals(mode, "code", StringComparison.OrdinalIgnoreCase);
-        var model = new MrWho.Controllers.LoginViewModel { UseCode = useCode };
-        return new ViewResult
-        {
-            ViewName = "Login",
-            ViewData = viewDataWithModel(viewData, model)
-        };
-    }
+                    if (showClientLogo && !string.IsNullOrWhiteSpace(clientLogo))
+                    {
+                        logoUri = clientLogo;
+                      }
+                   }
+                   catch (Exception ex)
+                   {
+                       _logger.LogDebug(ex, "Failed to compute client/realm logo for client {ClientId}", clientId);
+                   }
+      
+                   viewData["LogoUri"] = logoUri; // may be null -> view will fallback to default logo
+      
+                   // External providers filtered by client assignment
+                   var query = _db.IdentityProviders.Include(p => p.ClientLinks)
+                       .AsSplitQuery()
+                       .AsNoTracking()
+                       .Where(p => p.IsEnabled && p.Type == MrWho.Shared.IdentityProviderType.Oidc);
+      
+                   var providers = await query
+                       .OrderBy(p => p.Order)
+                       .ThenBy(p => p.Name)
+                       .Select(p => new { p.Name, DisplayName = p.DisplayName ?? p.Name, p.IconUri, p.ClientLinks })
+                       .ToListAsync(cancellationToken);
+      
+                   if (!string.IsNullOrEmpty(clientId))
+                   {
+                       providers = providers.Where(p => p.ClientLinks.Any(cl => cl.ClientId == client?.Id)).ToList();
+                   }
+                   viewData["ExternalProviders"] = providers;
+               }
+               else
+               {
+                   _logger.LogWarning("No client found for clientId: {ClientId}", clientId);
+                   viewData["ExternalProviders"] = Array.Empty<object>();
+                   viewData["LogoUri"] = null; // ensure not set
+               }
+           }
+           catch (Exception ex)
+           {
+               _logger.LogWarning(ex, "Failed to load external identity providers for login page");
+               viewData["ExternalProviders"] = Array.Empty<object>();
+               viewData["LogoUri"] = null;
+           }
+  
+          var useCode = string.Equals(mode, "code", StringComparison.OrdinalIgnoreCase);
+          var model = new MrWho.Controllers.LoginViewModel { UseCode = useCode };
+          return new ViewResult
+          {
+              ViewName = "Login",
+              ViewData = viewDataWithModel(viewData, model)
+          };
+      }
 
-    private bool ShouldUseRecaptcha()
-    {
-        if (_env.IsDevelopment()) return false;
-        var site = _configuration["GoogleReCaptcha:SiteKey"];
-        var secret = _configuration["GoogleReCaptcha:SecretKey"];
-        var enabledFlag = _configuration["GoogleReCaptcha:Enabled"];
-        if (!string.IsNullOrWhiteSpace(enabledFlag) && bool.TryParse(enabledFlag, out var enabled) && !enabled)
-            return false;
-        return !string.IsNullOrWhiteSpace(site) && !string.IsNullOrWhiteSpace(secret);
-    }
+      private bool ShouldUseRecaptcha()
+      {
+          if (_env.IsDevelopment()) return false;
+          var site = _configuration["GoogleReCaptcha:SiteKey"];
+          var secret = _configuration["GoogleReCaptcha:SecretKey"];
+          var enabledFlag = _configuration["GoogleReCaptcha:Enabled"];
+          if (!string.IsNullOrWhiteSpace(enabledFlag) && bool.TryParse(enabledFlag, out var enabled) && !enabled)
+              return false;
+          return !string.IsNullOrWhiteSpace(site) && !string.IsNullOrWhiteSpace(secret);
+      }
 
-    private static string? TryExtractClientIdFromReturnUrl(string? returnUrl)
-    {
-        if (string.IsNullOrEmpty(returnUrl)) return null;
-        try
-        {
-            if (Uri.TryCreate(returnUrl, UriKind.Absolute, out var absUri))
-            {
-                var query = System.Web.HttpUtility.ParseQueryString(absUri.Query);
-                return query["client_id"];            
-            }
-            else
-            {
-                var idx = returnUrl.IndexOf('?');
-                if (idx >= 0 && idx < returnUrl.Length - 1)
-                {
-                    var query = System.Web.HttpUtility.ParseQueryString(returnUrl.Substring(idx));
-                    return query["client_id"];            
-                }
-            }
-        }
-        catch { }
-        return null;
-    }
+      private static string? TryExtractClientIdFromReturnUrl(string? returnUrl)
+      {
+          if (string.IsNullOrEmpty(returnUrl)) return null;
+          try
+          {
+              if (Uri.TryCreate(returnUrl, UriKind.Absolute, out var absUri))
+              {
+                  var query = System.Web.HttpUtility.ParseQueryString(absUri.Query);
+                  return query["client_id"];            
+              }
+              else
+              {
+                  var idx = returnUrl.IndexOf('?');
+                  if (idx >= 0 && idx < returnUrl.Length - 1)
+                  {
+                      var query = System.Web.HttpUtility.ParseQueryString(returnUrl.Substring(idx));
+                      return query["client_id"];            
+                  }
+              }
+          }
+          catch { }
+          return null;
+      }
 
-    private static ViewDataDictionary NewViewData() => new(new EmptyModelMetadataProvider(), new ModelStateDictionary());
-    private static ViewDataDictionary viewDataWithModel(ViewDataDictionary vd, object model) { vd.Model = model; return vd; }
-}
+      private static ViewDataDictionary NewViewData() => new(new EmptyModelMetadataProvider(), new ModelStateDictionary());
+      private static ViewDataDictionary viewDataWithModel(ViewDataDictionary vd, object model) { vd.Model = model; return vd; }
+  }
