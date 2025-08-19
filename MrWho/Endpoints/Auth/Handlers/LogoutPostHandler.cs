@@ -39,7 +39,7 @@ public sealed class LogoutPostHandler : IRequestHandler<LogoutPostRequest, IActi
             return new SignOutResult(new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
         }
 
-        // Try session first, then durable claim on principal
+        // Direct (non-OIDC) logout: we can try session then claim fallback
         var externalRegId = http.Session.GetString("ExternalRegistrationId");
         if (string.IsNullOrWhiteSpace(externalRegId))
         {

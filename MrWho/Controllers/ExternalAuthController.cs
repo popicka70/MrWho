@@ -293,6 +293,18 @@ public class ExternalAuthController : ControllerBase
         }
         catch { /* ignore */ }
 
+        // If a resume URL was stored, prefer redirecting to it to continue the flow
+        try
+        {
+            var resume = HttpContext.Session.GetString("ExternalSignoutResumeUrl");
+            if (!string.IsNullOrWhiteSpace(resume))
+            {
+                HttpContext.Session.Remove("ExternalSignoutResumeUrl");
+                return Redirect(resume);
+            }
+        }
+        catch { /* ignore */ }
+
         if (!string.IsNullOrEmpty(returnUrl))
         {
             return Redirect(returnUrl);
