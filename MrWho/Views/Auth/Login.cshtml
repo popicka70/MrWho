@@ -4,7 +4,9 @@
     var clientId = ViewData["ClientId"] as string;
     var clientName = ViewData["ClientName"] as string;
     var recaptchaSiteKey = ViewData["RecaptchaSiteKey"] as string; // Provided by controller
-    var externalProviders = ViewBag.ExternalProviders as IEnumerable<dynamic> ?? Array.Empty<object>();
+    var externalProviders = (ViewData["ExternalProviders"] as IEnumerable<dynamic>) 
+                            ?? (ViewBag.ExternalProviders as IEnumerable<dynamic>)
+                            ?? Array.Empty<dynamic>();
     var logoUri = ViewData["LogoUri"] as string;
 }
 

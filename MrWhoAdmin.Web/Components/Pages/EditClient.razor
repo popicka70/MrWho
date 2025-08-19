@@ -198,7 +198,7 @@
                                     <RadzenColumn Size="12" SizeMD="6">
                                         <RadzenFormField Text="Search" Variant="Variant.Outlined">
                                             <ChildContent>
-                                                <RadzenTextBox @bind-Value="scopeSearch" Placeholder="Filter by name or description" Style="width: 100%;" Change="@(args => ApplyScopeFilter())" />
+                                                <RadzenTextBox @bind-Value="@scopeSearch" Placeholder="Filter by name or description" Style="width: 100%;" Change="@(args => ApplyScopeFilter())" />
                                             </ChildContent>
                                         </RadzenFormField>
                                     </RadzenColumn>
@@ -698,20 +698,30 @@
                             <RadzenStack Gap="0.75rem" class="rz-mb-4">
                                 <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Visual Customization</RadzenText>
                                 <RadzenStack Gap="1rem">
-                                    <RadzenFormField Text="Theme Name" Variant="Variant.Outlined">
+                                    <RadzenFormField Text="Theme" Variant="Variant.Outlined">
                                         <ChildContent>
-                                            <RadzenTextBox @bind-Value="@model.ThemeName" 
-                                                          Style="width: 100%;" 
-                                                          Placeholder="e.g., dark, light, corporate" />
+                                            <RadzenDropDown @bind-Value="@model.ThemeName" Data="@availableThemes" TextProperty="Text" ValueProperty="Value" Style="width: 100%;" Placeholder="Use realm default..." AllowClear="true" />
                                         </ChildContent>
                                         <Helper>
                                             <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                Name of the UI theme to use for this client
+                                                Select a predefined theme. Precedence: Client ? Realm ? Server.
                                             </RadzenText>
                                         </Helper>
                                     </RadzenFormField>
 
-                                    <RadzenFormField Text="Custom CSS URL" Variant="Variant.Outlined">
+                                    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" Wrap="Radzen.FlexWrap.Wrap">
+                                        @foreach (var t in availableThemes)
+                                        {
+                                            <RadzenButton ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" Click="@(() => model.ThemeName = t.Value)">
+                                                <RadzenIcon Icon="palette" class="rz-me-1" /> @t.Text
+                                            </RadzenButton>
+                                        }
+                                        <RadzenButton ButtonStyle="ButtonStyle.Secondary" Size="ButtonSize.Small" Click="@(() => model.ThemeName = null)">
+                                            <RadzenIcon Icon="restore" class="rz-me-1" /> Use realm default
+                                        </RadzenButton>
+                                    </RadzenStack>
+
+                                    <RadzenFormField Text="Custom CSS URI" Variant="Variant.Outlined">
                                         <ChildContent>
                                             <RadzenTextBox @bind-Value="@model.CustomCssUrl" 
                                                           Style="width: 100%;" 
@@ -719,7 +729,7 @@
                                         </ChildContent>
                                         <Helper>
                                             <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                URL to custom CSS stylesheet for client-specific styling
+                                                Optional: custom stylesheet loaded after theme for overrides.
                                             </RadzenText>
                                         </Helper>
                                     </RadzenFormField>
@@ -1143,6 +1153,16 @@
     private List<DropdownItem<string>> accessTokenTypes = new();
     private List<DropdownItem<bool?>> triStateOptions = new();
     private List<DropdownItem<string>> availableMfaMethods = new();
+    private List<DropdownItem<string>> availableThemes = new()
+    {
+        new("Light", "light"),
+        new("Dark", "dark"),
+        new("Ocean", "ocean"),
+        new("Forest", "forest"),
+        new("Corporate", "corporate"),
+        new("Sunset", "sunset"),
+        new("Purple", "purple")
+    };
 
     // Selections
     private List<string> selectedScopes = new();

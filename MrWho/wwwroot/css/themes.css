@@ -1,0 +1,260 @@
+/* MrWho Theme System (Login page focused)
+   Define theme variables and component overrides using Bootstrap-compatible CSS variables.
+   Apply by setting body class "theme-<name>" (done in _Layout.cshtml via ViewData["ThemeName"]).
+
+   Predefined themes:
+   - theme-light (default)
+   - theme-dark
+   - theme-ocean
+   - theme-forest
+   - theme-corporate
+   - theme-sunset
+   - theme-purple
+*/
+
+/* 1) Base defaults (match current light look) */
+:root {
+  --mr-body-bg: #f8f9fa;
+  --mr-body-text: #212529;
+
+  --mr-card-bg: #ffffff;
+  --mr-card-text: #212529;
+  --mr-card-border: #dee2e6;
+
+  --mr-header-bg: #0d6efd; /* default primary header */
+  --mr-header-text: #ffffff;
+
+  --mr-primary: #0d6efd;
+  --mr-secondary: #6c757d;
+  --mr-success: #198754;
+  --mr-info: #0dcaf0;
+  --mr-warning: #ffc107;
+  --mr-danger: #dc3545;
+
+  --mr-link: #0d6efd;
+  --mr-muted: #6c757d;
+  --mr-border: #dee2e6;
+  --mr-input-bg: #ffffff;
+}
+
+/* 2) Apply variables to common elements (scoped by body to allow body class swap) */
+body {
+  background: var(--mr-body-bg);
+  color: var(--mr-body-text);
+}
+
+/* Cards */
+body .card {
+  background-color: var(--mr-card-bg);
+  color: var(--mr-card-text);
+  border-color: var(--mr-card-border);
+}
+
+body .card-header {
+  background: var(--mr-header-bg);
+  color: var(--mr-header-text);
+}
+
+/* Buttons */
+body .btn-primary {
+  --bs-btn-bg: var(--mr-primary);
+  --bs-btn-border-color: var(--mr-primary);
+  --bs-btn-hover-bg: color-mix(in srgb, var(--mr-primary) 90%, white 10%);
+  --bs-btn-hover-border-color: color-mix(in srgb, var(--mr-primary) 85%, white 15%);
+  --bs-btn-disabled-bg: var(--mr-primary);
+  --bs-btn-disabled-border-color: var(--mr-primary);
+}
+
+body .btn-outline-secondary {
+  --bs-btn-color: var(--mr-secondary);
+  --bs-btn-border-color: var(--mr-secondary);
+  --bs-btn-hover-bg: var(--mr-secondary);
+  --bs-btn-hover-border-color: var(--mr-secondary);
+  --bs-btn-hover-color: #fff;
+}
+
+/* Links and muted text */
+body a { color: var(--mr-link); }
+body .text-muted { color: var(--mr-muted) !important; }
+
+/* Forms */
+body .form-control {
+  background-color: var(--mr-input-bg);
+  color: var(--mr-body-text);
+  border-color: var(--mr-border);
+}
+body .form-control:focus {
+  border-color: var(--mr-primary);
+  box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--mr-primary) 25%, transparent);
+}
+
+/* Navbar (keep Bootstrap classes but align colors when used) */
+body .navbar-dark.bg-dark {
+  background-color: color-mix(in srgb, var(--mr-body-text) 90%, black) !important;
+}
+
+/* Login-page specific helpers */
+body .auth-button.btn-outline-primary:hover {
+  background-color: var(--mr-primary);
+  border-color: var(--mr-primary);
+  color: #fff;
+}
+
+/* QR colors are referenced via CSS vars in site.css; ensure variables exist per theme */
+
+/* 3) Themes */
+
+/* Light (alias of :root) */
+body.theme-light {
+  /* No overrides needed; uses :root defaults */
+}
+
+/* Dark */
+body.theme-dark {
+  --mr-body-bg: #0f1115;
+  --mr-body-text: #e6e6e6;
+
+  --mr-card-bg: #171a21;
+  --mr-card-text: #e6e6e6;
+  --mr-card-border: #2a2f3a;
+
+  --mr-header-bg: #1f6feb; /* vibrant blue header */
+  --mr-header-text: #ffffff;
+
+  --mr-primary: #2f81f7;
+  --mr-secondary: #8b949e;
+  --mr-success: #3fb950;
+  --mr-info: #58a6ff;
+  --mr-warning: #d29922;
+  --mr-danger: #f85149;
+
+  --mr-link: #58a6ff;
+  --mr-muted: #8b949e;
+  --mr-border: #2a2f3a;
+  --mr-input-bg: #0f1115;
+}
+
+/* Ocean */
+body.theme-ocean {
+  --mr-body-bg: linear-gradient(180deg, #e8f1ff 0%, #cfe8ff 100%);
+  --mr-body-text: #0b2d48;
+
+  --mr-card-bg: #ffffff;
+  --mr-card-text: #0b2d48;
+  --mr-card-border: #b6d4fe;
+
+  --mr-header-bg: linear-gradient(90deg, #0ea5e9 0%, #3b82f6 100%);
+  --mr-header-text: #ffffff;
+
+  --mr-primary: #0ea5e9;
+  --mr-secondary: #64748b;
+  --mr-success: #10b981;
+  --mr-info: #22d3ee;
+  --mr-warning: #f59e0b;
+  --mr-danger: #ef4444;
+
+  --mr-link: #0ea5e9;
+  --mr-muted: #64748b;
+  --mr-border: #b6d4fe;
+  --mr-input-bg: #ffffff;
+}
+
+/* Forest */
+body.theme-forest {
+  --mr-body-bg: linear-gradient(180deg, #f0fff4 0%, #e6fffa 100%);
+  --mr-body-text: #0b3d2e;
+
+  --mr-card-bg: #ffffff;
+  --mr-card-text: #0b3d2e;
+  --mr-card-border: #b7e4c7;
+
+  --mr-header-bg: linear-gradient(90deg, #16a34a 0%, #059669 100%);
+  --mr-header-text: #ffffff;
+
+  --mr-primary: #16a34a; /* green */
+  --mr-secondary: #64748b;
+  --mr-success: #22c55e;
+  --mr-info: #2dd4bf;
+  --mr-warning: #f59e0b;
+  --mr-danger: #ef4444;
+
+  --mr-link: #16a34a;
+  --mr-muted: #64748b;
+  --mr-border: #b7e4c7;
+  --mr-input-bg: #ffffff;
+}
+
+/* Corporate */
+body.theme-corporate {
+  --mr-body-bg: #f6f7fb;
+  --mr-body-text: #1f2937;
+
+  --mr-card-bg: #ffffff;
+  --mr-card-text: #1f2937;
+  --mr-card-border: #e5e7eb;
+
+  --mr-header-bg: #111827; /* near-black header */
+  --mr-header-text: #ffffff;
+
+  --mr-primary: #2563eb; /* blue */
+  --mr-secondary: #6b7280; /* gray */
+  --mr-success: #059669;
+  --mr-info: #0ea5e9;
+  --mr-warning: #d97706;
+  --mr-danger: #dc2626;
+
+  --mr-link: #2563eb;
+  --mr-muted: #6b7280;
+  --mr-border: #e5e7eb;
+  --mr-input-bg: #ffffff;
+}
+
+/* Sunset */
+body.theme-sunset {
+  --mr-body-bg: linear-gradient(180deg, #fff1eb 0%, #ffd1c1 100%);
+  --mr-body-text: #5b2333;
+
+  --mr-card-bg: #ffffff;
+  --mr-card-text: #5b2333;
+  --mr-card-border: #ffc9b6;
+
+  --mr-header-bg: linear-gradient(90deg, #f97316 0%, #ec4899 100%);
+  --mr-header-text: #ffffff;
+
+  --mr-primary: #f97316; /* orange */
+  --mr-secondary: #a78bfa; /* violet */
+  --mr-success: #22c55e;
+  --mr-info: #06b6d4;
+  --mr-warning: #f59e0b;
+  --mr-danger: #ef4444;
+
+  --mr-link: #ec4899;
+  --mr-muted: #7f1d1d;
+  --mr-border: #ffc9b6;
+  --mr-input-bg: #ffffff;
+}
+
+/* Purple */
+body.theme-purple {
+  --mr-body-bg: linear-gradient(180deg, #f5f3ff 0%, #ede9fe 100%);
+  --mr-body-text: #2e1065;
+
+  --mr-card-bg: #ffffff;
+  --mr-card-text: #2e1065;
+  --mr-card-border: #ddd6fe;
+
+  --mr-header-bg: linear-gradient(90deg, #7c3aed 0%, #6d28d9 100%);
+  --mr-header-text: #ffffff;
+
+  --mr-primary: #7c3aed; /* purple */
+  --mr-secondary: #9333ea;
+  --mr-success: #22c55e;
+  --mr-info: #38bdf8;
+  --mr-warning: #eab308;
+  --mr-danger: #ef4444;
+
+  --mr-link: #6d28d9;
+  --mr-muted: #6b7280;
+  --mr-border: #ddd6fe;
+  --mr-input-bg: #ffffff;
+}

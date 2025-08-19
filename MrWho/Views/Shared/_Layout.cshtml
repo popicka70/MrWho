@@ -7,9 +7,21 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/themes.css" asp-append-version="true" />
+    @{
+        var customCssUrl = ViewData["CustomCssUrl"] as string;
+        if (!string.IsNullOrWhiteSpace(customCssUrl))
+        {
+            <link rel="stylesheet" href="@customCssUrl" />
+        }
+    }
     @await RenderSectionAsync("Styles", required: false)
 </head>
-<body>
+@{
+    var themeName = ViewData["ThemeName"] as string;
+    var themeClass = !string.IsNullOrWhiteSpace(themeName) ? ($"theme-" + themeName.ToLowerInvariant()) : null;
+}
+<body class="@themeClass">
     <header>
         <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-dark bg-dark border-bottom box-shadow mb-3">
             <div class="container-fluid">
