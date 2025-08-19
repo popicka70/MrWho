@@ -33,37 +33,6 @@ public class ClientCookieConfigurationService : IClientCookieConfigurationServic
         _db = db;
     }
 
-    // Static mapping of known clients to their cookie configurations (used only in ByClient mode)
-    private static readonly Dictionary<string, ClientCookieConfiguration> ClientCookieConfigurations = new()
-    {
-        { 
-            "mrwho_admin_web", 
-            new ClientCookieConfiguration
-            {
-                ClientId = "mrwho_admin_web",
-                SchemeName = "Identity.Application.mrwho_admin_web",
-                CookieName = ".MrWho.Admin"
-            }
-        },
-        { 
-            "mrwho_demo1", 
-            new ClientCookieConfiguration
-            {
-                ClientId = "mrwho_demo1",
-                SchemeName = "Identity.Application.mrwho_demo1",
-                CookieName = ".MrWho.Demo1"
-            }
-        },
-        { 
-            "postman_client", 
-            new ClientCookieConfiguration
-            {
-                ClientId = "postman_client",
-                SchemeName = "Identity.Application.postman_client",
-                CookieName = ".MrWho.API"
-            }
-        }
-    };
 
     public string GetCookieSchemeForClient(string clientId)
     {
@@ -80,11 +49,6 @@ public class ClientCookieConfigurationService : IClientCookieConfigurationServic
 
             case CookieSeparationMode.ByClient:
             default:
-                if (ClientCookieConfigurations.TryGetValue(clientId, out var config))
-                {
-                    return config.SchemeName;
-                }
-
                 // Dynamic per-client scheme
                 var dynamicSchemeName = $"Identity.Application.{clientId}";
                 _logger.LogDebug("Using dynamic authentication scheme for client {ClientId}: {SchemeName}", clientId, dynamicSchemeName);
@@ -107,27 +71,10 @@ public class ClientCookieConfigurationService : IClientCookieConfigurationServic
 
             case CookieSeparationMode.ByClient:
             default:
-                if (ClientCookieConfigurations.TryGetValue(clientId, out var config))
-                {
-                    return config.CookieName;
-                }
-
                 var dynamicCookieName = $".MrWho.{clientId}";
                 _logger.LogDebug("Using dynamic cookie name for client {ClientId}: {CookieName}", clientId, dynamicCookieName);
                 return dynamicCookieName;
         }
-    }
-
-    /// <summary>
-    /// Checks if a client has static cookie configuration
-    /// </summary>
-    public bool HasStaticConfiguration(string clientId)
-    {
-        // Only meaningful in ByClient mode
-        var hasStatic = _options.Value.CookieSeparationMode == CookieSeparationMode.ByClient && ClientCookieConfigurations.ContainsKey(clientId);
-        _logger.LogDebug("Static Configuration Check: Client {ClientId} has static config: {HasStatic}", 
-            clientId, hasStatic);
-        return hasStatic;
     }
 
     /// <summary>
@@ -144,11 +91,12 @@ public class ClientCookieConfigurationService : IClientCookieConfigurationServic
         {
             return true; // dynamic per-realm scheme
         }
-        return !HasStaticConfiguration(clientId); // ByClient
+        return true;
     }
 
     public async Task<string?> GetClientIdFromRequestAsync(HttpContext context)
     {
+        await Task.CompletedTask; // Ensure async completion
         // Method 1: Try to get client_id from query parameters (authorization endpoint)
         if (context.Request.Query.TryGetValue("client_id", out var clientIdQuery))
         {
@@ -186,31 +134,6 @@ public class ClientCookieConfigurationService : IClientCookieConfigurationServic
             }
         }
 
-        // Method 4: Try to determine from existing authentication cookies
-        var mode = _options.Value.CookieSeparationMode;
-        if (mode == CookieSeparationMode.ByClient)
-        {
-            foreach (var (clientId, config) in ClientCookieConfigurations)
-            {
-                if (context.Request.Cookies.ContainsKey(config.CookieName))
-                {
-                    try
-                    {
-                        var authResult = await context.AuthenticateAsync(config.SchemeName);
-                        if (authResult.Succeeded && authResult.Principal?.Identity?.IsAuthenticated == true)
-                        {
-                            _logger.LogDebug("Found active session for client {ClientId} via cookie {CookieName}", 
-                                clientId, config.CookieName);
-                            return clientId;
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogDebug("Could not authenticate with scheme {Scheme}: {Error}", config.SchemeName, ex.Message);
-                    }
-                }
-            }
-        }
 
         // Method 5: Check if this is a callback and get from state parameter or stored session
         if (context.Request.Path.StartsWithSegments("/signin-oidc") || 
@@ -231,10 +154,7 @@ public class ClientCookieConfigurationService : IClientCookieConfigurationServic
 
     public IDictionary<string, ClientCookieConfiguration> GetAllClientConfigurations()
     {
-        // Expose only meaningful static configs in ByClient mode
-        return _options.Value.CookieSeparationMode == CookieSeparationMode.ByClient
-            ? new Dictionary<string, ClientCookieConfiguration>(ClientCookieConfigurations)
-            : new Dictionary<string, ClientCookieConfiguration>();
+        return new Dictionary<string, ClientCookieConfiguration>();
     }
 
     private string GetRealmKeyForClient(string clientId)

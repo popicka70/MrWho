@@ -176,6 +176,7 @@ public static class WebApplicationExtensions
                 return;
             }
             http.Response.StatusCode = StatusCodes.Status204NoContent;
+            await Task.CompletedTask; // Ensure async completion
         }).AllowAnonymous();
 
         // Map OIDC authorize endpoint for OpenIddict passthrough
@@ -329,6 +330,7 @@ public static class WebApplicationExtensions
                 return;
             }
             http.Response.StatusCode = StatusCodes.Status204NoContent;
+            await Task.CompletedTask; // Ensure async completion
         }).AllowAnonymous();
 
         // Map OIDC authorize endpoint for OpenIddict passthrough
