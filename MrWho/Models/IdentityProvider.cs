@@ -119,6 +119,10 @@ public class ClientIdentityProvider
     [StringLength(4000)]
     public string? OptionsJson { get; set; }
 
+    // Optional per-client claim mapping override (external -> local)
+    [StringLength(4000)]
+    public string? ClaimMappingsJson { get; set; }
+
     // Audit
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;

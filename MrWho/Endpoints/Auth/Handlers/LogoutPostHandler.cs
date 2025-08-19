@@ -39,10 +39,15 @@ public sealed class LogoutPostHandler : IRequestHandler<LogoutPostRequest, IActi
             return new SignOutResult(new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
         }
 
+        // Try session first, then durable claim on principal
         var externalRegId = http.Session.GetString("ExternalRegistrationId");
+        if (string.IsNullOrWhiteSpace(externalRegId))
+        {
+            externalRegId = http.User?.FindFirst("ext_reg_id")?.Value;
+        }
         if (!string.IsNullOrWhiteSpace(externalRegId))
         {
-            _logger.LogInformation("External RegistrationId found in session during POST logout. Initiating external provider sign-out before local logout.");
+            _logger.LogInformation("External RegistrationId found during POST logout. Initiating external provider sign-out before local logout.");
             var props = new AuthenticationProperties { RedirectUri = "/connect/external/signout-callback" };
             props.Items[OpenIddictClientAspNetCoreConstants.Properties.RegistrationId] = externalRegId;
             await http.SignOutAsync(OpenIddictClientAspNetCoreDefaults.AuthenticationScheme, props);

@@ -133,6 +133,7 @@ public class IdentityProvidersController : ControllerBase
             IsEnabled = dto?.IsEnabled ?? true,
             Order = dto?.Order,
             OptionsJson = dto?.OptionsJson,
+            ClaimMappingsJson = dto?.ClaimMappingsJson,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow
         };
@@ -185,7 +186,8 @@ public class IdentityProvidersController : ControllerBase
         DisplayNameOverride = l.DisplayNameOverride,
         IsEnabled = l.IsEnabled,
         Order = l.Order,
-        OptionsJson = l.OptionsJson
+        OptionsJson = l.OptionsJson,
+        ClaimMappingsJson = l.ClaimMappingsJson
     };
 
     private static IdentityProvider MapFromDto(IdentityProviderDto d) => new()

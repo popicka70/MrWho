@@ -41,4 +41,5 @@ public class ClientIdentityProviderDto
     public bool? IsEnabled { get; set; }
     public int? Order { get; set; }
     public string? OptionsJson { get; set; }
+    public string? ClaimMappingsJson { get; set; }
 }
