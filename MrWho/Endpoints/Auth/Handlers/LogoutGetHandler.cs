@@ -54,7 +54,7 @@ public sealed class LogoutGetHandler : IRequestHandler<LogoutGetRequest, IAction
             return await ProcessLogoutInternalAsync(http, clientId, postUri, cancellationToken);
         }
 
-        // Try session first, then durable claim on principal
+        // Try session first, then durable claim on principal for direct (non-OIDC) logout
         var externalRegId = http.Session.GetString("ExternalRegistrationId");
         if (string.IsNullOrWhiteSpace(externalRegId))
         {
@@ -110,15 +110,11 @@ public sealed class LogoutGetHandler : IRequestHandler<LogoutGetRequest, IAction
         string? detectedClientId = clientId ?? await TryGetClientIdFromRequestAsync(http);
         _logger.LogDebug("Processing OIDC logout. Method: {Method}, ClientId parameter: {ClientId}, Detected ClientId: {DetectedClientId}, Post logout URI: {PostLogoutUri}", http.Request.Method, clientId, detectedClientId, postLogoutUri ?? request?.PostLogoutRedirectUri);
 
-        // Try session first, then durable claim on principal
+        // IMPORTANT: For OIDC logout, only use the session marker to avoid redirect loops.
         var externalRegId = http.Session.GetString("ExternalRegistrationId");
-        if (string.IsNullOrWhiteSpace(externalRegId))
-        {
-            externalRegId = http.User?.FindFirst("ext_reg_id")?.Value;
-        }
         if (!string.IsNullOrWhiteSpace(externalRegId))
         {
-            _logger.LogInformation("External RegistrationId found (session/principal). Initiating external provider sign-out before local logout.");
+            _logger.LogInformation("External RegistrationId found in session. Initiating external provider sign-out before local logout.");
             var props = new AuthenticationProperties { RedirectUri = "/connect/external/signout-callback" };
             props.Items[OpenIddictClientAspNetCoreConstants.Properties.RegistrationId] = externalRegId;
             var resume = UriHelper.GetDisplayUrl(http.Request);
@@ -128,9 +124,6 @@ public sealed class LogoutGetHandler : IRequestHandler<LogoutGetRequest, IAction
         }
 
         await SignOutFromAllSchemesAsync(http, detectedClientId);
-
-        var candidateUri = postLogoutUri ?? request?.PostLogoutRedirectUri;
-        var candidateClientId = clientId ?? request?.ClientId ?? detectedClientId;
 
         // Delegate end-session redirect/sign-out to OpenIddict
         return new SignOutResult(new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });

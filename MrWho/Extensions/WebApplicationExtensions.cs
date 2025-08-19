@@ -166,27 +166,13 @@ public static class WebApplicationExtensions
 
             var props = new AuthenticationProperties
             {
-                // After provider sign-out completes, return here and clear the session marker
+                // After provider sign-out completes, controller endpoint will handle resume
                 RedirectUri = "/connect/external/signout-callback"
             };
             props.Items[OpenIddictClientAspNetCoreConstants.Properties.RegistrationId] = regId;
 
             // Ask the OpenIddict client to sign the user out from the remote provider
             await http.SignOutAsync(OpenIddictClientAspNetCoreDefaults.AuthenticationScheme, props);
-        }).AllowAnonymous();
-
-        app.MapGet("/connect/external/signout-callback", async (HttpContext http) =>
-        {
-            try { http.Session.Remove("ExternalRegistrationId"); } catch { }
-            var resume = http.Session.GetString("ExternalSignoutResumeUrl");
-            if (!string.IsNullOrWhiteSpace(resume))
-            {
-                http.Session.Remove("ExternalSignoutResumeUrl");
-                http.Response.Redirect(resume);
-                return;
-            }
-            http.Response.StatusCode = StatusCodes.Status204NoContent;
-            await Task.CompletedTask; // Ensure async completion
         }).AllowAnonymous();
 
         // Map OIDC authorize endpoint for OpenIddict passthrough
@@ -330,27 +316,13 @@ public static class WebApplicationExtensions
 
             var props = new AuthenticationProperties
             {
-                // After provider sign-out completes, return here and clear the session marker
+                // After provider sign-out completes, controller endpoint will handle resume
                 RedirectUri = "/connect/external/signout-callback"
             };
             props.Items[OpenIddictClientAspNetCoreConstants.Properties.RegistrationId] = regId;
 
             // Ask the OpenIddict client to sign the user out from the remote provider
             await http.SignOutAsync(OpenIddictClientAspNetCoreDefaults.AuthenticationScheme, props);
-        }).AllowAnonymous();
-
-        app.MapGet("/connect/external/signout-callback", async (HttpContext http) =>
-        {
-            try { http.Session.Remove("ExternalRegistrationId"); } catch { }
-            var resume = http.Session.GetString("ExternalSignoutResumeUrl");
-            if (!string.IsNullOrWhiteSpace(resume))
-            {
-                http.Session.Remove("ExternalSignoutResumeUrl");
-                http.Response.Redirect(resume);
-                return;
-            }
-            http.Response.StatusCode = StatusCodes.Status204NoContent;
-            await Task.CompletedTask; // Ensure async completion
         }).AllowAnonymous();
 
         // Map OIDC authorize endpoint for OpenIddict passthrough
