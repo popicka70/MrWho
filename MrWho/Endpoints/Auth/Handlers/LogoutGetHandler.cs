@@ -54,10 +54,15 @@ public sealed class LogoutGetHandler : IRequestHandler<LogoutGetRequest, IAction
             return await ProcessLogoutInternalAsync(http, clientId, postUri, cancellationToken);
         }
 
+        // Try session first, then durable claim on principal
         var externalRegId = http.Session.GetString("ExternalRegistrationId");
+        if (string.IsNullOrWhiteSpace(externalRegId))
+        {
+            externalRegId = http.User?.FindFirst("ext_reg_id")?.Value;
+        }
         if (!string.IsNullOrWhiteSpace(externalRegId))
         {
-            _logger.LogInformation("External RegistrationId found in session during GET logout. Initiating external provider sign-out before local logout.");
+            _logger.LogInformation("External RegistrationId found (session/principal) during GET logout. Initiating external provider sign-out before local logout.");
             var returnAfterExternal = http.Request.Scheme + "://" + http.Request.Host + "/connect/logout" + new QueryString()
                 .Add("clientId", clientId ?? string.Empty)
                 .Add("post_logout_redirect_uri", postUri ?? string.Empty).ToUriComponent();
@@ -105,10 +110,15 @@ public sealed class LogoutGetHandler : IRequestHandler<LogoutGetRequest, IAction
         string? detectedClientId = clientId ?? await TryGetClientIdFromRequestAsync(http);
         _logger.LogDebug("Processing OIDC logout. Method: {Method}, ClientId parameter: {ClientId}, Detected ClientId: {DetectedClientId}, Post logout URI: {PostLogoutUri}", http.Request.Method, clientId, detectedClientId, postLogoutUri ?? request?.PostLogoutRedirectUri);
 
+        // Try session first, then durable claim on principal
         var externalRegId = http.Session.GetString("ExternalRegistrationId");
+        if (string.IsNullOrWhiteSpace(externalRegId))
+        {
+            externalRegId = http.User?.FindFirst("ext_reg_id")?.Value;
+        }
         if (!string.IsNullOrWhiteSpace(externalRegId))
         {
-            _logger.LogInformation("External RegistrationId found in session. Initiating external provider sign-out before local logout.");
+            _logger.LogInformation("External RegistrationId found (session/principal). Initiating external provider sign-out before local logout.");
             var props = new AuthenticationProperties { RedirectUri = "/connect/external/signout-callback" };
             props.Items[OpenIddictClientAspNetCoreConstants.Properties.RegistrationId] = externalRegId;
             var resume = UriHelper.GetDisplayUrl(http.Request);
@@ -122,142 +132,50 @@ public sealed class LogoutGetHandler : IRequestHandler<LogoutGetRequest, IAction
         var candidateUri = postLogoutUri ?? request?.PostLogoutRedirectUri;
         var candidateClientId = clientId ?? request?.ClientId ?? detectedClientId;
 
-        // IMPORTANT: Only perform our own validation when we know the client. If we don't,
-        // delegate to OpenIddict, which can infer the client from the id_token_hint.
-        if (!string.IsNullOrEmpty(candidateUri) && !string.IsNullOrEmpty(candidateClientId))
-        {
-            var isValid = await IsPostLogoutRedirectUriValidAsync(candidateClientId, candidateUri);
-            if (!isValid)
-            {
-                string? clientName = null;
-                try
-                {
-                    if (!string.IsNullOrEmpty(candidateClientId))
-                    {
-                        var app = await _applicationManager.FindByClientIdAsync(candidateClientId);
-                        if (app is not null) clientName = await _applicationManager.GetDisplayNameAsync(app);
-                    }
-                }
-                catch { }
-
-                var vd = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary())
-                {
-                    ["ClientName"] = clientName,
-                    ["ClientId"] = candidateClientId, // expose to view so it can preserve parameters
-                    ["ReturnUrl"] = null,
-                    ["LogoutError"] = "You have been signed out, but the redirect URL provided by the application is invalid or not allowed."
-                };
-                return new ViewResult { ViewName = "LoggedOut", ViewData = vd };
-            }
-        }
-
-        // Delegate end-session processing (including redirect validation) to OpenIddict.
-        if (request != null)
-        {
-            return new SignOutResult(new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
-        }
-
-        return new RedirectToActionResult("Index", "Home", new { logout = "success" });
-    }
-
-    private async Task SignOutFromAllSchemesAsync(HttpContext http, string? clientId)
-    {
-        try
-        {
-            await _signInManager.SignOutAsync();
-            DeleteCookieAcrossDomains(http, ".AspNetCore.Identity.Application");
-            if (!string.IsNullOrEmpty(clientId))
-            {
-                try { await _dynamicCookieService.SignOutFromClientAsync(clientId); } catch (Exception ex) { _logger.LogWarning(ex, "Failed to sign out from client-specific cookie for client {ClientId}", clientId); }
-                try { var cookieName = _cookieService.GetCookieNameForClient(clientId); DeleteCookieAcrossDomains(http, cookieName); } catch { }
-            }
-            else
-            {
-                var allConfigurations = _cookieService.GetAllClientConfigurations();
-                foreach (var config in allConfigurations)
-                {
-                    try { await _dynamicCookieService.SignOutFromClientAsync(config.Key); } catch (Exception ex) { _logger.LogDebug(ex, "Failed to sign out from client configuration for client {ClientId}", config.Key); }
-                    DeleteCookieAcrossDomains(http, config.Value.CookieName);
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error during logout process");
-        }
+        // Delegate end-session redirect/sign-out to OpenIddict
+        return new SignOutResult(new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
     }
 
     private void DeleteCookieAcrossDomains(HttpContext http, string cookieName)
     {
-        if (string.IsNullOrWhiteSpace(cookieName)) return;
-        try
-        {
-            http.Response.Cookies.Delete(cookieName, new CookieOptions{ Path = "/" });
-            var configuredDomain = _configuration["Cookie:Domain"];
-            if (!string.IsNullOrWhiteSpace(configuredDomain))
-            {
-                http.Response.Cookies.Delete(cookieName, new CookieOptions { Domain = configuredDomain, Path = "/" });
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogDebug(ex, "Error deleting cookie {CookieName}", cookieName);
-        }
+        http.Response.Cookies.Delete(cookieName, new CookieOptions { Path = "/" });
     }
 
     private async Task<string?> TryGetClientIdFromRequestAsync(HttpContext http)
     {
         try
         {
-            var request = http.GetOpenIddictServerRequest();
-            if (!string.IsNullOrEmpty(request?.ClientId)) return request.ClientId;
-            if (http.Request.Query.TryGetValue("client_id", out var clientIdFromQuery)) return clientIdFromQuery.ToString();
-            var clientIdFromCookies = await _cookieService.GetClientIdFromRequestAsync(http);
-            if (!string.IsNullOrEmpty(clientIdFromCookies)) return clientIdFromCookies;
-            var referer = http.Request.Headers.Referer.ToString();
-            if (!string.IsNullOrEmpty(referer) && referer.Contains("client_id="))
-            {
-                var uri = new Uri(referer);
-                var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
-                var clientIdFromReferer = query["client_id"];
-                if (!string.IsNullOrEmpty(clientIdFromReferer)) return clientIdFromReferer;
-            }
-            return null;
+            var req = http.GetOpenIddictServerRequest();
+            if (!string.IsNullOrEmpty(req?.ClientId)) return req.ClientId;
+            var query = http.Request.Query["client_id"].ToString();
+            if (!string.IsNullOrEmpty(query)) return query;
         }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Error attempting to detect ClientId from request");
-            return null;
-        }
+        catch { }
+        return null;
     }
 
-    private async Task<bool> IsPostLogoutRedirectUriValidAsync(string? clientId, string? uri)
+    private async Task SignOutFromAllSchemesAsync(HttpContext http, string? clientId)
     {
-        try
+        await _signInManager.SignOutAsync();
+        DeleteCookieAcrossDomains(http, ".AspNetCore.Identity.Application");
+
+        if (!string.IsNullOrEmpty(clientId))
         {
-            if (string.IsNullOrWhiteSpace(uri)) return true;
-            if (string.IsNullOrWhiteSpace(clientId)) return false;
-            var application = await _applicationManager.FindByClientIdAsync(clientId);
-            if (application is null) return false;
             try
             {
-                dynamic dynManager = _applicationManager;
-                var uris = await dynManager.GetPostLogoutRedirectUrisAsync(application);
-                if (uris is IEnumerable<string> list)
-                {
-                    return list.Any(allowed => string.Equals(allowed?.TrimEnd('/'), uri.TrimEnd('/'), StringComparison.OrdinalIgnoreCase));
-                }
+                await _dynamicCookieService.SignOutFromClientAsync(clientId);
+                var cookieName = _cookieService.GetCookieNameForClient(clientId);
+                DeleteCookieAcrossDomains(http, cookieName);
             }
-            catch (Exception ex)
-            {
-                _logger.LogDebug(ex, "Could not retrieve post-logout redirect URIs via manager API; treating as invalid");
-                return false;
-            }
+            catch { }
         }
-        catch (Exception ex)
+        else
         {
-            _logger.LogWarning(ex, "Error validating post_logout_redirect_uri");
+            foreach (var kvp in _cookieService.GetAllClientConfigurations())
+            {
+                try { await _dynamicCookieService.SignOutFromClientAsync(kvp.Key); } catch { }
+                DeleteCookieAcrossDomains(http, kvp.Value.CookieName);
+            }
         }
-        return false;
     }
 }
