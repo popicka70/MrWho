@@ -41,6 +41,16 @@
                     </ChildContent>
                 </RadzenFormField>
             </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="12">
+                <RadzenFormField Text="Claim mappings (JSON)" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenTextArea @bind-Value="_claimMappingsJson" Style="width:100%; min-height: 120px;" Placeholder='{"external_claim":"local_claim"}' />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Optional per-client mapping from external claims to local claim types.</RadzenText>
+                    </Helper>
+                </RadzenFormField>
+            </RadzenColumn>
             <RadzenColumn Size="12" SizeMD="3" class="rz-display-flex rz-justify-content-end rz-align-items-end">
                 <RadzenButton Icon="link" Text="Add Link" ButtonStyle="ButtonStyle.Primary" Click="@(async ()=> await AddLink())" Disabled="@string.IsNullOrEmpty(_selectedClientId)" />
             </RadzenColumn>
@@ -54,6 +64,7 @@
                 <RadzenDataGridColumn TItem="ClientIdentityProviderDto" Property="ClientId" Title="Client Id" />
                 <RadzenDataGridColumn TItem="ClientIdentityProviderDto" Property="DisplayNameOverride" Title="Display Name" />
                 <RadzenDataGridColumn TItem="ClientIdentityProviderDto" Property="Order" Title="Order" />
+                <RadzenDataGridColumn TItem="ClientIdentityProviderDto" Property="ClaimMappingsJson" Title="Claim Mappings" />
                 <RadzenDataGridColumn TItem="ClientIdentityProviderDto" Context="row" Title="Actions" Width="150px">
                     <Template Context="row">
                         <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.Small" Text="Remove"
@@ -78,6 +89,7 @@
     private string _clientSearch = string.Empty;
     private string? _displayNameOverride;
     private int? _order;
+    private string? _claimMappingsJson;
 
     protected override async Task OnInitializedAsync()
     {
@@ -104,7 +116,8 @@
         {
             DisplayNameOverride = _displayNameOverride,
             Order = _order,
-            IsEnabled = true
+            IsEnabled = true,
+            ClaimMappingsJson = _claimMappingsJson
         };
         var created = await IdentityProvidersApi.AddLinkAsync(Provider.Id, _selectedClientId, dto);
         if (created is not null)
@@ -113,6 +126,7 @@
             _displayNameOverride = null;
             _order = null;
             _selectedClientId = null;
+            _claimMappingsJson = null;
             await LoadLinks();
         }
         else

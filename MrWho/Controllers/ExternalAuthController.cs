@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.Identity;
 using System.Security.Claims;
 using MrWho.Services;
 using MrWho.Data;
+using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace MrWho.Controllers;
 
@@ -16,17 +18,20 @@ public class ExternalAuthController : ControllerBase
     private readonly SignInManager<IdentityUser> _signInManager;
     private readonly IDynamicCookieService _dynamicCookieService;
     private readonly ILogger<ExternalAuthController> _logger;
+    private readonly ApplicationDbContext _db;
 
     public ExternalAuthController(
         UserManager<IdentityUser> userManager,
         SignInManager<IdentityUser> signInManager,
         IDynamicCookieService dynamicCookieService,
-        ILogger<ExternalAuthController> logger)
+        ILogger<ExternalAuthController> logger,
+        ApplicationDbContext db)
     {
         _userManager = userManager;
         _signInManager = signInManager;
         _dynamicCookieService = dynamicCookieService;
         _logger = logger;
+        _db = db;
     }
 
     [HttpGet("callback")]
@@ -186,6 +191,57 @@ public class ExternalAuthController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "Failed to persist external tokens for provider {Provider} and user {UserId}", regId, user.Id);
+        }
+
+        // Apply optional per-client claim mappings to the local user (only on first creation or always if you prefer)
+        try
+        {
+            if (!string.IsNullOrEmpty(clientId) && !string.IsNullOrEmpty(regId))
+            {
+                var client = await _db.Clients.AsNoTracking().FirstOrDefaultAsync(c => c.ClientId == clientId || c.Id == clientId);
+                if (client != null)
+                {
+                    // Find link record to resolve per-client mapping
+                    var link = await _db.ClientIdentityProviders.AsNoTracking()
+                        .Include(l => l.IdentityProvider)
+                        .Where(l => l.ClientId == client.Id && l.IdentityProvider.Type == MrWho.Shared.IdentityProviderType.Oidc)
+                        .FirstOrDefaultAsync(l => l.IdentityProvider.ClientId == regId || l.IdentityProvider.Name == providerName);
+
+                    // Prefer per-client mapping, fallback to provider-level mapping
+                    string? mappingJson = link?.ClaimMappingsJson ?? link?.IdentityProvider?.ClaimMappingsJson;
+                    if (!string.IsNullOrWhiteSpace(mappingJson))
+                    {
+                        var map = JsonSerializer.Deserialize<Dictionary<string, string>>(mappingJson);
+                        if (map != null && map.Count > 0)
+                        {
+                            var newClaims = new List<Claim>();
+                            foreach (var kv in map)
+                            {
+                                var src = kv.Key;
+                                var dst = kv.Value;
+                                var val = principal.FindFirst(src)?.Value;
+                                if (!string.IsNullOrEmpty(val) && !string.IsNullOrEmpty(dst))
+                                {
+                                    // Only add if user doesn't already have it
+                                    var existing = await _userManager.GetClaimsAsync(user);
+                                    if (!existing.Any(c => c.Type == dst && c.Value == val))
+                                    {
+                                        newClaims.Add(new Claim(dst, val));
+                                    }
+                                }
+                            }
+                            if (newClaims.Count > 0)
+                            {
+                                await _userManager.AddClaimsAsync(user, newClaims);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed applying claim mappings for client {ClientId} and provider {Provider}", clientId, regId);
         }
 
         // Build additional per-session claims to remember external provider for cascade sign-out
