@@ -119,36 +119,32 @@ public class AuthController : Controller
         // Load enabled external IdPs for UI buttons
         try
         {
-            // Base query: enabled OIDC providers
-            var query = _db.IdentityProviders
-                .AsNoTracking()
-                .Where(p => p.IsEnabled && p.Type == MrWho.Shared.IdentityProviderType.Oidc);
-
-            var providers = await query
-                .OrderBy(p => p.Order)
-                .ThenBy(p => p.Name)
-                .Select(p => new { Name = p.Name, DisplayName = p.DisplayName ?? p.Name, IconUri = p.IconUri })
-                .ToListAsync();
-
-            // If client restricts IdPs, filter accordingly (AllowedIdentityProviders is a space/comma-separated list)
-            if (!string.IsNullOrEmpty(clientId))
+            var client = await _db.Clients.AsNoTracking().FirstOrDefaultAsync(c => c.ClientId == clientId);
+            if (client != null)
             {
-                var client = await _db.Clients.AsNoTracking().FirstOrDefaultAsync(c => c.ClientId == clientId);
-                var allowedRaw = client?.AllowedIdentityProviders;
-                if (!string.IsNullOrWhiteSpace(allowedRaw))
+                // Base query: enabled OIDC providers
+                var query = _db.IdentityProviders.Include(p => p.ClientLinks)
+                    .AsSplitQuery()
+                    .AsNoTracking()
+                    .Where(p => p.IsEnabled && p.Type == MrWho.Shared.IdentityProviderType.Oidc);
+
+                var providers = await query
+                    .OrderBy(p => p.Order)
+                    .ThenBy(p => p.Name)
+                    .Select(p => new { p.Name, DisplayName = p.DisplayName ?? p.Name, p.IconUri, p.ClientLinks })
+                    .ToListAsync();
+
+                if (!string.IsNullOrEmpty(clientId))
                 {
-                    var allowed = allowedRaw
-                        .Split(new[] { ' ', ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
-                        .Select(s => s.Trim().ToLowerInvariant())
-                        .ToHashSet();
-
-                    providers = providers
-                        .Where(p => allowed.Contains((p.Name ?? string.Empty).ToLowerInvariant()))
-                        .ToList();
+                    providers = providers.Where(p => p.ClientLinks.Any(cl => cl.ClientId == client?.Id)).ToList();
                 }
+                ViewBag.ExternalProviders = providers;
             }
-
-            ViewBag.ExternalProviders = providers;
+            else
+            {
+                _logger.LogWarning("No client found for clientId: {ClientId}", clientId);
+                ViewBag.ExternalProviders = Array.Empty<object>();
+            }
         }
         catch (Exception ex)
         {
