@@ -17,4 +17,9 @@ public interface IClientsApiService
     // New export/import
     Task<ClientExportDto?> ExportClientAsync(string id);
     Task<ClientImportResult?> ImportClientAsync(ClientExportDto dto);
+
+    // Identity provider links
+    Task<List<ClientIdentityProviderDto>> GetIdentityLinksAsync(string clientId);
+    Task<ClientIdentityProviderDto?> AddIdentityLinkAsync(string clientId, string providerId, ClientIdentityProviderDto? dto = null);
+    Task<bool> RemoveIdentityLinkAsync(string clientId, string linkId);
 }
