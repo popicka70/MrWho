@@ -9,12 +9,68 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Configuration;
 using MrWho.Data;
 using MrWho.Services;
 using MrWho.Services.Mediator;
 using OpenIddict.Abstractions;
 
 namespace MrWho.Endpoints;
+
+// Helper utilities for building URLs dynamically without hard-coded hosts/ports
+internal static class DebugUrlHelper
+{
+    public static string GetIssuer(IConfiguration configuration)
+    {
+        var issuer = configuration["OpenIddict:Issuer"] ?? configuration["Authentication:Authority"];
+        return string.IsNullOrWhiteSpace(issuer) ? "https://localhost:7113" : issuer.TrimEnd('/');
+    }
+
+    public static string GetAuthorizeUrl(IConfiguration configuration) => $"{GetIssuer(configuration)}/connect/authorize";
+    public static string GetTokenUrl(IConfiguration configuration) => $"{GetIssuer(configuration)}/connect/token";
+    public static string GetLogoutUrl(IConfiguration configuration) => $"{GetIssuer(configuration)}/connect/logout";
+
+    public static string? GetClientBaseUrl(MrWho.Models.Client client)
+    {
+        foreach (var uri in client.RedirectUris.Select(r => r.Uri))
+        {
+            if (TryGetBase(uri, out var b)) return b;
+        }
+        foreach (var uri in client.PostLogoutUris.Select(r => r.Uri))
+        {
+            if (TryGetBase(uri, out var b)) return b;
+        }
+        return null;
+    }
+
+    public static bool TryGetBase(string uri, out string? @base)
+    {
+        try
+        {
+            var u = new Uri(uri);
+            @base = $"{u.Scheme}://{u.Authority}";
+            return true;
+        }
+        catch
+        {
+            @base = null;
+            return false;
+        }
+    }
+
+    public static string PickRedirectUriOrFallback(MrWho.Models.Client client)
+        => client.RedirectUris.Select(r => r.Uri).FirstOrDefault()
+           ?? (GetClientBaseUrl(client) is { } b ? $"{b}/signin-oidc" : "");
+
+    public static string PickPostLogoutCallback(MrWho.Models.Client client)
+    {
+        var preferred = client.PostLogoutUris.Select(p => p.Uri)
+            .FirstOrDefault(u => u.Contains("signout-callback-oidc", StringComparison.OrdinalIgnoreCase));
+        if (!string.IsNullOrEmpty(preferred)) return preferred;
+        return client.PostLogoutUris.Select(p => p.Uri).FirstOrDefault()
+               ?? (GetClientBaseUrl(client) is { } b ? $"{b}/signout-callback-oidc" : "");
+    }
+}
 
 // Index
 public sealed record DebugIndexRequest() : IRequest<IResult>;
@@ -103,8 +159,13 @@ public sealed record ClientInfoRequest() : IRequest<IResult>;
 public sealed class ClientInfoHandler : IRequestHandler<ClientInfoRequest, IResult>
 {
     private readonly IOidcClientService _oidcClientService;
+    private readonly IConfiguration _configuration;
 
-    public ClientInfoHandler(IOidcClientService oidcClientService) => _oidcClientService = oidcClientService;
+    public ClientInfoHandler(IOidcClientService oidcClientService, IConfiguration configuration)
+    {
+        _oidcClientService = oidcClientService;
+        _configuration = configuration;
+    }
 
     public async Task<IResult> Handle(ClientInfoRequest request, CancellationToken cancellationToken)
     {
@@ -115,17 +176,23 @@ public sealed class ClientInfoHandler : IRequestHandler<ClientInfoRequest, IResu
             return Results.NotFound("Postman client not found");
         }
 
+        var issuerAuthorize = DebugUrlHelper.GetAuthorizeUrl(_configuration);
+        var issuerToken = DebugUrlHelper.GetTokenUrl(_configuration);
+        var issuerLogout = DebugUrlHelper.GetLogoutUrl(_configuration);
+        var redirect = DebugUrlHelper.PickRedirectUriOrFallback(postmanClient);
+        var postLogout = DebugUrlHelper.PickPostLogoutCallback(postmanClient);
+
         var payload = new
         {
             ClientId = postmanClient.ClientId,
             ClientSecret = postmanClient.ClientSecret,
-            AuthorizeUrl = "https://localhost:7000/connect/authorize",
-            TokenUrl = "https://localhost:7000/connect/token",
-            LogoutUrl = "https://localhost:7000/connect/logout",
+            AuthorizeUrl = issuerAuthorize,
+            TokenUrl = issuerToken,
+            LogoutUrl = issuerLogout,
             RedirectUris = postmanClient.RedirectUris.Select(ru => ru.Uri).ToArray(),
             PostLogoutRedirectUris = postmanClient.PostLogoutUris.Select(plu => plu.Uri).ToArray(),
-            SampleAuthUrl = $"https://localhost:7000/connect/authorize?client_id={postmanClient.ClientId}&response_type=code&redirect_uri=https://localhost:7002/signin-oidc&scope=openid%20email%20profile&state=test_state",
-            SampleLogoutUrl = "https://localhost:7000/connect/logout?post_logout_redirect_uri=https://localhost:7002/signout-callback-oidc"
+            SampleAuthUrl = $"{issuerAuthorize}?client_id={postmanClient.ClientId}&response_type=code&redirect_uri={Uri.EscapeDataString(redirect)}&scope=openid%20email%20profile&state=test_state",
+            SampleLogoutUrl = $"{issuerLogout}?post_logout_redirect_uri={Uri.EscapeDataString(postLogout)}"
         };
 
         return Results.Ok(payload);
@@ -185,8 +252,13 @@ public sealed record AdminClientInfoRequest() : IRequest<IResult>;
 public sealed class AdminClientInfoHandler : IRequestHandler<AdminClientInfoRequest, IResult>
 {
     private readonly IOidcClientService _oidcClientService;
+    private readonly IConfiguration _configuration;
 
-    public AdminClientInfoHandler(IOidcClientService oidcClientService) => _oidcClientService = oidcClientService;
+    public AdminClientInfoHandler(IOidcClientService oidcClientService, IConfiguration configuration)
+    {
+        _oidcClientService = oidcClientService;
+        _configuration = configuration;
+    }
 
     public async Task<IResult> Handle(AdminClientInfoRequest request, CancellationToken cancellationToken)
     {
@@ -197,6 +269,12 @@ public sealed class AdminClientInfoHandler : IRequestHandler<AdminClientInfoRequ
             return Results.NotFound("Admin client not found");
         }
 
+        var authorizeUrl = DebugUrlHelper.GetAuthorizeUrl(_configuration);
+        var tokenUrl = DebugUrlHelper.GetTokenUrl(_configuration);
+        var logoutUrl = DebugUrlHelper.GetLogoutUrl(_configuration);
+        var redirect = DebugUrlHelper.PickRedirectUriOrFallback(adminClient);
+        var postLogout = DebugUrlHelper.PickPostLogoutCallback(adminClient);
+
         return Results.Ok(new
         {
             ClientId = adminClient.ClientId,
@@ -204,14 +282,14 @@ public sealed class AdminClientInfoHandler : IRequestHandler<AdminClientInfoRequ
             Name = adminClient.Name,
             RealmName = adminClient.Realm.Name,
             IsEnabled = adminClient.IsEnabled,
-            AuthorizeUrl = "https://localhost:7113/connect/authorize",
-            TokenUrl = "https://localhost:7113/connect/token",
-            LogoutUrl = "https://localhost:7113/connect/logout",
+            AuthorizeUrl = authorizeUrl,
+            TokenUrl = tokenUrl,
+            LogoutUrl = logoutUrl,
             RedirectUris = adminClient.RedirectUris.Select(ru => ru.Uri).ToArray(),
             PostLogoutRedirectUris = adminClient.PostLogoutUris.Select(plu => plu.Uri).ToArray(),
             Scopes = adminClient.Scopes.Select(s => s.Scope).ToArray(),
-            SampleAuthUrl = $"https://localhost:7113/connect/authorize?client_id={adminClient.ClientId}&response_type=code&redirect_uri=https://localhost:7257/signin-oidc&scope=openid%20email%20profile%20roles%20api.read%20api.write&state=admin_test",
-            SampleLogoutUrl = "https://localhost:7113/connect/logout?post_logout_redirect_uri=https://localhost:7257/signout-callback-oidc",
+            SampleAuthUrl = $"{authorizeUrl}?client_id={adminClient.ClientId}&response_type=code&redirect_uri={Uri.EscapeDataString(redirect)}&scope=openid%20email%20profile%20roles%20api.read%20api.write&state=admin_test",
+            SampleLogoutUrl = $"{logoutUrl}?post_logout_redirect_uri={Uri.EscapeDataString(postLogout)}",
             AdminCredentials = new { Username = "admin@mrwho.local", Password = "Adm1n#2025!G7x" }
         });
     }
@@ -222,8 +300,14 @@ public sealed record Demo1ClientInfoRequest() : IRequest<IResult>;
 public sealed class Demo1ClientInfoHandler : IRequestHandler<Demo1ClientInfoRequest, IResult>
 {
     private readonly IOidcClientService _oidcClientService;
+    private readonly IConfiguration _configuration;
 
-    public Demo1ClientInfoHandler(IOidcClientService oidcClientService) => _oidcClientService = oidcClientService;
+    public Demo1ClientInfoHandler(IOidcClientService oidcClientService) : this(oidcClientService, new ConfigurationBuilder().Build()) { }
+    public Demo1ClientInfoHandler(IOidcClientService oidcClientService, IConfiguration configuration)
+    {
+        _oidcClientService = oidcClientService;
+        _configuration = configuration;
+    }
 
     public async Task<IResult> Handle(Demo1ClientInfoRequest request, CancellationToken cancellationToken)
     {
@@ -234,6 +318,12 @@ public sealed class Demo1ClientInfoHandler : IRequestHandler<Demo1ClientInfoRequ
             return Results.NotFound("Demo1 client not found");
         }
 
+        var authorizeUrl = DebugUrlHelper.GetAuthorizeUrl(_configuration);
+        var tokenUrl = DebugUrlHelper.GetTokenUrl(_configuration);
+        var logoutUrl = DebugUrlHelper.GetLogoutUrl(_configuration);
+        var redirect = DebugUrlHelper.PickRedirectUriOrFallback(demo1Client);
+        var postLogout = DebugUrlHelper.PickPostLogoutCallback(demo1Client);
+
         return Results.Ok(new
         {
             ClientId = demo1Client.ClientId,
@@ -241,14 +331,14 @@ public sealed class Demo1ClientInfoHandler : IRequestHandler<Demo1ClientInfoRequ
             Name = demo1Client.Name,
             RealmName = demo1Client.Realm.Name,
             IsEnabled = demo1Client.IsEnabled,
-            AuthorizeUrl = "https://localhost:7113/connect/authorize",
-            TokenUrl = "https://localhost:7113/connect/token",
-            LogoutUrl = "https://localhost:7113/connect/logout",
+            AuthorizeUrl = authorizeUrl,
+            TokenUrl = tokenUrl,
+            LogoutUrl = logoutUrl,
             RedirectUris = demo1Client.RedirectUris.Select(ru => ru.Uri).ToArray(),
             PostLogoutRedirectUris = demo1Client.PostLogoutUris.Select(plu => plu.Uri).ToArray(),
             Scopes = demo1Client.Scopes.Select(s => s.Scope).ToArray(),
-            SampleAuthUrl = $"https://localhost:7113/connect/authorize?client_id={demo1Client.ClientId}&response_type=code&redirect_uri=https://localhost:7037/signin-oidc&scope=openid%20email%20profile%20roles&state=demo1_test",
-            SampleLogoutUrl = "https://localhost:7113/connect/logout?post_logout_redirect_uri=https://localhost:7037/signout-callback-oidc",
+            SampleAuthUrl = $"{authorizeUrl}?client_id={demo1Client.ClientId}&response_type=code&redirect_uri={Uri.EscapeDataString(redirect)}&scope=openid%20email%20profile%20roles&state=demo1_test",
+            SampleLogoutUrl = $"{logoutUrl}?post_logout_redirect_uri={Uri.EscapeDataString(postLogout)}",
             Demo1Credentials = new { Username = "demo1@example.com", Password = "Demo123" }
         });
     }
@@ -259,8 +349,13 @@ public sealed record EssentialDataRequest() : IRequest<IResult>;
 public sealed class EssentialDataHandler : IRequestHandler<EssentialDataRequest, IResult>
 {
     private readonly ApplicationDbContext _context;
+    private readonly IConfiguration _configuration;
 
-    public EssentialDataHandler(ApplicationDbContext context) => _context = context;
+    public EssentialDataHandler(ApplicationDbContext context, IConfiguration configuration)
+    {
+        _context = context;
+        _configuration = configuration;
+    }
 
     public async Task<IResult> Handle(EssentialDataRequest request, CancellationToken cancellationToken)
     {
@@ -271,6 +366,10 @@ public sealed class EssentialDataHandler : IRequestHandler<EssentialDataRequest,
             .Include(c => c.Scopes)
             .FirstOrDefaultAsync(c => c.ClientId == "mrwho_admin_web", cancellationToken);
         var adminUser = await _context.Users.FirstOrDefaultAsync(u => u.UserName == "admin@mrwho.local", cancellationToken);
+
+        // Build a dynamic login URL based on admin client redirect URIs
+        string? adminBase = adminClient != null ? DebugUrlHelper.GetClientBaseUrl(adminClient) : null;
+        var loginUrl = string.IsNullOrEmpty(adminBase) ? "/login" : $"{adminBase}/login";
 
         return Results.Ok(new
         {
@@ -302,7 +401,7 @@ public sealed class EssentialDataHandler : IRequestHandler<EssentialDataRequest,
             } : null,
             SetupInstructions = new
             {
-                LoginUrl = "https://localhost:7257/login",
+                LoginUrl = loginUrl,
                 AdminCredentials = new { Username = "admin@mrwho.local", Password = "Adm1n#2025!G7x" }
             }
         });
