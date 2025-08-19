@@ -13,9 +13,6 @@ using MrWho.Shared.Models;
 using MrWho.Data;
 using MrWho.Models;
 using Microsoft.AspNetCore.RateLimiting;
-using System.Net.Http;
-using System.Text.Json;
-using Microsoft.EntityFrameworkCore; // added
 using MrWho.Services.Mediator; // added
 using MrWho.Endpoints.Auth; // added
 
@@ -24,57 +21,12 @@ namespace MrWho.Controllers;
 [Route("connect")]
 public class AuthController : Controller
 {
-    private readonly SignInManager<IdentityUser> _signInManager;
-    private readonly UserManager<IdentityUser> _userManager;
-    private readonly IClientCookieConfigurationService _cookieService;
-    private readonly IDynamicCookieService _dynamicCookieService;
-    private readonly IOpenIddictApplicationManager _applicationManager;
-    private readonly ApplicationDbContext _db;
-    private readonly ILogger<AuthController> _logger;
-    private readonly IConfiguration _configuration;
-    private readonly IHttpClientFactory _httpClientFactory;
-    private readonly IHostEnvironment _env;
-    private readonly IMediator _mediator; // added
+    private readonly IMediator _mediator;
 
-    public AuthController(
-        SignInManager<IdentityUser> signInManager,
-        UserManager<IdentityUser> userManager,
-        IClientCookieConfigurationService cookieService,
-        IDynamicCookieService dynamicCookieService,
-        IOpenIddictApplicationManager applicationManager,
-        ApplicationDbContext db,
-        ILogger<AuthController> logger,
-        IConfiguration configuration,
-        IHttpClientFactory httpClientFactory,
-        IHostEnvironment env,
-        IMediator mediator) // added
+    public AuthController(IMediator mediator)
     {
-        _signInManager = signInManager;
-        _userManager = userManager;
-        _cookieService = cookieService;
-        _dynamicCookieService = dynamicCookieService;
-        _applicationManager = applicationManager;
-        _db = db;
-        _logger = logger;
-        _configuration = configuration;
-        _httpClientFactory = httpClientFactory;
-        _env = env;
         _mediator = mediator; // added
     }
-
-    private bool ShouldUseRecaptcha()
-    {
-        if (_env.IsDevelopment()) return false; // Always off in development
-        var site = _configuration["GoogleReCaptcha:SiteKey"];
-        var secret = _configuration["GoogleReCaptcha:SecretKey"];
-        // Optional explicit override flag
-        var enabledFlag = _configuration["GoogleReCaptcha:Enabled"];
-        if (!string.IsNullOrWhiteSpace(enabledFlag) && bool.TryParse(enabledFlag, out var enabled) && !enabled)
-            return false;
-        return !string.IsNullOrWhiteSpace(site) && !string.IsNullOrWhiteSpace(secret);
-    }
-
-    // REMOVED: [HttpGet("authorize")] - Now handled by minimal API with client-specific cookies
 
     [HttpGet("login")]
     [EnableRateLimiting("rl.login")] // limit login page fetches
