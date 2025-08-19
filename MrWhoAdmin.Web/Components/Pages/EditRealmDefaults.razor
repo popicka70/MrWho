@@ -1,4 +1,4 @@
-@page "/realms/edit/{Id}/defaults"
+@page "/realms/edit/{Id}"
 @attribute [Authorize]
 @rendermode InteractiveServer
 @using MrWho.Shared.Models
@@ -450,7 +450,7 @@
 
             <!-- Action Buttons -->
             <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" class="rz-mt-4" JustifyContent="JustifyContent.SpaceBetween">
-                <RadzenButton Text="Back to Realm" Icon="arrow_back" ButtonStyle="ButtonStyle.Light" Click="@BackToRealm" />
+                <RadzenButton Text="Back to Realms" Icon="arrow_back" ButtonStyle="ButtonStyle.Light" Click="@BackToRealm" />
                 
                 <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
                     <RadzenButton Text="Reset to System Defaults" Icon="restore" ButtonStyle="ButtonStyle.Warning" Click="@(async () => await ResetToSystemDefaults())" />
