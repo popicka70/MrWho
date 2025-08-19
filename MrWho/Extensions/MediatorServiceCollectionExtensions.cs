@@ -1,6 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
 using MrWho.Endpoints;
+using MrWho.Endpoints.Auth;
 using MrWho.Services.Mediator;
+using Microsoft.AspNetCore.Mvc; // added
 
 namespace MrWho.Extensions;
 
@@ -15,6 +17,16 @@ public static class MediatorServiceCollectionExtensions
         services.AddTransient<IRequestHandler<OidcTokenRequest, IResult>, OidcTokenHandler>();
         services.AddTransient<IRequestHandler<OidcLogoutRequest, IResult>, OidcLogoutHandler>();
         services.AddTransient<IRequestHandler<UserInfoRequest, IResult>, UserInfoHandler>();
+
+        // Auth handlers
+        services.AddTransient<IRequestHandler<LoginGetRequest, IActionResult>, LoginGetHandler>();
+        services.AddTransient<IRequestHandler<LoginPostRequest, IActionResult>, LoginPostHandler>();
+        services.AddTransient<IRequestHandler<LogoutGetRequest, IActionResult>, LogoutGetHandler>();
+        services.AddTransient<IRequestHandler<LogoutPostRequest, IActionResult>, LogoutPostHandler>();
+        services.AddTransient<IRequestHandler<AccessDeniedGetRequest, IActionResult>, AccessDeniedGetHandler>();
+        services.AddTransient<IRequestHandler<RegisterGetRequest, IActionResult>, RegisterGetHandler>();
+        services.AddTransient<IRequestHandler<RegisterPostRequest, IActionResult>, RegisterPostHandler>();
+        services.AddTransient<IRequestHandler<RegisterSuccessGetRequest, IActionResult>, RegisterSuccessGetHandler>();
 
     // Debug endpoint handlers
     services.AddTransient<IRequestHandler<DebugIndexRequest, IResult>, DebugIndexHandler>();

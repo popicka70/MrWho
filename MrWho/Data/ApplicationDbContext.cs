@@ -152,6 +152,7 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
                   .WithMany(ip => ip.ClientLinks)
                   .HasForeignKey(cip => cip.IdentityProviderId)
                   .OnDelete(DeleteBehavior.Cascade);
+            entity.Property(cip => cip.ClaimMappingsJson).HasMaxLength(4000);
         });
 
         // Configure Identity Resource entities
@@ -416,6 +417,7 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
             builder.Entity<ClientIdentityProvider>(entity =>
             {
                 entity.Property(cip => cip.OptionsJson).HasColumnType("longtext");
+                entity.Property(cip => cip.ClaimMappingsJson).HasColumnType("longtext");
             });
 
             builder.Entity<Realm>(entity =>

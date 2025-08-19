@@ -4,6 +4,29 @@
     var clientName = ViewData["ClientName"] as string;
     var returnUrl = ViewData["ReturnUrl"] as string;
     var error = ViewData["LogoutError"] as string;
+
+    // Build a Sign In Again link that preserves context
+    var effectiveReturnUrl = returnUrl;
+    if (string.IsNullOrEmpty(effectiveReturnUrl))
+    {
+        // Fallback to query string if not provided via ViewData
+        var qsReturn = Context.Request.Query["returnUrl"].ToString();
+        if (!string.IsNullOrEmpty(qsReturn)) effectiveReturnUrl = qsReturn;
+    }
+
+    var effectiveClientId = (ViewData["ClientId"] as string) ?? Context.Request.Query["clientId"].ToString();
+    if (string.IsNullOrEmpty(effectiveClientId))
+    {
+        // Also try OIDC-style parameter name
+        var oidcClient = Context.Request.Query["client_id"].ToString();
+        if (!string.IsNullOrEmpty(oidcClient)) effectiveClientId = oidcClient;
+    }
+
+    var signInAgainHref = "/connect/login";
+    var queryParts = new List<string>();
+    if (!string.IsNullOrEmpty(effectiveReturnUrl)) queryParts.Add("returnUrl=" + Uri.EscapeDataString(effectiveReturnUrl));
+    if (!string.IsNullOrEmpty(effectiveClientId)) queryParts.Add("clientId=" + Uri.EscapeDataString(effectiveClientId));
+    if (queryParts.Count > 0) signInAgainHref += "?" + string.Join("&", queryParts);
 }
 
 <div class="container mt-4">
@@ -62,7 +85,7 @@
                             </a>
                         }
                         
-                        <a href="/connect/login" class="btn btn-outline-primary">
+                        <a href="@signInAgainHref" class="btn btn-outline-primary">
                             <i class="bi bi-box-arrow-in-right"></i> Sign In Again
                         </a>
                         

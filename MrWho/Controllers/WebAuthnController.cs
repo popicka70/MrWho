@@ -79,7 +79,7 @@ public class WebAuthnController : Controller
 
         var authSel = new AuthenticatorSelection
         {
-            RequireResidentKey = false,
+            ResidentKey = ResidentKeyRequirement.Required,
             UserVerification = UserVerificationRequirement.Required
         };
 
@@ -155,7 +155,7 @@ public class WebAuthnController : Controller
     public async Task<IActionResult> GetLoginOptions([FromQuery] string? email = null)
     {
         // If email provided and user has non-discoverable credentials, set allowCredentials; otherwise allow discoverable
-        List<PublicKeyCredentialDescriptor>? allowCredentials = null;
+        List<PublicKeyCredentialDescriptor> allowCredentials = new List<PublicKeyCredentialDescriptor>();
         if (!string.IsNullOrEmpty(email))
         {
             var user = await _userManager.FindByNameAsync(email) ?? await _userManager.FindByEmailAsync(email);

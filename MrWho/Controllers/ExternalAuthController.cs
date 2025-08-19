@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.Identity;
 using System.Security.Claims;
 using MrWho.Services;
 using MrWho.Data;
+using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace MrWho.Controllers;
 
@@ -16,17 +18,20 @@ public class ExternalAuthController : ControllerBase
     private readonly SignInManager<IdentityUser> _signInManager;
     private readonly IDynamicCookieService _dynamicCookieService;
     private readonly ILogger<ExternalAuthController> _logger;
+    private readonly ApplicationDbContext _db;
 
     public ExternalAuthController(
         UserManager<IdentityUser> userManager,
         SignInManager<IdentityUser> signInManager,
         IDynamicCookieService dynamicCookieService,
-        ILogger<ExternalAuthController> logger)
+        ILogger<ExternalAuthController> logger,
+        ApplicationDbContext db)
     {
         _userManager = userManager;
         _signInManager = signInManager;
         _dynamicCookieService = dynamicCookieService;
         _logger = logger;
+        _db = db;
     }
 
     [HttpGet("callback")]
@@ -42,9 +47,10 @@ public class ExternalAuthController : ControllerBase
         }
 
         // Persist the RegistrationId of the external provider in session for future sign-out
+        string? regId = null;
+        string? providerName = null;
         try
         {
-            string? regId = null;
             if (result.Properties?.Items != null)
             {
                 // Prefer custom roundtripped id if present
@@ -55,6 +61,11 @@ public class ExternalAuthController : ControllerBase
                 else if (result.Properties.Items.TryGetValue(OpenIddictClientAspNetCoreConstants.Properties.RegistrationId, out var regIdStd) && !string.IsNullOrWhiteSpace(regIdStd))
                 {
                     regId = regIdStd;
+                }
+
+                if (result.Properties.Items.TryGetValue("extProviderName", out var extProv) && !string.IsNullOrWhiteSpace(extProv))
+                {
+                    providerName = extProv;
                 }
             }
             if (!string.IsNullOrWhiteSpace(regId))
@@ -90,8 +101,23 @@ public class ExternalAuthController : ControllerBase
             email = subject ?? $"external_user_{Guid.NewGuid():N}";
         }
 
-        // Find or create local user
-        var user = await _userManager.FindByEmailAsync(email) ?? await _userManager.FindByNameAsync(email);
+        // Try durable external login link first
+        IdentityUser? user = null;
+        if (!string.IsNullOrWhiteSpace(regId) && !string.IsNullOrWhiteSpace(subject))
+        {
+            try
+            {
+                user = await _userManager.FindByLoginAsync(regId, subject);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "FindByLoginAsync failed");
+            }
+        }
+
+        // Fallbacks by email/username
+        user ??= await _userManager.FindByEmailAsync(email) ?? await _userManager.FindByNameAsync(email);
+        var newlyCreated = false;
         if (user == null)
         {
             user = new IdentityUser
@@ -106,6 +132,7 @@ public class ExternalAuthController : ControllerBase
                 _logger.LogError("Failed to create local user for external login: {Errors}", string.Join(", ", create.Errors.Select(e => e.Description)));
                 return StatusCode(500, new { error = "Failed to create local user" });
             }
+            newlyCreated = true;
 
             // Optionally store basic name claims
             var name = principal.FindFirst("name")?.Value;
@@ -121,8 +148,110 @@ public class ExternalAuthController : ControllerBase
             }
         }
 
-        // Sign in locally
-        await _signInManager.SignInAsync(user, isPersistent: false);
+        // Ensure the external login is linked durably
+        if (!string.IsNullOrWhiteSpace(regId) && !string.IsNullOrWhiteSpace(subject))
+        {
+            try
+            {
+                var logins = await _userManager.GetLoginsAsync(user);
+                if (!logins.Any(l => string.Equals(l.LoginProvider, regId, StringComparison.OrdinalIgnoreCase) && string.Equals(l.ProviderKey, subject, StringComparison.Ordinal)))
+                {
+                    var info = new UserLoginInfo(regId, subject, providerName ?? regId);
+                    var addLogin = await _userManager.AddLoginAsync(user, info);
+                    if (!addLogin.Succeeded)
+                    {
+                        _logger.LogWarning("AddLoginAsync failed for provider {Provider} and user {UserId}: {Errors}", regId, user.Id, string.Join(", ", addLogin.Errors.Select(e => e.Description)));
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to add external login for provider {Provider} and user {UserId}", regId, user.Id);
+            }
+        }
+
+        // Persist external tokens (access/refresh/id) in Identity tokens store
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(regId))
+            {
+                var tokens = result.Properties?.GetTokens();
+                if (tokens != null)
+                {
+                    foreach (var t in tokens)
+                    {
+                        if (!string.IsNullOrEmpty(t.Name) && !string.IsNullOrEmpty(t.Value))
+                        {
+                            await _userManager.SetAuthenticationTokenAsync(user, regId, t.Name, t.Value);
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Failed to persist external tokens for provider {Provider} and user {UserId}", regId, user.Id);
+        }
+
+        // Apply optional per-client claim mappings to the local user (only on first creation or always if you prefer)
+        try
+        {
+            if (!string.IsNullOrEmpty(clientId) && !string.IsNullOrEmpty(regId))
+            {
+                var client = await _db.Clients.AsNoTracking().FirstOrDefaultAsync(c => c.ClientId == clientId || c.Id == clientId);
+                if (client != null)
+                {
+                    // Find link record to resolve per-client mapping
+                    var link = await _db.ClientIdentityProviders.AsNoTracking()
+                        .Include(l => l.IdentityProvider)
+                        .Where(l => l.ClientId == client.Id && l.IdentityProvider.Type == MrWho.Shared.IdentityProviderType.Oidc)
+                        .FirstOrDefaultAsync(l => l.IdentityProvider.ClientId == regId || l.IdentityProvider.Name == providerName);
+
+                    // Prefer per-client mapping, fallback to provider-level mapping
+                    string? mappingJson = link?.ClaimMappingsJson ?? link?.IdentityProvider?.ClaimMappingsJson;
+                    if (!string.IsNullOrWhiteSpace(mappingJson))
+                    {
+                        var map = JsonSerializer.Deserialize<Dictionary<string, string>>(mappingJson);
+                        if (map != null && map.Count > 0)
+                        {
+                            var newClaims = new List<Claim>();
+                            foreach (var kv in map)
+                            {
+                                var src = kv.Key;
+                                var dst = kv.Value;
+                                var val = principal.FindFirst(src)?.Value;
+                                if (!string.IsNullOrEmpty(val) && !string.IsNullOrEmpty(dst))
+                                {
+                                    // Only add if user doesn't already have it
+                                    var existing = await _userManager.GetClaimsAsync(user);
+                                    if (!existing.Any(c => c.Type == dst && c.Value == val))
+                                    {
+                                        newClaims.Add(new Claim(dst, val));
+                                    }
+                                }
+                            }
+                            if (newClaims.Count > 0)
+                            {
+                                await _userManager.AddClaimsAsync(user, newClaims);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed applying claim mappings for client {ClientId} and provider {Provider}", clientId, regId);
+        }
+
+        // Build additional per-session claims to remember external provider for cascade sign-out
+        var sessionClaims = new List<Claim>();
+        if (!string.IsNullOrWhiteSpace(regId)) sessionClaims.Add(new Claim("ext_reg_id", regId));
+        if (!string.IsNullOrWhiteSpace(providerName)) sessionClaims.Add(new Claim("ext_provider", providerName));
+        if (!string.IsNullOrWhiteSpace(subject)) sessionClaims.Add(new Claim("ext_sub", subject));
+
+        // Sign in locally with added session claims
+        await _signInManager.SignInWithClaimsAsync(user, isPersistent: false, sessionClaims);
 
         // Also create client-specific cookie if clientId provided
         if (!string.IsNullOrEmpty(clientId))

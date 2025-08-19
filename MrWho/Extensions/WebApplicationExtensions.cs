@@ -128,6 +128,11 @@ public static class WebApplicationExtensions
 
             // Preserve registration id in a custom item that roundtrips in state
             props.Items["extRegistrationId"] = registration.RegistrationId;
+            // Also preserve a friendly provider name
+            if (!string.IsNullOrWhiteSpace(registration.ProviderName))
+            {
+                props.Items["extProviderName"] = registration.ProviderName;
+            }
 
             // Use RegistrationId to unambiguously select the configured client
             props.Items[OpenIddictClientAspNetCoreConstants.Properties.RegistrationId] = registration.RegistrationId;
@@ -149,7 +154,12 @@ public static class WebApplicationExtensions
             var regId = http.Session.GetString("ExternalRegistrationId");
             if (string.IsNullOrWhiteSpace(regId))
             {
-                logger.LogDebug("No external RegistrationId in session; skipping external sign-out");
+                // Fallback to claim on current principal
+                regId = http.User?.FindFirst("ext_reg_id")?.Value;
+            }
+            if (string.IsNullOrWhiteSpace(regId))
+            {
+                logger.LogDebug("No external RegistrationId in session or principal; skipping external sign-out");
                 http.Response.StatusCode = StatusCodes.Status204NoContent;
                 return;
             }
@@ -176,6 +186,7 @@ public static class WebApplicationExtensions
                 return;
             }
             http.Response.StatusCode = StatusCodes.Status204NoContent;
+            await Task.CompletedTask; // Ensure async completion
         }).AllowAnonymous();
 
         // Map OIDC authorize endpoint for OpenIddict passthrough
@@ -281,6 +292,11 @@ public static class WebApplicationExtensions
 
             // Preserve registration id in a custom item that roundtrips in state
             props.Items["extRegistrationId"] = registration.RegistrationId;
+            // Also preserve a friendly provider name
+            if (!string.IsNullOrWhiteSpace(registration.ProviderName))
+            {
+                props.Items["extProviderName"] = registration.ProviderName;
+            }
 
             // Use RegistrationId to unambiguously select the configured client
             props.Items[OpenIddictClientAspNetCoreConstants.Properties.RegistrationId] = registration.RegistrationId;
@@ -302,7 +318,12 @@ public static class WebApplicationExtensions
             var regId = http.Session.GetString("ExternalRegistrationId");
             if (string.IsNullOrWhiteSpace(regId))
             {
-                logger.LogDebug("No external RegistrationId in session; skipping external sign-out");
+                // Fallback to claim on current principal
+                regId = http.User?.FindFirst("ext_reg_id")?.Value;
+            }
+            if (string.IsNullOrWhiteSpace(regId))
+            {
+                logger.LogDebug("No external RegistrationId in session or principal; skipping external sign-out");
                 http.Response.StatusCode = StatusCodes.Status204NoContent;
                 return;
             }
@@ -329,6 +350,7 @@ public static class WebApplicationExtensions
                 return;
             }
             http.Response.StatusCode = StatusCodes.Status204NoContent;
+            await Task.CompletedTask; // Ensure async completion
         }).AllowAnonymous();
 
         // Map OIDC authorize endpoint for OpenIddict passthrough

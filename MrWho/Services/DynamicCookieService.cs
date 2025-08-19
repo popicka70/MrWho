@@ -44,12 +44,8 @@ public class DynamicCookieService : IDynamicCookieService
             var identity = new ClaimsIdentity(scheme);
             await AddUserClaimsToIdentity(identity, user);
             
-            // For dynamic clients, add the client_id claim for validation
-            if (!_cookieConfigService.HasStaticConfiguration(clientId))
-            {
-                identity.AddClaim(new Claim("client_id", clientId));
-                _logger.LogDebug("🔧 Added client_id claim for dynamic client {ClientId}", clientId);
-            }
+            identity.AddClaim(new Claim("client_id", clientId));
+            _logger.LogDebug("🔧 Added client_id claim for dynamic client {ClientId}", clientId);
 
             var principal = new ClaimsPrincipal(identity);
             var properties = new AuthenticationProperties
@@ -60,16 +56,8 @@ public class DynamicCookieService : IDynamicCookieService
 
             await context.SignInAsync(scheme, principal, properties);
             
-            if (_cookieConfigService.HasStaticConfiguration(clientId))
-            {
-                _logger.LogDebug("✅ Signed in user {UserName} with static scheme {Scheme} for client {ClientId}", 
-                    user.UserName, scheme, clientId);
-            }
-            else
-            {
-                _logger.LogDebug("🔧 Signed in user {UserName} with dynamic scheme {Scheme} for client {ClientId}", 
-                    user.UserName, scheme, clientId);
-            }
+            _logger.LogDebug("🔧 Signed in user {UserName} with dynamic scheme {Scheme} for client {ClientId}", 
+                user.UserName, scheme, clientId);
         }
         catch (Exception ex)
         {
@@ -95,15 +83,12 @@ public class DynamicCookieService : IDynamicCookieService
             }
 
             // For dynamic clients, validate that this authentication result is for the correct client
-            if (!_cookieConfigService.HasStaticConfiguration(clientId))
+            var clientIdClaim = authResult.Principal.FindFirst("client_id");
+            if (clientIdClaim?.Value != clientId)
             {
-                var clientIdClaim = authResult.Principal.FindFirst("client_id");
-                if (clientIdClaim?.Value != clientId)
-                {
-                    _logger.LogDebug("🔧 Authentication succeeded but for different client. Expected: {ExpectedClient}, Found: {ActualClient}", 
-                        clientId, clientIdClaim?.Value ?? "NULL");
-                    return false;
-                }
+                _logger.LogDebug("🔧 Authentication succeeded but for different client. Expected: {ExpectedClient}, Found: {ActualClient}", 
+                    clientId, clientIdClaim?.Value ?? "NULL");
+                return false;
             }
             
             return true;
@@ -126,14 +111,7 @@ public class DynamicCookieService : IDynamicCookieService
             var scheme = _cookieConfigService.GetCookieSchemeForClient(clientId);
             await context.SignOutAsync(scheme);
             
-            if (_cookieConfigService.HasStaticConfiguration(clientId))
-            {
-                _logger.LogDebug("✅ Signed out from static scheme {Scheme} for client {ClientId}", scheme, clientId);
-            }
-            else
-            {
-                _logger.LogDebug("🔧 Signed out from dynamic scheme {Scheme} for client {ClientId}", scheme, clientId);
-            }
+            _logger.LogDebug("🔧 Signed out from dynamic scheme {Scheme} for client {ClientId}", scheme, clientId);
         }
         catch (Exception ex)
         {
@@ -161,24 +139,16 @@ public class DynamicCookieService : IDynamicCookieService
             }
 
             // For dynamic clients, validate that this authentication result is for the correct client
-            if (!_cookieConfigService.HasStaticConfiguration(clientId))
+            var clientIdClaim = authResult.Principal.FindFirst("client_id");
+            if (clientIdClaim?.Value != clientId)
             {
-                var clientIdClaim = authResult.Principal.FindFirst("client_id");
-                if (clientIdClaim?.Value != clientId)
-                {
-                    _logger.LogDebug("🔧 Authentication succeeded but for different client. Expected: {ExpectedClient}, Found: {ActualClient}", 
-                        clientId, clientIdClaim?.Value ?? "NULL");
-                    return null;
-                }
+                _logger.LogDebug("🔧 Authentication succeeded but for different client. Expected: {ExpectedClient}, Found: {ActualClient}", 
+                    clientId, clientIdClaim?.Value ?? "NULL");
+                return null;
+            }
                 
-                _logger.LogDebug("🔧 DYNAMIC SCHEME SUCCESS: Client {ClientId} authenticated using dynamic scheme {SchemeName}", 
-                    clientId, scheme);
-            }
-            else
-            {
-                _logger.LogDebug("✅ STATIC SCHEME SUCCESS: Client {ClientId} authenticated using static scheme {SchemeName}", 
-                    clientId, scheme);
-            }
+            _logger.LogDebug("🔧 DYNAMIC SCHEME SUCCESS: Client {ClientId} authenticated using dynamic scheme {SchemeName}", 
+                clientId, scheme);
 
             return authResult.Principal;
         }

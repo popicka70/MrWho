@@ -91,12 +91,6 @@ public class DynamicClientCookieService : IHostedService
                 continue;
             }
 
-            if (cookieConfigService.HasStaticConfiguration(client.ClientId))
-            {
-                _logger.LogDebug("Client {ClientId} has static cookie configuration, skipping dynamic registration", client.ClientId);
-                continue;
-            }
-
             try
             {
                 var scheme = new AuthenticationScheme(schemeName, schemeName, typeof(CookieAuthenticationHandler));
