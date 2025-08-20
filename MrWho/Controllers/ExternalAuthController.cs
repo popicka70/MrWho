@@ -146,6 +146,64 @@ public class ExternalAuthController : ControllerBase
             {
                 await _userManager.AddClaimsAsync(user, claims);
             }
+
+            // Create a pending registration profile so admins can approve
+            try
+            {
+                var display = !string.IsNullOrWhiteSpace(name)
+                    ? name
+                    : BuildDisplayNameFromEmailOrUserName(email);
+
+                var profile = new MrWho.Models.UserProfile
+                {
+                    UserId = user.Id,
+                    FirstName = given,
+                    LastName = family,
+                    DisplayName = display,
+                    State = MrWho.Models.UserState.New,
+                    CreatedAt = DateTime.UtcNow
+                };
+                _db.UserProfiles.Add(profile);
+                await _db.SaveChangesAsync();
+                _logger.LogInformation("Created pending user profile for external user {UserId}", user.Id);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to create pending profile for external user {UserId}", user.Id);
+            }
+        }
+        else
+        {
+            // Ensure profile exists for existing users
+            try
+            {
+                var hasProfile = await _db.UserProfiles.AsNoTracking().AnyAsync(p => p.UserId == user.Id);
+                if (!hasProfile)
+                {
+                    var name = principal.FindFirst("name")?.Value;
+                    var given = principal.FindFirst("given_name")?.Value;
+                    var family = principal.FindFirst("family_name")?.Value;
+                    var display = !string.IsNullOrWhiteSpace(name)
+                        ? name
+                        : BuildDisplayNameFromEmailOrUserName(user.UserName ?? user.Email ?? user.Id);
+
+                    _db.UserProfiles.Add(new MrWho.Models.UserProfile
+                    {
+                        UserId = user.Id,
+                        FirstName = given,
+                        LastName = family,
+                        DisplayName = display,
+                        State = MrWho.Models.UserState.New,
+                        CreatedAt = DateTime.UtcNow
+                    });
+                    await _db.SaveChangesAsync();
+                    _logger.LogInformation("Backfilled missing profile for user {UserId}", user.Id);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to ensure profile for user {UserId}", user.Id);
+            }
         }
 
         // Ensure the external login is linked durably
@@ -266,6 +324,13 @@ public class ExternalAuthController : ControllerBase
             }
         }
 
+        // If this is a new external user, notify that enrollment is pending
+        if (newlyCreated)
+        {
+            _logger.LogInformation("External user {UserId} created; redirecting to registration success notification", user.Id);
+            return RedirectToAction("RegisterSuccess", "Auth");
+        }
+
         // Redirect back to original OIDC authorization or local URL
         if (!string.IsNullOrEmpty(returnUrl))
         {
@@ -311,5 +376,15 @@ public class ExternalAuthController : ControllerBase
         }
 
         return Ok(new { Message = "External sign-out completed" });
+    }
+
+    private static string BuildDisplayNameFromEmailOrUserName(string? input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return "New User";
+        var source = input;
+        if (source.Contains('@')) source = source.Split('@')[0];
+        var friendly = source.Replace('.', ' ').Replace('_', ' ').Replace('-', ' ');
+        var words = friendly.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return string.Join(' ', words.Select(w => char.ToUpper(w[0]) + w.Substring(1).ToLower()));
     }
 }
