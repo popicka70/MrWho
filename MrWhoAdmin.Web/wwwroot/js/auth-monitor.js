@@ -78,24 +78,13 @@ window.mrWhoAuth = {
     },
     
     // Monitor Blazor Server errors specifically
+    // IMPORTANT: Do not call Blazor.start() here. Doing so after Blazor has already started
+    // causes runtime errors like "Blazor has already started" and breaks JS interop.
+    // We intentionally keep this as a no-op to avoid double-starting Blazor.
     initializeBlazorMonitoring: function() {
-        // Listen for Blazor circuit errors that might indicate authentication issues
-        if (window.Blazor) {
-            window.Blazor.start({
-                circuit: {
-                    configureSignalR: function (builder) {
-                        builder.onclose(function (error) {
-                            if (error && error.message && error.message.includes('401') || error.message.includes('403')) {
-                                console.warn('Blazor circuit closed due to authentication error:', error);
-                                setTimeout(() => {
-                                    window.location.href = '/auth/error?error=blazor_circuit_closed&status_code=403';
-                                }, 2000);
-                            }
-                        });
-                    }
-                }
-            });
-        }
+        // No-op. If circuit-level monitoring is needed later, hook into supported Blazor
+        // client events without re-initializing Blazor. For now, rely on fetch/XHR monitoring
+        // and server-side ForbiddenRedirectMiddleware headers to handle auth issues.
     },
     
     // Force logout and redirect
@@ -123,10 +112,7 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('Initializing MrWho authentication monitoring');
     window.mrWhoAuth.initializeAuthMonitoring();
     
-    // Initialize Blazor monitoring after a short delay to ensure Blazor is loaded
-    setTimeout(() => {
-        window.mrWhoAuth.initializeBlazorMonitoring();
-    }, 1000);
+    // Removed: calling initializeBlazorMonitoring that attempted to call Blazor.start()
 });
 
 // Also initialize immediately in case DOM is already loaded
@@ -134,8 +120,5 @@ if (document.readyState !== 'loading') {
     console.log('DOM already loaded, initializing MrWho authentication monitoring immediately');
     window.mrWhoAuth.initializeAuthMonitoring();
     
-    // Initialize Blazor monitoring after a short delay
-    setTimeout(() => {
-        window.mrWhoAuth.initializeBlazorMonitoring();
-    }, 1000);
+    // Removed: calling initializeBlazorMonitoring that attempted to call Blazor.start()
 }
