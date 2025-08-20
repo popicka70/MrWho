@@ -23,6 +23,14 @@
                     <form id="registerForm" method="post" action="/connect/register">
                         @Html.AntiForgeryToken()
                         <input type="hidden" id="recaptchaToken" name="recaptchaToken" />
+                        @if (!string.IsNullOrEmpty(ViewData["ReturnUrl"] as string))
+                        {
+                            <input type="hidden" name="returnUrl" value="@ViewData["ReturnUrl"]" />
+                        }
+                        @if (!string.IsNullOrEmpty(ViewData["ClientId"] as string))
+                        {
+                            <input type="hidden" name="clientId" value="@ViewData["ClientId"]" />
+                        }
                         <div class="mb-3">
                             <label class="form-label">Email</label>
                             <input asp-for="Email" class="form-control" />

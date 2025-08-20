@@ -11,6 +11,7 @@ using MrWho.Services.Mediator;
 using MrWho.Shared.Models;
 using System.Net.Http;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
 
 namespace MrWho.Endpoints.Auth;
 
@@ -48,12 +49,17 @@ public sealed class RegisterPostHandler : IRequestHandler<RegisterPostRequest, I
             return new ViewResult { ViewName = "Register", ViewData = new ViewDataDictionary(vd) { Model = input } };
         }
 
+        // Required field validation with proper ModelState errors
         if (string.IsNullOrWhiteSpace(input.Email) || string.IsNullOrWhiteSpace(input.Password) || string.IsNullOrWhiteSpace(input.FirstName) || string.IsNullOrWhiteSpace(input.LastName))
         {
             var vd = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary())
             {
                 ["RecaptchaSiteKey"] = ShouldUseRecaptcha() ? _configuration["GoogleReCaptcha:SiteKey"] : null
             };
+            if (string.IsNullOrWhiteSpace(input.Email)) vd.ModelState.AddModelError("Email", "Email is required.");
+            if (string.IsNullOrWhiteSpace(input.Password)) vd.ModelState.AddModelError("Password", "Password is required.");
+            if (string.IsNullOrWhiteSpace(input.FirstName)) vd.ModelState.AddModelError("FirstName", "First name is required.");
+            if (string.IsNullOrWhiteSpace(input.LastName)) vd.ModelState.AddModelError("LastName", "Last name is required.");
             return new ViewResult { ViewName = "Register", ViewData = new ViewDataDictionary(vd) { Model = input } };
         }
 
@@ -68,29 +74,71 @@ public sealed class RegisterPostHandler : IRequestHandler<RegisterPostRequest, I
             return new ViewResult { ViewName = "Register", ViewData = new ViewDataDictionary(vd) { Model = input } };
         }
 
-        var user = new IdentityUser { UserName = input.Email, Email = input.Email, EmailConfirmed = false };
-        var result = await _userManager.CreateAsync(user, input.Password);
-        if (!result.Succeeded)
+        // Begin transaction to ensure user, profile and client link are consistent
+        await using var tx = await _db.Database.BeginTransactionAsync(cancellationToken);
+        try
         {
-            var vd = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary())
+            var user = new IdentityUser { UserName = input.Email, Email = input.Email, EmailConfirmed = false };
+            var createResult = await _userManager.CreateAsync(user, input.Password);
+            if (!createResult.Succeeded)
             {
-                ["RecaptchaSiteKey"] = ShouldUseRecaptcha() ? _configuration["GoogleReCaptcha:SiteKey"] : null
-            };
-            foreach (var error in result.Errors) vd.ModelState.AddModelError(string.Empty, error.Description);
-            return new ViewResult { ViewName = "Register", ViewData = new ViewDataDictionary(vd) { Model = input } };
-        }
+                var vd = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary())
+                {
+                    ["RecaptchaSiteKey"] = ShouldUseRecaptcha() ? _configuration["GoogleReCaptcha:SiteKey"] : null
+                };
+                foreach (var error in createResult.Errors)
+                {
+                    var code = error.Code ?? string.Empty;
+                    if (code.Contains("Password", StringComparison.OrdinalIgnoreCase)) vd.ModelState.AddModelError("Password", error.Description);
+                    else if (code.Contains("Email", StringComparison.OrdinalIgnoreCase) || code.Contains("UserName", StringComparison.OrdinalIgnoreCase)) vd.ModelState.AddModelError("Email", error.Description);
+                    else vd.ModelState.AddModelError(string.Empty, error.Description);
+                }
+                return new ViewResult { ViewName = "Register", ViewData = new ViewDataDictionary(vd) { Model = input } };
+            }
 
-        var profile = new MrWho.Models.UserProfile
+            var profile = new MrWho.Models.UserProfile
+            {
+                UserId = user.Id,
+                FirstName = input.FirstName,
+                LastName = input.LastName,
+                DisplayName = $"{input.FirstName} {input.LastName}".Trim(),
+                State = MrWho.Models.UserState.New,
+                CreatedAt = DateTime.UtcNow
+            };
+            _db.UserProfiles.Add(profile);
+            await _db.SaveChangesAsync(cancellationToken);
+
+            // Link user to client if we have a hint (either direct clientId or via returnUrl's client_id)
+            var formClientId = http.Request.Form["clientId"].ToString();
+            var returnUrl = http.Request.Form["returnUrl"].ToString();
+            var clientHint = !string.IsNullOrWhiteSpace(formClientId) ? formClientId : TryExtractClientIdFromReturnUrl(returnUrl);
+            if (!string.IsNullOrWhiteSpace(clientHint))
+            {
+                var client = await _db.Clients.FirstOrDefaultAsync(c => c.Id == clientHint || c.ClientId == clientHint, cancellationToken);
+                if (client != null)
+                {
+                    var exists = await _db.ClientUsers.AnyAsync(cu => cu.ClientId == client.Id && cu.UserId == user.Id, cancellationToken);
+                    if (!exists)
+                    {
+                        _db.ClientUsers.Add(new ClientUser
+                        {
+                            ClientId = client.Id,
+                            UserId = user.Id,
+                            CreatedAt = DateTime.UtcNow,
+                            CreatedBy = user.UserName
+                        });
+                        await _db.SaveChangesAsync(cancellationToken);
+                    }
+                }
+            }
+
+            await tx.CommitAsync(cancellationToken);
+        }
+        catch
         {
-            UserId = user.Id,
-            FirstName = input.FirstName,
-            LastName = input.LastName,
-            DisplayName = $"{input.FirstName} {input.LastName}".Trim(),
-            State = MrWho.Models.UserState.New,
-            CreatedAt = DateTime.UtcNow
-        };
-        _db.UserProfiles.Add(profile);
-        await _db.SaveChangesAsync(cancellationToken);
+            await tx.RollbackAsync(cancellationToken);
+            throw;
+        }
 
         return new RedirectToActionResult("RegisterSuccess", "Auth", null);
     }
@@ -130,25 +178,6 @@ public sealed class RegisterPostHandler : IRequestHandler<RegisterPostRequest, I
 
     private record RecaptchaVerifyResult(bool success, double score, string action, string hostname, DateTime challenge_ts, string[]? error_codes);
 
-    private static ViewDataDictionary NewViewData() => new(new EmptyModelMetadataProvider(), new ModelStateDictionary());
-    private static ViewDataDictionary viewDataWithModel(ViewDataDictionary vd, object model) { vd.Model = model; return vd; }
-
-    private static bool IsModelStateValid(MrWho.Controllers.LoginViewModel model, out List<KeyValuePair<string, string>> errors)
-    {
-        errors = new();
-        if (model is null) { errors.Add(new("", "Invalid model")); return false; }
-        if (!model.UseCode)
-        {
-            if (string.IsNullOrWhiteSpace(model.Email)) errors.Add(new("Email", "The Email field is required."));
-            if (string.IsNullOrWhiteSpace(model.Password)) errors.Add(new("Password", "The Password field is required."));
-        }
-        else
-        {
-            if (string.IsNullOrWhiteSpace(model.Email)) errors.Add(new("Email", "The Email field is required."));
-            if (string.IsNullOrWhiteSpace(model.Code)) errors.Add(new("Code", "The Code field is required."));
-        }
-        return errors.Count == 0;
-    }
 
     private static string? TryExtractClientIdFromReturnUrl(string? returnUrl)
     {
@@ -173,6 +202,4 @@ public sealed class RegisterPostHandler : IRequestHandler<RegisterPostRequest, I
         catch { }
         return null;
     }
-
-    private static bool IsLocalUrl(string? url) => !string.IsNullOrEmpty(url) && url.StartsWith('/') && !url.StartsWith("//") && !url.StartsWith("/\\");
 }
