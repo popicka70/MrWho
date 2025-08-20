@@ -85,7 +85,8 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
             _logger.LogDebug(ex, "Failed to check client cookie for {ClientId}", clientId);
         }
 
-        // 2) Fallback to default Identity cookie and bootstrap client cookie (don't require AuthenticateAsync immediately)
+        // POP i'm not sure we need this, but keeping it for now
+        // 2) Fallback to default Identity cookie and (conditionally) bootstrap client cookie
         if (authUser == null)
         {
             try
@@ -98,20 +99,27 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
                                defaultAuth.Principal.FindFirst("sub");
                     if (subj != null)
                     {
-                        authUser = await _userManager.FindByIdAsync(subj.Value);
-                        amrSource = defaultAuth.Principal;
-                        _logger.LogDebug("Default Identity cookie authenticated. Using user {UserId} and bootstrapping client cookie for {ClientId}", subj.Value, clientId);
-
-                        // Best-effort client cookie sign-in for next requests
-                        if (authUser != null)
+                        var candidateUser = await _userManager.FindByIdAsync(subj.Value);
+                        if (candidateUser != null)
                         {
+                            // IMPORTANT: only reuse the default cookie if this user is actually allowed for this client
                             try
                             {
-                                await _dynamicCookieService.SignInWithClientCookieAsync(clientId, authUser, rememberMe: false);
+                                var realmValidation = await _realmValidationService.ValidateUserRealmAccessAsync(candidateUser, clientId);
+                                if (realmValidation.IsValid)
+                                {
+                                    authUser = candidateUser;
+                                    amrSource = defaultAuth.Principal;
+                                    _logger.LogDebug("Default Identity cookie authenticated. Using user {UserId} for client {ClientId}", subj.Value, clientId);
+                                }
+                                else
+                                {
+                                    _logger.LogInformation("Default Identity cookie user {UserId} is not valid for client {ClientId}: {Reason}. Forcing login for this client.", subj.Value, clientId, realmValidation.Reason);
+                                }
                             }
                             catch (Exception ex)
                             {
-                                _logger.LogWarning(ex, "Failed to sign in client-specific cookie for {ClientId} (continuing)", clientId);
+                                _logger.LogWarning(ex, "Realm validation failed when checking default cookie user for {ClientId}", clientId);
                             }
                         }
                     }
@@ -136,7 +144,7 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
             return Results.Challenge(props, new[] { cookieScheme });
         }
 
-        // 4) Realm and profile checks
+        // 4) Realm and profile checks (defense-in-depth)
         try
         {
             var realmValidation = await _realmValidationService.ValidateUserRealmAccessAsync(authUser, clientId);
@@ -243,7 +251,7 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         var authPrincipal = new ClaimsPrincipal(claimsIdentity);
         authPrincipal.SetScopes(request.GetScopes());
 
-        // Best-effort: ensure client cookie exists for next requests
+        // Best-effort: ensure client cookie exists for next requests (only after validation)
         if (!await _dynamicCookieService.IsAuthenticatedForClientAsync(clientId))
         {
             try { await _dynamicCookieService.SignInWithClientCookieAsync(clientId, authUser, false); }

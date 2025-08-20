@@ -1,0 +1,303 @@
+@page "/system/config"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inherits AuthenticatedComponentBase
+
+@using Microsoft.AspNetCore.Authentication.Cookies
+@using Microsoft.AspNetCore.Authentication.OpenIdConnect
+@using Microsoft.Extensions.Options
+
+@inject IOptionsMonitor<OpenIdConnectOptions> OidcOptions
+@inject IOptionsMonitor<CookieAuthenticationOptions> CookieOptions
+@inject IConfiguration Configuration
+@inject NavigationManager Navigation
+@inject IWebHostEnvironment Env
+@inject IJSRuntime JS
+@inject Radzen.NotificationService NotificationService
+
+<PageTitle>System Configuration</PageTitle>
+
+@if (IsLoading)
+{
+    <div class="d-flex justify-content-center align-items-center" style="min-height: 50vh;">
+        <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+        <RadzenText class="rz-ml-2">Loading configuration...</RadzenText>
+    </div>
+}
+else if (!IsAuthenticated)
+{
+    @RenderAuthenticationStatus()
+}
+else
+{
+    <RadzenText TextStyle="TextStyle.H3" class="rz-mb-3">
+        <RadzenIcon Icon="tune" class="rz-me-2" />
+        System Configuration
+    </RadzenText>
+
+    <RadzenRow Gap="1.5rem">
+        <RadzenColumn Size="12" SizeMD="6">
+            <RadzenCard class="rz-p-3">
+                <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">
+                    <RadzenIcon Icon="verified_user" class="rz-me-1" />
+                    Authentication (OpenID Connect)
+                </RadzenText>
+                <RadzenStack Gap="0.5rem">
+                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                        <RadzenText>Authority</RadzenText>
+                        <RadzenText class="rz-color-secondary">@oidc.Authority</RadzenText>
+                    </RadzenStack>
+                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                        <RadzenText>Client ID</RadzenText>
+                        <RadzenText class="rz-color-secondary">@oidc.ClientId</RadzenText>
+                    </RadzenStack>
+                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                        <RadzenText>Response Type</RadzenText>
+                        <RadzenText class="rz-color-secondary">@oidc.ResponseType</RadzenText>
+                    </RadzenStack>
+                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                        <RadzenText>Use PKCE</RadzenText>
+                        <RadzenText class="rz-color-secondary">@(oidc.UsePkce ? "True" : "False")</RadzenText>
+                    </RadzenStack>
+                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                        <RadzenText>Save Tokens</RadzenText>
+                        <RadzenText class="rz-color-secondary">@(oidc.SaveTokens ? "True" : "False")</RadzenText>
+                    </RadzenStack>
+                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                        <RadzenText>Require HTTPS Metadata</RadzenText>
+                        <RadzenText class="rz-color-secondary">@(oidc.RequireHttpsMetadata ? "True" : "False")</RadzenText>
+                    </RadzenStack>
+                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                        <RadzenText>Metadata Address</RadzenText>
+                        <RadzenText class="rz-color-secondary">@oidc.MetadataAddress</RadzenText>
+                    </RadzenStack>
+                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                        <RadzenText>Callback Path</RadzenText>
+                        <RadzenText class="rz-color-secondary">@oidc.CallbackPath</RadzenText>
+                    </RadzenStack>
+                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                        <RadzenText>Signout Callback Path</RadzenText>
+                        <RadzenText class="rz-color-secondary">@oidc.SignedOutCallbackPath</RadzenText>
+                    </RadzenStack>
+                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                        <RadzenText>SignedOut Redirect URI</RadzenText>
+                        <RadzenText class="rz-color-secondary">@oidc.SignedOutRedirectUri</RadzenText>
+                    </RadzenStack>
+                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                        <RadzenText>Remote Signout Path</RadzenText>
+                        <RadzenText class="rz-color-secondary">@oidc.RemoteSignOutPath</RadzenText>
+                    </RadzenStack>
+                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                        <RadzenText>Discovery Endpoint</RadzenText>
+                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                            <RadzenText class="rz-color-secondary">@discoveryEndpoint</RadzenText>
+                            <RadzenBadge Text="@discoveryStateText" BadgeStyle="@discoveryStateStyle" />
+                        </RadzenStack>
+                    </RadzenStack>
+                    <div>
+                        <RadzenText TextStyle="TextStyle.Subtitle2">Scopes</RadzenText>
+                        <RadzenChips TValue="string" Value="@scopes" ReadOnly="true" class="rz-mt-1" />
+                    </div>
+                </RadzenStack>
+                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" class="rz-mt-2">
+                    <RadzenButton Text="Open Discovery" Icon="open_in_new" ButtonStyle="ButtonStyle.Secondary" Link="@discoveryEndpoint" Target="_blank" />
+                    <RadzenButton Text="Copy Report" Icon="content_copy" ButtonStyle="ButtonStyle.Light" Click="@(async ()=> await CopyDiagnosticsAsync())" />
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+
+        <RadzenColumn Size="12" SizeMD="6">
+            <RadzenCard class="rz-p-3">
+                <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">
+                    <RadzenIcon Icon="cookie" class="rz-me-1" />
+                    Cookies (Admin Session)
+                </RadzenText>
+                <RadzenStack Gap="0.5rem">
+                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                        <RadzenText>Scheme</RadzenText>
+                        <RadzenText class="rz-color-secondary">AdminCookies</RadzenText>
+                    </RadzenStack>
+                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                        <RadzenText>Name</RadzenText>
+                        <RadzenText class="rz-color-secondary">@cookie.Cookie.Name</RadzenText>
+                    </RadzenStack>
+                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                        <RadzenText>Path</RadzenText>
+                        <RadzenText class="rz-color-secondary">@cookie.Cookie.Path</RadzenText>
+                    </RadzenStack>
+                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                        <RadzenText>SameSite</RadzenText>
+                        <RadzenText class="rz-color-secondary">@cookie.Cookie.SameSite.ToString()</RadzenText>
+                    </RadzenStack>
+                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                        <RadzenText>SecurePolicy</RadzenText>
+                        <RadzenText class="rz-color-secondary">@cookie.Cookie.SecurePolicy.ToString()</RadzenText>
+                    </RadzenStack>
+                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                        <RadzenText>HttpOnly</RadzenText>
+                        <RadzenText class="rz-color-secondary">@(cookie.Cookie.HttpOnly ? "True" : "False")</RadzenText>
+                    </RadzenStack>
+                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                        <RadzenText>Expire Time</RadzenText>
+                        <RadzenText class="rz-color-secondary">@cookie.ExpireTimeSpan.ToString()</RadzenText>
+                    </RadzenStack>
+                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                        <RadzenText>Sliding Expiration</RadzenText>
+                        <RadzenText class="rz-color-secondary">@(cookie.SlidingExpiration ? "True" : "False")</RadzenText>
+                    </RadzenStack>
+                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                        <RadzenText>Login Path</RadzenText>
+                        <RadzenText class="rz-color-secondary">@cookie.LoginPath</RadzenText>
+                    </RadzenStack>
+                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                        <RadzenText>Logout Path</RadzenText>
+                        <RadzenText class="rz-color-secondary">@cookie.LogoutPath</RadzenText>
+                    </RadzenStack>
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+    </RadzenRow>
+
+    <RadzenRow Gap="1.5rem" class="rz-mt-2">
+        <RadzenColumn Size="12" SizeMD="6">
+            <RadzenCard class="rz-p-3">
+                <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">
+                    <RadzenIcon Icon="api" class="rz-me-1" />
+                    API
+                </RadzenText>
+                <RadzenStack Gap="0.5rem">
+                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                        <RadzenText>MrWho API Base URL</RadzenText>
+                        <RadzenText class="rz-color-secondary">@apiBaseUrl</RadzenText>
+                    </RadzenStack>
+                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                        <RadzenText>Token Refresh Interval</RadzenText>
+                        <RadzenText class="rz-color-secondary">@oidc.RefreshInterval.ToString()</RadzenText>
+                    </RadzenStack>
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeMD="6">
+            <RadzenCard class="rz-p-3">
+                <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">
+                    <RadzenIcon Icon="info" class="rz-me-1" />
+                    Environment
+                </RadzenText>
+                <RadzenStack Gap="0.5rem">
+                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                        <RadzenText>Environment</RadzenText>
+                        <RadzenText class="rz-color-secondary">@Env.EnvironmentName</RadzenText>
+                    </RadzenStack>
+                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                        <RadzenText>Application Name</RadzenText>
+                        <RadzenText class="rz-color-secondary">@Env.ApplicationName</RadzenText>
+                    </RadzenStack>
+                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                        <RadzenText>Content Root</RadzenText>
+                        <RadzenText class="rz-color-secondary">@Env.ContentRootPath</RadzenText>
+                    </RadzenStack>
+                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                        <RadzenText>Base URI</RadzenText>
+                        <RadzenText class="rz-color-secondary">@Navigation.BaseUri</RadzenText>
+                    </RadzenStack>
+                    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                        <RadzenText>Assembly Version</RadzenText>
+                        <RadzenText class="rz-color-secondary">@assemblyVersion</RadzenText>
+                    </RadzenStack>
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+    </RadzenRow>
+}
+
+@code {
+    private OpenIdConnectOptions oidc = default!;
+    private CookieAuthenticationOptions cookie = default!;
+    private string discoveryEndpoint = string.Empty;
+    private string discoveryStateText = string.Empty;
+    private BadgeStyle discoveryStateStyle = BadgeStyle.Info;
+    private IReadOnlyList<string> scopes = Array.Empty<string>();
+    private string apiBaseUrl = string.Empty;
+    private string assemblyVersion = typeof(Program).Assembly.GetName().Version?.ToString() ?? "-";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+        if (!IsAuthenticated)
+            return;
+
+        oidc = OidcOptions.Get(OpenIdConnectDefaults.AuthenticationScheme);
+        cookie = CookieOptions.Get("AdminCookies");
+        scopes = oidc.Scope.ToList();
+
+        // From configuration with fallback used in code
+        apiBaseUrl = Configuration.GetValue<string>("MrWhoApi:BaseUrl") ?? "https://localhost:7113/";
+
+        discoveryEndpoint = string.IsNullOrWhiteSpace(oidc.MetadataAddress)
+            ? $"{(oidc.Authority ?? string.Empty).TrimEnd('/')}/.well-known/openid-configuration"
+            : oidc.MetadataAddress;
+
+        if (discoveryEndpoint.Contains("_well-known") || discoveryEndpoint.Contains("openid_configuration"))
+        {
+            discoveryStateText = "WARNING: underscore detected - should be .well-known/openid-configuration";
+            discoveryStateStyle = BadgeStyle.Warning;
+        }
+        else if (discoveryEndpoint.Contains(".well-known/openid-configuration"))
+        {
+            discoveryStateText = "OK";
+            discoveryStateStyle = BadgeStyle.Success;
+        }
+        else
+        {
+            discoveryStateText = "Custom";
+            discoveryStateStyle = BadgeStyle.Info;
+        }
+    }
+
+    private async Task CopyDiagnosticsAsync()
+    {
+        var report = new
+        {
+            Environment = Env.EnvironmentName,
+            App = new { Env.ApplicationName, Env.ContentRootPath, Navigation.BaseUri, Version = assemblyVersion },
+            Oidc = new
+            {
+                oidc.Authority,
+                oidc.ClientId,
+                oidc.ResponseType,
+                oidc.UsePkce,
+                oidc.SaveTokens,
+                oidc.RequireHttpsMetadata,
+                oidc.MetadataAddress,
+                oidc.CallbackPath,
+                oidc.SignedOutCallbackPath,
+                oidc.SignedOutRedirectUri,
+                oidc.RemoteSignOutPath,
+                Discovery = discoveryEndpoint,
+                Scopes = scopes
+            },
+            Cookie = new
+            {
+                Scheme = "AdminCookies",
+                cookie.Cookie.Name,
+                cookie.Cookie.Path,
+                cookie.Cookie.SameSite,
+                cookie.Cookie.SecurePolicy,
+                cookie.Cookie.HttpOnly,
+                cookie.ExpireTimeSpan,
+                cookie.SlidingExpiration,
+                cookie.LoginPath,
+                cookie.LogoutPath
+            },
+            Api = new { BaseUrl = apiBaseUrl }
+        };
+
+        var json = System.Text.Json.JsonSerializer.Serialize(report, new System.Text.Json.JsonSerializerOptions
+        {
+            WriteIndented = true
+        });
+
+        await JS.InvokeVoidAsync("navigator.clipboard.writeText", json);
+        NotificationService.Notify(NotificationSeverity.Success, "Copied", "Diagnostics copied to clipboard", 3000);
+    }
+}

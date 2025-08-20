@@ -836,6 +836,15 @@ public class OidcClientService : IOidcClientService
     {
         try
         {
+            // Guard: confidential/machine clients requiring a secret must have one.
+            if ((client.ClientType == ClientType.Confidential || client.ClientType == ClientType.Machine)
+                && client.RequireClientSecret
+                && string.IsNullOrWhiteSpace(client.ClientSecret))
+            {
+                _logger.LogWarning("Skipping OpenIddict sync for client '{ClientId}': confidential/machine client requires a secret but none is set.", client.ClientId);
+                return; // Don't fail startup; just skip this invalid record.
+            }
+
             // Remove existing OpenIddict application if it exists
             var existingClient = await _applicationManager.FindByClientIdAsync(client.ClientId);
             if (existingClient != null)
@@ -902,11 +911,11 @@ public class OidcClientService : IOidcClientService
                         break;
                     case "api.read":
                     case "api.write":
-                        // For custom API scopes, use the scp: prefix (which is the OpenIddict format for custom scopes)
+                        // For custom API scopes, use the scp: prefix (OpenIddict format for custom scopes)
                         descriptor.Permissions.Add($"scp:{scope.Scope}");
                         break;
                     default:
-                        // For other custom scopes, add them with the scp: prefix
+                        // Other custom scopes
                         descriptor.Permissions.Add($"scp:{scope.Scope}");
                         break;
                 }
@@ -918,10 +927,9 @@ public class OidcClientService : IOidcClientService
                 descriptor.Permissions.Add(OpenIddictConstants.Permissions.Endpoints.EndSession);
             }
 
-            // Add additional permissions from client permissions (but skip the ones we're handling above)
+            // Add additional permissions from client permissions (skip the ones handled above)
             foreach (var permission in client.Permissions)
             {
-                // Skip scope permissions as they are handled above, and skip old incorrect API permissions
                 if (!permission.Permission.StartsWith("oidc:scope:") && 
                     !permission.Permission.StartsWith("api.") &&
                     !permission.Permission.StartsWith("scp:") &&

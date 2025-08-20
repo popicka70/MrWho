@@ -8,6 +8,11 @@
                             ?? (ViewBag.ExternalProviders as IEnumerable<dynamic>)
                             ?? Array.Empty<dynamic>();
     var logoUri = ViewData["LogoUri"] as string;
+    bool allowLocal = ViewData["AllowLocalLogin"] as bool? ?? true;
+    bool allowPasskey = ViewData["AllowPasskeyLogin"] as bool? ?? true;
+    bool allowQrQuick = ViewData["AllowQrLoginQuick"] as bool? ?? true;
+    bool allowQrSecure = ViewData["AllowQrLoginSecure"] as bool? ?? true;
+    bool allowCode = ViewData["AllowCodeLogin"] as bool? ?? true;
 }
 
 <div class="row justify-content-center">
@@ -58,185 +63,203 @@
                     </div>
                 }
                 
-                <form id="loginForm" method="post">
-                    @Html.AntiForgeryToken()
-                    <div asp-validation-summary="All" class="text-danger"></div>
-                    <input type="hidden" id="recaptchaToken" name="recaptchaToken" />
-                    
-                    @if (!string.IsNullOrEmpty(ViewData["ReturnUrl"] as string))
-                    {
-                        <input type="hidden" name="returnUrl" value="@ViewData["ReturnUrl"]" />
-                    }
-                    
-                    @if (!string.IsNullOrEmpty(ViewData["ClientId"] as string))
-                    {
-                        <input type="hidden" name="clientId" value="@ViewData["ClientId"]" />
-                    }
-                    
-                    <input type="hidden" asp-for="UseCode" />
-                    <div class="mb-3">
-                        <label asp-for="Email" class="form-label">Email</label>
-                        <input asp-for="Email" class="form-control" type="email" placeholder="Enter your email" required />
-                        <span asp-validation-for="Email" class="text-danger"></span>
-                    </div>
-
-                    @if (Model.UseCode)
-                    {
-                        <div class="mb-3">
-                            <label asp-for="Code" class="form-label">Authenticator code</label>
-                            <input asp-for="Code" class="form-control" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="123 456" />
-                            <span asp-validation-for="Code" class="text-danger"></span>
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="mb-3">
-                            <label asp-for="Password" class="form-label">Password</label>
-                            <input asp-for="Password" class="form-control" type="password" placeholder="Enter your password" />
-                            <span asp-validation-for="Password" class="text-danger"></span>
-                        </div>
-                    }
-                    
-                    <div class="mb-3 form-check">
-                        <input asp-for="RememberMe" class="form-check-input" type="checkbox" />
-                        <label asp-for="RememberMe" class="form-check-label">Remember me</label>
-                    </div>
-                    
-                    <div class="d-grid mb-2">
-                        <button id="btnLogin" type="submit" class="btn btn-primary btn-lg">
-                            <i class="bi bi-box-arrow-in-right me-2"></i>Sign In
-                        </button>
-                    </div>
-
-                    @{
-                        // Build register link preserving returnUrl + clientId
-                        var regQs = new Dictionary<string, string?>
+                @if (allowLocal)
+                {
+                    <form id="loginForm" method="post">
+                        @Html.AntiForgeryToken()
+                        <div asp-validation-summary="All" class="text-danger"></div>
+                        <input type="hidden" id="recaptchaToken" name="recaptchaToken" />
+                        
+                        @if (!string.IsNullOrEmpty(ViewData["ReturnUrl"] as string))
                         {
-                            { "returnUrl", ViewData["ReturnUrl"] as string },
-                            { "clientId", ViewData["ClientId"] as string }
-                        };
-                        var regQuery = string.Join("&", regQs.Where(kv => !string.IsNullOrEmpty(kv.Value))
-                                                             .Select(kv => kv.Key + "=" + Uri.EscapeDataString(kv.Value!)));
-                        var registerHref = string.IsNullOrEmpty(regQuery) ? "/connect/register" : ($"/connect/register?{regQuery}");
-                    }
-
-                    <div class="text-center mb-3">
-                        <small class="text-muted">Don't have an account?</small>
-                        <div>
-                            <a href="@registerHref" class="btn btn-link p-0"><i class="bi bi-person-plus me-1"></i>Register new account</a>
-                        </div>
-                    </div>
-                    
-                    <!-- Alternative Authentication Methods -->
-                    <div class="d-grid gap-2">
-                        @{
-                            var qs = new Dictionary<string, string?>
-                            {
-                                { "returnUrl", ViewData["ReturnUrl"] as string },
-                                { "clientId", ViewData["ClientId"] as string },
-                                { "mode", Model.UseCode ? null : "code" }
-                            };
-                            var query = string.Join("&", qs.Where(kv => !string.IsNullOrEmpty(kv.Value))
-                                                         .Select(kv => kv.Key + "=" + Uri.EscapeDataString(kv.Value!)));
-                            var toggleHref = string.IsNullOrEmpty(query) ? "/connect/login" : ($"/connect/login?{query}");
-                            var qrQuery = string.Join("&", new[]{ ViewData["ReturnUrl"] as string is string ru && !string.IsNullOrEmpty(ru) ? $"returnUrl={Uri.EscapeDataString(ru)}" : null,
-                                                                   ViewData["ClientId"] as string is string cid && !string.IsNullOrEmpty(cid) ? $"clientId={Uri.EscapeDataString(cid)}" : null }
-                                                                   .Where(s => s != null));
-                            var qrHref = string.IsNullOrEmpty(qrQuery) ? "/qr-login/start" : ($"/qr-login/start?{qrQuery}");
-                            var enhancedQrHref = string.IsNullOrEmpty(qrQuery) ? "/qr-login/start?persistent=true" : ($"/qr-login/start?persistent=true&{qrQuery}");
+                            <input type="hidden" name="returnUrl" value="@ViewData["ReturnUrl"]" />
                         }
                         
+                        @if (!string.IsNullOrEmpty(ViewData["ClientId"] as string))
+                        {
+                            <input type="hidden" name="clientId" value="@ViewData["ClientId"]" />
+                        }
+                        
+                        <input type="hidden" asp-for="UseCode" />
+                        <div class="mb-3">
+                            <label asp-for="Email" class="form-label">Email</label>
+                            <input asp-for="Email" class="form-control" type="email" placeholder="Enter your email" required />
+                            <span asp-validation-for="Email" class="text-danger"></span>
+                        </div>
+
+                        @if (Model.UseCode && allowCode)
+                        {
+                            <div class="mb-3">
+                                <label asp-for="Code" class="form-label">Authenticator code</label>
+                                <input asp-for="Code" class="form-control" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="123 456" />
+                                <span asp-validation-for="Code" class="text-danger"></span>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="mb-3">
+                                <label asp-for="Password" class="form-label">Password</label>
+                                <input asp-for="Password" class="form-control" type="password" placeholder="Enter your password" />
+                                <span asp-validation-for="Password" class="text-danger"></span>
+                            </div>
+                        }
+                        
+                        <div class="mb-3 form-check">
+                            <input asp-for="RememberMe" class="form-check-input" type="checkbox" />
+                            <label asp-for="RememberMe" class="form-check-label">Remember me</label>
+                        </div>
+                        
+                        <div class="d-grid mb-2">
+                            <button id="btnLogin" type="submit" class="btn btn-primary btn-lg">
+                                <i class="bi bi-box-arrow-in-right me-2"></i>Sign In
+                            </button>
+                        </div>
+
+                        @{
+                            // Build register link preserving returnUrl + clientId
+                            var regQs = new Dictionary<string, string?>
+                            {
+                                { "returnUrl", ViewData["ReturnUrl"] as string },
+                                { "clientId", ViewData["ClientId"] as string }
+                            };
+                            var regQuery = string.Join("&", regQs.Where(kv => !string.IsNullOrEmpty(kv.Value))
+                                                                 .Select(kv => kv.Key + "=" + Uri.EscapeDataString(kv.Value!)));
+                            var registerHref = string.IsNullOrEmpty(regQuery) ? "/connect/register" : ($"/connect/register?{regQuery}");
+                        }
+
+                        <div class="text-center mb-3">
+                            <small class="text-muted">Don't have an account?</small>
+                            <div>
+                                <a href="@registerHref" class="btn btn-link p-0"><i class="bi bi-person-plus me-1"></i>Register new account</a>
+                            </div>
+                        </div>
+                    </form>
+                }
+
+                <!-- Alternative Authentication Methods -->
+                <div class="d-grid gap-2">
+                    @{
+                        var qs = new Dictionary<string, string?>
+                        {
+                            { "returnUrl", ViewData["ReturnUrl"] as string },
+                            { "clientId", ViewData["ClientId"] as string },
+                            { "mode", (Model.UseCode && allowCode) ? null : (allowCode ? "code" : null) }
+                        };
+                        var query = string.Join("&", qs.Where(kv => !string.IsNullOrEmpty(kv.Value))
+                                                     .Select(kv => kv.Key + "=" + Uri.EscapeDataString(kv.Value!)));
+                        var toggleHref = string.IsNullOrEmpty(query) ? "/connect/login" : ($"/connect/login?{query}");
+                        var qrQuery = string.Join("&", new[]{ ViewData["ReturnUrl"] as string is string ru && !string.IsNullOrEmpty(ru) ? $"returnUrl={Uri.EscapeDataString(ru)}" : null,
+                                                               ViewData["ClientId"] as string is string cid && !string.IsNullOrEmpty(cid) ? $"clientId={Uri.EscapeDataString(cid)}" : null }
+                                                               .Where(s => s != null));
+                        var qrHref = string.IsNullOrEmpty(qrQuery) ? "/qr-login/start" : ($"/qr-login/start?{qrQuery}");
+                        var enhancedQrHref = string.IsNullOrEmpty(qrQuery) ? "/qr-login/start?persistent=true" : ($"/qr-login/start?persistent=true&{qrQuery}");
+                    }
+                    
+                    @if (allowCode)
+                    {
                         @if (Model.UseCode)
                         {
                             <a href="@toggleHref" class="btn btn-outline-secondary auth-button">
                                 <i class="bi bi-key me-2"></i>Use password instead
                             </a>
                         }
-                        else
+                        else if (allowLocal)
                         {
                             <a href="@toggleHref" class="btn btn-outline-secondary auth-button">
                                 <i class="bi bi-shield-check me-2"></i>Use authenticator code instead
                             </a>
                         }
+                    }
 
+                    @if (allowPasskey)
+                    {
                         <!-- Passkey Login -->
                         <button id="btn-passkey" type="button" class="btn btn-outline-primary">
                             <i class="bi bi-fingerprint me-2"></i>Sign in with a passkey
                         </button>
-                        
+                    }
+                    
+                    @if (allowQrQuick || allowQrSecure)
+                    {
                         <!-- QR Login Options with Clear Distinction -->
                         <hr class="my-3">
                         <h6 class="text-center text-muted mb-3">
                             <i class="bi bi-qr-code me-1"></i>QR Code Login Options
                         </h6>
                         
-                        <a href="@qrHref" class="btn auth-button qr-login-quick">
-                            <div class="qr-mode-badge quick">
-                                <i class="bi bi-lightning-fill"></i>
-                            </div>
-                            <div class="d-flex flex-column text-start">
-                                <div>
-                                    <i class="bi bi-qr-code me-2"></i><strong>Quick QR Login</strong>
-                                </div>
-                                <small class="text-muted">Session-based • Any authenticated device • Fast</small>
-                            </div>
-                        </a>
-                        
-                        <a href="@enhancedQrHref" class="btn auth-button qr-login-secure">
-                            <div class="qr-mode-badge secure">
-                                <i class="bi bi-shield-check"></i>
-                            </div>
-                            <div class="d-flex flex-column text-start">
-                                <div>
-                                    <i class="bi bi-qr-code-scan me-2"></i><strong>Secure QR Login</strong>
-                                </div>
-                                <small class="text-muted">Device management • Enhanced security • Audit trail</small>
-                            </div>
-                        </a>
-
-                        <!-- External Identity Providers -->
-                        @if (externalProviders.Any())
+                        @if (allowQrQuick)
                         {
-                            <hr class="my-3">
-                            <h6 class="text-center text-muted mb-3">
-                                <i class="bi bi-box-arrow-in-right me-1"></i>Or sign in with
-                            </h6>
-                            <div class="d-grid gap-2">
-                                @foreach (var p in externalProviders)
-                                {
-                                    var name = (string)p.Name;
-                                    var display = (string)p.DisplayName;
-                                    var icon = p.IconUri as string;
-                                    var extQueryBase = new[]{ ViewData["ReturnUrl"] as string is string er && !string.IsNullOrEmpty(er) ? ($"returnUrl={Uri.EscapeDataString(er)}") : null,
-                                                              ViewData["ClientId"] as string is string ec && !string.IsNullOrEmpty(ec) ? ($"clientId={Uri.EscapeDataString(ec)}") : null }
-                                                             .Where(s => s != null);
-                                    var extQuery = string.Join("&", extQueryBase);
-                                    var extHref = string.IsNullOrEmpty(extQuery)
-                                        ? $"/connect/external/login/{Uri.EscapeDataString(name)}"
-                                        : $"/connect/external/login/{Uri.EscapeDataString(name)}?{extQuery}";
-
-                                    <a href="@extHref" class="btn auth-button">
-                                        <i class="bi bi-box-arrow-in-right me-2"></i>@display
-                                    </a>
-
-                                    // Force new external login (prompt=login)
-                                    var forceQuery = string.IsNullOrEmpty(extQuery) ? "force=1" : extQuery + "&force=1";
-                                    var forceHref = $"/connect/external/login/{Uri.EscapeDataString(name)}?{forceQuery}";
-                                    <a href="@forceHref" class="btn btn-outline-secondary small">
-                                        <i class="bi bi-arrow-repeat me-1"></i>Use @display (force new login)
-                                    </a>
-                                }
-                            </div>
+                            <a href="@qrHref" class="btn auth-button qr-login-quick">
+                                <div class="qr-mode-badge quick">
+                                    <i class="bi bi-lightning-fill"></i>
+                                </div>
+                                <div class="d-flex flex-column text-start">
+                                    <div>
+                                        <i class="bi bi-qr-code me-2"></i><strong>Quick QR Login</strong>
+                                    </div>
+                                    <small class="text-muted">Session-based • Any authenticated device • Fast</small>
+                                </div>
+                            </a>
                         }
                         
-                        <div class="mt-2">
-                            <small class="text-muted">
-                                <i class="bi bi-info-circle"></i> 
-                                Choose <strong>Quick</strong> for immediate access or <strong>Secure</strong> for enhanced security with device tracking.
-                            </small>
+                        @if (allowQrSecure)
+                        {
+                            <a href="@enhancedQrHref" class="btn auth-button qr-login-secure">
+                                <div class="qr-mode-badge secure">
+                                    <i class="bi bi-shield-check"></i>
+                                </div>
+                                <div class="d-flex flex-column text-start">
+                                    <div>
+                                        <i class="bi bi-qr-code-scan me-2"></i><strong>Secure QR Login</strong>
+                                    </div>
+                                    <small class="text-muted">Device management • Enhanced security • Audit trail</small>
+                                </div>
+                            </a>
+                        }
+                    }
+
+                    <!-- External Identity Providers -->
+                    @if (externalProviders.Any())
+                    {
+                        <hr class="my-3">
+                        <h6 class="text-center text-muted mb-3">
+                            <i class="bi bi-box-arrow-in-right me-1"></i>Or sign in with
+                        </h6>
+                        <div class="d-grid gap-2">
+                            @foreach (var p in externalProviders)
+                            {
+                                var name = (string)p.Name;
+                                var display = (string)p.DisplayName;
+                                var icon = p.IconUri as string;
+                                var extQueryBase = new[]{ ViewData["ReturnUrl"] as string is string er && !string.IsNullOrEmpty(er) ? ($"returnUrl={Uri.EscapeDataString(er)}") : null,
+                                                          ViewData["ClientId"] as string is string ec && !string.IsNullOrEmpty(ec) ? ($"clientId={Uri.EscapeDataString(ec)}") : null }
+                                                         .Where(s => s != null);
+                                var extQuery = string.Join("&", extQueryBase);
+                                var extHref = string.IsNullOrEmpty(extQuery)
+                                    ? $"/connect/external/login/{Uri.EscapeDataString(name)}"
+                                    : $"/connect/external/login/{Uri.EscapeDataString(name)}?{extQuery}";
+
+                                <a href="@extHref" class="btn auth-button">
+                                    <i class="bi bi-box-arrow-in-right me-2"></i>@display
+                                </a>
+
+                                // Force new external login (prompt=login)
+                                var forceQuery = string.IsNullOrEmpty(extQuery) ? "force=1" : extQuery + "&force=1";
+                                var forceHref = $"/connect/external/login/{Uri.EscapeDataString(name)}?{forceQuery}";
+                                <a href="@forceHref" class="btn btn-outline-secondary small">
+                                    <i class="bi bi-arrow-repeat me-1"></i>Use @display (force new login)
+                                </a>
+                            }
                         </div>
+                    }
+                    
+                    <div class="mt-2">
+                        <small class="text-muted">
+                            <i class="bi bi-info-circle"></i> 
+                            Choose <strong>Quick</strong> for immediate access or <strong>Secure</strong> for enhanced security with device tracking.
+                        </small>
                     </div>
-                </form>
+                </div>
             </div>
         </div>
     </div>
@@ -271,6 +294,7 @@
     }
     <script>
         (function(){
+            if (!(@allowPasskey.ToString().ToLower())) return; // disable passkey script if not allowed
             const passkeyBtn = document.getElementById('btn-passkey');
             if(!passkeyBtn || !window.PublicKeyCredential) return;
             passkeyBtn.addEventListener('click', async () => {

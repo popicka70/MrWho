@@ -143,7 +143,13 @@ public class ClientsController : ControllerBase
                 EnableLocalLogin = c.EnableLocalLogin,
                 CustomLoginPageUrl = c.CustomLoginPageUrl,
                 CustomLogoutPageUrl = c.CustomLogoutPageUrl,
-                CustomErrorPageUrl = c.CustomErrorPageUrl
+                CustomErrorPageUrl = c.CustomErrorPageUrl,
+
+                // login options
+                AllowPasskeyLogin = c.AllowPasskeyLogin,
+                AllowQrLoginQuick = c.AllowQrLoginQuick,
+                AllowQrLoginSecure = c.AllowQrLoginSecure,
+                AllowCodeLogin = c.AllowCodeLogin
             })
             .ToListAsync();
 
@@ -252,7 +258,13 @@ public class ClientsController : ControllerBase
             EnableLocalLogin = client.EnableLocalLogin,
             CustomLoginPageUrl = client.CustomLoginPageUrl,
             CustomLogoutPageUrl = client.CustomLogoutPageUrl,
-            CustomErrorPageUrl = client.CustomErrorPageUrl
+            CustomErrorPageUrl = client.CustomErrorPageUrl,
+
+            // login options
+            AllowPasskeyLogin = client.AllowPasskeyLogin,
+            AllowQrLoginQuick = client.AllowQrLoginQuick,
+            AllowQrLoginSecure = client.AllowQrLoginSecure,
+            AllowCodeLogin = client.AllowCodeLogin
         };
 
         return Ok(clientDto);
@@ -437,6 +449,13 @@ public class ClientsController : ControllerBase
             CustomLoginPageUrl = client.CustomLoginPageUrl,
             CustomLogoutPageUrl = client.CustomLogoutPageUrl,
             CustomErrorPageUrl = client.CustomErrorPageUrl,
+
+            // login options
+            AllowPasskeyLogin = client.AllowPasskeyLogin,
+            AllowQrLoginQuick = client.AllowQrLoginQuick,
+            AllowQrLoginSecure = client.AllowQrLoginSecure,
+            AllowCodeLogin = client.AllowCodeLogin,
+
             RedirectUris = client.RedirectUris.Select(x => x.Uri).ToList(),
             PostLogoutUris = client.PostLogoutUris.Select(x => x.Uri).ToList(),
             Scopes = client.Scopes.Select(x => x.Scope).ToList(),
@@ -569,6 +588,12 @@ public class ClientsController : ControllerBase
                 client.CustomLoginPageUrl = dto.CustomLoginPageUrl;
                 client.CustomLogoutPageUrl = dto.CustomLogoutPageUrl;
                 client.CustomErrorPageUrl = dto.CustomErrorPageUrl;
+
+                // login options
+                client.AllowPasskeyLogin = dto.AllowPasskeyLogin;
+                client.AllowQrLoginQuick = dto.AllowQrLoginQuick;
+                client.AllowQrLoginSecure = dto.AllowQrLoginSecure;
+                client.AllowCodeLogin = dto.AllowCodeLogin;
 
                 client.UpdatedAt = now;
                 client.UpdatedBy = userName;
@@ -732,7 +757,13 @@ public class ClientsController : ControllerBase
                     EnableLocalLogin = full.EnableLocalLogin,
                     CustomLoginPageUrl = full.CustomLoginPageUrl,
                     CustomLogoutPageUrl = full.CustomLogoutPageUrl,
-                    CustomErrorPageUrl = full.CustomErrorPageUrl
+                    CustomErrorPageUrl = full.CustomErrorPageUrl,
+
+                    // login options
+                    AllowPasskeyLogin = full.AllowPasskeyLogin,
+                    AllowQrLoginQuick = full.AllowQrLoginQuick,
+                    AllowQrLoginSecure = full.AllowQrLoginSecure,
+                    AllowCodeLogin = full.AllowCodeLogin
                 };
 
                 var result = new ClientImportResult
@@ -755,6 +786,12 @@ public class ClientsController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<ClientDto>> CreateClient([FromBody] CreateClientRequest request)
     {
+        // Generate default ID when missing
+        if (string.IsNullOrWhiteSpace(request.ClientId))
+        {
+            request.ClientId = GenerateClientIdFromName(request.Name);
+        }
+
         // Verify realm exists
         var realm = await _context.Realms.FindAsync(request.RealmId);
         if (realm == null)
@@ -766,6 +803,13 @@ public class ClientsController : ControllerBase
         if (await _context.Clients.AnyAsync(c => c.ClientId == request.ClientId))
         {
             return BadRequest($"Client with ID '{request.ClientId}' already exists.");
+        }
+
+        // Validate confidential/machine secret requirement
+        var requiresSecret = (request.ClientType == ClientType.Confidential || request.ClientType == ClientType.Machine) && request.RequireClientSecret;
+        if (requiresSecret && string.IsNullOrWhiteSpace(request.ClientSecret))
+        {
+            return ValidationProblem("ClientSecret is required for confidential or machine clients when RequireClientSecret is true.");
         }
 
         var strategy = _context.Database.CreateExecutionStrategy();
@@ -782,17 +826,23 @@ public class ClientsController : ControllerBase
                     Description = request.Description,
                     RealmId = request.RealmId,
                     IsEnabled = request.IsEnabled,
-                    ClientType = request.ClientType, // Remove cast since now using shared enum
+                    ClientType = request.ClientType, // shared enum
                     AllowAuthorizationCodeFlow = request.AllowAuthorizationCodeFlow,
                     AllowClientCredentialsFlow = request.AllowClientCredentialsFlow,
                     AllowPasswordFlow = request.AllowPasswordFlow,
                     AllowRefreshTokenFlow = request.AllowRefreshTokenFlow,
                     RequirePkce = request.RequirePkce,
                     RequireClientSecret = request.RequireClientSecret,
-                    AccessTokenLifetime = request.AccessTokenLifetime,
-                    RefreshTokenLifetime = request.RefreshTokenLifetime,
-                    AuthorizationCodeLifetime = request.AuthorizationCodeLifetime,
-                    CreatedBy = User.Identity?.Name
+                    AccessTokenLifetime = request.AccessTokenLifetime ?? MrWhoConstants.TokenLifetimes.AccessToken,
+                    RefreshTokenLifetime = request.RefreshTokenLifetime ?? MrWhoConstants.TokenLifetimes.RefreshToken,
+                    AuthorizationCodeLifetime = request.AuthorizationCodeLifetime ?? MrWhoConstants.TokenLifetimes.AuthorizationCode,
+                    CreatedBy = User.Identity?.Name,
+
+                    // login options
+                    AllowPasskeyLogin = request.AllowPasskeyLogin,
+                    AllowQrLoginQuick = request.AllowQrLoginQuick,
+                    AllowQrLoginSecure = request.AllowQrLoginSecure,
+                    AllowCodeLogin = request.AllowCodeLogin
                 };
 
                 _context.Clients.Add(client);
@@ -840,8 +890,15 @@ public class ClientsController : ControllerBase
 
                 await _context.SaveChangesAsync();
 
-                // Create OpenIddict application
-                await CreateOpenIddictApplication(client, request);
+                // Create OpenIddict application only if valid
+                if (!requiresSecret || !string.IsNullOrWhiteSpace(client.ClientSecret))
+                {
+                    await CreateOpenIddictApplication(client, request);
+                }
+                else
+                {
+                    _logger.LogWarning("Skipping OpenIddict application creation for client '{ClientId}' due to missing secret for confidential/machine client.", client.ClientId);
+                }
 
                 await transaction.CommitAsync();
 
@@ -854,7 +911,7 @@ public class ClientsController : ControllerBase
                     Name = client.Name,
                     Description = client.Description,
                     IsEnabled = client.IsEnabled,
-                    ClientType = client.ClientType, // Remove cast since now using shared enum
+                    ClientType = client.ClientType,
                     AllowAuthorizationCodeFlow = client.AllowAuthorizationCodeFlow,
                     AllowClientCredentialsFlow = client.AllowClientCredentialsFlow,
                     AllowPasswordFlow = client.AllowPasswordFlow,
@@ -873,7 +930,13 @@ public class ClientsController : ControllerBase
                     RedirectUris = request.RedirectUris,
                     PostLogoutUris = request.PostLogoutUris,
                     Scopes = request.Scopes,
-                    Permissions = request.Permissions
+                    Permissions = request.Permissions,
+
+                    // login options
+                    AllowPasskeyLogin = client.AllowPasskeyLogin,
+                    AllowQrLoginQuick = client.AllowQrLoginQuick,
+                    AllowQrLoginSecure = client.AllowQrLoginSecure,
+                    AllowCodeLogin = client.AllowCodeLogin
                 };
 
                 return CreatedAtAction(nameof(GetClient), new { id = client.Id }, clientDto);
@@ -905,6 +968,15 @@ public class ClientsController : ControllerBase
             return NotFound($"Client with ID '{id}' not found.");
         }
 
+        // validate secret requirement before persisting/creating openiddict app
+        var targetType = request.ClientType ?? client.ClientType;
+        var requireSecret = (targetType == ClientType.Confidential || targetType == ClientType.Machine) && (request.RequireClientSecret ?? client.RequireClientSecret);
+        var targetSecret = string.IsNullOrWhiteSpace(request.ClientSecret) ? client.ClientSecret : request.ClientSecret;
+        if (requireSecret && string.IsNullOrWhiteSpace(targetSecret))
+        {
+            return ValidationProblem("ClientSecret is required for confidential or machine clients when RequireClientSecret is true.");
+        }
+
         // Use execution strategy for transaction handling with retry support
         var strategy = _context.Database.CreateExecutionStrategy();
         var result = await strategy.ExecuteAsync(async () =>
@@ -921,7 +993,7 @@ public class ClientsController : ControllerBase
                 if (request.IsEnabled.HasValue)
                     client.IsEnabled = request.IsEnabled.Value;
                 if (request.ClientType.HasValue)
-                    client.ClientType = request.ClientType.Value; // Remove cast since now using shared enum
+                    client.ClientType = request.ClientType.Value; // shared enum
                 if (request.AllowAuthorizationCodeFlow.HasValue)
                     client.AllowAuthorizationCodeFlow = request.AllowAuthorizationCodeFlow.Value;
                 if (request.AllowClientCredentialsFlow.HasValue)
@@ -935,9 +1007,9 @@ public class ClientsController : ControllerBase
                 if (request.RequireClientSecret.HasValue)
                     client.RequireClientSecret = request.RequireClientSecret.Value;
 
-                client.AccessTokenLifetime = request.AccessTokenLifetime;
-                client.RefreshTokenLifetime = request.RefreshTokenLifetime;
-                client.AuthorizationCodeLifetime = request.AuthorizationCodeLifetime;
+                client.AccessTokenLifetime = request.AccessTokenLifetime ?? client.AccessTokenLifetime;
+                client.RefreshTokenLifetime = request.RefreshTokenLifetime ?? client.RefreshTokenLifetime;
+                client.AuthorizationCodeLifetime = request.AuthorizationCodeLifetime ?? client.AuthorizationCodeLifetime;
 
                 // === Apply dynamic configuration (allow setting to null to reset to defaults) ===
                 client.SessionTimeoutHours = request.SessionTimeoutHours;
@@ -998,6 +1070,12 @@ public class ClientsController : ControllerBase
                 client.CustomLoginPageUrl = request.CustomLoginPageUrl;
                 client.CustomLogoutPageUrl = request.CustomLogoutPageUrl;
                 client.CustomErrorPageUrl = request.CustomErrorPageUrl;
+
+                // login options
+                client.AllowPasskeyLogin = request.AllowPasskeyLogin;
+                client.AllowQrLoginQuick = request.AllowQrLoginQuick;
+                client.AllowQrLoginSecure = request.AllowQrLoginSecure;
+                client.AllowCodeLogin = request.AllowCodeLogin;
 
                 client.UpdatedAt = DateTime.UtcNow;
                 client.UpdatedBy = User.Identity?.Name;
@@ -1061,13 +1139,20 @@ public class ClientsController : ControllerBase
                 await _context.SaveChangesAsync();
                 _logger.LogInformation("Client '{ClientId}' updated in database", client.ClientId);
                 
-                // Update OpenIddict application
-                await UpdateOpenIddictApplication(client);
+                // Update OpenIddict application (only if valid)
+                if (!requireSecret || !string.IsNullOrWhiteSpace(client.ClientSecret))
+                {
+                    await UpdateOpenIddictApplication(client);
+                }
+                else
+                {
+                    _logger.LogWarning("Skipping OpenIddict application update for client '{ClientId}' due to missing secret for confidential/machine client.", client.ClientId);
+                }
 
                 await transaction.CommitAsync();
 
                 _logger.LogInformation("Client '{ClientId}' updated successfully", client.ClientId);
-
+                
                 // Reload client with updated data
                 await _context.Entry(client).ReloadAsync();
                 await _context.Entry(client).Reference(c => c.Realm).LoadAsync();
@@ -1083,7 +1168,7 @@ public class ClientsController : ControllerBase
                     Name = client.Name,
                     Description = client.Description,
                     IsEnabled = client.IsEnabled,
-                    ClientType = client.ClientType, // Remove cast since now using shared enum
+                    ClientType = client.ClientType, // shared enum
                     AllowAuthorizationCodeFlow = client.AllowAuthorizationCodeFlow,
                     AllowClientCredentialsFlow = client.AllowClientCredentialsFlow,
                     AllowPasswordFlow = client.AllowPasswordFlow,
@@ -1153,7 +1238,13 @@ public class ClientsController : ControllerBase
                     EnableLocalLogin = client.EnableLocalLogin,
                     CustomLoginPageUrl = client.CustomLoginPageUrl,
                     CustomLogoutPageUrl = client.CustomLogoutPageUrl,
-                    CustomErrorPageUrl = client.CustomErrorPageUrl
+                    CustomErrorPageUrl = client.CustomErrorPageUrl,
+
+                    // login options
+                    AllowPasskeyLogin = client.AllowPasskeyLogin,
+                    AllowQrLoginQuick = client.AllowQrLoginQuick,
+                    AllowQrLoginSecure = client.AllowQrLoginSecure,
+                    AllowCodeLogin = client.AllowCodeLogin
                 };
 
                 return clientDto;
@@ -1169,112 +1260,16 @@ public class ClientsController : ControllerBase
         return Ok(result);
     }
 
-    [HttpDelete("{id}")]
-    public async Task<IActionResult> DeleteClient(string id)
-    {
-        var client = await _context.Clients.FindAsync(id);
-        if (client == null)
-        {
-            return NotFound($"Client with ID '{id}' not found.");
-        }
-
-        // Use execution strategy for transaction handling with retry support
-        var strategy = _context.Database.CreateExecutionStrategy();
-        await strategy.ExecuteAsync(async () =>
-        {
-            using var transaction = await _context.Database.BeginTransactionAsync();
-            try
-            {
-                // Delete from OpenIddict
-                var openIddictClient = await _applicationManager.FindByClientIdAsync(client.ClientId);
-                if (openIddictClient != null)
-                {
-                    await _applicationManager.DeleteAsync(openIddictClient);
-                }
-
-                // Delete from our database (cascade will handle related entities)
-                _context.Clients.Remove(client);
-                await _context.SaveChangesAsync();
-
-                await transaction.CommitAsync();
-
-                _logger.LogInformation("Client '{ClientId}' deleted successfully", client.ClientId);
-            }
-            catch (Exception ex)
-            {
-                await transaction.RollbackAsync();
-                _logger.LogError(ex, "Error deleting client '{ClientId}'", client.ClientId);
-                throw;
-            }
-        });
-
-        return NoContent();
-    }
-
-    [HttpPost("{id}/toggle")]
-    public async Task<ActionResult<ClientDto>> ToggleClient(string id)
-    {
-        var client = await _context.Clients
-            .Include(c => c.Realm)
-            .Include(c => c.RedirectUris)
-            .Include(c => c.PostLogoutUris)
-            .Include(c => c.Scopes)
-            .Include(c => c.Permissions)
-            .FirstOrDefaultAsync(c => c.Id == id);
-
-        if (client == null)
-        {
-            return NotFound($"Client with ID '{id}' not found.");
-        }
-
-        client.IsEnabled = !client.IsEnabled;
-        client.UpdatedAt = DateTime.UtcNow;
-        client.UpdatedBy = User.Identity?.Name;
-
-        await _context.SaveChangesAsync();
-
-        var action = client.IsEnabled ? "enabled" : "disabled";
-        _logger.LogInformation("Client '{ClientId}' {Action} successfully", client.ClientId, action);
-
-        var clientDto = new ClientDto
-        {
-            Id = client.Id,
-            ClientId = client.ClientId,
-            Name = client.Name,
-            Description = client.Description,
-            IsEnabled = client.IsEnabled,
-            ClientType = client.ClientType, // Remove cast since now using shared enum
-            AllowAuthorizationCodeFlow = client.AllowAuthorizationCodeFlow,
-            AllowClientCredentialsFlow = client.AllowClientCredentialsFlow,
-            AllowPasswordFlow = client.AllowPasswordFlow,
-            AllowRefreshTokenFlow = client.AllowRefreshTokenFlow,
-            RequirePkce = client.RequirePkce,
-            RequireClientSecret = client.RequireClientSecret,
-            AccessTokenLifetime = client.AccessTokenLifetime,
-            RefreshTokenLifetime = client.RefreshTokenLifetime,
-            AuthorizationCodeLifetime = client.AuthorizationCodeLifetime,
-            RealmId = client.RealmId,
-            RealmName = client.Realm.Name,
-            CreatedAt = client.CreatedAt,
-            UpdatedAt = client.UpdatedAt,
-            CreatedBy = client.CreatedBy,
-            UpdatedBy = client.UpdatedBy,
-            RedirectUris = client.RedirectUris.Select(ru => ru.Uri).ToList(),
-            PostLogoutUris = client.PostLogoutUris.Select(plu => plu.Uri).ToList(),
-            Scopes = client.Scopes.Select(s => s.Scope).ToList(),
-            Permissions = client.Permissions.Select(p => p.Permission).ToList()
-        };
-
-        return Ok(clientDto);
-    }
-
     private async Task CreateOpenIddictApplication(Client client, CreateClientRequest request)
     {
         var descriptor = new OpenIddictApplicationDescriptor
         {
             ClientId = client.ClientId,
             ClientSecret = client.ClientSecret,
-            DisplayName = client.Name
+            DisplayName = client.Name,
+            ClientType = client.ClientType == ClientType.Public 
+                ? OpenIddictConstants.ClientTypes.Public 
+                : OpenIddictConstants.ClientTypes.Confidential
         };
 
         // Add permissions based on flows
@@ -1340,8 +1335,6 @@ public class ClientsController : ControllerBase
         var openIddictClient = await _applicationManager.FindByClientIdAsync(client.ClientId);
         if (openIddictClient != null)
         {
-            // For simplicity, we'll recreate the OpenIddict application
-            // In production, you might want to update it in place
             await _applicationManager.DeleteAsync(openIddictClient);
             
             var request = new CreateClientRequest
@@ -1351,7 +1344,7 @@ public class ClientsController : ControllerBase
                 Name = client.Name,
                 Description = client.Description,
                 RealmId = client.RealmId,
-                ClientType = client.ClientType, // Remove cast since now using shared enum
+                ClientType = client.ClientType,
                 RedirectUris = client.RedirectUris.Select(ru => ru.Uri).ToList(),
                 PostLogoutUris = client.PostLogoutUris.Select(plu => plu.Uri).ToList(),
                 Scopes = client.Scopes.Select(s => s.Scope).ToList(),
@@ -1360,5 +1353,14 @@ public class ClientsController : ControllerBase
             
             await CreateOpenIddictApplication(client, request);
         }
+    }
+
+    private static string GenerateClientIdFromName(string name)
+    {
+        var baseId = new string((name ?? "client").ToLowerInvariant()
+            .Where(c => char.IsLetterOrDigit(c) || c == '-' || c == '_')
+            .ToArray());
+        if (string.IsNullOrWhiteSpace(baseId)) baseId = "client";
+        return $"{baseId}_{Guid.NewGuid().ToString("N")[..6]}"; // short suffix to avoid collisions
     }
 }

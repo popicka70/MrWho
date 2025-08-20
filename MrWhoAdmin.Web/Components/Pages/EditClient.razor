@@ -124,6 +124,28 @@
                                         </RadzenColumn>
                                     </RadzenRow>
 
+                                    <!-- Client Secret -->
+                                    <RadzenFormField Text="Client Secret" Variant="Variant.Outlined">
+                                        <ChildContent>
+                                            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center" Wrap="Radzen.FlexWrap.Wrap">
+                                                <RadzenTextBox @bind-Value="@model.ClientSecret" Style="width: 100%; max-width: 520px;" Placeholder="@(IsEdit ? "Leave blank to keep unchanged" : "Enter or generate a secret")" />
+                                                <RadzenButton Icon="password" Text="Generate" ButtonStyle="ButtonStyle.Secondary" Click="@GenerateSecret" />
+                                            </RadzenStack>
+                                        </ChildContent>
+                                        <Helper>
+                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                Required for Confidential and Machine clients when Require Client Secret is enabled. Do not share publicly.
+                                            </RadzenText>
+                                        </Helper>
+                                    </RadzenFormField>
+
+                                    <!-- Security banner about secrets -->
+                                    <RadzenAlert AlertStyle="AlertStyle.Info" ShowIcon="true">
+                                        <RadzenText TextStyle="TextStyle.Body2">
+                                            Client secrets are write-only and will not be displayed on this page. On edit, leave the field empty to keep the current secret. If you generate a new secret, copy and store it securely now.
+                                        </RadzenText>
+                                    </RadzenAlert>
+
                                     <RadzenFormField Text="Description" Variant="Variant.Outlined">
                                         <ChildContent>
                                             <RadzenTextArea @bind-Value="@model.Description" 
@@ -141,6 +163,48 @@
                                                 Toggle to enable or disable this client
                                             </RadzenText>
                                         </Helper>
+                                    </RadzenFormField>
+
+                                    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Allowed Login Methods</RadzenText>
+                                    <RadzenFormField Variant="Variant.Outlined">
+                                        <Start>
+                                            <RadzenCheckBox @bind-Value="@model.EnableLocalLogin" TriState="true" Name="allowLocal" />
+                                        </Start>
+                                        <ChildContent>
+                                            <RadzenLabel Text="Allow local login (username/password)" Component="allowLocal" />
+                                        </ChildContent>
+                                    </RadzenFormField>
+                                    <RadzenFormField Variant="Variant.Outlined">
+                                        <Start>
+                                            <RadzenCheckBox @bind-Value="@model.AllowPasskeyLogin" TriState="true" Name="allowPasskey" />
+                                        </Start>
+                                        <ChildContent>
+                                            <RadzenLabel Text="Allow passkey (WebAuthn)" Component="allowPasskey" />
+                                        </ChildContent>
+                                    </RadzenFormField>
+                                    <RadzenFormField Variant="Variant.Outlined">
+                                        <Start>
+                                            <RadzenCheckBox @bind-Value="@model.AllowQrLoginQuick" TriState="true" Name="allowQrQuick" />
+                                        </Start>
+                                        <ChildContent>
+                                            <RadzenLabel Text="Allow Quick QR login" Component="allowQrQuick" />
+                                        </ChildContent>
+                                    </RadzenFormField>
+                                    <RadzenFormField Variant="Variant.Outlined">
+                                        <Start>
+                                            <RadzenCheckBox @bind-Value="@model.AllowQrLoginSecure" TriState="true" Name="allowQrSecure" />
+                                        </Start>
+                                        <ChildContent>
+                                            <RadzenLabel Text="Allow Secure QR login" Component="allowQrSecure" />
+                                        </ChildContent>
+                                    </RadzenFormField>
+                                    <RadzenFormField Variant="Variant.Outlined">
+                                        <Start>
+                                            <RadzenCheckBox @bind-Value="@model.AllowCodeLogin" TriState="true" Name="allowCode" />
+                                        </Start>
+                                        <ChildContent>
+                                            <RadzenLabel Text="Allow authenticator code login option" Component="allowCode" />
+                                        </ChildContent>
                                     </RadzenFormField>
                                 </RadzenStack>
                             </RadzenStack>
@@ -1207,6 +1271,11 @@
             model.AllowAccessToRevocationEndpoint = true;
             model.RememberMfaForSession = true;
             model.EnableLocalLogin = true;
+            // Login option defaults
+            model.AllowPasskeyLogin = true;
+            model.AllowQrLoginQuick = true;
+            model.AllowQrLoginSecure = true;
+            model.AllowCodeLogin = true;
             // Reasonable default scopes for new client
             selectedScopes = new() { "openid", "profile", "email", "roles", "offline_access" };
         }
@@ -1326,7 +1395,7 @@
 
     private IEnumerable<IdentityProviderDto> FilteredProviders => string.IsNullOrWhiteSpace(providerSearch)
         ? providers
-        : providers.Where(p => (p.DisplayName ?? p.Name).Contains(providerSearch, StringComparison.OrdinalIgnoreCase)
+        : providers.Where(p => ((p.DisplayName ?? p.Name)?.Contains(providerSearch, StringComparison.OrdinalIgnoreCase) ?? false)
                             || p.Name.Contains(providerSearch, StringComparison.OrdinalIgnoreCase));
 
     private string GetProviderName(string providerId)
@@ -1461,7 +1530,12 @@
             EnableLocalLogin = client.EnableLocalLogin,
             CustomLoginPageUrl = client.CustomLoginPageUrl,
             CustomLogoutPageUrl = client.CustomLogoutPageUrl,
-            CustomErrorPageUrl = client.CustomErrorPageUrl
+            CustomErrorPageUrl = client.CustomErrorPageUrl,
+            // New login options
+            AllowPasskeyLogin = client.AllowPasskeyLogin,
+            AllowQrLoginQuick = client.AllowQrLoginQuick,
+            AllowQrLoginSecure = client.AllowQrLoginSecure,
+            AllowCodeLogin = client.AllowCodeLogin
         };
     }
 
@@ -1534,8 +1608,16 @@
             EnableLocalLogin = model.EnableLocalLogin,
             CustomLoginPageUrl = model.CustomLoginPageUrl,
             CustomLogoutPageUrl = model.CustomLogoutPageUrl,
-            CustomErrorPageUrl = model.CustomErrorPageUrl
+            CustomErrorPageUrl = model.CustomErrorPageUrl,
+            // New login options
+            AllowPasskeyLogin = model.AllowPasskeyLogin,
+            AllowQrLoginQuick = model.AllowQrLoginQuick,
+            AllowQrLoginSecure = model.AllowQrLoginSecure,
+            AllowCodeLogin = model.AllowCodeLogin
         };
+
+        // Only include ClientSecret when provided (blank keeps unchanged)
+        update.ClientSecret = string.IsNullOrWhiteSpace(model.ClientSecret) ? null : model.ClientSecret;
 
         return update;
     }
@@ -1611,7 +1693,12 @@
             EnableLocalLogin = model.EnableLocalLogin,
             CustomLoginPageUrl = model.CustomLoginPageUrl,
             CustomLogoutPageUrl = model.CustomLogoutPageUrl,
-            CustomErrorPageUrl = model.CustomErrorPageUrl
+            CustomErrorPageUrl = model.CustomErrorPageUrl,
+            // New login options
+            AllowPasskeyLogin = model.AllowPasskeyLogin,
+            AllowQrLoginQuick = model.AllowQrLoginQuick,
+            AllowQrLoginSecure = model.AllowQrLoginSecure,
+            AllowCodeLogin = model.AllowCodeLogin
         };
     }
 
@@ -1740,6 +1827,12 @@
         model.FrontChannelLogoutSessionRequired = null;
         model.AllowedCorsOrigins = null;
         model.AllowedIdentityProviders = null;
+        // Reset login options to null (realm/server default)
+        model.EnableLocalLogin = null;
+        model.AllowPasskeyLogin = null;
+        model.AllowQrLoginQuick = null;
+        model.AllowQrLoginSecure = null;
+        model.AllowCodeLogin = null;
         StateHasChanged();
         return Task.CompletedTask;
     }
@@ -1821,4 +1914,14 @@
          public bool IsStandard { get; set; }
          public bool Selected { get; set; }
      }
+
+    private void GenerateSecret()
+    {
+        // Generate a 32-byte random secret encoded as Base64Url (no padding)
+        var bytes = System.Security.Cryptography.RandomNumberGenerator.GetBytes(32);
+        var base64 = Convert.ToBase64String(bytes);
+        // Make it URL-safe to avoid copy/paste issues in config files if needed
+        var urlSafe = base64.Replace('+', '-').Replace('/', '_').TrimEnd('=');
+        model.ClientSecret = urlSafe;
+    }
 }

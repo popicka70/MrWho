@@ -149,4 +149,10 @@ public class CreateClientRequest
     
     [StringLength(2000)]
     public string? CustomErrorPageUrl { get; set; }
+
+    // Login options (new)
+    public bool? AllowPasskeyLogin { get; set; }
+    public bool? AllowQrLoginQuick { get; set; }
+    public bool? AllowQrLoginSecure { get; set; }
+    public bool? AllowCodeLogin { get; set; }
 }

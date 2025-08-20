@@ -79,6 +79,7 @@ public sealed class LoginGetHandler : IRequestHandler<LoginGetRequest, IActionRe
         viewData["RecaptchaSiteKey"] = ShouldUseRecaptcha() ? _configuration["GoogleReCaptcha:SiteKey"] : null;
 
         string? clientName = null;
+        bool allowLocal = true, allowPasskey = true, allowQrQuick = true, allowQrSecure = true, allowCode = true;
         if (!string.IsNullOrEmpty(clientId))
         {
             try
@@ -104,6 +105,21 @@ public sealed class LoginGetHandler : IRequestHandler<LoginGetRequest, IActionRe
                 .AsNoTracking()
                 .Include(c => c.Realm)
                 .FirstOrDefaultAsync(c => c.ClientId == clientId, cancellationToken);
+
+            // Visible login options
+            if (client != null)
+            {
+                allowLocal = client.EnableLocalLogin ?? true;
+                allowPasskey = client.AllowPasskeyLogin ?? true;
+                allowQrQuick = client.AllowQrLoginQuick ?? true;
+                allowQrSecure = client.AllowQrLoginSecure ?? true;
+                allowCode = client.AllowCodeLogin ?? true;
+            }
+            viewData["AllowLocalLogin"] = allowLocal;
+            viewData["AllowPasskeyLogin"] = allowPasskey;
+            viewData["AllowQrLoginQuick"] = allowQrQuick;
+            viewData["AllowQrLoginSecure"] = allowQrSecure;
+            viewData["AllowCodeLogin"] = allowCode;
 
             // Compute theme and custom CSS with precedence: client > realm > server
             string? themeName = null;
@@ -186,6 +202,8 @@ public sealed class LoginGetHandler : IRequestHandler<LoginGetRequest, IActionRe
         }
 
         var useCode = string.Equals(mode, "code", StringComparison.OrdinalIgnoreCase);
+        // If code mode is not allowed, force to password
+        if (!allowCode) useCode = false;
         var model = new MrWho.Controllers.LoginViewModel { UseCode = useCode };
         return new ViewResult
         {

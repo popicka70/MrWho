@@ -4,6 +4,7 @@
 @inject IRegistrationsApiService RegistrationsApi
 @inject NotificationService NotificationService
 @inject ILogger<PendingRegistrations> Logger
+@inject NavigationManager Navigation
 
 <PageTitle>Pending Registrations - MrWho Admin</PageTitle>
 
@@ -82,7 +83,8 @@
             if (ok)
             {
                 NotificationService.Notify(NotificationSeverity.Success, "Approved", $"Approved {item.Email}");
-                await LoadAsync();
+                // Navigate to the user's detail page for review
+                Navigation.NavigateTo($"/users/edit/{item.Id}");
             }
             else
             {

@@ -12,18 +12,34 @@
                     <h4 class="mb-0"><i class="bi bi-box-arrow-right"></i> Logout</h4>
                 </div>
                 <div class="card-body">
-                    <p>Are you sure you want to logout?</p>
-                    
-                    <form method="post">
-                        <div class="d-flex gap-2">
-                            <button type="submit" class="btn btn-danger">
-                                <i class="bi bi-box-arrow-right"></i> Yes, Logout
-                            </button>
-                            <a href="/" class="btn btn-secondary">
-                                <i class="bi bi-arrow-left"></i> Cancel
-                            </a>
+                    <p>Choose how you want to logout:</p>
+
+                    <div class="alert alert-secondary">
+                        <div class="d-flex align-items-start gap-2">
+                            <i class="bi bi-info-circle"></i>
+                            <div>
+                                <strong>Local-only</strong> clears just this app's cookie and keeps the OIDC server session (good for testing SSO).
+                                <br/>
+                                <strong>Complete</strong> also signs out at the OIDC provider (global sign-out).
+                            </div>
                         </div>
+                    </div>
+
+                    <form method="post" class="mb-2">
+                        <button type="submit" class="btn btn-secondary">
+                            <i class="bi bi-x-circle"></i> Local-only Logout
+                        </button>
                     </form>
+
+                    <form method="post" asp-page-handler="Complete" class="mb-3">
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-box-arrow-right"></i> Complete Logout (OIDC)
+                        </button>
+                    </form>
+
+                    <a href="/" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left"></i> Cancel
+                    </a>
                 </div>
             </div>
         </div>
