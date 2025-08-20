@@ -188,22 +188,23 @@
                                     var name = (string)p.Name;
                                     var display = (string)p.DisplayName;
                                     var icon = p.IconUri as string;
-                                    var extQuery = string.Join("&", new[]{ ViewData["ReturnUrl"] as string is string er && !string.IsNullOrEmpty(er) ? ($"returnUrl={Uri.EscapeDataString(er)}") : null,
-                                                                           ViewData["ClientId"] as string is string ec && !string.IsNullOrEmpty(ec) ? ($"clientId={Uri.EscapeDataString(ec)}") : null }
-                                                                           .Where(s => s != null));
+                                    var extQueryBase = new[]{ ViewData["ReturnUrl"] as string is string er && !string.IsNullOrEmpty(er) ? ($"returnUrl={Uri.EscapeDataString(er)}") : null,
+                                                              ViewData["ClientId"] as string is string ec && !string.IsNullOrEmpty(ec) ? ($"clientId={Uri.EscapeDataString(ec)}") : null }
+                                                             .Where(s => s != null);
+                                    var extQuery = string.Join("&", extQueryBase);
                                     var extHref = string.IsNullOrEmpty(extQuery)
                                         ? $"/connect/external/login/{Uri.EscapeDataString(name)}"
                                         : $"/connect/external/login/{Uri.EscapeDataString(name)}?{extQuery}";
-                                    <a href="@extHref" class="btn btn-outline-dark d-flex align-items-center justify-content-center">
-                                        @if (!string.IsNullOrWhiteSpace(icon))
-                                        {
-                                            <img src="@icon" alt="@display" style="height: 18px; width: 18px; object-fit: contain;" class="me-2" />
-                                        }
-                                        else
-                                        {
-                                            <i class="bi bi-shield-lock me-2"></i>
-                                        }
-                                        <span>Sign in with @display</span>
+
+                                    <a href="@extHref" class="btn auth-button">
+                                        <i class="bi bi-box-arrow-in-right me-2"></i>@display
+                                    </a>
+
+                                    // Force new external login (prompt=login)
+                                    var forceQuery = string.IsNullOrEmpty(extQuery) ? "force=1" : extQuery + "&force=1";
+                                    var forceHref = $"/connect/external/login/{Uri.EscapeDataString(name)}?{forceQuery}";
+                                    <a href="@forceHref" class="btn btn-outline-secondary small">
+                                        <i class="bi bi-arrow-repeat me-1"></i>Use @display (force new login)
                                     </a>
                                 }
                             </div>
