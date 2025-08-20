@@ -125,7 +125,7 @@ public static class ServiceCollectionExtensions
             options.UseNpgsql(connectionString);
 
             if (isDevelopment)
-            {
+			{
                 options.ConfigureWarnings(w => w.Log(RelationalEventId.PendingModelChangesWarning));
                 options.EnableDetailedErrors();
                 options.EnableSensitiveDataLogging();
@@ -163,14 +163,15 @@ public static class ServiceCollectionExtensions
             options.ClaimsIdentity.EmailClaimType = OpenIddictConstants.Claims.Email;
         });
 
-        // Ensure default Identity cookie uses our connect/* routes (important in None mode)
+        // Ensure default Identity cookie uses our connect/* routes and SameSite=None for cross-site flows
         services.ConfigureApplicationCookie(options =>
         {
             options.LoginPath = "/connect/login";
             options.LogoutPath = "/connect/logout";
             options.AccessDeniedPath = "/connect/access-denied";
             options.SlidingExpiration = true;
-            // Keep SameSite=Lax for OIDC redirects; domain/secure overrides are applied via PostConfigureAll in Program.cs
+            options.Cookie.SameSite = SameSiteMode.None; // Required for external IdP (cross-site) login/logout
+            options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
         });
 
         // Add support for multiple cookie configurations
@@ -196,7 +197,7 @@ public static class ServiceCollectionExtensions
                 options.Cookie.Name = actualCookieName;
                 options.Cookie.HttpOnly = true;
                 options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
-                options.Cookie.SameSite = SameSiteMode.Lax;
+                options.Cookie.SameSite = SameSiteMode.None; // Required for cross-site OIDC redirects
                 options.ExpireTimeSpan = TimeSpan.FromHours(24);
                 options.SlidingExpiration = true;
                 

@@ -106,6 +106,8 @@ public sealed class LogoutPostHandler : IRequestHandler<LogoutPostRequest, IActi
         if (string.IsNullOrWhiteSpace(cookieName)) return;
         var configured = _configuration["Cookie:Domain"];
         var host = http.Request.Host.Host;
+        var requireHttps = string.Equals(_configuration["Cookie:RequireHttps"], "true", StringComparison.OrdinalIgnoreCase);
+        var secure = requireHttps || http.Request.IsHttps;
         var domains = new List<string?> { null };
         if (!string.IsNullOrWhiteSpace(host))
         {
@@ -119,7 +121,7 @@ public sealed class LogoutPostHandler : IRequestHandler<LogoutPostRequest, IActi
         }
         foreach (var d in domains.Distinct(StringComparer.OrdinalIgnoreCase))
         {
-            try { http.Response.Cookies.Delete(cookieName, new CookieOptions { Path = "/", Domain = d }); }
+            try { http.Response.Cookies.Delete(cookieName, new CookieOptions { Path = "/", Domain = d, HttpOnly = true, Secure = secure, SameSite = SameSiteMode.None }); }
             catch (Exception ex) { _logger.LogDebug(ex, "Error deleting cookie {Cookie} for domain {Domain}", cookieName, d ?? "<null>"); }
         }
     }

@@ -248,7 +248,7 @@ public static class ServiceCollectionExtensions
             options.Cookie.Path = "/";
             options.Cookie.HttpOnly = true;
             options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
-            options.Cookie.SameSite = SameSiteMode.Lax;
+            options.Cookie.SameSite = SameSiteMode.None; // Required for cross-site OIDC flows
             options.ExpireTimeSpan = TimeSpan.FromHours(8);
             options.SlidingExpiration = true;
             options.LoginPath = "/login";
