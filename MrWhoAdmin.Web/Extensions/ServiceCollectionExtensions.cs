@@ -233,6 +233,10 @@ public static class ServiceCollectionExtensions
         // CORRECTED: Use standard OIDC schemes - session isolation handled server-side
         const string adminCookieScheme = "AdminCookies";
         
+        // Compute admin cookie name using the same convention as the server
+        static string GetMrWhoCookieName(string clientId) => $".MrWho.{clientId}";
+        var adminCookieName = GetMrWhoCookieName("mrwho_admin_web");
+        
         services.AddAuthentication(options =>
         {
             options.DefaultScheme = adminCookieScheme;
@@ -240,7 +244,7 @@ public static class ServiceCollectionExtensions
         })
         .AddCookie(adminCookieScheme, options =>
         {
-            options.Cookie.Name = ".MrWho.Admin"; // Client-specific cookie name for local session
+            options.Cookie.Name = adminCookieName; // Align with server standard .MrWho.{clientId}
             options.Cookie.Path = "/";
             options.Cookie.HttpOnly = true;
             options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
