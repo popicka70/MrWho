@@ -78,7 +78,7 @@ public class ClientCookieConfigurationService : IClientCookieConfigurationServic
     }
 
     /// <summary>
-    /// Checks if a client should use dynamic cookie management
+    /// Checks if a client should use dynamic cookies
     /// </summary>
     public bool UsesDynamicCookies(string clientId)
     {
@@ -154,7 +154,46 @@ public class ClientCookieConfigurationService : IClientCookieConfigurationServic
 
     public IDictionary<string, ClientCookieConfiguration> GetAllClientConfigurations()
     {
-        return new Dictionary<string, ClientCookieConfiguration>();
+        var dict = new Dictionary<string, ClientCookieConfiguration>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            var mode = _options.Value.CookieSeparationMode;
+
+            // Default Identity cookie when not separating
+            if (mode == CookieSeparationMode.None)
+            {
+                dict["default"] = new ClientCookieConfiguration
+                {
+                    ClientId = "default",
+                    SchemeName = IdentityConstants.ApplicationScheme,
+                    CookieName = ".AspNetCore.Identity.Application"
+                };
+            }
+
+            // Load enabled clients from the database (sync wait is fine on ASP.NET Core)
+            var clients = _oidcClientService.GetEnabledClientsAsync().GetAwaiter().GetResult();
+            foreach (var client in clients)
+            {
+                var id = client.ClientId;
+                if (string.IsNullOrWhiteSpace(id)) continue;
+                var scheme = GetCookieSchemeForClient(id);
+                var cookie = GetCookieNameForClient(id);
+                dict[id] = new ClientCookieConfiguration
+                {
+                    ClientId = id,
+                    SchemeName = scheme,
+                    CookieName = cookie
+                };
+            }
+
+            _logger.LogDebug("Enumerated {Count} client cookie configurations", dict.Count);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to enumerate client cookie configurations");
+        }
+
+        return dict;
     }
 
     private string GetRealmKeyForClient(string clientId)
