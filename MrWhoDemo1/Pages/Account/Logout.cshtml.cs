@@ -25,39 +25,46 @@ public class LogoutModel : PageModel
         return Page();
     }
 
-    public async Task<IActionResult> OnPost()
+    // Local-only logout: clears the app cookie but keeps the OIDC provider session (SSO preserved)
+    public async Task<IActionResult> OnPostAsync()
     {
         if (User.Identity?.IsAuthenticated == true)
         {
-            _logger.LogInformation("?? Starting Demo1 LOCAL-ONLY logout to avoid affecting other clients");
+            _logger.LogInformation("Demo1 LOCAL-ONLY logout: clearing local cookie only (OIDC provider session remains)");
 
             try
             {
-                // FIXED: Do completely local logout - do NOT hit server's global logout endpoint
-                // This prevents interference with other clients' sessions
-
-                _logger.LogInformation("?? Demo1 performing local-only logout: Clearing only local Demo1 session");
-                
-                // Step 1: Sign out from local Demo1 cookie only (no server call)
                 await HttpContext.SignOutAsync(Demo1CookieScheme);
-                
-                // Step 2: Optional - could call a Demo1-specific logout endpoint if needed
-                // But for now, just do local logout to maintain session isolation
-                
-                _logger.LogInformation("? Demo1 local logout complete: Only Demo1 session cleared, other clients unaffected");
-                
                 return LocalRedirect("/?logout=success");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "? Error during Demo1 local logout process");
-                
-                // Fallback: at least clear local authentication
+                _logger.LogError(ex, "Error during Demo1 local logout process");
                 await HttpContext.SignOutAsync(Demo1CookieScheme);
                 return LocalRedirect("/?logout=error");
             }
         }
 
         return LocalRedirect("/");
+    }
+
+    // Complete logout: clears local cookie and performs OIDC end-session at the provider
+    public IActionResult OnPostComplete()
+    {
+        if (User.Identity?.IsAuthenticated != true)
+        {
+            return LocalRedirect("/");
+        }
+
+        _logger.LogInformation("Demo1 COMPLETE logout: signing out locally and at OIDC provider");
+
+        var props = new AuthenticationProperties
+        {
+            // After provider redirects back, OIDC middleware will send the user to options.SignedOutRedirectUri
+            RedirectUri = Url.Content("~/")
+        };
+
+        // Sign out of both local and OIDC schemes. The OIDC handler will redirect to the identity provider's logout endpoint.
+        return SignOut(props, Demo1CookieScheme, OpenIdConnectDefaults.AuthenticationScheme);
     }
 }
