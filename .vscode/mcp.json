@@ -3,10 +3,6 @@
         "Ref": {
             "type": "http",
             "url": "https://api.ref.tools/mcp?apiKey=ref-242e04c0f5aa7c1e822e"
-        },
-        "Neon": {
-            "url": "https://mcp.neon.tech/mcp",
-            "type": "http"
         }
     }
 }

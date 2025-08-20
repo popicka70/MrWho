@@ -84,3 +84,30 @@ h1:focus {
 .rz-form-field-start:has(.rz-chkbox) {
     padding-right: 7px !important;
 }
+
+/* ------------------------------------------------------------ */
+/* Additional selectable themes (apply class on <body> or a root container) */
+/* Ocean */
+body.theme-ocean, .theme-ocean body { background-color: #f0f9ff; color: #0c4a6e; }
+.theme-ocean a, .theme-ocean .btn-link { color: #0ea5e9; }
+.theme-ocean .btn-primary { background-color: #0284c7; border-color: #0369a1; color: #fff; }
+.theme-ocean .btn:focus, .theme-ocean .btn:active:focus, .theme-ocean .btn-link.nav-link:focus, .theme-ocean .form-control:focus, .theme-ocean .form-check-input:focus { box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #38bdf8; }
+/* Radzen primary button/link */
+.theme-ocean .rz-button.rz-primary, .theme-ocean .rz-button.rz-state-active { background-color: #0284c7; border-color: #0369a1; color: #fff; }
+.theme-ocean .rz-link { color: #0ea5e9; }
+
+/* Forest */
+body.theme-forest, .theme-forest body { background-color: #f0fdf4; color: #064e3b; }
+.theme-forest a, .theme-forest .btn-link { color: #059669; }
+.theme-forest .btn-primary { background-color: #10b981; border-color: #059669; color: #083344; }
+.theme-forest .btn:focus, .theme-forest .btn:active:focus, .theme-forest .btn-link.nav-link:focus, .theme-forest .form-control:focus, .theme-forest .form-check-input:focus { box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #34d399; }
+.theme-forest .rz-button.rz-primary, .theme-forest .rz-button.rz-state-active { background-color: #10b981; border-color: #059669; color: #083344; }
+.theme-forest .rz-link { color: #059669; }
+
+/* Sunset */
+body.theme-sunset, .theme-sunset body { background-color: #fff7ed; color: #7c2d12; }
+.theme-sunset a, .theme-sunset .btn-link { color: #f97316; }
+.theme-sunset .btn-primary { background-color: #ea580c; border-color: #c2410c; color: #fff; }
+.theme-sunset .btn:focus, .theme-sunset .btn:active:focus, .theme-sunset .btn-link.nav-link:focus, .theme-sunset .form-control:focus, .theme-sunset .form-check-input:focus { box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #fb923c; }
+.theme-sunset .rz-button.rz-primary, .theme-sunset .rz-button.rz-state-active { background-color: #ea580c; border-color: #c2410c; color: #fff; }
+.theme-sunset .rz-link { color: #f97316; }
