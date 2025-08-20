@@ -74,49 +74,41 @@ public sealed class RegisterPostHandler : IRequestHandler<RegisterPostRequest, I
             return new ViewResult { ViewName = "Register", ViewData = new ViewDataDictionary(vd) { Model = input } };
         }
 
-        var user = new IdentityUser { UserName = input.Email, Email = input.Email, EmailConfirmed = false };
-        var result = await _userManager.CreateAsync(user, input.Password);
-        if (!result.Succeeded)
-        {
-            var vd = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary())
-            {
-                ["RecaptchaSiteKey"] = ShouldUseRecaptcha() ? _configuration["GoogleReCaptcha:SiteKey"] : null
-            };
-            foreach (var error in result.Errors)
-            {
-                // Map common Identity password/email errors to fields so asp-validation-for renders them
-                var code = error.Code ?? string.Empty;
-                if (code.Contains("Password", StringComparison.OrdinalIgnoreCase))
-                {
-                    vd.ModelState.AddModelError("Password", error.Description);
-                }
-                else if (code.Contains("Email", StringComparison.OrdinalIgnoreCase) || code.Contains("UserName", StringComparison.OrdinalIgnoreCase))
-                {
-                    vd.ModelState.AddModelError("Email", error.Description);
-                }
-                else
-                {
-                    vd.ModelState.AddModelError(string.Empty, error.Description);
-                }
-            }
-            return new ViewResult { ViewName = "Register", ViewData = new ViewDataDictionary(vd) { Model = input } };
-        }
-
-        var profile = new MrWho.Models.UserProfile
-        {
-            UserId = user.Id,
-            FirstName = input.FirstName,
-            LastName = input.LastName,
-            DisplayName = $"{input.FirstName} {input.LastName}".Trim(),
-            State = MrWho.Models.UserState.New,
-            CreatedAt = DateTime.UtcNow
-        };
-        _db.UserProfiles.Add(profile);
-        await _db.SaveChangesAsync(cancellationToken);
-
-        // Link user to client if we have a hint (either direct clientId or via returnUrl's client_id)
+        // Begin transaction to ensure user, profile and client link are consistent
+        await using var tx = await _db.Database.BeginTransactionAsync(cancellationToken);
         try
         {
+            var user = new IdentityUser { UserName = input.Email, Email = input.Email, EmailConfirmed = false };
+            var createResult = await _userManager.CreateAsync(user, input.Password);
+            if (!createResult.Succeeded)
+            {
+                var vd = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary())
+                {
+                    ["RecaptchaSiteKey"] = ShouldUseRecaptcha() ? _configuration["GoogleReCaptcha:SiteKey"] : null
+                };
+                foreach (var error in createResult.Errors)
+                {
+                    var code = error.Code ?? string.Empty;
+                    if (code.Contains("Password", StringComparison.OrdinalIgnoreCase)) vd.ModelState.AddModelError("Password", error.Description);
+                    else if (code.Contains("Email", StringComparison.OrdinalIgnoreCase) || code.Contains("UserName", StringComparison.OrdinalIgnoreCase)) vd.ModelState.AddModelError("Email", error.Description);
+                    else vd.ModelState.AddModelError(string.Empty, error.Description);
+                }
+                return new ViewResult { ViewName = "Register", ViewData = new ViewDataDictionary(vd) { Model = input } };
+            }
+
+            var profile = new MrWho.Models.UserProfile
+            {
+                UserId = user.Id,
+                FirstName = input.FirstName,
+                LastName = input.LastName,
+                DisplayName = $"{input.FirstName} {input.LastName}".Trim(),
+                State = MrWho.Models.UserState.New,
+                CreatedAt = DateTime.UtcNow
+            };
+            _db.UserProfiles.Add(profile);
+            await _db.SaveChangesAsync(cancellationToken);
+
+            // Link user to client if we have a hint (either direct clientId or via returnUrl's client_id)
             var formClientId = http.Request.Form["clientId"].ToString();
             var returnUrl = http.Request.Form["returnUrl"].ToString();
             var clientHint = !string.IsNullOrWhiteSpace(formClientId) ? formClientId : TryExtractClientIdFromReturnUrl(returnUrl);
@@ -139,10 +131,13 @@ public sealed class RegisterPostHandler : IRequestHandler<RegisterPostRequest, I
                     }
                 }
             }
+
+            await tx.CommitAsync(cancellationToken);
         }
         catch
         {
-            // best-effort only; ignore failures to keep registration flow resilient
+            await tx.RollbackAsync(cancellationToken);
+            throw;
         }
 
         return new RedirectToActionResult("RegisterSuccess", "Auth", null);
