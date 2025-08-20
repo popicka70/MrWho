@@ -38,8 +38,14 @@ public sealed class LogoutPostHandler : IRequestHandler<LogoutPostRequest, IActi
         bool isOidcLogoutRequest = oidcReq != null && (!string.IsNullOrEmpty(oidcReq.IdTokenHint) || !string.IsNullOrEmpty(oidcReq.PostLogoutRedirectUri) || !string.IsNullOrEmpty(oidcReq.ClientId) || !string.IsNullOrEmpty(oidcReq.State));
         if (isOidcLogoutRequest)
         {
-            // Limit logout to the initiating client's session only.
-            await SignOutClientOnlyAsync(http, clientId);
+            if (UseGlobalLogout(http))
+            {
+                await SignOutGlobalAsync(http, clientId);
+            }
+            else
+            {
+                await SignOutClientOnlyAsync(http, clientId);
+            }
             return new SignOutResult(new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
         }
 
@@ -58,12 +64,32 @@ public sealed class LogoutPostHandler : IRequestHandler<LogoutPostRequest, IActi
             return new EmptyResult();
         }
 
-        await SignOutClientOnlyAsync(http, clientId);
+        if (UseGlobalLogout(http))
+        {
+            await SignOutGlobalAsync(http, clientId);
+        }
+        else
+        {
+            await SignOutClientOnlyAsync(http, clientId);
+        }
+
         return new RedirectToActionResult("Index", "Home", new { logout = "success" });
     }
 
-    // Signs out only the specified client's cookie/session. Does not clear global/default cookies
-    // to preserve other clients' sessions.
+    private bool UseGlobalLogout(HttpContext http)
+    {
+        // Config flag: Logout:Scope = Global | Client (default Client)
+        var scope = _configuration["Logout:Scope"]; // e.g. appsettings.json or environment
+        if (!string.IsNullOrWhiteSpace(scope) && scope.Equals("Global", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogDebug("Logout scope set to GLOBAL by configuration");
+            return true;
+        }
+        _logger.LogDebug("Logout scope set to CLIENT (default)");
+        return false;
+    }
+
+    // Signs out only the specified client's cookie/session. Preserves other clients' sessions.
     private async Task SignOutClientOnlyAsync(HttpContext http, string? clientId)
     {
         try
@@ -96,6 +122,61 @@ public sealed class LogoutPostHandler : IRequestHandler<LogoutPostRequest, IActi
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Error during client-only sign-out");
+        }
+    }
+
+    // Signs out from default Identity cookie and clears all known client cookies
+    private async Task SignOutGlobalAsync(HttpContext http, string? clientId)
+    {
+        try
+        {
+            await _signInManager.SignOutAsync();
+            DeleteCookieAcrossDomains(http, ".AspNetCore.Identity.Application");
+
+            // Clear the initiating client's cookie (if any)
+            if (!string.IsNullOrEmpty(clientId))
+            {
+                try
+                {
+                    await _dynamicCookieService.SignOutFromClientAsync(clientId);
+                    var cookieName = _cookieService.GetCookieNameForClient(clientId);
+                    DeleteCookieAcrossDomains(http, cookieName);
+                }
+                catch {}
+            }
+
+            // Also clear any other known client cookies present on the request
+            var configs = _cookieService.GetAllClientConfigurations();
+            if (configs.Count > 0)
+            {
+                foreach (var kvp in configs)
+                {
+                    try { await _dynamicCookieService.SignOutFromClientAsync(kvp.Key); } catch { }
+                    DeleteCookieAcrossDomains(http, kvp.Value.CookieName);
+                }
+            }
+            else
+            {
+                // Best-effort: clear commonly named cookies
+                DeleteCookieAcrossDomains(http, ".MrWho.Session");
+                foreach (var kv in http.Request.Cookies)
+                {
+                    var name = kv.Key;
+                    if (name.StartsWith(".MrWho", StringComparison.OrdinalIgnoreCase) ||
+                        name.Contains("Identity.Application", StringComparison.OrdinalIgnoreCase) ||
+                        name.Contains("Identity.External", StringComparison.OrdinalIgnoreCase) ||
+                        name.StartsWith(".AspNetCore.Identity", StringComparison.OrdinalIgnoreCase))
+                    {
+                        DeleteCookieAcrossDomains(http, name);
+                    }
+                }
+            }
+
+            _logger.LogInformation("GLOBAL logout: cleared default and client cookies");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error during global sign-out");
         }
     }
 
