@@ -11,6 +11,7 @@ using MrWho.Services.Mediator;
 using MrWho.Shared.Models;
 using System.Net.Http;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
 
 namespace MrWho.Endpoints.Auth;
 
@@ -92,6 +93,37 @@ public sealed class RegisterPostHandler : IRequestHandler<RegisterPostRequest, I
         _db.UserProfiles.Add(profile);
         await _db.SaveChangesAsync(cancellationToken);
 
+        // Link user to client if we have a hint (either direct clientId or via returnUrl's client_id)
+        try
+        {
+            var formClientId = http.Request.Form["clientId"].ToString();
+            var returnUrl = http.Request.Form["returnUrl"].ToString();
+            var clientHint = !string.IsNullOrWhiteSpace(formClientId) ? formClientId : TryExtractClientIdFromReturnUrl(returnUrl);
+            if (!string.IsNullOrWhiteSpace(clientHint))
+            {
+                var client = await _db.Clients.FirstOrDefaultAsync(c => c.Id == clientHint || c.ClientId == clientHint, cancellationToken);
+                if (client != null)
+                {
+                    var exists = await _db.ClientUsers.AnyAsync(cu => cu.ClientId == client.Id && cu.UserId == user.Id, cancellationToken);
+                    if (!exists)
+                    {
+                        _db.ClientUsers.Add(new ClientUser
+                        {
+                            ClientId = client.Id,
+                            UserId = user.Id,
+                            CreatedAt = DateTime.UtcNow,
+                            CreatedBy = user.UserName
+                        });
+                        await _db.SaveChangesAsync(cancellationToken);
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // best-effort only; ignore failures to keep registration flow resilient
+        }
+
         return new RedirectToActionResult("RegisterSuccess", "Auth", null);
     }
 
@@ -130,25 +162,6 @@ public sealed class RegisterPostHandler : IRequestHandler<RegisterPostRequest, I
 
     private record RecaptchaVerifyResult(bool success, double score, string action, string hostname, DateTime challenge_ts, string[]? error_codes);
 
-    private static ViewDataDictionary NewViewData() => new(new EmptyModelMetadataProvider(), new ModelStateDictionary());
-    private static ViewDataDictionary viewDataWithModel(ViewDataDictionary vd, object model) { vd.Model = model; return vd; }
-
-    private static bool IsModelStateValid(MrWho.Controllers.LoginViewModel model, out List<KeyValuePair<string, string>> errors)
-    {
-        errors = new();
-        if (model is null) { errors.Add(new("", "Invalid model")); return false; }
-        if (!model.UseCode)
-        {
-            if (string.IsNullOrWhiteSpace(model.Email)) errors.Add(new("Email", "The Email field is required."));
-            if (string.IsNullOrWhiteSpace(model.Password)) errors.Add(new("Password", "The Password field is required."));
-        }
-        else
-        {
-            if (string.IsNullOrWhiteSpace(model.Email)) errors.Add(new("Email", "The Email field is required."));
-            if (string.IsNullOrWhiteSpace(model.Code)) errors.Add(new("Code", "The Code field is required."));
-        }
-        return errors.Count == 0;
-    }
 
     private static string? TryExtractClientIdFromReturnUrl(string? returnUrl)
     {
@@ -173,6 +186,4 @@ public sealed class RegisterPostHandler : IRequestHandler<RegisterPostRequest, I
         catch { }
         return null;
     }
-
-    private static bool IsLocalUrl(string? url) => !string.IsNullOrEmpty(url) && url.StartsWith('/') && !url.StartsWith("//") && !url.StartsWith("/\\");
 }
