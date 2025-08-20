@@ -124,6 +124,20 @@
                                         </RadzenColumn>
                                     </RadzenRow>
 
+                                    <RadzenFormField Text="Client Secret" Variant="Variant.Outlined">
+                                        <ChildContent>
+                                            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center" Wrap="Radzen.FlexWrap.Wrap">
+                                                <RadzenTextBox @bind-Value="@model.ClientSecret" Style="width: 100%; max-width: 520px;" Placeholder="@(IsEdit ? "Leave blank to keep unchanged" : "Enter or generate a secret")" />
+                                                <RadzenButton Icon="password" Text="Generate" ButtonStyle="ButtonStyle.Secondary" Click="@GenerateSecret" />
+                                            </RadzenStack>
+                                        </ChildContent>
+                                        <Helper>
+                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                                Required for Confidential and Machine clients when Require Client Secret is enabled. Do not share publicly.
+                                            </RadzenText>
+                                        </Helper>
+                                    </RadzenFormField>
+
                                     <RadzenFormField Text="Description" Variant="Variant.Outlined">
                                         <ChildContent>
                                             <RadzenTextArea @bind-Value="@model.Description" 
@@ -1373,7 +1387,7 @@
 
     private IEnumerable<IdentityProviderDto> FilteredProviders => string.IsNullOrWhiteSpace(providerSearch)
         ? providers
-        : providers.Where(p => (p.DisplayName ?? p.Name).Contains(providerSearch, StringComparison.OrdinalIgnoreCase)
+        : providers.Where(p => ((p.DisplayName ?? p.Name)?.Contains(providerSearch, StringComparison.OrdinalIgnoreCase) ?? false)
                             || p.Name.Contains(providerSearch, StringComparison.OrdinalIgnoreCase));
 
     private string GetProviderName(string providerId)
@@ -1593,6 +1607,9 @@
             AllowQrLoginSecure = model.AllowQrLoginSecure,
             AllowCodeLogin = model.AllowCodeLogin
         };
+
+        // Only include ClientSecret when provided (blank keeps unchanged)
+        update.ClientSecret = string.IsNullOrWhiteSpace(model.ClientSecret) ? null : model.ClientSecret;
 
         return update;
     }
@@ -1889,4 +1906,14 @@
          public bool IsStandard { get; set; }
          public bool Selected { get; set; }
      }
+
+    private void GenerateSecret()
+    {
+        // Generate a 32-byte random secret encoded as Base64Url (no padding)
+        var bytes = System.Security.Cryptography.RandomNumberGenerator.GetBytes(32);
+        var base64 = Convert.ToBase64String(bytes);
+        // Make it URL-safe to avoid copy/paste issues in config files if needed
+        var urlSafe = base64.Replace('+', '-').Replace('/', '_').TrimEnd('=');
+        model.ClientSecret = urlSafe;
+    }
 }
