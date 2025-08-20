@@ -88,6 +88,12 @@ public class ClientExportDto
     public string? CustomLogoutPageUrl { get; set; }
     public string? CustomErrorPageUrl { get; set; }
 
+    // Login options (new)
+    public bool? AllowPasskeyLogin { get; set; }
+    public bool? AllowQrLoginQuick { get; set; }
+    public bool? AllowQrLoginSecure { get; set; }
+    public bool? AllowCodeLogin { get; set; }
+
     // Collections
     public List<string> RedirectUris { get; set; } = new();
     public List<string> PostLogoutUris { get; set; } = new();

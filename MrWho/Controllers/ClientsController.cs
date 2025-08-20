@@ -143,7 +143,13 @@ public class ClientsController : ControllerBase
                 EnableLocalLogin = c.EnableLocalLogin,
                 CustomLoginPageUrl = c.CustomLoginPageUrl,
                 CustomLogoutPageUrl = c.CustomLogoutPageUrl,
-                CustomErrorPageUrl = c.CustomErrorPageUrl
+                CustomErrorPageUrl = c.CustomErrorPageUrl,
+
+                // login options
+                AllowPasskeyLogin = c.AllowPasskeyLogin,
+                AllowQrLoginQuick = c.AllowQrLoginQuick,
+                AllowQrLoginSecure = c.AllowQrLoginSecure,
+                AllowCodeLogin = c.AllowCodeLogin
             })
             .ToListAsync();
 
@@ -252,7 +258,13 @@ public class ClientsController : ControllerBase
             EnableLocalLogin = client.EnableLocalLogin,
             CustomLoginPageUrl = client.CustomLoginPageUrl,
             CustomLogoutPageUrl = client.CustomLogoutPageUrl,
-            CustomErrorPageUrl = client.CustomErrorPageUrl
+            CustomErrorPageUrl = client.CustomErrorPageUrl,
+
+            // login options
+            AllowPasskeyLogin = client.AllowPasskeyLogin,
+            AllowQrLoginQuick = client.AllowQrLoginQuick,
+            AllowQrLoginSecure = client.AllowQrLoginSecure,
+            AllowCodeLogin = client.AllowCodeLogin
         };
 
         return Ok(clientDto);
@@ -437,6 +449,13 @@ public class ClientsController : ControllerBase
             CustomLoginPageUrl = client.CustomLoginPageUrl,
             CustomLogoutPageUrl = client.CustomLogoutPageUrl,
             CustomErrorPageUrl = client.CustomErrorPageUrl,
+
+            // login options
+            AllowPasskeyLogin = client.AllowPasskeyLogin,
+            AllowQrLoginQuick = client.AllowQrLoginQuick,
+            AllowQrLoginSecure = client.AllowQrLoginSecure,
+            AllowCodeLogin = client.AllowCodeLogin,
+
             RedirectUris = client.RedirectUris.Select(x => x.Uri).ToList(),
             PostLogoutUris = client.PostLogoutUris.Select(x => x.Uri).ToList(),
             Scopes = client.Scopes.Select(x => x.Scope).ToList(),
@@ -569,6 +588,12 @@ public class ClientsController : ControllerBase
                 client.CustomLoginPageUrl = dto.CustomLoginPageUrl;
                 client.CustomLogoutPageUrl = dto.CustomLogoutPageUrl;
                 client.CustomErrorPageUrl = dto.CustomErrorPageUrl;
+
+                // login options
+                client.AllowPasskeyLogin = dto.AllowPasskeyLogin;
+                client.AllowQrLoginQuick = dto.AllowQrLoginQuick;
+                client.AllowQrLoginSecure = dto.AllowQrLoginSecure;
+                client.AllowCodeLogin = dto.AllowCodeLogin;
 
                 client.UpdatedAt = now;
                 client.UpdatedBy = userName;
@@ -732,7 +757,13 @@ public class ClientsController : ControllerBase
                     EnableLocalLogin = full.EnableLocalLogin,
                     CustomLoginPageUrl = full.CustomLoginPageUrl,
                     CustomLogoutPageUrl = full.CustomLogoutPageUrl,
-                    CustomErrorPageUrl = full.CustomErrorPageUrl
+                    CustomErrorPageUrl = full.CustomErrorPageUrl,
+
+                    // login options
+                    AllowPasskeyLogin = full.AllowPasskeyLogin,
+                    AllowQrLoginQuick = full.AllowQrLoginQuick,
+                    AllowQrLoginSecure = full.AllowQrLoginSecure,
+                    AllowCodeLogin = full.AllowCodeLogin
                 };
 
                 var result = new ClientImportResult
@@ -792,7 +823,13 @@ public class ClientsController : ControllerBase
                     AccessTokenLifetime = request.AccessTokenLifetime,
                     RefreshTokenLifetime = request.RefreshTokenLifetime,
                     AuthorizationCodeLifetime = request.AuthorizationCodeLifetime,
-                    CreatedBy = User.Identity?.Name
+                    CreatedBy = User.Identity?.Name,
+
+                    // login options
+                    AllowPasskeyLogin = request.AllowPasskeyLogin,
+                    AllowQrLoginQuick = request.AllowQrLoginQuick,
+                    AllowQrLoginSecure = request.AllowQrLoginSecure,
+                    AllowCodeLogin = request.AllowCodeLogin
                 };
 
                 _context.Clients.Add(client);
@@ -873,7 +910,13 @@ public class ClientsController : ControllerBase
                     RedirectUris = request.RedirectUris,
                     PostLogoutUris = request.PostLogoutUris,
                     Scopes = request.Scopes,
-                    Permissions = request.Permissions
+                    Permissions = request.Permissions,
+
+                    // login options
+                    AllowPasskeyLogin = client.AllowPasskeyLogin,
+                    AllowQrLoginQuick = client.AllowQrLoginQuick,
+                    AllowQrLoginSecure = client.AllowQrLoginSecure,
+                    AllowCodeLogin = client.AllowCodeLogin
                 };
 
                 return CreatedAtAction(nameof(GetClient), new { id = client.Id }, clientDto);
@@ -998,6 +1041,12 @@ public class ClientsController : ControllerBase
                 client.CustomLoginPageUrl = request.CustomLoginPageUrl;
                 client.CustomLogoutPageUrl = request.CustomLogoutPageUrl;
                 client.CustomErrorPageUrl = request.CustomErrorPageUrl;
+
+                // login options
+                client.AllowPasskeyLogin = request.AllowPasskeyLogin;
+                client.AllowQrLoginQuick = request.AllowQrLoginQuick;
+                client.AllowQrLoginSecure = request.AllowQrLoginSecure;
+                client.AllowCodeLogin = request.AllowCodeLogin;
 
                 client.UpdatedAt = DateTime.UtcNow;
                 client.UpdatedBy = User.Identity?.Name;
@@ -1153,7 +1202,13 @@ public class ClientsController : ControllerBase
                     EnableLocalLogin = client.EnableLocalLogin,
                     CustomLoginPageUrl = client.CustomLoginPageUrl,
                     CustomLogoutPageUrl = client.CustomLogoutPageUrl,
-                    CustomErrorPageUrl = client.CustomErrorPageUrl
+                    CustomErrorPageUrl = client.CustomErrorPageUrl,
+
+                    // login options
+                    AllowPasskeyLogin = client.AllowPasskeyLogin,
+                    AllowQrLoginQuick = client.AllowQrLoginQuick,
+                    AllowQrLoginSecure = client.AllowQrLoginSecure,
+                    AllowCodeLogin = client.AllowCodeLogin
                 };
 
                 return clientDto;

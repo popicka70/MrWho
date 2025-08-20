@@ -142,6 +142,48 @@
                                             </RadzenText>
                                         </Helper>
                                     </RadzenFormField>
+
+                                    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Allowed Login Methods</RadzenText>
+                                    <RadzenFormField Variant="Variant.Outlined">
+                                        <Start>
+                                            <RadzenCheckBox @bind-Value="@model.EnableLocalLogin" TriState="true" Name="allowLocal" />
+                                        </Start>
+                                        <ChildContent>
+                                            <RadzenLabel Text="Allow local login (username/password)" Component="allowLocal" />
+                                        </ChildContent>
+                                    </RadzenFormField>
+                                    <RadzenFormField Variant="Variant.Outlined">
+                                        <Start>
+                                            <RadzenCheckBox @bind-Value="@model.AllowPasskeyLogin" TriState="true" Name="allowPasskey" />
+                                        </Start>
+                                        <ChildContent>
+                                            <RadzenLabel Text="Allow passkey (WebAuthn)" Component="allowPasskey" />
+                                        </ChildContent>
+                                    </RadzenFormField>
+                                    <RadzenFormField Variant="Variant.Outlined">
+                                        <Start>
+                                            <RadzenCheckBox @bind-Value="@model.AllowQrLoginQuick" TriState="true" Name="allowQrQuick" />
+                                        </Start>
+                                        <ChildContent>
+                                            <RadzenLabel Text="Allow Quick QR login" Component="allowQrQuick" />
+                                        </ChildContent>
+                                    </RadzenFormField>
+                                    <RadzenFormField Variant="Variant.Outlined">
+                                        <Start>
+                                            <RadzenCheckBox @bind-Value="@model.AllowQrLoginSecure" TriState="true" Name="allowQrSecure" />
+                                        </Start>
+                                        <ChildContent>
+                                            <RadzenLabel Text="Allow Secure QR login" Component="allowQrSecure" />
+                                        </ChildContent>
+                                    </RadzenFormField>
+                                    <RadzenFormField Variant="Variant.Outlined">
+                                        <Start>
+                                            <RadzenCheckBox @bind-Value="@model.AllowCodeLogin" TriState="true" Name="allowCode" />
+                                        </Start>
+                                        <ChildContent>
+                                            <RadzenLabel Text="Allow authenticator code login option" Component="allowCode" />
+                                        </ChildContent>
+                                    </RadzenFormField>
                                 </RadzenStack>
                             </RadzenStack>
                         </div>
@@ -1207,6 +1249,11 @@
             model.AllowAccessToRevocationEndpoint = true;
             model.RememberMfaForSession = true;
             model.EnableLocalLogin = true;
+            // Login option defaults
+            model.AllowPasskeyLogin = true;
+            model.AllowQrLoginQuick = true;
+            model.AllowQrLoginSecure = true;
+            model.AllowCodeLogin = true;
             // Reasonable default scopes for new client
             selectedScopes = new() { "openid", "profile", "email", "roles", "offline_access" };
         }
@@ -1461,7 +1508,12 @@
             EnableLocalLogin = client.EnableLocalLogin,
             CustomLoginPageUrl = client.CustomLoginPageUrl,
             CustomLogoutPageUrl = client.CustomLogoutPageUrl,
-            CustomErrorPageUrl = client.CustomErrorPageUrl
+            CustomErrorPageUrl = client.CustomErrorPageUrl,
+            // New login options
+            AllowPasskeyLogin = client.AllowPasskeyLogin,
+            AllowQrLoginQuick = client.AllowQrLoginQuick,
+            AllowQrLoginSecure = client.AllowQrLoginSecure,
+            AllowCodeLogin = client.AllowCodeLogin
         };
     }
 
@@ -1534,7 +1586,12 @@
             EnableLocalLogin = model.EnableLocalLogin,
             CustomLoginPageUrl = model.CustomLoginPageUrl,
             CustomLogoutPageUrl = model.CustomLogoutPageUrl,
-            CustomErrorPageUrl = model.CustomErrorPageUrl
+            CustomErrorPageUrl = model.CustomErrorPageUrl,
+            // New login options
+            AllowPasskeyLogin = model.AllowPasskeyLogin,
+            AllowQrLoginQuick = model.AllowQrLoginQuick,
+            AllowQrLoginSecure = model.AllowQrLoginSecure,
+            AllowCodeLogin = model.AllowCodeLogin
         };
 
         return update;
@@ -1611,7 +1668,12 @@
             EnableLocalLogin = model.EnableLocalLogin,
             CustomLoginPageUrl = model.CustomLoginPageUrl,
             CustomLogoutPageUrl = model.CustomLogoutPageUrl,
-            CustomErrorPageUrl = model.CustomErrorPageUrl
+            CustomErrorPageUrl = model.CustomErrorPageUrl,
+            // New login options
+            AllowPasskeyLogin = model.AllowPasskeyLogin,
+            AllowQrLoginQuick = model.AllowQrLoginQuick,
+            AllowQrLoginSecure = model.AllowQrLoginSecure,
+            AllowCodeLogin = model.AllowCodeLogin
         };
     }
 
@@ -1740,6 +1802,12 @@
         model.FrontChannelLogoutSessionRequired = null;
         model.AllowedCorsOrigins = null;
         model.AllowedIdentityProviders = null;
+        // Reset login options to null (realm/server default)
+        model.EnableLocalLogin = null;
+        model.AllowPasskeyLogin = null;
+        model.AllowQrLoginQuick = null;
+        model.AllowQrLoginSecure = null;
+        model.AllowCodeLogin = null;
         StateHasChanged();
         return Task.CompletedTask;
     }

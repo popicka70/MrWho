@@ -267,6 +267,22 @@ public partial class Client
     [StringLength(200)]
     public string? PageTitlePrefix { get; set; }
 
+    // ============================================================================
+    // LOGIN OPTIONS (NEW)
+    // ============================================================================
+    
+    /// <summary>Allow passkey (WebAuthn) login on the login page</summary>
+    public bool? AllowPasskeyLogin { get; set; }
+
+    /// <summary>Allow QR-code based quick login on the login page</summary>
+    public bool? AllowQrLoginQuick { get; set; }
+
+    /// <summary>Allow QR-code based secure (managed device) login on the login page</summary>
+    public bool? AllowQrLoginSecure { get; set; }
+
+    /// <summary>Allow authenticator code (TOTP) login mode toggle</summary>
+    public bool? AllowCodeLogin { get; set; }
+
     // Audit fields
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
