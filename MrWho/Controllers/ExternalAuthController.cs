@@ -324,6 +324,39 @@ public class ExternalAuthController : ControllerBase
             }
         }
 
+        // Ensure the user is linked to the client when a clientId is provided
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(clientId))
+            {
+                var client = await _db.Clients.FirstOrDefaultAsync(c => c.Id == clientId || c.ClientId == clientId);
+                if (client != null)
+                {
+                    var exists = await _db.ClientUsers.AnyAsync(cu => cu.ClientId == client.Id && cu.UserId == user.Id);
+                    if (!exists)
+                    {
+                        _db.ClientUsers.Add(new MrWho.Models.ClientUser
+                        {
+                            ClientId = client.Id,
+                            UserId = user.Id,
+                            CreatedAt = DateTime.UtcNow,
+                            CreatedBy = providerName ?? "external"
+                        });
+                        await _db.SaveChangesAsync();
+                        _logger.LogInformation("Linked user {UserId} to client {ClientPublicId} ({ClientDbId})", user.Id, client.ClientId, client.Id);
+                    }
+                }
+                else
+                {
+                    _logger.LogDebug("Client not found for id/publicId '{ClientId}' - skipping client link", clientId);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to link user {UserId} to client '{ClientId}'", user?.Id, clientId);
+        }
+
         // If this is a new external user, notify that enrollment is pending
         if (newlyCreated)
         {
