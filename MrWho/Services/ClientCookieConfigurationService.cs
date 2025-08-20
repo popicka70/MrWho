@@ -8,6 +8,7 @@ using MrWho.Options;
 using MrWho.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
+using MrWho.Shared.Authentication; // unify naming
 
 namespace MrWho.Services;
 
@@ -45,12 +46,12 @@ public class ClientCookieConfigurationService : IClientCookieConfigurationServic
 
             case CookieSeparationMode.ByRealm:
                 var realmKey = GetRealmKeyForClient(clientId);
-                return $"Identity.Application.Realm.{realmKey}";
+                return CookieSchemeNaming.BuildRealmScheme(realmKey);
 
             case CookieSeparationMode.ByClient:
             default:
                 // Dynamic per-client scheme
-                var dynamicSchemeName = $"Identity.Application.{clientId}";
+                var dynamicSchemeName = CookieSchemeNaming.BuildClientScheme(clientId);
                 _logger.LogDebug("Using dynamic authentication scheme for client {ClientId}: {SchemeName}", clientId, dynamicSchemeName);
                 return dynamicSchemeName;
         }
@@ -63,15 +64,15 @@ public class ClientCookieConfigurationService : IClientCookieConfigurationServic
         {
             case CookieSeparationMode.None:
                 // Default identity cookie name
-                return ".AspNetCore.Identity.Application";
+                return CookieSchemeNaming.DefaultCookieName;
 
             case CookieSeparationMode.ByRealm:
                 var realmKey = GetRealmKeyForClient(clientId);
-                return $".MrWho.Realm.{realmKey}";
+                return CookieSchemeNaming.BuildRealmCookie(realmKey);
 
             case CookieSeparationMode.ByClient:
             default:
-                var dynamicCookieName = $".MrWho.{clientId}";
+                var dynamicCookieName = CookieSchemeNaming.BuildClientCookie(clientId);
                 _logger.LogDebug("Using dynamic cookie name for client {ClientId}: {CookieName}", clientId, dynamicCookieName);
                 return dynamicCookieName;
         }
@@ -166,7 +167,7 @@ public class ClientCookieConfigurationService : IClientCookieConfigurationServic
                 {
                     ClientId = "default",
                     SchemeName = IdentityConstants.ApplicationScheme,
-                    CookieName = ".AspNetCore.Identity.Application"
+                    CookieName = CookieSchemeNaming.DefaultCookieName
                 };
             }
 
@@ -208,24 +209,12 @@ public class ClientCookieConfigurationService : IClientCookieConfigurationServic
                 .FirstOrDefault();
 
             realmName ??= "Default";
-            return Sanitize(realmName);
+            return CookieSchemeNaming.Sanitize(realmName);
         }
         catch (Exception ex)
         {
             _logger.LogDebug(ex, "Failed to resolve realm for client {ClientId}", clientId);
             return "Default";
         }
-    }
-
-    private static string Sanitize(string name)
-    {
-        if (string.IsNullOrWhiteSpace(name)) return "Default";
-        Span<char> buffer = stackalloc char[name.Length];
-        var i = 0;
-        foreach (var ch in name)
-        {
-            buffer[i++] = char.IsLetterOrDigit(ch) || ch is '.' or '_' or '-' ? ch : '_';
-        }
-        return new string(buffer[..i]);
     }
 }

@@ -14,6 +14,7 @@ using MrWho.Data;
 using MrWho.Services;
 using MrWho.Services.Mediator;
 using OpenIddict.Abstractions;
+using MrWho.Shared.Authentication; // for naming defaults
 
 namespace MrWho.Endpoints;
 
@@ -92,6 +93,11 @@ public sealed class DebugIndexHandler : IRequestHandler<DebugIndexRequest, IResu
                 ClientPermissions = "/debug/client-permissions",
                 OpenIddictScopes = "/debug/openiddict-scopes",
                 ClientCookieStatus = "/debug/client-cookies"
+            },
+            Defaults = new
+            {
+                DefaultScheme = CookieSchemeNaming.DefaultScheme,
+                DefaultCookie = CookieSchemeNaming.DefaultCookieName
             },
             Documentation = "Visit any endpoint above for debug information or tools"
         };

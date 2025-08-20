@@ -213,9 +213,7 @@ public class DynamicAuthorizationPolicyProvider : IAuthorizationPolicyProvider
             // Fallback to essential static schemes if database access fails
             schemes.AddRange(new[]
             {
-                "Identity.Application.mrwho_admin_web",
-                "Identity.Application.mrwho_demo1",
-                "Identity.Application.postman_client"
+                "Identity.Application.mrwho_admin_web"
             });
         }
 
