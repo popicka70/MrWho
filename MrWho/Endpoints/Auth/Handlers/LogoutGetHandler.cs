@@ -147,6 +147,8 @@ public sealed class LogoutGetHandler : IRequestHandler<LogoutGetRequest, IAction
         // Try multiple domain variants to ensure deletion in production where Cookie:Domain is set
         var configured = _configuration["Cookie:Domain"];
         var host = http.Request.Host.Host;
+        var requireHttps = string.Equals(_configuration["Cookie:RequireHttps"], "true", StringComparison.OrdinalIgnoreCase);
+        var secure = requireHttps || http.Request.IsHttps;
 
         // Build a unique list of domain variants to try (null = current host only)
         var domains = new List<string?> { null };
@@ -165,7 +167,14 @@ public sealed class LogoutGetHandler : IRequestHandler<LogoutGetRequest, IAction
         {
             try
             {
-                http.Response.Cookies.Delete(cookieName, new CookieOptions { Path = "/", Domain = d });
+                http.Response.Cookies.Delete(cookieName, new CookieOptions
+                {
+                    Path = "/",
+                    Domain = d,
+                    HttpOnly = true,
+                    Secure = secure,
+                    SameSite = SameSiteMode.None // ensure deletion works in third-party contexts
+                });
             }
             catch (Exception ex)
             {

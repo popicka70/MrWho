@@ -309,10 +309,18 @@ public class DynamicCookieOptionsConfigurator : IConfigureNamedOptions<CookieAut
             options.SlidingExpiration = true;
             options.Cookie.HttpOnly = true;
             options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
-            options.Cookie.SameSite = SameSiteMode.Lax;
+            options.Cookie.SameSite = SameSiteMode.None; // Important for cross-site redirect/logout flows
             options.LoginPath = "/connect/login";
             options.LogoutPath = "/connect/logout";
             options.AccessDeniedPath = "/connect/access-denied";
+        }
+        else
+        {
+            // Ensure SameSite is compatible even if name was set elsewhere
+            if (options.Cookie.SameSite != SameSiteMode.None)
+            {
+                options.Cookie.SameSite = SameSiteMode.None;
+            }
         }
     }
 }

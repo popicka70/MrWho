@@ -32,7 +32,7 @@ builder.Services.AddDataProtection()
 // Use new client-specific cookie configuration instead of standard Identity
 builder.Services.AddMrWhoIdentityWithClientCookies();
 builder.Services.AddMrWhoServices(); // This now includes device management services
-builder.Services.AddMrWhoClientCookies(); // Add client-specific cookies
+builder.Services.AddMrWhoClientCookies(builder.Configuration); // Add client-specific cookies using config-driven naming
 builder.Services.AddMrWhoOpenIddict();
 
 // Add OpenIddict client for upstream OIDC brokering
