@@ -49,12 +49,17 @@ public sealed class RegisterPostHandler : IRequestHandler<RegisterPostRequest, I
             return new ViewResult { ViewName = "Register", ViewData = new ViewDataDictionary(vd) { Model = input } };
         }
 
+        // Required field validation with proper ModelState errors
         if (string.IsNullOrWhiteSpace(input.Email) || string.IsNullOrWhiteSpace(input.Password) || string.IsNullOrWhiteSpace(input.FirstName) || string.IsNullOrWhiteSpace(input.LastName))
         {
             var vd = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary())
             {
                 ["RecaptchaSiteKey"] = ShouldUseRecaptcha() ? _configuration["GoogleReCaptcha:SiteKey"] : null
             };
+            if (string.IsNullOrWhiteSpace(input.Email)) vd.ModelState.AddModelError("Email", "Email is required.");
+            if (string.IsNullOrWhiteSpace(input.Password)) vd.ModelState.AddModelError("Password", "Password is required.");
+            if (string.IsNullOrWhiteSpace(input.FirstName)) vd.ModelState.AddModelError("FirstName", "First name is required.");
+            if (string.IsNullOrWhiteSpace(input.LastName)) vd.ModelState.AddModelError("LastName", "Last name is required.");
             return new ViewResult { ViewName = "Register", ViewData = new ViewDataDictionary(vd) { Model = input } };
         }
 
@@ -77,7 +82,23 @@ public sealed class RegisterPostHandler : IRequestHandler<RegisterPostRequest, I
             {
                 ["RecaptchaSiteKey"] = ShouldUseRecaptcha() ? _configuration["GoogleReCaptcha:SiteKey"] : null
             };
-            foreach (var error in result.Errors) vd.ModelState.AddModelError(string.Empty, error.Description);
+            foreach (var error in result.Errors)
+            {
+                // Map common Identity password/email errors to fields so asp-validation-for renders them
+                var code = error.Code ?? string.Empty;
+                if (code.Contains("Password", StringComparison.OrdinalIgnoreCase))
+                {
+                    vd.ModelState.AddModelError("Password", error.Description);
+                }
+                else if (code.Contains("Email", StringComparison.OrdinalIgnoreCase) || code.Contains("UserName", StringComparison.OrdinalIgnoreCase))
+                {
+                    vd.ModelState.AddModelError("Email", error.Description);
+                }
+                else
+                {
+                    vd.ModelState.AddModelError(string.Empty, error.Description);
+                }
+            }
             return new ViewResult { ViewName = "Register", ViewData = new ViewDataDictionary(vd) { Model = input } };
         }
 
