@@ -27,6 +27,7 @@ using MrWho.Models; // added for UserProfile, UserState
 using System.Data;
 using Microsoft.AspNetCore.RateLimiting; // added
 using MrWho.Options; // for CookieSeparationMode
+using MrWho.Shared.Authentication; // for CookieSchemeNaming
 
 namespace MrWho.Extensions;
 
@@ -188,8 +189,8 @@ public static class ServiceCollectionExtensions
         string? cookieName = null,
         Action<CookieAuthenticationOptions>? configureOptions = null)
     {
-        var actualCookieName = cookieName ?? $".AspNetCore.Identity.{clientId}";
-        var schemeName = $"Identity.Application.{clientId}";
+        var schemeName = CookieSchemeNaming.BuildClientScheme(clientId);
+        var actualCookieName = cookieName ?? CookieSchemeNaming.BuildClientCookie(clientId);
 
         services.AddAuthentication()
             .AddCookie(schemeName, options =>
@@ -223,9 +224,9 @@ public static class ServiceCollectionExtensions
         // Compute the bootstrap cookie name for the admin client without resolving services
         string adminCookieName = mode switch
         {
-            CookieSeparationMode.None => ".AspNetCore.Identity.Application",
-            CookieSeparationMode.ByRealm => ".MrWho.Realm.admin", // admin client lives in the 'admin' realm
-            _ => ".MrWho.mrwho_admin_web" // ByClient (default)
+            CookieSeparationMode.None => CookieSchemeNaming.DefaultCookieName,
+            CookieSeparationMode.ByRealm => CookieSchemeNaming.BuildRealmCookie("admin"), // admin client lives in the 'admin' realm
+            _ => CookieSchemeNaming.BuildClientCookie("mrwho_admin_web") // ByClient (default)
         };
 
         services.AddClientSpecificCookie("mrwho_admin_web", adminCookieName, options =>

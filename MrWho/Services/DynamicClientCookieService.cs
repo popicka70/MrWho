@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using MrWho.Options;
 using MrWho.Data;
 using Microsoft.EntityFrameworkCore;
+using MrWho.Shared.Authentication; // use centralized naming
 
 namespace MrWho.Services;
 
@@ -72,7 +73,6 @@ public class DynamicClientCookieService : IHostedService
     {
         var oidcClientService = scope.ServiceProvider.GetRequiredService<IOidcClientService>();
         var authSchemeProvider = scope.ServiceProvider.GetRequiredService<IAuthenticationSchemeProvider>();
-        var cookieConfigService = scope.ServiceProvider.GetRequiredService<IClientCookieConfigurationService>();
 
         var enabledClients = await oidcClientService.GetEnabledClientsAsync();
         var registeredCount = 0;
@@ -81,8 +81,8 @@ public class DynamicClientCookieService : IHostedService
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var schemeName = $"Identity.Application.{client.ClientId}";
-            var cookieName = $".MrWho.{client.Name?.Replace(" ", string.Empty).Replace("-", string.Empty)}";
+            var schemeName = CookieSchemeNaming.BuildClientScheme(client.ClientId);
+            var cookieName = CookieSchemeNaming.BuildClientCookie(client.ClientId);
 
             var existingScheme = await authSchemeProvider.GetSchemeAsync(schemeName);
             if (existingScheme != null)
@@ -135,9 +135,8 @@ public class DynamicClientCookieService : IHostedService
             }
 
             var realm = item.Realm;
-            var realmKey = Sanitize(realm.Name);
-            var schemeName = $"Identity.Application.Realm.{realmKey}";
-            var cookieName = $".MrWho.Realm.{realmKey}";
+            var schemeName = CookieSchemeNaming.BuildRealmScheme(realm.Name);
+            var cookieName = CookieSchemeNaming.BuildRealmCookie(realm.Name);
 
             var existingScheme = await authSchemeProvider.GetSchemeAsync(schemeName);
             if (existingScheme != null)
@@ -304,7 +303,7 @@ public class DynamicCookieOptionsConfigurator : IConfigureNamedOptions<CookieAut
 
             // Extract key from scheme name and apply default configuration
             var key = name.Replace("Identity.Application.", "");
-            options.Cookie.Name = $".MrWho.{key}";
+            options.Cookie.Name = CookieSchemeNaming.BuildClientCookie(key);
             options.ExpireTimeSpan = TimeSpan.FromHours(8);
             options.SlidingExpiration = true;
             options.Cookie.HttpOnly = true;
