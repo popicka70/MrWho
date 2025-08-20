@@ -26,6 +26,7 @@ using Microsoft.AspNetCore.HttpOverrides;
 using MrWho.Models; // added for UserProfile, UserState
 using System.Data;
 using Microsoft.AspNetCore.RateLimiting; // added
+using MrWho.Options; // for CookieSeparationMode
 
 namespace MrWho.Extensions;
 
@@ -208,43 +209,34 @@ public static class ServiceCollectionExtensions
 
     /// <summary>
     /// Configures client-specific cookies for essential clients (fallback + database clients via DynamicClientCookieService)
-    /// CORRECTED: This now handles only essential/static clients, database clients are handled by DynamicClientCookieService
+    /// Only the admin client is statically registered to guarantee bootstrap login; all others are database-driven.
     /// </summary>
-    public static IServiceCollection AddMrWhoClientCookies(this IServiceCollection services)
+    public static IServiceCollection AddMrWhoClientCookies(this IServiceCollection services, IConfiguration? configuration = null)
     {
-        // ESSENTIAL: Admin client cookie (always needed for bootstrap)
-        services.AddClientSpecificCookie("mrwho_admin_web", ".MrWho.Admin", options =>
+        // Determine cookie separation mode from configuration (fallback to ByClient)
+        var modeString = configuration?["MrWho:CookieSeparationMode"] ?? "ByClient";
+        var mode = Enum.TryParse<CookieSeparationMode>(modeString, ignoreCase: true, out var parsed)
+            ? parsed
+            : CookieSeparationMode.ByClient;
+
+        // Compute the bootstrap cookie name for the admin client without resolving services
+        string adminCookieName = mode switch
+        {
+            CookieSeparationMode.None => ".AspNetCore.Identity.Application",
+            CookieSeparationMode.ByRealm => ".MrWho.Realm.admin", // admin client lives in the 'admin' realm
+            _ => ".MrWho.mrwho_admin_web" // ByClient (default)
+        };
+
+        services.AddClientSpecificCookie("mrwho_admin_web", adminCookieName, options =>
         {
             options.LoginPath = "/connect/login";
             options.LogoutPath = "/connect/logout";
             options.AccessDeniedPath = "/connect/access-denied";
-            options.Cookie.Domain = null; // Same domain only
+            options.Cookie.Domain = null; // Same domain only; domain overrides applied globally in Program.cs
             options.ExpireTimeSpan = TimeSpan.FromHours(8); // Work day session
         });
 
-        // OPTIONAL: Keep Demo1 for development/testing
-        services.AddClientSpecificCookie("mrwho_demo1", ".MrWho.Demo1", options =>
-        {
-            options.LoginPath = "/connect/login";
-            options.LogoutPath = "/connect/logout";
-            options.AccessDeniedPath = "/connect/access-denied"; // CORRECTED: Use proper connect route
-            options.Cookie.Domain = null; // Same domain only
-            options.ExpireTimeSpan = TimeSpan.FromHours(2); // Demo session timeout
-        });
-
-        // OPTIONAL: Keep Postman for API testing
-        services.AddClientSpecificCookie("postman_client", ".MrWho.API", options =>
-        {
-            options.ExpireTimeSpan = TimeSpan.FromHours(1); // Shorter for API testing
-            options.SlidingExpiration = false; // Fixed expiration for API
-        });
-
-        // ?? DYNAMIC CLIENTS: All other clients are automatically registered by DynamicClientCookieService
-        // which loads from database and creates schemes like:
-        // - "my_custom_client" ? ".MrWho.MyCustomClient" 
-        // - "partner_app" ? ".MrWho.PartnerApp"
-        // - etc. (unlimited scalability!)
-
+        // Note: Remaining clients are registered dynamically by DynamicClientCookieService from the database.
         return services;
     }
 

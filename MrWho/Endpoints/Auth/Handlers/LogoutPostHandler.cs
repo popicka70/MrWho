@@ -83,8 +83,21 @@ public sealed class LogoutPostHandler : IRequestHandler<LogoutPostRequest, IActi
         }
         else
         {
-            // Best-effort clear of currently present cookies if client is unknown
-            DeleteAllKnownAuthCookies(http);
+            // Restore previous behavior: iterate all configured client cookies when we cannot detect a specific client.
+            var configs = _cookieService.GetAllClientConfigurations();
+            if (configs.Count > 0)
+            {
+                foreach (var kvp in configs)
+                {
+                    try { await _dynamicCookieService.SignOutFromClientAsync(kvp.Key); } catch { }
+                    DeleteCookieAcrossDomains(http, kvp.Value.CookieName);
+                }
+            }
+            else
+            {
+                // Best-effort clear of currently present cookies if client is unknown
+                DeleteAllKnownAuthCookies(http);
+            }
         }
     }
 
