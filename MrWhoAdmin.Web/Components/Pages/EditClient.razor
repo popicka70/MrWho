@@ -124,6 +124,7 @@
                                         </RadzenColumn>
                                     </RadzenRow>
 
+                                    <!-- Client Secret -->
                                     <RadzenFormField Text="Client Secret" Variant="Variant.Outlined">
                                         <ChildContent>
                                             <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center" Wrap="Radzen.FlexWrap.Wrap">
@@ -137,6 +138,13 @@
                                             </RadzenText>
                                         </Helper>
                                     </RadzenFormField>
+
+                                    <!-- Security banner about secrets -->
+                                    <RadzenAlert AlertStyle="AlertStyle.Info" ShowIcon="true">
+                                        <RadzenText TextStyle="TextStyle.Body2">
+                                            Client secrets are write-only and will not be displayed on this page. On edit, leave the field empty to keep the current secret. If you generate a new secret, copy and store it securely now.
+                                        </RadzenText>
+                                    </RadzenAlert>
 
                                     <RadzenFormField Text="Description" Variant="Variant.Outlined">
                                         <ChildContent>
