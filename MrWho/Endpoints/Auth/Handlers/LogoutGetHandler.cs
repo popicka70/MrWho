@@ -94,8 +94,21 @@ public sealed class LogoutGetHandler : IRequestHandler<LogoutGetRequest, IAction
         }
         else
         {
-            // Best-effort: clear any known auth cookies currently present on the request (works even if configuration list is empty)
-            DeleteAllKnownAuthCookies(http);
+            // Restore previous behavior: iterate all configured client cookies when we cannot detect a specific client.
+            var configs = _cookieService.GetAllClientConfigurations();
+            if (configs.Count > 0)
+            {
+                foreach (var kvp in configs)
+                {
+                    try { await _dynamicCookieService.SignOutFromClientAsync(kvp.Key); } catch { }
+                    DeleteCookieAcrossDomains(http, kvp.Value.CookieName);
+                }
+            }
+            else
+            {
+                // Best-effort: clear any known auth cookies currently present on the request (works even if configuration list is empty)
+                DeleteAllKnownAuthCookies(http);
+            }
         }
 
         return new RedirectToActionResult("Index", "Home", new { logout = "success" });
@@ -218,7 +231,19 @@ public sealed class LogoutGetHandler : IRequestHandler<LogoutGetRequest, IAction
         else
         {
             // If we don't know the client, still attempt to clear any known cookies present on the request
-            DeleteAllKnownAuthCookies(http);
+            var configs = _cookieService.GetAllClientConfigurations();
+            if (configs.Count > 0)
+            {
+                foreach (var kvp in configs)
+                {
+                    try { await _dynamicCookieService.SignOutFromClientAsync(kvp.Key); } catch { }
+                    DeleteCookieAcrossDomains(http, kvp.Value.CookieName);
+                }
+            }
+            else
+            {
+                DeleteAllKnownAuthCookies(http);
+            }
         }
     }
 }
