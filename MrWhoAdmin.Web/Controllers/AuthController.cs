@@ -25,14 +25,21 @@ public class AuthController : Controller
     /// Endpoint to trigger login/challenge
     /// </summary>
     /// <param name="returnUrl">URL to redirect to after authentication</param>
+    /// <param name="force">If true, force a fresh sign-in (prompt=login) at the OP and upstream IdP</param>
     /// <returns>Challenge result</returns>
     [HttpGet("/auth/login")]
-    public IActionResult Login(string? returnUrl = null)
+    public IActionResult Login(string? returnUrl = null, bool force = false)
     {
         var properties = new AuthenticationProperties
         {
             RedirectUri = !string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl) ? returnUrl : "/"
         };
+
+        if (force)
+        {
+            // This item will be read in the OIDC event to add prompt=login
+            properties.Items["force"] = "1";
+        }
 
         return Challenge(properties, OpenIdConnectDefaults.AuthenticationScheme); // Use standard OIDC scheme
     }
