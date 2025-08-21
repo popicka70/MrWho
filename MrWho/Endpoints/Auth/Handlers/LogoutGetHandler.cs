@@ -139,6 +139,8 @@ public sealed class LogoutGetHandler : IRequestHandler<LogoutGetRequest, IAction
         }
 
         // Delegate end-session redirect/sign-out to OpenIddict
+        // Clear the default Identity cookie
+        DeleteCookieAcrossDomains(http, ".AspNetCore.Identity.Application");
         return new SignOutResult(new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
     }
 

@@ -46,6 +46,8 @@ public sealed class LogoutPostHandler : IRequestHandler<LogoutPostRequest, IActi
             {
                 await SignOutClientOnlyAsync(http, clientId);
             }
+            // Clear the default Identity cookie
+            DeleteCookieAcrossDomains(http, ".AspNetCore.Identity.Application");
             return new SignOutResult(new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
         }
 
