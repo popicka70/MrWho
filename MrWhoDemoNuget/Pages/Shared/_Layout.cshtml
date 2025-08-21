@@ -19,11 +19,11 @@
                     <ul class="navbar-nav">
                         @if (User.Identity?.IsAuthenticated == true)
                         {
-                            <li class="nav-item"><a class="nav-link" asp-page="/Account/Logout">Logout</a></li>
+                            <li class="nav-item"><a class="nav-link" asp-page="/Logout">Logout</a></li>
                         }
                         else
                         {
-                            <li class="nav-item"><a class="nav-link" asp-page="/Account/Login">Login</a></li>
+                            <li class="nav-item"><a class="nav-link" asp-page="/Login">Login</a></li>
                         }
                     </ul>
                 </div>

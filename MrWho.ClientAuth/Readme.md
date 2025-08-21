@@ -24,6 +24,23 @@ builder.Services.AddAuthorization();
 
 2) Use the standard [Authorize] attributes and the default cookie scheme created by the package.
 
+3) (Optional) Map convenience login/logout endpoints:
+
+```csharp
+app.MapMrWhoLoginEndpoint();      // GET /login?returnUrl=/protected
+app.MapMrWhoLogoutEndpoints();    // GET/POST /logout?returnUrl=/
+app.MapMrWhoBackChannelLogoutEndpoint(); // POST /signout-backchannel
+```
+
+Or call Challenge/SignOut manually:
+
+```csharp
+// Login
+app.MapGet("/login-direct", ctx => ctx.ChallengeAsync());
+// Logout
+app.MapPost("/logout-direct", ctx => ctx.SignOutAsync());
+```
+
 Notes and defaults
 ------------------
 - Uses cookie authentication for local session storage and OpenIdConnect challenge.
@@ -32,3 +49,4 @@ Notes and defaults
 - Always uses the correct discovery endpoint path: /.well-known/openid-configuration
 - Supports explicit MetadataAddress override for containerized deployments.
 - Supports trusting self-signed certificates for development.
+- Provides optional mapped endpoints: /login, /logout (GET+POST) and /signout-backchannel.
