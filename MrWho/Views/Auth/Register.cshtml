@@ -3,10 +3,22 @@
     ViewData["Title"] = "Create an account";
     var success = TempData["RegistrationSuccess"] as bool? ?? false;
     var recaptchaSiteKey = ViewData["RecaptchaSiteKey"] as string; // Provided by controller
+    var logoUri = ViewData["LogoUri"] as string;
+    var clientName = ViewData["ClientName"] as string;
 }
 
 <div class="row justify-content-center">
     <div class="col-md-6 col-lg-5">
+        <div class="text-center mb-4">
+            @if (!string.IsNullOrWhiteSpace(logoUri))
+            {
+                <img src="@logoUri" alt="@(clientName ?? "Client") Logo" class="mrwho-logo" />
+            }
+            else
+            {
+                <img src="~/images/AuthMrWho.jpeg" alt="MrWho Identity Server" class="mrwho-logo" />
+            }
+        </div>
         <div class="card shadow-sm">
             <div class="card-header bg-primary text-white">
                 <h4 class="mb-0"><i class="bi bi-person-plus"></i> Create an account</h4>
