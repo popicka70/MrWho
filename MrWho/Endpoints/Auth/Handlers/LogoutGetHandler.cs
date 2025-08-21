@@ -17,27 +17,15 @@ namespace MrWho.Endpoints.Auth;
 
 public sealed class LogoutGetHandler : IRequestHandler<LogoutGetRequest, IActionResult>
 {
-    private readonly SignInManager<IdentityUser> _signInManager;
-    private readonly IClientCookieConfigurationService _cookieService;
-    private readonly IDynamicCookieService _dynamicCookieService;
-    private readonly IOpenIddictApplicationManager _applicationManager;
     private readonly ILogger<LogoutGetHandler> _logger;
-    private readonly IConfiguration _configuration;
+    private readonly ILogoutHelper _logoutHelper;
 
     public LogoutGetHandler(
-        SignInManager<IdentityUser> signInManager,
-        IClientCookieConfigurationService cookieService,
-        IDynamicCookieService dynamicCookieService,
-        IOpenIddictApplicationManager applicationManager,
         ILogger<LogoutGetHandler> logger,
-        IConfiguration configuration)
+        ILogoutHelper logoutHelper)
     {
-        _signInManager = signInManager;
-        _cookieService = cookieService;
-        _dynamicCookieService = dynamicCookieService;
-        _applicationManager = applicationManager;
         _logger = logger;
-        _configuration = configuration;
+        _logoutHelper = logoutHelper;
     }
 
     public async Task<IActionResult> Handle(LogoutGetRequest request, CancellationToken cancellationToken)
@@ -47,8 +35,7 @@ public sealed class LogoutGetHandler : IRequestHandler<LogoutGetRequest, IAction
         var postUri = request.PostLogoutRedirectUri;
 
         _logger.LogInformation("GET /connect/logout accessed directly. ClientId: {ClientId}, PostLogoutUri: {PostLogoutUri}", clientId, postUri);
-        var oidcReq = http.GetOpenIddictServerRequest();
-        bool isOidcLogoutRequest = oidcReq != null && (!string.IsNullOrEmpty(oidcReq.IdTokenHint) || !string.IsNullOrEmpty(oidcReq.PostLogoutRedirectUri) || !string.IsNullOrEmpty(oidcReq.ClientId) || !string.IsNullOrEmpty(oidcReq.State));
+        bool isOidcLogoutRequest = _logoutHelper.IsOidcLogoutRequest(http);
         if (isOidcLogoutRequest)
         {
             return await ProcessLogoutInternalAsync(http, clientId, postUri, cancellationToken);
@@ -76,31 +63,13 @@ public sealed class LogoutGetHandler : IRequestHandler<LogoutGetRequest, IAction
 
         _logger.LogInformation("Direct browser logout access detected (no OIDC parameters)");
 
-        if (UseGlobalLogout(http))
+        if (_logoutHelper.UseGlobalLogout(http))
         {
-            await SignOutGlobalAsync(http, clientId);
+            await _logoutHelper.SignOutGlobalAsync(http, clientId);
         }
         else
         {
-            // Client-only local logout (preserve other clients)
-            string? detectedClientId = clientId ?? await TryGetClientIdFromRequestAsync(http);
-            if (!string.IsNullOrEmpty(detectedClientId))
-            {
-                try
-                {
-                    await _dynamicCookieService.SignOutFromClientAsync(detectedClientId);
-                    var cookieName = _cookieService.GetCookieNameForClient(detectedClientId);
-                    DeleteCookieAcrossDomains(http, cookieName);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to sign out from client-specific cookie for client {ClientId}", detectedClientId);
-                }
-            }
-            else
-            {
-                _logger.LogWarning("Could not detect clientId for direct logout; preserving all sessions");
-            }
+            await _logoutHelper.SignOutClientOnlyAsync(http, clientId);
         }
 
         return new RedirectToActionResult("Index", "Home", new { logout = "success" });
@@ -109,150 +78,22 @@ public sealed class LogoutGetHandler : IRequestHandler<LogoutGetRequest, IAction
     private async Task<IActionResult> ProcessLogoutInternalAsync(HttpContext http, string? clientId, string? postLogoutUri, CancellationToken ct)
     {
         var request = http.GetOpenIddictServerRequest();
-        string? detectedClientId = clientId ?? await TryGetClientIdFromRequestAsync(http);
+        string? detectedClientId = clientId ?? await _logoutHelper.TryGetClientIdFromRequestAsync(http);
         _logger.LogDebug("Processing OIDC logout. Method: {Method}, ClientId parameter: {ClientId}, Detected ClientId: {DetectedClientId}, Post logout URI: {PostLogoutUri}", http.Request.Method, clientId, detectedClientId, postLogoutUri ?? request?.PostLogoutRedirectUri);
 
-        if (UseGlobalLogout(http))
+        if (_logoutHelper.UseGlobalLogout(http))
         {
-            await SignOutGlobalAsync(http, detectedClientId);
+            await _logoutHelper.SignOutGlobalAsync(http, detectedClientId);
         }
         else
         {
             // IMPORTANT: For OIDC logout, only sign the initiating client out locally to avoid impacting other clients.
-            if (!string.IsNullOrEmpty(detectedClientId))
-            {
-                try
-                {
-                    await _dynamicCookieService.SignOutFromClientAsync(detectedClientId);
-                    var cookieName = _cookieService.GetCookieNameForClient(detectedClientId);
-                    DeleteCookieAcrossDomains(http, cookieName);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to sign out from client-specific cookie for client {ClientId}", detectedClientId);
-                }
-            }
-            else
-            {
-                _logger.LogWarning("OIDC logout without resolvable clientId; preserving other sessions");
-            }
+            await _logoutHelper.SignOutClientOnlyAsync(http, detectedClientId);
         }
 
         // Delegate end-session redirect/sign-out to OpenIddict
         // Clear the default Identity cookie
-        DeleteCookieAcrossDomains(http, ".AspNetCore.Identity.Application");
+        _logoutHelper.DeleteCookieAcrossDomains(http, ".AspNetCore.Identity.Application");
         return new SignOutResult(new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
-    }
-
-    private bool UseGlobalLogout(HttpContext http)
-    {
-        var scope = _configuration["Logout:Scope"]; // Global | Client (default Client)
-        if (!string.IsNullOrWhiteSpace(scope) && scope.Equals("Global", StringComparison.OrdinalIgnoreCase))
-        {
-            _logger.LogDebug("Logout scope set to GLOBAL by configuration");
-            return true;
-        }
-        _logger.LogDebug("Logout scope set to CLIENT (default)");
-        return false;
-    }
-
-    private async Task SignOutGlobalAsync(HttpContext http, string? initiatingClientId)
-    {
-        await _signInManager.SignOutAsync();
-        DeleteCookieAcrossDomains(http, ".AspNetCore.Identity.Application");
-
-        if (!string.IsNullOrEmpty(initiatingClientId))
-        {
-            try
-            {
-                await _dynamicCookieService.SignOutFromClientAsync(initiatingClientId);
-                var cookieName = _cookieService.GetCookieNameForClient(initiatingClientId);
-                DeleteCookieAcrossDomains(http, cookieName);
-            }
-            catch { }
-        }
-
-        var configs = _cookieService.GetAllClientConfigurations();
-        if (configs.Count > 0)
-        {
-            foreach (var kvp in configs)
-            {
-                try { await _dynamicCookieService.SignOutFromClientAsync(kvp.Key); } catch { }
-                DeleteCookieAcrossDomains(http, kvp.Value.CookieName);
-            }
-        }
-        else
-        {
-            DeleteCookieAcrossDomains(http, ".MrWho.Session");
-            foreach (var kv in http.Request.Cookies)
-            {
-                var name = kv.Key;
-                if (name.StartsWith(".MrWho", StringComparison.OrdinalIgnoreCase) ||
-                    name.Contains("Identity.Application", StringComparison.OrdinalIgnoreCase) ||
-                    name.Contains("Identity.External", StringComparison.OrdinalIgnoreCase) ||
-                    name.StartsWith(".AspNetCore.Identity", StringComparison.OrdinalIgnoreCase))
-                {
-                    DeleteCookieAcrossDomains(http, name);
-                }
-            }
-        }
-
-        _logger.LogInformation("GLOBAL logout: cleared default and client cookies");
-    }
-
-    private void DeleteCookieAcrossDomains(HttpContext http, string cookieName)
-    {
-        if (string.IsNullOrWhiteSpace(cookieName)) return;
-
-        // Try multiple domain variants to ensure deletion in production where Cookie:Domain is set
-        var configured = _configuration["Cookie:Domain"];
-        var host = http.Request.Host.Host;
-        var requireHttps = string.Equals(_configuration["Cookie:RequireHttps"], "true", StringComparison.OrdinalIgnoreCase);
-        var secure = requireHttps || http.Request.IsHttps;
-
-        // Build a unique list of domain variants to try (null = current host only)
-        var domains = new List<string?> { null };
-        if (!string.IsNullOrWhiteSpace(host))
-        {
-            domains.Add(host);
-            if (!host.StartsWith('.')) domains.Add("." + host);
-        }
-        if (!string.IsNullOrWhiteSpace(configured))
-        {
-            domains.Add(configured);
-            if (!configured.StartsWith('.')) domains.Add("." + configured);
-        }
-
-        foreach (var d in domains.Distinct(StringComparer.OrdinalIgnoreCase))
-        {
-            try
-            {
-                http.Response.Cookies.Delete(cookieName, new CookieOptions
-                {
-                    Path = "/",
-                    Domain = d,
-                    HttpOnly = true,
-                    Secure = secure,
-                    SameSite = SameSiteMode.None // ensure deletion works in third-party contexts
-                });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogDebug(ex, "Error deleting cookie {Cookie} for domain {Domain}", cookieName, d ?? "<null>");
-            }
-        }
-    }
-
-    private async Task<string?> TryGetClientIdFromRequestAsync(HttpContext http)
-    {
-        try
-        {
-            var req = http.GetOpenIddictServerRequest();
-            if (!string.IsNullOrEmpty(req?.ClientId)) return req.ClientId;
-            var query = http.Request.Query["client_id"].ToString();
-            if (!string.IsNullOrEmpty(query)) return query;
-        }
-        catch { }
-        return null;
     }
 }
