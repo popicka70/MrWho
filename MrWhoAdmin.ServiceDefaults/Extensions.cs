@@ -5,6 +5,8 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.ServiceDiscovery;
 using OpenTelemetry;
+using OpenTelemetry.Exporter;
+using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
 
@@ -70,7 +72,22 @@ public static class Extensions
                     )
                     // Uncomment the following line to enable gRPC instrumentation (requires the OpenTelemetry.Instrumentation.GrpcNetClient package)
                     //.AddGrpcClientInstrumentation()
-                    .AddHttpClientInstrumentation();
+                    .AddHttpClientInstrumentation()
+                    .AddOtlpExporter(options =>
+                    {
+                        // Google Cloud Operations (Cloud Trace) OTLP HTTP endpoint
+                        options.Endpoint = new Uri("https://otlp.googleapis.com/v1/traces");
+                        options.Protocol = OtlpExportProtocol.HttpProtobuf;
+                    });
+
+            }).WithLogging(logging =>
+            {
+                logging.AddOtlpExporter(options =>
+                {
+                    // Google Cloud Operations (Cloud Logging) OTLP HTTP endpoint
+                    options.Endpoint = new Uri("https://otlp.googleapis.com/v1/logs");
+                    options.Protocol = OtlpExportProtocol.HttpProtobuf;
+                });
             });
 
         builder.AddOpenTelemetryExporters();
@@ -84,7 +101,8 @@ public static class Extensions
 
         if (useOtlpExporter)
         {
-            builder.Services.AddOpenTelemetry().UseOtlpExporter();
+            //builder.Services.AddOpenTelemetry().UseOtlpExporter();
+            builder.Services.AddOpenTelemetry().WithLogging();
         }
 
         // Uncomment the following lines to enable the Azure Monitor exporter (requires the Azure.Monitor.OpenTelemetry.AspNetCore package)
