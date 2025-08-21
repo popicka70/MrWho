@@ -16,41 +16,29 @@ namespace MrWho.Endpoints.Auth;
 
 public sealed class LoginGetHandler : IRequestHandler<LoginGetRequest, IActionResult>
 {
-    private readonly SignInManager<IdentityUser> _signInManager;
-    private readonly UserManager<IdentityUser> _userManager;
     private readonly IClientCookieConfigurationService _cookieService;
     private readonly IDynamicCookieService _dynamicCookieService;
     private readonly IOpenIddictApplicationManager _applicationManager;
     private readonly ApplicationDbContext _db;
     private readonly ILogger<LoginGetHandler> _logger;
-    private readonly IConfiguration _configuration;
-    private readonly IHttpClientFactory _httpClientFactory;
-    private readonly IHostEnvironment _env;
+    private readonly ILoginHelper _loginHelper;
     private readonly IOptions<MrWhoOptions> _mrWhoOptions;
 
     public LoginGetHandler(
-        SignInManager<IdentityUser> signInManager,
-        UserManager<IdentityUser> userManager,
         IClientCookieConfigurationService cookieService,
         IDynamicCookieService dynamicCookieService,
         IOpenIddictApplicationManager applicationManager,
         ApplicationDbContext db,
         ILogger<LoginGetHandler> logger,
-        IConfiguration configuration,
-        IHttpClientFactory httpClientFactory,
-        IHostEnvironment env,
+        ILoginHelper loginHelper,
         IOptions<MrWhoOptions> mrWhoOptions)
     {
-        _signInManager = signInManager;
-        _userManager = userManager;
         _cookieService = cookieService;
         _dynamicCookieService = dynamicCookieService;
         _applicationManager = applicationManager;
         _db = db;
         _logger = logger;
-        _configuration = configuration;
-        _httpClientFactory = httpClientFactory;
-        _env = env;
+        _loginHelper = loginHelper;
         _mrWhoOptions = mrWhoOptions;
     }
 
@@ -65,7 +53,7 @@ public sealed class LoginGetHandler : IRequestHandler<LoginGetRequest, IActionRe
 
         if (string.IsNullOrEmpty(clientId) && !string.IsNullOrEmpty(returnUrl))
         {
-            var extracted = TryExtractClientIdFromReturnUrl(returnUrl);
+            var extracted = _loginHelper.TryExtractClientIdFromReturnUrl(returnUrl);
             if (!string.IsNullOrEmpty(extracted))
             {
                 clientId = extracted;
@@ -76,7 +64,7 @@ public sealed class LoginGetHandler : IRequestHandler<LoginGetRequest, IActionRe
         var viewData = NewViewData();
         viewData["ReturnUrl"] = returnUrl;
         viewData["ClientId"] = clientId;
-        viewData["RecaptchaSiteKey"] = ShouldUseRecaptcha() ? _configuration["GoogleReCaptcha:SiteKey"] : null;
+        viewData["RecaptchaSiteKey"] = _loginHelper.GetRecaptchaSiteKey();
 
         string? clientName = null;
         bool allowLocal = true, allowPasskey = true, allowQrQuick = true, allowQrSecure = true, allowCode = true;
@@ -156,11 +144,11 @@ public sealed class LoginGetHandler : IRequestHandler<LoginGetRequest, IActionRe
                     if (showClientLogo && !string.IsNullOrWhiteSpace(clientLogo))
                     {
                         logoUri = clientLogo;
-                    }
-                    else if (!string.IsNullOrWhiteSpace(client.Realm?.RealmLogoUri))
-                    {
+                      }
+                      else if (!string.IsNullOrWhiteSpace(client.Realm?.RealmLogoUri))
+                      {
                         logoUri = client.Realm!.RealmLogoUri;
-                    }
+                      }
                 }
                 catch (Exception ex)
                 {
@@ -210,41 +198,6 @@ public sealed class LoginGetHandler : IRequestHandler<LoginGetRequest, IActionRe
             ViewName = "Login",
             ViewData = viewDataWithModel(viewData, model)
         };
-    }
-
-    private bool ShouldUseRecaptcha()
-    {
-        if (_env.IsDevelopment()) return false;
-        var site = _configuration["GoogleReCaptcha:SiteKey"];
-        var secret = _configuration["GoogleReCaptcha:SecretKey"];
-        var enabledFlag = _configuration["GoogleReCaptcha:Enabled"];
-        if (!string.IsNullOrWhiteSpace(enabledFlag) && bool.TryParse(enabledFlag, out var enabled) && !enabled)
-            return false;
-        return !string.IsNullOrWhiteSpace(site) && !string.IsNullOrWhiteSpace(secret);
-    }
-
-    private static string? TryExtractClientIdFromReturnUrl(string? returnUrl)
-    {
-        if (string.IsNullOrEmpty(returnUrl)) return null;
-        try
-        {
-            if (Uri.TryCreate(returnUrl, UriKind.Absolute, out var absUri))
-            {
-                var query = System.Web.HttpUtility.ParseQueryString(absUri.Query);
-                return query["client_id"];            
-            }
-            else
-            {
-                var idx = returnUrl.IndexOf('?');
-                if (idx >= 0 && idx < returnUrl.Length - 1)
-                {
-                    var query = System.Web.HttpUtility.ParseQueryString(returnUrl.Substring(idx));
-                    return query["client_id"];            
-                }
-            }
-        }
-        catch { }
-        return null;
     }
 
     private static ViewDataDictionary NewViewData() => new(new EmptyModelMetadataProvider(), new ModelStateDictionary());
