@@ -3,17 +3,24 @@
     var clientId = ViewData["ClientId"] as string;
     var clientName = ViewData["ClientName"] as string;
     var returnUrl = ViewData["ReturnUrl"] as string;
+    var logoUri = ViewData["LogoUri"] as string; // themed logo like login
     // Build a route value dictionary preserving existing query params
     var routeParams = new System.Collections.Generic.Dictionary<string, string?>(System.StringComparer.OrdinalIgnoreCase);
-    if (!string.IsNullOrEmpty(returnUrl)) routeParams["returnUrl"] = returnUrl;
-    if (!string.IsNullOrEmpty(clientId)) routeParams["clientId"] = clientId;
+    if (!string.IsNullOrEmpty(returnUrl))
+    {
+        routeParams["returnUrl"] = returnUrl;
+    }
+    if (!string.IsNullOrEmpty(clientId))
+    {
+        routeParams["clientId"] = clientId;
+    }
     var query = Context?.Request?.Query;
     if (query != null)
     {
         foreach (var kvp in query)
         {
             var key = kvp.Key;
-            if (string.IsNullOrEmpty(key)) continue;
+            if (string.IsNullOrEmpty(key)) { continue; }
             if (string.Equals(key, "returnUrl", System.StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(key, "clientId", System.StringComparison.OrdinalIgnoreCase))
             {
@@ -31,9 +38,16 @@
 
 <div class="row justify-content-center">
     <div class="col-md-8 col-lg-6">
-        <!-- MrWho Logo -->
+        <!-- Logo (client/realm-specific when provided, fallback to default) -->
         <div class="text-center mb-4">
-            <img src="~/images/AuthMrWho.jpeg" alt="MrWho Identity Server" class="mrwho-logo" />
+            @if (!string.IsNullOrWhiteSpace(logoUri))
+            {
+                <img src="@logoUri" alt="@(clientName ?? "Client") Logo" class="mrwho-logo" />
+            }
+            else
+            {
+                <img src="~/images/AuthMrWho.jpeg" alt="MrWho Identity Server" class="mrwho-logo" />
+            }
         </div>
         
         <div class="card border-warning">
