@@ -20,6 +20,7 @@ public sealed class LoginPostHandler : IRequestHandler<MrWho.Endpoints.Auth.Logi
     private readonly ApplicationDbContext _db;
     private readonly ILogger<LoginPostHandler> _logger;
     private readonly ILoginHelper _loginHelper;
+    private readonly IUserRealmValidationService _realmValidationService; // added
 
     public LoginPostHandler(
         SignInManager<IdentityUser> signInManager,
@@ -28,7 +29,8 @@ public sealed class LoginPostHandler : IRequestHandler<MrWho.Endpoints.Auth.Logi
         IDynamicCookieService dynamicCookieService,
         ApplicationDbContext db,
         ILogger<LoginPostHandler> logger,
-        ILoginHelper loginHelper)
+        ILoginHelper loginHelper,
+        IUserRealmValidationService realmValidationService) // added
     {
         _signInManager = signInManager;
         _userManager = userManager;
@@ -37,6 +39,7 @@ public sealed class LoginPostHandler : IRequestHandler<MrWho.Endpoints.Auth.Logi
         _db = db;
         _logger = logger;
         _loginHelper = loginHelper;
+        _realmValidationService = realmValidationService; // added
     }
 
     public async Task<IActionResult> Handle(MrWho.Endpoints.Auth.LoginPostRequest request, CancellationToken cancellationToken)
@@ -138,6 +141,29 @@ public sealed class LoginPostHandler : IRequestHandler<MrWho.Endpoints.Auth.Logi
 
             await _signInManager.SignInAsync(user, isPersistent: model.RememberMe, authenticationMethod: "mfa");
 
+            // Realm/policy validation after successful sign-in
+            if (!string.IsNullOrEmpty(clientId))
+            {
+                try
+                {
+                    var realmValidation = await _realmValidationService.ValidateUserRealmAccessAsync(user, clientId);
+                    if (!realmValidation.IsValid)
+                    {
+                        _logger.LogWarning("Login denied for user {User} to client {ClientId} (code login). Reason: {Reason}", user.UserName, clientId, realmValidation.Reason);
+                        try { await _dynamicCookieService.SignOutFromClientAsync(clientId); } catch { }
+                        await _signInManager.SignOutAsync();
+                        return new RedirectResult(BuildAccessDeniedUrl(returnUrl, clientId));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error during realm validation for user {User} and client {ClientId} (code login)", user.Id, clientId);
+                    try { await _dynamicCookieService.SignOutFromClientAsync(clientId); } catch { }
+                    await _signInManager.SignOutAsync();
+                    return new RedirectResult(BuildAccessDeniedUrl(returnUrl, clientId));
+                }
+            }
+
             if (!string.IsNullOrEmpty(clientId))
             {
                 try { await _dynamicCookieService.SignInWithClientCookieAsync(clientId, user, model.RememberMe); }
@@ -170,6 +196,29 @@ public sealed class LoginPostHandler : IRequestHandler<MrWho.Endpoints.Auth.Logi
                 return new ViewResult { ViewName = "Login", ViewData = viewDataWithModel(vd, model) };
             }
 
+            // Realm/policy validation after successful sign-in
+            if (!string.IsNullOrEmpty(clientId))
+            {
+                try
+                {
+                    var realmValidation = await _realmValidationService.ValidateUserRealmAccessAsync(user, clientId);
+                    if (!realmValidation.IsValid)
+                    {
+                        _logger.LogWarning("Login denied for user {User} to client {ClientId}. Reason: {Reason}", user.UserName, clientId, realmValidation.Reason);
+                        try { await _dynamicCookieService.SignOutFromClientAsync(clientId); } catch { }
+                        await _signInManager.SignOutAsync();
+                        return new RedirectResult(BuildAccessDeniedUrl(returnUrl, clientId));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error during realm validation for user {User} and client {ClientId}", user.Id, clientId);
+                    try { await _dynamicCookieService.SignOutFromClientAsync(clientId); } catch { }
+                    await _signInManager.SignOutAsync();
+                    return new RedirectResult(BuildAccessDeniedUrl(returnUrl, clientId));
+                }
+            }
+
             if (!string.IsNullOrEmpty(clientId))
             {
                 try { await _dynamicCookieService.SignInWithClientCookieAsync(clientId, user, model.RememberMe); }
@@ -189,6 +238,17 @@ public sealed class LoginPostHandler : IRequestHandler<MrWho.Endpoints.Auth.Logi
             vd["ReturnUrl"] = returnUrl; vd["ClientId"] = clientId; vd["RecaptchaSiteKey"] = viewData["RecaptchaSiteKey"]; vd["ClientName"] = clientName;
             return new ViewResult { ViewName = "Login", ViewData = viewDataWithModel(vd, model) };
         }
+    }
+
+    private static string BuildAccessDeniedUrl(string? returnUrl, string? clientId)
+    {
+        var ret = !string.IsNullOrEmpty(returnUrl) ? Uri.EscapeDataString(returnUrl) : string.Empty;
+        var cid = !string.IsNullOrEmpty(clientId) ? Uri.EscapeDataString(clientId) : string.Empty;
+        var url = "/connect/access-denied";
+        var hasQuery = false;
+        if (!string.IsNullOrEmpty(ret)) { url += $"?returnUrl={ret}"; hasQuery = true; }
+        if (!string.IsNullOrEmpty(cid)) { url += hasQuery ? $"&clientId={cid}" : $"?clientId={cid}"; }
+        return url;
     }
 
     private static bool IsModelStateValid(MrWho.Controllers.LoginViewModel model, out List<KeyValuePair<string, string>> errors)

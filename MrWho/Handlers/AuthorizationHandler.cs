@@ -152,24 +152,20 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
             {
                 _logger.LogWarning("Access denied for user {UserName} to client {ClientId}. Reason: {Reason}", authUser.UserName, clientId, realmValidation.Reason);
                 await SafeSignOutClientAsync(clientId);
-                var forbidProps = new AuthenticationProperties(new Dictionary<string, string?>
-                {
-                    [OpenIddictServerAspNetCoreConstants.Properties.Error] = OpenIddictConstants.Errors.AccessDenied,
-                    [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = realmValidation.Reason
-                });
-                return Results.Forbid(forbidProps, new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
+
+                // Handle on OP side: show access denied instead of pushing error back to client app
+                var accessDeniedUrl = BuildAccessDeniedUrl(context, clientId);
+                return Results.Redirect(accessDeniedUrl);
             }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during realm validation for user {UserId} and client {ClientId}", authUser.Id, clientId);
             await SafeSignOutClientAsync(clientId);
-            var forbidProps = new AuthenticationProperties(new Dictionary<string, string?>
-            {
-                [OpenIddictServerAspNetCoreConstants.Properties.Error] = OpenIddictConstants.Errors.ServerError,
-                [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = "Realm validation error"
-            });
-            return Results.Forbid(forbidProps, new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
+
+            // Handle on OP side for unexpected errors as well
+            var accessDeniedUrl = BuildAccessDeniedUrl(context, clientId);
+            return Results.Redirect(accessDeniedUrl);
         }
 
         try
@@ -179,24 +175,20 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
             {
                 _logger.LogWarning("User {UserName} has invalid/missing profile for client {ClientId}", authUser.UserName, clientId);
                 await SafeSignOutClientAsync(clientId);
-                var forbidProps = new AuthenticationProperties(new Dictionary<string, string?>
-                {
-                    [OpenIddictServerAspNetCoreConstants.Properties.Error] = OpenIddictConstants.Errors.AccessDenied,
-                    [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = "Inactive user profile"
-                });
-                return Results.Forbid(forbidProps, new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
+
+                // Handle on OP side
+                var accessDeniedUrl = BuildAccessDeniedUrl(context, clientId);
+                return Results.Redirect(accessDeniedUrl);
             }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error checking user profile state for user {UserId}", authUser.Id);
             await SafeSignOutClientAsync(clientId);
-            var forbidProps = new AuthenticationProperties(new Dictionary<string, string?>
-            {
-                [OpenIddictServerAspNetCoreConstants.Properties.Error] = OpenIddictConstants.Errors.ServerError,
-                [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = "Profile validation error"
-            });
-            return Results.Forbid(forbidProps, new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
+
+            // Handle on OP side
+            var accessDeniedUrl = BuildAccessDeniedUrl(context, clientId);
+            return Results.Redirect(accessDeniedUrl);
         }
 
         // 5) Build authorization principal
@@ -260,6 +252,19 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
 
         _logger.LogDebug("Authorization granted for user {UserName} and client {ClientId}", authUser.UserName, clientId);
         return Results.SignIn(authPrincipal, authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+    }
+
+    private static string BuildAccessDeniedUrl(HttpContext context, string clientId)
+    {
+        var currentUrl = context.Request.GetDisplayUrl();
+        var returnUrl = Uri.EscapeDataString(currentUrl);
+        var cid = Uri.EscapeDataString(clientId ?? string.Empty);
+        var url = $"/connect/access-denied?returnUrl={returnUrl}";
+        if (!string.IsNullOrEmpty(cid))
+        {
+            url += $"&clientId={cid}";
+        }
+        return url;
     }
 
     private async Task SafeSignOutClientAsync(string clientId)
