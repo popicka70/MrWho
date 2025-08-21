@@ -10,9 +10,9 @@ using MrWho.Services;
 using MrWho.Services.Mediator;
 using MrWho.Shared.Models;
 
-namespace MrWho.Endpoints.Auth;
+namespace MrWho.Handlers.Auth;
 
-public sealed class RegisterPostHandler : IRequestHandler<RegisterPostRequest, IActionResult>
+public sealed class RegisterPostHandler : IRequestHandler<MrWho.Endpoints.Auth.RegisterPostRequest, IActionResult>
 {
     private readonly UserManager<IdentityUser> _userManager;
     private readonly ApplicationDbContext _db;
@@ -25,7 +25,7 @@ public sealed class RegisterPostHandler : IRequestHandler<RegisterPostRequest, I
         _loginHelper = loginHelper;
     }
 
-    public async Task<IActionResult> Handle(RegisterPostRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> Handle(MrWho.Endpoints.Auth.RegisterPostRequest request, CancellationToken cancellationToken)
     {
         var http = request.HttpContext;
         var input = request.Input;

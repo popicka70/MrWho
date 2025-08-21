@@ -10,14 +10,12 @@ using Microsoft.AspNetCore; // for extension visibility
 using Microsoft.AspNetCore.Authentication;
 using OpenIddict.Client.AspNetCore;
 
-namespace MrWho.Endpoints;
+namespace MrWho.Handlers.Oidc;
 
-public sealed record OidcLogoutRequest(HttpContext HttpContext) : IRequest<IResult>;
-
-public sealed class OidcLogoutHandler : IRequestHandler<OidcLogoutRequest, IResult>
+public sealed class OidcLogoutHandler : IRequestHandler<MrWho.Endpoints.OidcLogoutRequest, IResult>
 {
     private readonly IDynamicCookieService _dynamicCookieService;
-    private readonly ILogger _logger;
+    private readonly ILogger<OidcLogoutHandler> _logger;
 
     public OidcLogoutHandler(IDynamicCookieService dynamicCookieService, ILogger<OidcLogoutHandler> logger)
     {
@@ -25,7 +23,7 @@ public sealed class OidcLogoutHandler : IRequestHandler<OidcLogoutRequest, IResu
         _logger = logger;
     }
 
-    public async Task<IResult> Handle(OidcLogoutRequest request, CancellationToken cancellationToken)
+    public async Task<IResult> Handle(MrWho.Endpoints.OidcLogoutRequest request, CancellationToken cancellationToken)
     {
         var context = request.HttpContext;
         var oidcRequest = context.GetOpenIddictServerRequest() ??
@@ -67,60 +65,21 @@ public sealed class OidcLogoutHandler : IRequestHandler<OidcLogoutRequest, IResu
 
                 if (!string.IsNullOrEmpty(postLogoutUri))
                 {
-                    _logger.LogInformation("Trying to determine client from post_logout_redirect_uri: {Uri}", postLogoutUri);
-
-                    if (postLogoutUri.Contains("7257") || postLogoutUri.Contains("localhost:7257"))
-                    {
-                        clientId = "mrwho_admin_web";
-                        _logger.LogInformation("Client detected: Admin app (port 7257) {ClientId}", clientId);
-                    }
-                    else if (postLogoutUri.Contains("7037") || postLogoutUri.Contains("localhost:7037"))
-                    {
-                        clientId = "mrwho_demo1";
-                        _logger.LogInformation("Client detected: Demo1 app (port 7037) {ClientId}", clientId);
-                    }
+                    _logger.LogInformation("OIDC logout without client_id. Skipping client cookie cleanup and delegating to OP.");
+                    return Results.SignOut(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
                 }
+
+                _logger.LogWarning("End session request missing client_id and post_logout_redirect_uri; delegating to OP");
+                return Results.SignOut(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
             }
 
-            if (string.IsNullOrEmpty(clientId))
-            {
-                var referrer = context.Request.Headers.Referer.FirstOrDefault();
-                if (!string.IsNullOrEmpty(referrer))
-                {
-                    _logger.LogInformation("Checking referrer: {Referrer}", referrer);
-                    if (referrer.Contains("7257"))
-                    {
-                        clientId = "mrwho_admin_web";
-                    }
-                    else if (referrer.Contains("7037"))
-                    {
-                        clientId = "mrwho_demo1";
-                    }
-                }
-            }
-
-            _logger.LogInformation("Logout request: ClientId={ClientId}, PostLogoutUri={PostLogoutUri}, HasIdToken={HasIdToken}, Referrer={Referrer}",
-                clientId ?? "NULL",
-                oidcRequest.PostLogoutRedirectUri ?? "NULL",
-                !string.IsNullOrEmpty(oidcRequest.IdTokenHint),
-                context.Request.Headers.Referer.FirstOrDefault() ?? "NULL");
-
-            if (!string.IsNullOrEmpty(clientId))
-            {
-                _logger.LogInformation("Client-specific logout for {ClientId}", clientId);
-                await _dynamicCookieService.SignOutFromClientAsync(clientId);
-            }
-            else
-            {
-                _logger.LogWarning("Fallback logout: no client ID detected. This will affect all clients.");
-            }
-
+            await _dynamicCookieService.SignOutFromClientAsync(clientId);
             return Results.SignOut(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during client-specific logout for client {ClientId}", oidcRequest.ClientId);
-            return Results.SignOut(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
+            _logger.LogError(ex, "Error processing OIDC logout");
+            return Results.Problem("Error processing logout");
         }
     }
 }

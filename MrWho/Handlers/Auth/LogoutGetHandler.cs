@@ -13,9 +13,9 @@ using OpenIddict.Abstractions;
 using OpenIddict.Client.AspNetCore;
 using OpenIddict.Server.AspNetCore;
 
-namespace MrWho.Endpoints.Auth;
+namespace MrWho.Handlers.Auth;
 
-public sealed class LogoutGetHandler : IRequestHandler<LogoutGetRequest, IActionResult>
+public sealed class LogoutGetHandler : IRequestHandler<MrWho.Endpoints.Auth.LogoutGetRequest, IActionResult>
 {
     private readonly ILogger<LogoutGetHandler> _logger;
     private readonly ILogoutHelper _logoutHelper;
@@ -28,7 +28,7 @@ public sealed class LogoutGetHandler : IRequestHandler<LogoutGetRequest, IAction
         _logoutHelper = logoutHelper;
     }
 
-    public async Task<IActionResult> Handle(LogoutGetRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> Handle(MrWho.Endpoints.Auth.LogoutGetRequest request, CancellationToken cancellationToken)
     {
         var http = request.HttpContext;
         var clientId = request.ClientId;

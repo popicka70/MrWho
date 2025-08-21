@@ -1,6 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
 using MrWho.Endpoints;
-using MrWho.Endpoints.Auth;
 using MrWho.Services.Mediator;
 using Microsoft.AspNetCore.Mvc; // added
 
@@ -13,20 +12,20 @@ public static class MediatorServiceCollectionExtensions
     services.AddScoped<IMediator, Mediator>();
 
         // Register endpoint handlers
-        services.AddTransient<IRequestHandler<OidcAuthorizeRequest, IResult>, OidcAuthorizeHandler>();
-        services.AddTransient<IRequestHandler<OidcTokenRequest, IResult>, OidcTokenHandler>();
-        services.AddTransient<IRequestHandler<OidcLogoutRequest, IResult>, OidcLogoutHandler>();
-        services.AddTransient<IRequestHandler<UserInfoRequest, IResult>, UserInfoHandler>();
+        services.AddTransient<IRequestHandler<OidcAuthorizeRequest, IResult>, MrWho.Handlers.Oidc.OidcAuthorizeHandler>();
+        services.AddTransient<IRequestHandler<OidcTokenRequest, IResult>, MrWho.Handlers.Oidc.OidcTokenHandler>();
+        services.AddTransient<IRequestHandler<OidcLogoutRequest, IResult>, MrWho.Handlers.Oidc.OidcLogoutHandler>();
+        services.AddTransient<IRequestHandler<UserInfoRequest, IResult>, MrWho.Handlers.Oidc.UserInfoEndpointHandler>();
 
         // Auth handlers
-        services.AddTransient<IRequestHandler<LoginGetRequest, IActionResult>, LoginGetHandler>();
-        services.AddTransient<IRequestHandler<LoginPostRequest, IActionResult>, LoginPostHandler>();
-        services.AddTransient<IRequestHandler<LogoutGetRequest, IActionResult>, LogoutGetHandler>();
-        services.AddTransient<IRequestHandler<LogoutPostRequest, IActionResult>, LogoutPostHandler>();
-        services.AddTransient<IRequestHandler<AccessDeniedGetRequest, IActionResult>, AccessDeniedGetHandler>();
-        services.AddTransient<IRequestHandler<RegisterGetRequest, IActionResult>, RegisterGetHandler>();
-        services.AddTransient<IRequestHandler<RegisterPostRequest, IActionResult>, RegisterPostHandler>();
-        services.AddTransient<IRequestHandler<RegisterSuccessGetRequest, IActionResult>, RegisterSuccessGetHandler>();
+        services.AddTransient<IRequestHandler<MrWho.Endpoints.Auth.LoginGetRequest, IActionResult>, MrWho.Handlers.Auth.LoginGetHandler>();
+        services.AddTransient<IRequestHandler<MrWho.Endpoints.Auth.LoginPostRequest, IActionResult>, MrWho.Handlers.Auth.LoginPostHandler>();
+        services.AddTransient<IRequestHandler<MrWho.Endpoints.Auth.LogoutGetRequest, IActionResult>, MrWho.Handlers.Auth.LogoutGetHandler>();
+        services.AddTransient<IRequestHandler<MrWho.Endpoints.Auth.LogoutPostRequest, IActionResult>, MrWho.Handlers.Auth.LogoutPostHandler>();
+        services.AddTransient<IRequestHandler<MrWho.Endpoints.Auth.AccessDeniedGetRequest, IActionResult>, MrWho.Handlers.Auth.AccessDeniedGetHandler>();
+        services.AddTransient<IRequestHandler<MrWho.Endpoints.Auth.RegisterGetRequest, IActionResult>, MrWho.Handlers.Auth.RegisterGetHandler>();
+        services.AddTransient<IRequestHandler<MrWho.Endpoints.Auth.RegisterPostRequest, IActionResult>, MrWho.Handlers.Auth.RegisterPostHandler>();
+        services.AddTransient<IRequestHandler<MrWho.Endpoints.Auth.RegisterSuccessGetRequest, IActionResult>, MrWho.Handlers.Auth.RegisterSuccessGetHandler>();
 
     // Debug endpoint handlers
     services.AddTransient<IRequestHandler<DebugIndexRequest, IResult>, DebugIndexHandler>();

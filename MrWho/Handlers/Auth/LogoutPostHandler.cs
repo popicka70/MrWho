@@ -8,9 +8,9 @@ using MrWho.Services.Mediator;
 using OpenIddict.Client.AspNetCore;
 using OpenIddict.Server.AspNetCore;
 
-namespace MrWho.Endpoints.Auth;
+namespace MrWho.Handlers.Auth;
 
-public sealed class LogoutPostHandler : IRequestHandler<LogoutPostRequest, IActionResult>
+public sealed class LogoutPostHandler : IRequestHandler<MrWho.Endpoints.Auth.LogoutPostRequest, IActionResult>
 {
     private readonly ILogger<LogoutPostHandler> _logger;
     private readonly ILogoutHelper _logoutHelper;
@@ -21,7 +21,7 @@ public sealed class LogoutPostHandler : IRequestHandler<LogoutPostRequest, IActi
         _logoutHelper = logoutHelper;
     }
 
-    public async Task<IActionResult> Handle(LogoutPostRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> Handle(MrWho.Endpoints.Auth.LogoutPostRequest request, CancellationToken cancellationToken)
     {
         var http = request.HttpContext;
         var clientId = request.ClientId;

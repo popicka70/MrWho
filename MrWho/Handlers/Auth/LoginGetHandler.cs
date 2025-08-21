@@ -12,9 +12,9 @@ using OpenIddict.Abstractions;
 using Microsoft.Extensions.Options;
 using MrWho.Options;
 
-namespace MrWho.Endpoints.Auth;
+namespace MrWho.Handlers.Auth;
 
-public sealed class LoginGetHandler : IRequestHandler<LoginGetRequest, IActionResult>
+public sealed class LoginGetHandler : IRequestHandler<MrWho.Endpoints.Auth.LoginGetRequest, IActionResult>
 {
     private readonly IClientCookieConfigurationService _cookieService;
     private readonly IDynamicCookieService _dynamicCookieService;
@@ -42,7 +42,7 @@ public sealed class LoginGetHandler : IRequestHandler<LoginGetRequest, IActionRe
         _mrWhoOptions = mrWhoOptions;
     }
 
-    public async Task<IActionResult> Handle(LoginGetRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> Handle(MrWho.Endpoints.Auth.LoginGetRequest request, CancellationToken cancellationToken)
     {
         var http = request.HttpContext;
         var returnUrl = request.ReturnUrl;

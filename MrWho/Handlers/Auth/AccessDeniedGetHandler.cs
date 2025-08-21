@@ -4,9 +4,9 @@ using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using MrWho.Services.Mediator;
 using OpenIddict.Abstractions;
 
-namespace MrWho.Endpoints.Auth;
+namespace MrWho.Handlers.Auth;
 
-public sealed class AccessDeniedGetHandler : IRequestHandler<AccessDeniedGetRequest, IActionResult>
+public sealed class AccessDeniedGetHandler : IRequestHandler<MrWho.Endpoints.Auth.AccessDeniedGetRequest, IActionResult>
 {
     private readonly IOpenIddictApplicationManager _applicationManager;
     private readonly ILogger<AccessDeniedGetHandler> _logger;
@@ -17,7 +17,7 @@ public sealed class AccessDeniedGetHandler : IRequestHandler<AccessDeniedGetRequ
         _logger = logger;
     }
 
-    public async Task<IActionResult> Handle(AccessDeniedGetRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> Handle(MrWho.Endpoints.Auth.AccessDeniedGetRequest request, CancellationToken cancellationToken)
     {
         var returnUrl = request.ReturnUrl;
         var clientId = request.ClientId;

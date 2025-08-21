@@ -8,12 +8,10 @@ using Microsoft.Extensions.Hosting;
 using MrWho.Data;
 using MrWho.Services;
 using MrWho.Services.Mediator;
-using System.Net.Http;
-using System.Text.Json;
 
-namespace MrWho.Endpoints.Auth;
+namespace MrWho.Handlers.Auth;
 
-public sealed class LoginPostHandler : IRequestHandler<LoginPostRequest, IActionResult>
+public sealed class LoginPostHandler : IRequestHandler<MrWho.Endpoints.Auth.LoginPostRequest, IActionResult>
 {
     private readonly SignInManager<IdentityUser> _signInManager;
     private readonly UserManager<IdentityUser> _userManager;
@@ -41,7 +39,7 @@ public sealed class LoginPostHandler : IRequestHandler<LoginPostRequest, IAction
         _loginHelper = loginHelper;
     }
 
-    public async Task<IActionResult> Handle(LoginPostRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> Handle(MrWho.Endpoints.Auth.LoginPostRequest request, CancellationToken cancellationToken)
     {
         var http = request.HttpContext;
         var model = request.Model;

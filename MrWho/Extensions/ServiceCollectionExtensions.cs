@@ -74,8 +74,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IUpdateUserHandler, UpdateUserHandler>();
         services.AddScoped<IDeleteUserHandler, DeleteUserHandler>();
 
-        // Register authorization and token handlers
+        // Register authorization, token and userinfo handlers
         services.AddScoped<IOidcAuthorizationHandler, OidcAuthorizationHandler>();
+        services.AddScoped<ITokenHandler, TokenHandler>();
         services.AddScoped<IUserInfoHandler, MrWho.Handlers.UserInfoHandler>(); // disambiguate
 
         // Register back-channel logout service
