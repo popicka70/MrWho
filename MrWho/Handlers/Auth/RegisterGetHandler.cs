@@ -6,9 +6,9 @@ using Microsoft.Extensions.Hosting;
 using MrWho.Services.Mediator;
 using MrWho.Shared.Models;
 
-namespace MrWho.Endpoints.Auth;
+namespace MrWho.Handlers.Auth;
 
-public sealed class RegisterGetHandler : IRequestHandler<RegisterGetRequest, IActionResult>
+public sealed class RegisterGetHandler : IRequestHandler<MrWho.Endpoints.Auth.RegisterGetRequest, IActionResult>
 {
     private readonly IConfiguration _configuration;
     private readonly IHostEnvironment _env;
@@ -19,7 +19,7 @@ public sealed class RegisterGetHandler : IRequestHandler<RegisterGetRequest, IAc
         _env = env;
     }
 
-    public Task<IActionResult> Handle(RegisterGetRequest request, CancellationToken cancellationToken)
+    public Task<IActionResult> Handle(MrWho.Endpoints.Auth.RegisterGetRequest request, CancellationToken cancellationToken)
     {
         var http = request.HttpContext;
 

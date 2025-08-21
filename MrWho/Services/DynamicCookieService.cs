@@ -59,6 +59,11 @@ public class DynamicCookieService : IDynamicCookieService
             _logger.LogDebug("🔧 Signed in user {UserName} with dynamic scheme {Scheme} for client {ClientId}", 
                 user.UserName, scheme, clientId);
         }
+        catch (Exception ex) when (ex.Source == "Microsoft.AspNetCore.Authentication.Cookies")
+        {
+            _logger.LogWarning("Failed to sign in user {UserName} for client {ClientId}", user.UserName, clientId);
+            throw;
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to sign in user {UserName} for client {ClientId}", user.UserName, clientId);

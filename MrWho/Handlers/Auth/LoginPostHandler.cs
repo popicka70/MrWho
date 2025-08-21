@@ -8,12 +8,10 @@ using Microsoft.Extensions.Hosting;
 using MrWho.Data;
 using MrWho.Services;
 using MrWho.Services.Mediator;
-using System.Net.Http;
-using System.Text.Json;
 
-namespace MrWho.Endpoints.Auth;
+namespace MrWho.Handlers.Auth;
 
-public sealed class LoginPostHandler : IRequestHandler<LoginPostRequest, IActionResult>
+public sealed class LoginPostHandler : IRequestHandler<MrWho.Endpoints.Auth.LoginPostRequest, IActionResult>
 {
     private readonly SignInManager<IdentityUser> _signInManager;
     private readonly UserManager<IdentityUser> _userManager;
@@ -21,9 +19,7 @@ public sealed class LoginPostHandler : IRequestHandler<LoginPostRequest, IAction
     private readonly IDynamicCookieService _dynamicCookieService;
     private readonly ApplicationDbContext _db;
     private readonly ILogger<LoginPostHandler> _logger;
-    private readonly IConfiguration _configuration;
-    private readonly IHttpClientFactory _httpClientFactory;
-    private readonly IHostEnvironment _env;
+    private readonly ILoginHelper _loginHelper;
 
     public LoginPostHandler(
         SignInManager<IdentityUser> signInManager,
@@ -32,9 +28,7 @@ public sealed class LoginPostHandler : IRequestHandler<LoginPostRequest, IAction
         IDynamicCookieService dynamicCookieService,
         ApplicationDbContext db,
         ILogger<LoginPostHandler> logger,
-        IConfiguration configuration,
-        IHttpClientFactory httpClientFactory,
-        IHostEnvironment env)
+        ILoginHelper loginHelper)
     {
         _signInManager = signInManager;
         _userManager = userManager;
@@ -42,28 +36,26 @@ public sealed class LoginPostHandler : IRequestHandler<LoginPostRequest, IAction
         _dynamicCookieService = dynamicCookieService;
         _db = db;
         _logger = logger;
-        _configuration = configuration;
-        _httpClientFactory = httpClientFactory;
-        _env = env;
+        _loginHelper = loginHelper;
     }
 
-    public async Task<IActionResult> Handle(LoginPostRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> Handle(MrWho.Endpoints.Auth.LoginPostRequest request, CancellationToken cancellationToken)
     {
         var http = request.HttpContext;
         var model = request.Model;
         var returnUrl = request.ReturnUrl;
         var clientId = request.ClientId;
 
-        if (ShouldUseRecaptcha())
+        if (_loginHelper.ShouldUseRecaptcha())
         {
             var token = http.Request.Form["recaptchaToken"].ToString();
-            var recaptchaOk = await VerifyRecaptchaAsync(http, token, "login");
+            var recaptchaOk = await _loginHelper.VerifyRecaptchaAsync(http, token, "login");
             if (!recaptchaOk)
             {
                 var vd = NewViewData();
                 vd["ReturnUrl"] = returnUrl;
                 vd["ClientId"] = clientId;
-                vd["RecaptchaSiteKey"] = _configuration["GoogleReCaptcha:SiteKey"];
+                vd["RecaptchaSiteKey"] = _loginHelper.GetRecaptchaSiteKey();
                 vd.ModelState.AddModelError(string.Empty, "reCAPTCHA verification failed. Please try again.");
                 return new ViewResult { ViewName = "Login", ViewData = viewDataWithModel(vd, model) };
             }
@@ -71,7 +63,7 @@ public sealed class LoginPostHandler : IRequestHandler<LoginPostRequest, IAction
 
         if (string.IsNullOrEmpty(clientId) && !string.IsNullOrEmpty(returnUrl))
         {
-            var extracted = TryExtractClientIdFromReturnUrl(returnUrl);
+            var extracted = _loginHelper.TryExtractClientIdFromReturnUrl(returnUrl);
             if (!string.IsNullOrEmpty(extracted))
             {
                 clientId = extracted;
@@ -82,7 +74,7 @@ public sealed class LoginPostHandler : IRequestHandler<LoginPostRequest, IAction
         var viewData = NewViewData();
         viewData["ReturnUrl"] = returnUrl;
         viewData["ClientId"] = clientId;
-        viewData["RecaptchaSiteKey"] = ShouldUseRecaptcha() ? _configuration["GoogleReCaptcha:SiteKey"] : null;
+        viewData["RecaptchaSiteKey"] = _loginHelper.GetRecaptchaSiteKey();
 
         string? clientName = null;
         if (!string.IsNullOrEmpty(clientId))
@@ -155,7 +147,7 @@ public sealed class LoginPostHandler : IRequestHandler<LoginPostRequest, IAction
             if (!string.IsNullOrEmpty(returnUrl))
             {
                 if (returnUrl.Contains("/connect/authorize")) return new RedirectResult(returnUrl);
-                else if (IsLocalUrl(returnUrl)) return new RedirectResult(returnUrl);
+                else if (_loginHelper.IsLocalUrl(returnUrl)) return new RedirectResult(returnUrl);
             }
             return new RedirectToActionResult("Index", "Home", null);
         }
@@ -187,7 +179,7 @@ public sealed class LoginPostHandler : IRequestHandler<LoginPostRequest, IAction
             if (!string.IsNullOrEmpty(returnUrl))
             {
                 if (returnUrl.Contains("/connect/authorize")) return new RedirectResult(returnUrl);
-                else if (IsLocalUrl(returnUrl)) return new RedirectResult(returnUrl);
+                else if (_loginHelper.IsLocalUrl(returnUrl)) return new RedirectResult(returnUrl);
             }
             return new RedirectToActionResult("Index", "Home", null);
         }
@@ -197,39 +189,6 @@ public sealed class LoginPostHandler : IRequestHandler<LoginPostRequest, IAction
             vd["ReturnUrl"] = returnUrl; vd["ClientId"] = clientId; vd["RecaptchaSiteKey"] = viewData["RecaptchaSiteKey"]; vd["ClientName"] = clientName;
             return new ViewResult { ViewName = "Login", ViewData = viewDataWithModel(vd, model) };
         }
-    }
-
-    private bool ShouldUseRecaptcha()
-    {
-        if (_env.IsDevelopment()) return false;
-        var site = _configuration["GoogleReCaptcha:SiteKey"];
-        var secret = _configuration["GoogleReCaptcha:SecretKey"];
-        var enabledFlag = _configuration["GoogleReCaptcha:Enabled"];
-        if (!string.IsNullOrWhiteSpace(enabledFlag) && bool.TryParse(enabledFlag, out var enabled) && !enabled)
-            return false;
-        return !string.IsNullOrWhiteSpace(site) && !string.IsNullOrWhiteSpace(secret);
-    }
-
-    private async Task<bool> VerifyRecaptchaAsync(HttpContext http, string? token, string actionExpected)
-    {
-        if (!ShouldUseRecaptcha()) return true;
-        var secret = _configuration["GoogleReCaptcha:SecretKey"];
-        if (string.IsNullOrWhiteSpace(token)) return false;
-        var client = _httpClientFactory.CreateClient();
-        var resp = await client.PostAsync("https://www.google.com/recaptcha/api/siteverify", new FormUrlEncodedContent(new Dictionary<string,string>{
-            ["secret"] = secret!,
-            ["response"] = token,
-            ["remoteip"] = http.Connection.RemoteIpAddress?.ToString() ?? string.Empty
-        }));
-        if (!resp.IsSuccessStatusCode) return false;
-        using var s = await resp.Content.ReadAsStreamAsync();
-        var result = await System.Text.Json.JsonSerializer.DeserializeAsync<RecaptchaVerifyResult>(s, new System.Text.Json.JsonSerializerOptions{ PropertyNameCaseInsensitive = true });
-        if (result == null || !result.success) return false;
-        var threshold = 0.5;
-        var cfgThr = _configuration["GoogleReCaptcha:Threshold"];
-        if (double.TryParse(cfgThr, out var t)) threshold = t;
-        if (!string.Equals(result.action, actionExpected, StringComparison.OrdinalIgnoreCase)) return false;
-        return result.score >= threshold;
     }
 
     private static bool IsModelStateValid(MrWho.Controllers.LoginViewModel model, out List<KeyValuePair<string, string>> errors)
@@ -248,34 +207,6 @@ public sealed class LoginPostHandler : IRequestHandler<LoginPostRequest, IAction
         }
         return errors.Count == 0;
     }
-
-    private static string? TryExtractClientIdFromReturnUrl(string? returnUrl)
-    {
-        if (string.IsNullOrEmpty(returnUrl)) return null;
-        try
-        {
-            if (Uri.TryCreate(returnUrl, UriKind.Absolute, out var absUri))
-            {
-                var query = System.Web.HttpUtility.ParseQueryString(absUri.Query);
-                return query["client_id"];            
-            }
-            else
-            {
-                var idx = returnUrl.IndexOf('?');
-                if (idx >= 0 && idx < returnUrl.Length - 1)
-                {
-                    var query = System.Web.HttpUtility.ParseQueryString(returnUrl.Substring(idx));
-                    return query["client_id"];            
-                }
-            }
-        }
-        catch { }
-        return null;
-    }
-
-    private static bool IsLocalUrl(string? url) => !string.IsNullOrEmpty(url) && url.StartsWith('/') && !url.StartsWith("//") && !url.StartsWith("/\\");
-
-    private record RecaptchaVerifyResult(bool success, double score, string action, string hostname, DateTime challenge_ts, string[]? error_codes);
 
     private static ViewDataDictionary NewViewData() => new(new EmptyModelMetadataProvider(), new ModelStateDictionary());
     private static ViewDataDictionary viewDataWithModel(ViewDataDictionary vd, object model) { vd.Model = model; return vd; }

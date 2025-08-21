@@ -4,17 +4,15 @@ using Microsoft.AspNetCore.Http;
 using MrWho.Services.Mediator;
 using MrWho.Handlers;
 
-namespace MrWho.Endpoints;
+namespace MrWho.Handlers.Oidc;
 
-public sealed record OidcAuthorizeRequest(HttpContext HttpContext) : IRequest<IResult>;
-
-public sealed class OidcAuthorizeHandler : IRequestHandler<OidcAuthorizeRequest, IResult>
+public sealed class OidcAuthorizeHandler : IRequestHandler<MrWho.Endpoints.OidcAuthorizeRequest, IResult>
 {
     private readonly IOidcAuthorizationHandler _authorizationHandler;
 
     public OidcAuthorizeHandler(IOidcAuthorizationHandler authorizationHandler)
         => _authorizationHandler = authorizationHandler;
 
-    public Task<IResult> Handle(OidcAuthorizeRequest request, CancellationToken cancellationToken)
+    public Task<IResult> Handle(MrWho.Endpoints.OidcAuthorizeRequest request, CancellationToken cancellationToken)
         => _authorizationHandler.HandleAuthorizationRequestAsync(request.HttpContext);
 }

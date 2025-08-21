@@ -3,47 +3,40 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Hosting;
+using Microsoft.EntityFrameworkCore;
 using MrWho.Data;
 using MrWho.Models;
+using MrWho.Services;
 using MrWho.Services.Mediator;
 using MrWho.Shared.Models;
-using System.Net.Http;
-using System.Text.Json;
-using Microsoft.EntityFrameworkCore;
 
-namespace MrWho.Endpoints.Auth;
+namespace MrWho.Handlers.Auth;
 
-public sealed class RegisterPostHandler : IRequestHandler<RegisterPostRequest, IActionResult>
+public sealed class RegisterPostHandler : IRequestHandler<MrWho.Endpoints.Auth.RegisterPostRequest, IActionResult>
 {
     private readonly UserManager<IdentityUser> _userManager;
     private readonly ApplicationDbContext _db;
-    private readonly IConfiguration _configuration;
-    private readonly IHttpClientFactory _httpClientFactory;
-    private readonly IHostEnvironment _env;
+    private readonly ILoginHelper _loginHelper;
 
-    public RegisterPostHandler(UserManager<IdentityUser> userManager, ApplicationDbContext db, IConfiguration configuration, IHttpClientFactory httpClientFactory, IHostEnvironment env)
+    public RegisterPostHandler(UserManager<IdentityUser> userManager, ApplicationDbContext db, ILoginHelper loginHelper)
     {
         _userManager = userManager;
         _db = db;
-        _configuration = configuration;
-        _httpClientFactory = httpClientFactory;
-        _env = env;
+        _loginHelper = loginHelper;
     }
 
-    public async Task<IActionResult> Handle(RegisterPostRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> Handle(MrWho.Endpoints.Auth.RegisterPostRequest request, CancellationToken cancellationToken)
     {
         var http = request.HttpContext;
         var input = request.Input;
 
         var token = http.Request.Form["recaptchaToken"].ToString();
-        var recaptchaOk = await VerifyRecaptchaAsync(http, token, "register");
+        var recaptchaOk = await _loginHelper.VerifyRecaptchaAsync(http, token, "register");
         if (!recaptchaOk)
         {
             var vd = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary())
             {
-                ["RecaptchaSiteKey"] = ShouldUseRecaptcha() ? _configuration["GoogleReCaptcha:SiteKey"] : null
+                ["RecaptchaSiteKey"] = _loginHelper.GetRecaptchaSiteKey()
             };
             vd.ModelState.AddModelError(string.Empty, "reCAPTCHA verification failed. Please try again.");
             return new ViewResult { ViewName = "Register", ViewData = new ViewDataDictionary(vd) { Model = input } };
@@ -54,7 +47,7 @@ public sealed class RegisterPostHandler : IRequestHandler<RegisterPostRequest, I
         {
             var vd = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary())
             {
-                ["RecaptchaSiteKey"] = ShouldUseRecaptcha() ? _configuration["GoogleReCaptcha:SiteKey"] : null
+                ["RecaptchaSiteKey"] = _loginHelper.GetRecaptchaSiteKey()
             };
             if (string.IsNullOrWhiteSpace(input.Email)) vd.ModelState.AddModelError("Email", "Email is required.");
             if (string.IsNullOrWhiteSpace(input.Password)) vd.ModelState.AddModelError("Password", "Password is required.");
@@ -68,7 +61,7 @@ public sealed class RegisterPostHandler : IRequestHandler<RegisterPostRequest, I
         {
             var vd = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary())
             {
-                ["RecaptchaSiteKey"] = ShouldUseRecaptcha() ? _configuration["GoogleReCaptcha:SiteKey"] : null
+                ["RecaptchaSiteKey"] = _loginHelper.GetRecaptchaSiteKey()
             };
             vd.ModelState.AddModelError("Email", "An account with this email already exists.");
             return new ViewResult { ViewName = "Register", ViewData = new ViewDataDictionary(vd) { Model = input } };
@@ -84,7 +77,7 @@ public sealed class RegisterPostHandler : IRequestHandler<RegisterPostRequest, I
             {
                 var vd = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary())
                 {
-                    ["RecaptchaSiteKey"] = ShouldUseRecaptcha() ? _configuration["GoogleReCaptcha:SiteKey"] : null
+                    ["RecaptchaSiteKey"] = _loginHelper.GetRecaptchaSiteKey()
                 };
                 foreach (var error in createResult.Errors)
                 {
@@ -111,7 +104,7 @@ public sealed class RegisterPostHandler : IRequestHandler<RegisterPostRequest, I
             // Link user to client if we have a hint (either direct clientId or via returnUrl's client_id)
             var formClientId = http.Request.Form["clientId"].ToString();
             var returnUrl = http.Request.Form["returnUrl"].ToString();
-            var clientHint = !string.IsNullOrWhiteSpace(formClientId) ? formClientId : TryExtractClientIdFromReturnUrl(returnUrl);
+            var clientHint = !string.IsNullOrWhiteSpace(formClientId) ? formClientId : _loginHelper.TryExtractClientIdFromReturnUrl(returnUrl);
             if (!string.IsNullOrWhiteSpace(clientHint))
             {
                 var client = await _db.Clients.FirstOrDefaultAsync(c => c.Id == clientHint || c.ClientId == clientHint, cancellationToken);
@@ -141,65 +134,5 @@ public sealed class RegisterPostHandler : IRequestHandler<RegisterPostRequest, I
         }
 
         return new RedirectToActionResult("RegisterSuccess", "Auth", null);
-    }
-
-    private bool ShouldUseRecaptcha()
-    {
-        if (_env.IsDevelopment()) return false;
-        var site = _configuration["GoogleReCaptcha:SiteKey"];
-        var secret = _configuration["GoogleReCaptcha:SecretKey"];
-        var enabledFlag = _configuration["GoogleReCaptcha:Enabled"];
-        if (!string.IsNullOrWhiteSpace(enabledFlag) && bool.TryParse(enabledFlag, out var enabled) && !enabled)
-            return false;
-        return !string.IsNullOrWhiteSpace(site) && !string.IsNullOrWhiteSpace(secret);
-    }
-
-    private async Task<bool> VerifyRecaptchaAsync(HttpContext http, string? token, string actionExpected)
-    {
-        if (!ShouldUseRecaptcha()) return true;
-        var secret = _configuration["GoogleReCaptcha:SecretKey"];
-        if (string.IsNullOrWhiteSpace(token)) return false;
-        var client = _httpClientFactory.CreateClient();
-        var resp = await client.PostAsync("https://www.google.com/recaptcha/api/siteverify", new FormUrlEncodedContent(new Dictionary<string,string>{
-            ["secret"] = secret!,
-            ["response"] = token,
-            ["remoteip"] = http.Connection.RemoteIpAddress?.ToString() ?? string.Empty
-        }));
-        if (!resp.IsSuccessStatusCode) return false;
-        using var s = await resp.Content.ReadAsStreamAsync();
-        var result = await JsonSerializer.DeserializeAsync<RecaptchaVerifyResult>(s, new JsonSerializerOptions{ PropertyNameCaseInsensitive = true });
-        if (result == null || !result.success) return false;
-        var threshold = 0.5;
-        var cfgThr = _configuration["GoogleReCaptcha:Threshold"];
-        if (double.TryParse(cfgThr, out var t)) threshold = t;
-        if (!string.Equals(result.action, actionExpected, StringComparison.OrdinalIgnoreCase)) return false;
-        return result.score >= threshold;
-    }
-
-    private record RecaptchaVerifyResult(bool success, double score, string action, string hostname, DateTime challenge_ts, string[]? error_codes);
-
-
-    private static string? TryExtractClientIdFromReturnUrl(string? returnUrl)
-    {
-        if (string.IsNullOrEmpty(returnUrl)) return null;
-        try
-        {
-            if (Uri.TryCreate(returnUrl, UriKind.Absolute, out var absUri))
-            {
-                var query = System.Web.HttpUtility.ParseQueryString(absUri.Query);
-                return query["client_id"];            
-            }
-            else
-            {
-                var idx = returnUrl.IndexOf('?');
-                if (idx >= 0 && idx < returnUrl.Length - 1)
-                {
-                    var query = System.Web.HttpUtility.ParseQueryString(returnUrl.Substring(idx));
-                    return query["client_id"];            
-                }
-            }
-        }
-        catch { }
-        return null;
     }
 }

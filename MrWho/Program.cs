@@ -78,6 +78,10 @@ builder.Services.AddSingleton<IPostConfigureOptions<OpenIddictClientOptions>, Op
 builder.Services.AddMrWhoAuthorizationWithClientCookies(); // Use authorization with client cookie support
 builder.Services.AddMrWhoMediator(); // Lightweight mediator + endpoint handlers
 
+// Register helpers
+builder.Services.AddScoped<ILogoutHelper, LogoutHelper>();
+builder.Services.AddScoped<ILoginHelper, LoginHelper>();
+
 // Global cookie overrides from configuration (domain, HTTPS)
 var configuredCookieDomain = builder.Configuration["Cookie:Domain"];
 var configuredRequireHttps = string.Equals(builder.Configuration["Cookie:RequireHttps"], "true", StringComparison.OrdinalIgnoreCase);
