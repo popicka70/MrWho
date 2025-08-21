@@ -5,6 +5,7 @@ using MrWho.Options;
 using MrWho.Data;
 using Microsoft.EntityFrameworkCore;
 using MrWho.Shared.Authentication; // use centralized naming
+using Microsoft.AspNetCore.DataProtection; // ensure data protection is available
 
 namespace MrWho.Services;
 
@@ -73,6 +74,7 @@ public class DynamicClientCookieService : IHostedService
     {
         var oidcClientService = scope.ServiceProvider.GetRequiredService<IOidcClientService>();
         var authSchemeProvider = scope.ServiceProvider.GetRequiredService<IAuthenticationSchemeProvider>();
+        var dataProtectionProvider = scope.ServiceProvider.GetRequiredService<IDataProtectionProvider>();
 
         var enabledClients = await oidcClientService.GetEnabledClientsAsync();
         var registeredCount = 0;
@@ -97,6 +99,14 @@ public class DynamicClientCookieService : IHostedService
                 authSchemeProvider.AddScheme(scheme);
 
                 var cookieOptions = CreateClientCookieOptions(client, cookieName);
+
+                // Ensure cookies can be unprotected by configuring a TicketDataFormat using Data Protection
+                var protector = dataProtectionProvider.CreateProtector(
+                    "Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationMiddleware",
+                    schemeName,
+                    "v2");
+                cookieOptions.TicketDataFormat = new TicketDataFormat(protector);
+
                 _optionsCache.TryAdd(schemeName, cookieOptions);
 
                 registeredCount++;
@@ -117,6 +127,7 @@ public class DynamicClientCookieService : IHostedService
     {
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
         var authSchemeProvider = scope.ServiceProvider.GetRequiredService<IAuthenticationSchemeProvider>();
+        var dataProtectionProvider = scope.ServiceProvider.GetRequiredService<IDataProtectionProvider>();
 
         // Get enabled realms that have at least one enabled client
         var realms = await db.Realms
@@ -151,6 +162,14 @@ public class DynamicClientCookieService : IHostedService
                 authSchemeProvider.AddScheme(scheme);
 
                 var cookieOptions = CreateRealmCookieOptions(realm, cookieName);
+
+                // Ensure cookies can be unprotected by configuring a TicketDataFormat using Data Protection
+                var protector = dataProtectionProvider.CreateProtector(
+                    "Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationMiddleware",
+                    schemeName,
+                    "v2");
+                cookieOptions.TicketDataFormat = new TicketDataFormat(protector);
+
                 _optionsCache.TryAdd(schemeName, cookieOptions);
 
                 registered++;

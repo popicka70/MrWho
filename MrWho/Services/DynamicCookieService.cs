@@ -98,6 +98,11 @@ public class DynamicCookieService : IDynamicCookieService
             
             return true;
         }
+        catch (Exception ex) when (ex.Source == "Microsoft.AspNetCore.Authentication.Cookies")
+        {
+            _logger.LogWarning("Failed to check authentication for client {ClientId}", clientId);
+            return false;
+        }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to check authentication for client {ClientId}", clientId);
@@ -117,6 +122,11 @@ public class DynamicCookieService : IDynamicCookieService
             await context.SignOutAsync(scheme);
             
             _logger.LogDebug("🔧 Signed out from dynamic scheme {Scheme} for client {ClientId}", scheme, clientId);
+        }
+        catch (Exception ex) when (ex.Source == "Microsoft.AspNetCore.Authentication.Cookies")
+        {
+            _logger.LogWarning("Failed to sign out for client {ClientId}", clientId);
+            throw;
         }
         catch (Exception ex)
         {
