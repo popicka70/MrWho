@@ -51,6 +51,8 @@ app.MapGet("/health", () => Results.Ok("OK"));
 
 // Map the back-channel logout endpoint provided by MrWho.ClientAuth
 app.MapMrWhoBackChannelLogoutEndpoint();
+app.MapMrWhoLoginEndpoint();
+app.MapMrWhoLogoutEndpoints();
 
 app.MapRazorPages();
 

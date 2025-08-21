@@ -10,4 +10,8 @@
     <ProjectReference Include="..\MrWho.ClientAuth\MrWho.ClientAuth.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Pages\Account\" />
+  </ItemGroup>
+
 </Project>
