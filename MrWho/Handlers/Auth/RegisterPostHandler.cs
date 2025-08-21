@@ -133,6 +133,8 @@ public sealed class RegisterPostHandler : IRequestHandler<MrWho.Endpoints.Auth.R
             throw;
         }
 
-        return new RedirectToActionResult("RegisterSuccess", "Auth", null);
+        // Preserve original query params on redirect so success page can offer a proper Login link
+        var redirectRouteValues = new { returnUrl = http.Request.Form["returnUrl"].ToString(), clientId = http.Request.Form["clientId"].ToString() };
+        return new RedirectToActionResult("RegisterSuccess", "Auth", redirectRouteValues);
     }
 }

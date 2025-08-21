@@ -20,14 +20,51 @@ public sealed class RegisterSuccessGetHandler : IRequestHandler<MrWho.Endpoints.
 
     public async Task<IActionResult> Handle(MrWho.Endpoints.Auth.RegisterSuccessGetRequest request, CancellationToken cancellationToken)
     {
-        var vd = new Microsoft.AspNetCore.Mvc.ViewFeatures.ViewDataDictionary(new Microsoft.AspNetCore.Mvc.ModelBinding.EmptyModelMetadataProvider(), new Microsoft.AspNetCore.Mvc.ModelBinding.ModelStateDictionary());
+        var http = request.HttpContext;
+        var returnUrl = http.Request.Query["returnUrl"].ToString();
+        var clientId = http.Request.Query["clientId"].ToString();
 
-        // Optionally theme by clientId if present in query (readable via HttpContext from Controller, but we don't have it here)
-        // Keep it simple: just set defaults to ensure themed layout still loads
+        var vd = new Microsoft.AspNetCore.Mvc.ViewFeatures.ViewDataDictionary(new Microsoft.AspNetCore.Mvc.ModelBinding.EmptyModelMetadataProvider(), new Microsoft.AspNetCore.Mvc.ModelBinding.ModelStateDictionary())
+        {
+            ["ReturnUrl"] = returnUrl,
+            ["ClientId"] = clientId
+        };
+
+        // Compute theme with client/realm precedence
         try
         {
-            var themeName = _mrWhoOptions.Value.DefaultThemeName;
+            string? themeName = null;
+            string? customCssUrl = null;
+            string? logoUri = null;
+            string? clientName = null;
+
+            if (!string.IsNullOrEmpty(clientId))
+            {
+                var client = await _db.Clients.AsNoTracking().Include(c => c.Realm).FirstOrDefaultAsync(c => c.ClientId == clientId, cancellationToken);
+                if (client != null)
+                {
+                    clientName = client.Name ?? client.ClientId;
+                    themeName = client.ThemeName ?? client.Realm?.DefaultThemeName ?? _mrWhoOptions.Value.DefaultThemeName;
+                    customCssUrl = client.CustomCssUrl ?? client.Realm?.RealmCustomCssUrl;
+                    var showClientLogo = (bool?)client.GetType().GetProperty("ShowClientLogo")?.GetValue(client) ?? true;
+                    var clientLogo = (string?)client.GetType().GetProperty("LogoUri")?.GetValue(client);
+                    if (showClientLogo && !string.IsNullOrWhiteSpace(clientLogo)) logoUri = clientLogo;
+                    else if (!string.IsNullOrWhiteSpace(client.Realm?.RealmLogoUri)) logoUri = client.Realm!.RealmLogoUri;
+                }
+                else
+                {
+                    themeName = _mrWhoOptions.Value.DefaultThemeName;
+                }
+            }
+            else
+            {
+                themeName = _mrWhoOptions.Value.DefaultThemeName;
+            }
+
             if (!string.IsNullOrWhiteSpace(themeName)) vd["ThemeName"] = themeName;
+            if (!string.IsNullOrWhiteSpace(customCssUrl)) vd["CustomCssUrl"] = customCssUrl;
+            if (!string.IsNullOrWhiteSpace(logoUri)) vd["LogoUri"] = logoUri;
+            if (!string.IsNullOrWhiteSpace(clientName)) vd["ClientName"] = clientName;
         }
         catch { }
 
