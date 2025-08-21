@@ -5,6 +5,15 @@
     var recaptchaSiteKey = ViewData["RecaptchaSiteKey"] as string; // Provided by controller
     var logoUri = ViewData["LogoUri"] as string;
     var clientName = ViewData["ClientName"] as string;
+    var backReturnUrl = ViewData["ReturnUrl"] as string;
+    var backClientId = ViewData["ClientId"] as string;
+    var loginHref = "/connect/login";
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrEmpty(backReturnUrl)) parts.Add("returnUrl=" + Uri.EscapeDataString(backReturnUrl));
+        if (!string.IsNullOrEmpty(backClientId)) parts.Add("clientId=" + Uri.EscapeDataString(backClientId));
+        if (parts.Count > 0) loginHref += "?" + string.Join("&", parts);
+    }
 }
 
 <div class="row justify-content-center">
@@ -76,7 +85,7 @@
                 }
             </div>
             <div class="card-footer text-end">
-                <a href="/connect/login" class="btn btn-link">Back to login</a>
+                <a href="@loginHref" class="btn btn-link">Back to login</a>
             </div>
         </div>
     </div>
