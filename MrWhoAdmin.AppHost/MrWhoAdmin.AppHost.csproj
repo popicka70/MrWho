@@ -11,6 +11,14 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Content Include="etc\secrets\mrwho-1755324848344-21f187c4a986.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\MrWhoDemo1\MrWhoDemo1.csproj" />
     <ProjectReference Include="..\MrWho\MrWho.csproj" />
     <ProjectReference Include="..\MrWhoAdmin.Web\MrWhoAdmin.Web.csproj" />

@@ -361,3 +361,5 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+/MrWho/etc/secrets/mrwho-1755324848344-21f187c4a986.json
+/MrWhoAdmin.AppHost/etc/secrets/mrwho-1755324848344-21f187c4a986.json

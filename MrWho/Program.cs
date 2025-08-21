@@ -15,6 +15,9 @@ using MrWho.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
+AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
+builder.Logging.AddFilter("OpenTelemetry", LogLevel.Debug);
+
 builder.AddServiceDefaults();
 
 // Bind global MrWho options from configuration
