@@ -5,6 +5,10 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using MrWho.Services.Mediator;
 using MrWho.Shared.Models;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using MrWho.Data;
+using MrWho.Options;
 
 namespace MrWho.Handlers.Auth;
 
@@ -12,14 +16,18 @@ public sealed class RegisterGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Re
 {
     private readonly IConfiguration _configuration;
     private readonly IHostEnvironment _env;
+    private readonly ApplicationDbContext _db;
+    private readonly IOptions<MrWhoOptions> _mrWhoOptions;
 
-    public RegisterGetHandler(IConfiguration configuration, IHostEnvironment env)
+    public RegisterGetHandler(IConfiguration configuration, IHostEnvironment env, ApplicationDbContext db, IOptions<MrWhoOptions> mrWhoOptions)
     {
         _configuration = configuration;
         _env = env;
+        _db = db;
+        _mrWhoOptions = mrWhoOptions;
     }
 
-    public Task<IActionResult> Handle(MrWho.Endpoints.Auth.RegisterGetRequest request, CancellationToken cancellationToken)
+    public async Task<IActionResult> Handle(MrWho.Endpoints.Auth.RegisterGetRequest request, CancellationToken cancellationToken)
     {
         var http = request.HttpContext;
 
@@ -37,7 +45,60 @@ public sealed class RegisterGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Re
             ["ReturnUrl"] = returnUrl,
             ["ClientId"] = clientId
         };
-        return Task.FromResult<IActionResult>(new ViewResult { ViewName = "Register", ViewData = new ViewDataDictionary(vd) { Model = new RegisterUserRequest() } });
+
+        // Compute theme and logo similar to Login
+        try
+        {
+            string? themeName = null;
+            string? customCssUrl = null;
+            string? logoUri = null;
+            string? clientName = null;
+
+            if (!string.IsNullOrEmpty(clientId))
+            {
+                var client = await _db.Clients
+                    .AsNoTracking()
+                    .Include(c => c.Realm)
+                    .FirstOrDefaultAsync(c => c.ClientId == clientId, cancellationToken);
+                if (client != null)
+                {
+                    clientName = client.Name ?? client.ClientId;
+                    themeName = client.ThemeName ?? client.Realm?.DefaultThemeName ?? _mrWhoOptions.Value.DefaultThemeName;
+                    customCssUrl = client.CustomCssUrl ?? client.Realm?.RealmCustomCssUrl;
+
+                    try
+                    {
+                        var showClientLogo = (bool?)client.GetType().GetProperty("ShowClientLogo")?.GetValue(client) ?? true;
+                        var clientLogo = (string?)client.GetType().GetProperty("LogoUri")?.GetValue(client);
+                        if (showClientLogo && !string.IsNullOrWhiteSpace(clientLogo))
+                        {
+                            logoUri = clientLogo;
+                        }
+                        else if (!string.IsNullOrWhiteSpace(client.Realm?.RealmLogoUri))
+                        {
+                            logoUri = client.Realm!.RealmLogoUri;
+                        }
+                    }
+                    catch { /* ignore */ }
+                }
+                else
+                {
+                    themeName = _mrWhoOptions.Value.DefaultThemeName;
+                }
+            }
+            else
+            {
+                themeName = _mrWhoOptions.Value.DefaultThemeName;
+            }
+
+            if (!string.IsNullOrWhiteSpace(themeName)) vd["ThemeName"] = themeName;
+            if (!string.IsNullOrWhiteSpace(customCssUrl)) vd["CustomCssUrl"] = customCssUrl;
+            if (!string.IsNullOrWhiteSpace(logoUri)) vd["LogoUri"] = logoUri;
+            if (!string.IsNullOrWhiteSpace(clientName)) vd["ClientName"] = clientName;
+        }
+        catch { /* ignore theme errors */ }
+
+        return new ViewResult { ViewName = "Register", ViewData = new ViewDataDictionary(vd) { Model = new RegisterUserRequest() } };
     }
 
     private bool ShouldUseRecaptcha()

@@ -3,6 +3,10 @@ using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using MrWho.Services.Mediator;
 using OpenIddict.Abstractions;
+using Microsoft.EntityFrameworkCore; // added
+using MrWho.Data; // added
+using Microsoft.Extensions.Options; // added
+using MrWho.Options; // added
 
 namespace MrWho.Handlers.Auth;
 
@@ -10,11 +14,19 @@ public sealed class AccessDeniedGetHandler : IRequestHandler<MrWho.Endpoints.Aut
 {
     private readonly IOpenIddictApplicationManager _applicationManager;
     private readonly ILogger<AccessDeniedGetHandler> _logger;
+    private readonly ApplicationDbContext _db; // added
+    private readonly IOptions<MrWhoOptions> _mrWhoOptions; // added
 
-    public AccessDeniedGetHandler(IOpenIddictApplicationManager applicationManager, ILogger<AccessDeniedGetHandler> logger)
+    public AccessDeniedGetHandler(
+        IOpenIddictApplicationManager applicationManager,
+        ILogger<AccessDeniedGetHandler> logger,
+        ApplicationDbContext db,
+        IOptions<MrWhoOptions> mrWhoOptions)
     {
         _applicationManager = applicationManager;
         _logger = logger;
+        _db = db;
+        _mrWhoOptions = mrWhoOptions;
     }
 
     public async Task<IActionResult> Handle(MrWho.Endpoints.Auth.AccessDeniedGetRequest request, CancellationToken cancellationToken)
@@ -69,6 +81,65 @@ public sealed class AccessDeniedGetHandler : IRequestHandler<MrWho.Endpoints.Aut
             {
                 _logger.LogWarning(ex, "Failed to retrieve client information for clientId: {ClientId}", clientId);
             }
+        }
+
+        // Compute theme, custom CSS and logo like on Login page
+        try
+        {
+            string? themeName = null;
+            string? customCssUrl = null;
+            string? logoUri = null;
+
+            if (!string.IsNullOrEmpty(clientId))
+            {
+                var client = await _db.Clients
+                    .AsNoTracking()
+                    .Include(c => c.Realm)
+                    .FirstOrDefaultAsync(c => c.ClientId == clientId, cancellationToken);
+
+                if (client != null)
+                {
+                    themeName = client.ThemeName ?? client.Realm?.DefaultThemeName ?? _mrWhoOptions.Value.DefaultThemeName;
+                    customCssUrl = client.CustomCssUrl ?? client.Realm?.RealmCustomCssUrl;
+
+                    try
+                    {
+                        var showClientLogo = (bool?)client.GetType().GetProperty("ShowClientLogo")?.GetValue(client) ?? true;
+                        var clientLogo = (string?)client.GetType().GetProperty("LogoUri")?.GetValue(client);
+                        if (showClientLogo && !string.IsNullOrWhiteSpace(clientLogo))
+                        {
+                            logoUri = clientLogo;
+                        }
+                        else if (!string.IsNullOrWhiteSpace(client.Realm?.RealmLogoUri))
+                        {
+                            logoUri = client.Realm!.RealmLogoUri;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogDebug(ex, "Failed computing logo for client {ClientId}", clientId);
+                    }
+                }
+                else
+                {
+                    themeName = _mrWhoOptions.Value.DefaultThemeName;
+                }
+            }
+            else
+            {
+                themeName = _mrWhoOptions.Value.DefaultThemeName;
+            }
+
+            if (!string.IsNullOrWhiteSpace(themeName))
+                vd["ThemeName"] = themeName;
+            if (!string.IsNullOrWhiteSpace(customCssUrl))
+                vd["CustomCssUrl"] = customCssUrl;
+            if (!string.IsNullOrWhiteSpace(logoUri))
+                vd["LogoUri"] = logoUri;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Failed to compute theme/custom assets for AccessDenied");
         }
 
         vd["ClientName"] = clientName;

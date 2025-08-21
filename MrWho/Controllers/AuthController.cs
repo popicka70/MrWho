@@ -67,8 +67,8 @@ public class AuthController : Controller
 
     [HttpGet("register/success")]
     [AllowAnonymous]
-    public async Task<IActionResult> RegisterSuccess()
-        => await _mediator.Send(new RegisterSuccessGetRequest());
+    public async Task<IActionResult> RegisterSuccess([FromQuery] string? returnUrl = null, [FromQuery] string? clientId = null)
+        => await _mediator.Send(new MrWho.Endpoints.Auth.RegisterSuccessGetRequest(HttpContext));
 }
 
 public class LoginViewModel

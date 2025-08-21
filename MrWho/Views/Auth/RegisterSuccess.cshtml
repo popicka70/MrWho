@@ -1,8 +1,28 @@
 @{
     ViewData["Title"] = "Registration submitted";
+    var clientId = ViewData["ClientId"] as string;
+    var returnUrl = ViewData["ReturnUrl"] as string;
+    var logoUri = ViewData["LogoUri"] as string;
+    var clientName = ViewData["ClientName"] as string;
+
+    var loginHref = "/connect/login";
+    var parts = new List<string>();
+    if (!string.IsNullOrEmpty(returnUrl)) parts.Add("returnUrl=" + Uri.EscapeDataString(returnUrl));
+    if (!string.IsNullOrEmpty(clientId)) parts.Add("clientId=" + Uri.EscapeDataString(clientId));
+    if (parts.Count > 0) loginHref += "?" + string.Join("&", parts);
 }
 <div class="row justify-content-center">
     <div class="col-md-6 col-lg-5">
+        <div class="text-center mb-4">
+            @if (!string.IsNullOrWhiteSpace(logoUri))
+            {
+                <img src="@logoUri" alt="@(clientName ?? "Client") Logo" class="mrwho-logo" />
+            }
+            else
+            {
+                <img src="~/images/AuthMrWho.jpeg" alt="MrWho Identity Server" class="mrwho-logo" />
+            }
+        </div>
         <div class="card shadow-sm">
             <div class="card-header bg-success text-white">
                 <h4 class="mb-0"><i class="bi bi-check-circle"></i> Registration submitted</h4>
@@ -12,7 +32,7 @@
             </div>
             <div class="card-footer text-end">
                 <a href="/" class="btn btn-primary">Home</a>
-                <a href="/connect/login" class="btn btn-outline-secondary">Login</a>
+                <a href="@loginHref" class="btn btn-outline-secondary">Login</a>
             </div>
         </div>
     </div>
