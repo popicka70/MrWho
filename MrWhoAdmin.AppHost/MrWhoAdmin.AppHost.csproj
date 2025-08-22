@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\MrWhoDemo1\MrWhoDemo1.csproj" />
+    <ProjectReference Include="..\MrWhoDemoApi\MrWhoDemoApi.csproj" />
     <ProjectReference Include="..\MrWho\MrWho.csproj" />
     <ProjectReference Include="..\MrWhoAdmin.Web\MrWhoAdmin.Web.csproj" />
     <ProjectReference Include="..\MrWhoDemoNuget\MrWhoDemoNuget.csproj" />

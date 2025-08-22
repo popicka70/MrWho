@@ -25,4 +25,6 @@ var demoNuget = builder.AddProject<Projects.MrWhoDemoNuget>("mrwhodemonuget")
     .WithReference(mrWho)
     .WaitFor(mrWho);
 
+builder.AddProject<Projects.MrWhoDemoApi>("mrwhodemoapi");
+
 builder.Build().Run();
