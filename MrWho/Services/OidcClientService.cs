@@ -529,6 +529,80 @@ public class OidcClientService : IOidcClientService
             }
         }
 
+        // 2.6. Create machine-to-machine client for service-to-service calls if it doesn't exist
+        var m2mClient = await _context.Clients
+            .Include(c => c.Scopes)
+            .Include(c => c.Permissions)
+            .FirstOrDefaultAsync(c => c.ClientId == "mrwho_demo_api_client");
+
+        if (m2mClient == null)
+        {
+            // reuse existing demoRealm variable (guaranteed created above)
+            m2mClient = new Client
+            {
+                ClientId = "mrwho_demo_api_client",
+                ClientSecret = "DemoApiClientSecret2025!", // demo-only secret
+                Name = "MrWho Demo API Machine Client",
+                Description = "Machine-to-machine client (client_credentials) for calling MrWhoDemoApi",
+                RealmId = demoRealm.Id,
+                IsEnabled = true,
+                ClientType = ClientType.Machine,
+                AllowAuthorizationCodeFlow = false,
+                AllowClientCredentialsFlow = true,
+                AllowPasswordFlow = false,
+                AllowRefreshTokenFlow = false,
+                RequirePkce = false,
+                RequireClientSecret = true,
+                CreatedBy = "System"
+            };
+            _context.Clients.Add(m2mClient);
+            await _context.SaveChangesAsync();
+
+            foreach (var scopeName in new[] { "api.read", "api.write" })
+            {
+                _context.ClientScopes.Add(new ClientScope { ClientId = m2mClient.Id, Scope = scopeName });
+            }
+            foreach (var permission in new[]
+            {
+                OpenIddictConstants.Permissions.Endpoints.Token,
+                OpenIddictConstants.Permissions.GrantTypes.ClientCredentials,
+                "scp:api.read",
+                "scp:api.write"
+            })
+            {
+                _context.ClientPermissions.Add(new ClientPermission { ClientId = m2mClient.Id, Permission = permission });
+            }
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Created machine-to-machine client 'mrwho_demo_api_client'.");
+        }
+        else
+        {
+            var added = false;
+            foreach (var scopeName in new[] { "api.read", "api.write" }.Where(s => !m2mClient.Scopes.Any(cs => cs.Scope == s)))
+            {
+                _context.ClientScopes.Add(new ClientScope { ClientId = m2mClient.Id, Scope = scopeName });
+                added = true;
+            }
+            var requiredPermissionsM2M = new[]
+            {
+                OpenIddictConstants.Permissions.Endpoints.Token,
+                OpenIddictConstants.Permissions.GrantTypes.ClientCredentials,
+                "scp:api.read",
+                "scp:api.write"
+            };
+            var existingPermSetM2M = m2mClient.Permissions.Select(p => p.Permission).ToHashSet();
+            foreach (var perm in requiredPermissionsM2M.Where(p => !existingPermSetM2M.Contains(p)))
+            {
+                _context.ClientPermissions.Add(new ClientPermission { ClientId = m2mClient.Id, Permission = perm });
+                added = true;
+            }
+            if (added)
+            {
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Updated machine-to-machine client 'mrwho_demo_api_client' with missing scopes/permissions.");
+            }
+        }
+
         // 3. Create admin user if it doesn't exist
         var adminUser = await _userManager.FindByNameAsync("admin@mrwho.local");
         if (adminUser == null)
@@ -539,21 +613,15 @@ public class OidcClientService : IOidcClientService
                 Email = "admin@mrwho.local",
                 EmailConfirmed = true
             };
-
-            // Stronger, more random-looking development seed password
             var result = await _userManager.CreateAsync(adminUser, "Adm1n#2025!G7x");
             if (result.Succeeded)
             {
-                // Add name claims to admin user for proper display name
                 await _userManager.AddClaimAsync(adminUser, new System.Security.Claims.Claim("name", "MrWho Administrator"));
                 await _userManager.AddClaimAsync(adminUser, new System.Security.Claims.Claim("given_name", "MrWho"));
                 await _userManager.AddClaimAsync(adminUser, new System.Security.Claims.Claim("family_name", "Administrator"));
                 await _userManager.AddClaimAsync(adminUser, new System.Security.Claims.Claim("preferred_username", "admin"));
-                
-                // CRITICAL: Add explicit realm claim to ensure admin user belongs to admin realm
                 await _userManager.AddClaimAsync(adminUser, new System.Security.Claims.Claim("realm", "admin"));
-                
-                _logger.LogInformation("Created admin user 'admin@mrwho.local' with name claims and admin realm");
+                _logger.LogInformation("Created admin user 'admin@mrwho.local'");
             }
             else
             {
@@ -562,47 +630,14 @@ public class OidcClientService : IOidcClientService
         }
         else
         {
-            // Check if existing admin user has name claims, and add them if missing
-            var existingClaims = await _userManager.GetClaimsAsync(adminUser);
-            var hasNameClaim = existingClaims.Any(c => c.Type == "name");
-            var hasGivenNameClaim = existingClaims.Any(c => c.Type == "given_name");
-            var hasFamilyNameClaim = existingClaims.Any(c => c.Type == "family_name");
-            var hasPreferredUsernameClaim = existingClaims.Any(c => c.Type == "preferred_username");
-            var hasRealmClaim = existingClaims.Any(c => c.Type == "realm");
-
-            if (!hasNameClaim)
-            {
-                await _userManager.AddClaimAsync(adminUser, new System.Security.Claims.Claim("name", "MrWho Administrator"));
-                _logger.LogInformation("Added 'name' claim to existing admin user");
-            }
-
-            if (!hasGivenNameClaim)
-            {
-                await _userManager.AddClaimAsync(adminUser, new System.Security.Claims.Claim("given_name", "MrWho"));
-                _logger.LogInformation("Added 'given_name' claim to existing admin user");
-            }
-
-            if (!hasFamilyNameClaim)
-            {
-                await _userManager.AddClaimAsync(adminUser, new System.Security.Claims.Claim("family_name", "Administrator"));
-                _logger.LogInformation("Added 'family_name' claim to existing admin user");
-            }
-
-            if (!hasPreferredUsernameClaim)
-            {
-                await _userManager.AddClaimAsync(adminUser, new System.Security.Claims.Claim("preferred_username", "admin"));
-                _logger.LogInformation("Added 'preferred_username' claim to existing admin user");
-            }
-
-            // CRITICAL: Ensure admin user has realm claim
-            if (!hasRealmClaim)
+            var adminClaims = await _userManager.GetClaimsAsync(adminUser);
+            if (!adminClaims.Any(c => c.Type == "realm"))
             {
                 await _userManager.AddClaimAsync(adminUser, new System.Security.Claims.Claim("realm", "admin"));
-                _logger.LogInformation("Added 'realm' claim to existing admin user");
             }
         }
 
-        // 3.5. Create demo1 user if it doesn't exist
+        // 3.5 Create demo1 user if it doesn't exist
         var demo1User = await _userManager.FindByNameAsync("demo1@example.com");
         if (demo1User == null)
         {
@@ -612,21 +647,15 @@ public class OidcClientService : IOidcClientService
                 Email = "demo1@example.com",
                 EmailConfirmed = true
             };
-
-            // Stronger sample password for development/demo user
             var result = await _userManager.CreateAsync(demo1User, "Dem0!User#2025");
             if (result.Succeeded)
             {
-                // Add name claims to demo1 user for proper display name
                 await _userManager.AddClaimAsync(demo1User, new System.Security.Claims.Claim("name", "Demo User One"));
                 await _userManager.AddClaimAsync(demo1User, new System.Security.Claims.Claim("given_name", "Demo"));
                 await _userManager.AddClaimAsync(demo1User, new System.Security.Claims.Claim("family_name", "User One"));
                 await _userManager.AddClaimAsync(demo1User, new System.Security.Claims.Claim("preferred_username", "demo1"));
-                
-                // CRITICAL: Add explicit realm claim to ensure demo1 user belongs to demo realm
                 await _userManager.AddClaimAsync(demo1User, new System.Security.Claims.Claim("realm", "demo"));
-                
-                _logger.LogInformation("Created demo1 user 'demo1@example.com' with name claims and demo realm");
+                _logger.LogInformation("Created demo1 user 'demo1@example.com'");
             }
             else
             {
@@ -635,56 +664,28 @@ public class OidcClientService : IOidcClientService
         }
         else
         {
-            // Check if existing demo1 user has realm claim, and add it if missing
-            var existingClaims = await _userManager.GetClaimsAsync(demo1User);
-            var hasRealmClaim = existingClaims.Any(c => c.Type == "realm");
-
-            // CRITICAL: Ensure demo1 user has realm claim
-            if (!hasRealmClaim)
+            var demoClaims = await _userManager.GetClaimsAsync(demo1User);
+            if (!demoClaims.Any(c => c.Type == "realm"))
             {
                 await _userManager.AddClaimAsync(demo1User, new System.Security.Claims.Claim("realm", "demo"));
-                _logger.LogInformation("Added 'realm' claim to existing demo1 user");
             }
         }
 
-        // Ensure required user-client assignments exist so admins/demos can sign in
-        if (adminClient != null && adminUser != null)
+        // Assign users to their clients
+        if (adminClient != null && adminUser != null && !await _context.ClientUsers.AnyAsync(cu => cu.ClientId == adminClient.Id && cu.UserId == adminUser.Id))
         {
-            if (!await _context.ClientUsers.AnyAsync(cu => cu.ClientId == adminClient.Id && cu.UserId == adminUser.Id))
-            {
-                _context.ClientUsers.Add(new ClientUser
-                {
-                    ClientId = adminClient.Id,
-                    UserId = adminUser.Id,
-                    CreatedAt = DateTime.UtcNow,
-                    CreatedBy = "System"
-                });
-                _logger.LogInformation("Assigned admin user to admin client for access control");
-            }
+            _context.ClientUsers.Add(new ClientUser { ClientId = adminClient.Id, UserId = adminUser.Id, CreatedAt = DateTime.UtcNow, CreatedBy = "System" });
         }
-        if (demo1Client != null && demo1User != null)
+        if (demo1Client != null && demo1User != null && !await _context.ClientUsers.AnyAsync(cu => cu.ClientId == demo1Client.Id && cu.UserId == demo1User.Id))
         {
-            if (!await _context.ClientUsers.AnyAsync(cu => cu.ClientId == demo1Client.Id && cu.UserId == demo1User.Id))
-            {
-                _context.ClientUsers.Add(new ClientUser
-                {
-                    ClientId = demo1Client.Id,
-                    UserId = demo1User.Id,
-                    CreatedAt = DateTime.UtcNow,
-                    CreatedBy = "System"
-                });
-                _logger.LogInformation("Assigned demo1 user to demo1 client for access control");
-            }
+            _context.ClientUsers.Add(new ClientUser { ClientId = demo1Client.Id, UserId = demo1User.Id, CreatedAt = DateTime.UtcNow, CreatedBy = "System" });
         }
         await _context.SaveChangesAsync();
 
-        // Sync the admin client with OpenIddict
+        // Sync clients with OpenIddict
         await SyncClientWithOpenIddictAsync(adminClient!);
-
-        // Sync the demo1 client with OpenIddict
         await SyncClientWithOpenIddictAsync(demo1Client!);
-        
-        // CRITICAL FIX: Clean up any existing incorrect API permissions and ensure correct ones are present
+        await SyncClientWithOpenIddictAsync(m2mClient!);
         await FixExistingApiPermissionsAsync(adminClient!);
     }
 

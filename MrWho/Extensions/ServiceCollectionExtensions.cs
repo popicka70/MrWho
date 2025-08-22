@@ -298,6 +298,7 @@ public static class ServiceCollectionExtensions
                 // Register the ASP.NET Core host and enable passthrough for the authorization endpoint
                 options.UseAspNetCore()
                        .EnableAuthorizationEndpointPassthrough()
+                       .EnableTokenEndpointPassthrough() // ADDED: allow custom minimal API handler for /connect/token
                        .EnableEndSessionEndpointPassthrough();
             })
             .AddValidation(options =>

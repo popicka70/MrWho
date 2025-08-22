@@ -8,6 +8,8 @@ builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
+builder.Services.AddHttpClient(); // For M2M demo
+
 // Add authentication/authorization for JWT Bearer tokens from MrWho OIDC
 builder.Services.AddAuthentication(options =>
 {

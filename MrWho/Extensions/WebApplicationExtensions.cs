@@ -182,6 +182,12 @@ public static class WebApplicationExtensions
             return await mediator.Send(new OidcAuthorizeRequest(http));
         }).AllowAnonymous();
 
+        // Map OIDC token endpoint for OpenIddict passthrough (supports client_credentials, password, refresh, code exchange)
+        app.MapPost("/connect/token", async (HttpContext http, IMediator mediator) =>
+        {
+            return await mediator.Send(new OidcTokenRequest(http));
+        }).AllowAnonymous();
+
         return app;
     }
 
@@ -330,6 +336,12 @@ public static class WebApplicationExtensions
         app.MapMethods("/connect/authorize", new[] { "GET", "POST" }, async (HttpContext http, IMediator mediator) =>
         {
             return await mediator.Send(new OidcAuthorizeRequest(http));
+        }).AllowAnonymous();
+
+        // Map OIDC token endpoint for OpenIddict passthrough
+        app.MapPost("/connect/token", async (HttpContext http, IMediator mediator) =>
+        {
+            return await mediator.Send(new OidcTokenRequest(http));
         }).AllowAnonymous();
 
         return app;
