@@ -11,6 +11,8 @@ builder.Services.AddMrWhoAuthentication(options =>
     options.Authority = builder.Configuration["Authentication:Authority"] ?? "https://localhost:7113";
     options.ClientId = builder.Configuration["Authentication:ClientId"] ?? "mrwho_demo_nuget";
     options.ClientSecret = builder.Configuration["Authentication:ClientSecret"]; // null for public
+    options.SaveTokens = true;
+    options.SignedOutCallbackPath = "/signout-callback-oidc";
 
     options.Scopes.Clear();
     options.Scopes.Add("openid");

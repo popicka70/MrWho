@@ -46,14 +46,14 @@ public static class MrWhoClientAuthLoginLogoutEndpointExtensions
     }
 
     /// <summary>
-    /// Maps /logout endpoint(s) that perform local cookie sign-out and, if configured, remote OIDC sign-out.
+    /// Maps /logout endpoint(s) that perform local cookie sign-out and then remote OIDC end-session if configured.
     /// Supports both GET and POST. Query string: ?returnUrl=/relative/path (defaults to "/").
     /// </summary>
     /// <remarks>
     /// Sign-out flow:
     /// 1. Signs out the default authenticate scheme (cookie) if present.
-    /// 2. Signs out using the default sign-out scheme; if none, tries default challenge scheme (OIDC) for upstream logout.
-    /// 3. Redirects back to returnUrl afterwards.
+    /// 2. Always attempts OIDC sign-out via the default sign-out scheme (or challenge scheme) to propagate logout server-side.
+    /// 3. Redirects back to returnUrl afterwards (OIDC handler will handle its own redirect if configured).
     /// </remarks>
     public static IEndpointRouteBuilder MapMrWhoLogoutEndpoints(
         this IEndpointRouteBuilder endpoints,
@@ -85,16 +85,11 @@ public static class MrWhoClientAuthLoginLogoutEndpointExtensions
 
             if (signOutScheme is not null)
             {
-                // Avoid double sign-out if both point to same underlying scheme (e.g., only cookies).
-                if (defaultAuth?.Name != signOutScheme.Name)
-                {
-                    var props = new AuthenticationProperties { RedirectUri = returnUrl };
-                    await context.SignOutAsync(signOutScheme.Name, props);
-                    return; // Upstream handler will handle redirect.
-                }
+                var props = new AuthenticationProperties { RedirectUri = returnUrl };
+                await context.SignOutAsync(signOutScheme.Name, props);
+                return; // Upstream handler handles redirect/end-session.
             }
 
-            // Fallback local redirect.
             context.Response.Redirect(returnUrl);
         }
 

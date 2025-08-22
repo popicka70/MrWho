@@ -36,11 +36,12 @@ public static class MrWhoClientAuthBuilderExtensions
         // Decide default require-https if not set
         bool requireHttps = options.RequireHttpsMetadata ?? options.Authority.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
 
-        // Configure authentication with a local cookie scheme and OIDC challenge scheme
+        // Configure authentication with a local cookie scheme and OIDC challenge + sign-out scheme
         var builder = services.AddAuthentication(auth =>
         {
             auth.DefaultScheme = cookieScheme;
             auth.DefaultChallengeScheme = oidcScheme;
+            auth.DefaultSignOutScheme = oidcScheme; // ensure SignOutAsync() triggers OIDC end-session
         })
         .AddCookie(cookieScheme, cookie =>
         {
@@ -69,6 +70,10 @@ public static class MrWhoClientAuthBuilderExtensions
             oidc.CallbackPath = options.CallbackPath;
             oidc.SignedOutCallbackPath = options.SignedOutCallbackPath;
             oidc.RemoteSignOutPath = options.RemoteSignOutPath;
+            if (!string.IsNullOrWhiteSpace(options.SignedOutRedirectUri))
+            {
+                oidc.SignedOutRedirectUri = options.SignedOutRedirectUri;
+            }
 
             // Ensure Identity.Name and roles resolve using standard OIDC claims by default
             oidc.TokenValidationParameters = new TokenValidationParameters
@@ -147,6 +152,13 @@ public static class MrWhoClientAuthBuilderExtensions
                     }
                     return Task.CompletedTask;
                 },
+                OnRedirectToIdentityProviderForSignOut = ctx =>
+                {
+                    var logger = ctx.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>()
+                        .CreateLogger("MrWho.ClientAuth.OIDC");
+                    logger.LogInformation("Initiating OIDC end-session for client_id={ClientId}. IdTokenHint? {HasHint}", ctx.Options.ClientId, !string.IsNullOrEmpty(ctx.ProtocolMessage.IdTokenHint));
+                    return Task.CompletedTask;
+                },
                 OnTokenResponseReceived = ctx =>
                 {
                     var logger = ctx.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>()
@@ -162,7 +174,6 @@ public static class MrWhoClientAuthBuilderExtensions
                     var identity = ctx.Principal?.Identities?.FirstOrDefault();
                     if (identity != null)
                     {
-                        // If there's no "name" claim, try to synthesize one from preferred_username, email, then sub
                         bool hasName = identity.HasClaim(c => c.Type == "name");
                         if (!hasName)
                         {

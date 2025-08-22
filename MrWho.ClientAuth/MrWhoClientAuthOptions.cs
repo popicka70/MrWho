@@ -87,6 +87,11 @@ public sealed class MrWhoClientAuthOptions
     public string RemoteSignOutPath { get; set; } = "/signout-oidc";
 
     /// <summary>
+    /// Optional post logout redirect (sets ProtocolMessage.PostLogoutRedirectUri). If null, it is omitted.
+    /// </summary>
+    public string? SignedOutRedirectUri { get; set; }
+
+    /// <summary>
     /// Optional extra configuration hook for OpenIdConnectOptions.
     /// </summary>
     public Action<OpenIdConnectOptions>? ConfigureOpenIdConnect { get; set; }
