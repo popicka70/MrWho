@@ -243,7 +243,7 @@ public static class ServiceCollectionExtensions
         return services;
     }
 
-    public static IServiceCollection AddMrWhoOpenIddict(this IServiceCollection services)
+    public static IServiceCollection AddMrWhoOpenIddict(this IServiceCollection services, IConfiguration configuration)
     {
         // Configure OpenIddict
         services.AddOpenIddict()
@@ -255,7 +255,6 @@ public static class ServiceCollectionExtensions
             .AddServer(options =>
             {
                 // Allow setting a static issuer via configuration/environment for reverse proxy/Docker scenarios
-                var configuration = services.BuildServiceProvider().GetRequiredService<IConfiguration>();
                 var issuer = configuration["OpenIddict:Issuer"]; // maps from env OPENIDDICT__ISSUER
                 if (!string.IsNullOrWhiteSpace(issuer))
                 {
