@@ -13,11 +13,15 @@ var adminWeb = builder.AddProject<Projects.MrWhoAdmin_Web>("webfrontend")
     .WithReference(mrWho)
     .WaitFor(mrWho);
 
+var demoApi = builder.AddProject<Projects.MrWhoDemoApi>("mrwhodemoapi");
+
 var demo1 = builder.AddProject<Projects.MrWhoDemo1>("mrwhodemo1")
     .WithExternalHttpEndpoints()
     .WithHttpHealthCheck("/health")
     .WithReference(mrWho)
-    .WaitFor(mrWho);
+    .WithReference(demoApi)
+    .WaitFor(mrWho)
+    .WaitFor(demoApi);
 
 var demoNuget = builder.AddProject<Projects.MrWhoDemoNuget>("mrwhodemonuget")
     .WithExternalHttpEndpoints()
@@ -25,6 +29,5 @@ var demoNuget = builder.AddProject<Projects.MrWhoDemoNuget>("mrwhodemonuget")
     .WithReference(mrWho)
     .WaitFor(mrWho);
 
-builder.AddProject<Projects.MrWhoDemoApi>("mrwhodemoapi");
 
 builder.Build().Run();
