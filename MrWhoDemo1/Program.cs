@@ -228,6 +228,15 @@ app.MapGet("/call-api", async (IHttpClientFactory factory, HttpContext http) =>
     return Results.Json(new { status = (int)response.StatusCode, ok = response.IsSuccessStatusCode, body = content });
 }).RequireAuthorization();
 
+// Machine-to-machine demo: invoke API's internal client_credentials test endpoint (no user context required)
+app.MapGet("/call-m2m", async (IHttpClientFactory factory) =>
+{
+    var client = factory.CreateClient("DemoApi");
+    var response = await client.GetAsync("m2m-test/obtain-token-and-call");
+    var body = await response.Content.ReadAsStringAsync();
+    return Results.Json(new { status = (int)response.StatusCode, ok = response.IsSuccessStatusCode, raw = body });
+});
+
 // Add health check endpoint
 app.MapGet("/health", () => Results.Ok(new 
 { 

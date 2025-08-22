@@ -10,6 +10,18 @@
         <div class="col-12">
             <h1 class="display-4 mb-4">Welcome to MrWho Demo Application 1</h1>
             
+            <!-- Always visible Machine-to-Machine test card -->
+            <div class="card border-success mb-4">
+                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-cpu"></i> Machine-to-Machine API Test (No Login Needed)</h5>
+                    <button id="btnCallM2M" class="btn btn-light btn-sm"><i class="bi bi-play-circle"></i> Run Test</button>
+                </div>
+                <div class="card-body">
+                    <p class="small text-muted mb-2">Calls Demo API endpoint <code>m2m-test/obtain-token-and-call</code> which performs a client_credentials token request then fetches WeatherForecast. Useful to prove service-to-service flow works.</p>
+                    <pre id="m2mResult" class="bg-dark text-light p-3 rounded" style="min-height:110px; white-space:pre-wrap;"><em>Click "Run Test" to perform machine-to-machine call...</em></pre>
+                </div>
+            </div>
+            
             @if (Model.ShowLogoutSuccess)
             {
                 <div class="alert alert-success alert-dismissible fade show" role="alert">
@@ -284,29 +296,45 @@
 @section Scripts {
 <script>
     document.addEventListener('DOMContentLoaded', () => {
-        const btn = document.getElementById('btnCallApi');
-        if (!btn) return;
-        btn.addEventListener('click', async () => {
-            const resultEl = document.getElementById('apiResult');
-            resultEl.textContent = 'Calling API...';
-            try {
-                const resp = await fetch('/call-api');
-                const data = await resp.json();
-                if (data.body) {
-                    // If body is a JSON string of the forecast, try to pretty print
-                    let prettyBody = data.body;
-                    try {
-                        const parsed = JSON.parse(data.body);
-                        prettyBody = JSON.stringify(parsed, null, 2);
-                    } catch { }
-                    resultEl.textContent = `Status: ${data.status} (ok=${data.ok})\n${prettyBody}`;
-                } else {
-                    resultEl.textContent = JSON.stringify(data, null, 2);
+        // Machine-to-machine test (works even if not logged in)
+        const btnM2M = document.getElementById('btnCallM2M');
+        if (btnM2M) {
+            btnM2M.addEventListener('click', async () => {
+                const el = document.getElementById('m2mResult');
+                el.textContent = 'Running machine-to-machine test...';
+                try {
+                    const resp = await fetch('/call-m2m');
+                    const data = await resp.json();
+                    let raw = data.raw || ''; 
+                    try { raw = JSON.stringify(JSON.parse(raw), null, 2); } catch {}
+                    el.textContent = `Status: ${data.status} (ok=${data.ok})\n${raw}`;
+                } catch (e) {
+                    el.textContent = 'Error: ' + e;
                 }
-            } catch (e) {
-                resultEl.textContent = 'Error calling API: ' + e;
-            }
-        });
+            });
+        }
+
+        // Existing user access token call (only present when authenticated section rendered)
+        const btn = document.getElementById('btnCallApi');
+        if (btn) {
+            btn.addEventListener('click', async () => {
+                const resultEl = document.getElementById('apiResult');
+                resultEl && (resultEl.textContent = 'Calling API...');
+                try {
+                    const resp = await fetch('/call-api');
+                    const data = await resp.json();
+                    if (data.body) {
+                        let prettyBody = data.body;
+                        try { prettyBody = JSON.stringify(JSON.parse(data.body), null, 2); } catch {}
+                        resultEl.textContent = `Status: ${data.status} (ok=${data.ok})\n${prettyBody}`;
+                    } else {
+                        resultEl.textContent = JSON.stringify(data, null, 2);
+                    }
+                } catch (e) {
+                    resultEl.textContent = 'Error calling API: ' + e;
+                }
+            });
+        }
     });
 </script>
 }
