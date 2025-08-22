@@ -362,7 +362,7 @@ public class OidcClientService : IOidcClientService
                 ClientSecret = "Demo1Secret2024!",
                 Name = "MrWho Demo Application 1",
                 Description = "Demo application showcasing MrWho OIDC integration",
-                RealmId = demoRealm.Id,
+                RealmId = (await _context.Realms.FirstAsync(r => r.Name == "demo")).Id,
                 IsEnabled = true,
                 ClientType = ClientType.Confidential,
                 AllowAuthorizationCodeFlow = true,
@@ -409,8 +409,8 @@ public class OidcClientService : IOidcClientService
                 });
             }
 
-            // Add scopes for demo1
-            var scopes = new[] { "openid", "email", "profile", "roles", "offline_access" };
+            // Add scopes for demo1 (include API scopes)
+            var scopes = new[] { "openid", "email", "profile", "roles", "offline_access", "api.read", "api.write" };
             foreach (var scope in scopes)
             {
                 _context.ClientScopes.Add(new ClientScope
@@ -420,7 +420,7 @@ public class OidcClientService : IOidcClientService
                 });
             }
 
-            // Add permissions for demo1
+            // Add permissions for demo1 (include API scope permissions)
             var permissions = new[]
             {
                 OpenIddictConstants.Permissions.Endpoints.Authorization,
@@ -428,12 +428,14 @@ public class OidcClientService : IOidcClientService
                 OpenIddictConstants.Permissions.Endpoints.EndSession,
                 OpenIddictConstants.Permissions.GrantTypes.AuthorizationCode,
                 OpenIddictConstants.Permissions.GrantTypes.RefreshToken,
+                OpenIddictConstants.Permissions.ResponseTypes.Code,
                 "scp:openid",
                 OpenIddictConstants.Permissions.Scopes.Email,
                 OpenIddictConstants.Permissions.Scopes.Profile,
                 OpenIddictConstants.Permissions.Scopes.Roles,
-                OpenIddictConstants.Permissions.ResponseTypes.Code,
-                "scp:offline_access"
+                "scp:offline_access",
+                "scp:api.read",
+                "scp:api.write"
             };
 
             foreach (var permission in permissions)
@@ -446,7 +448,7 @@ public class OidcClientService : IOidcClientService
             }
 
             await _context.SaveChangesAsync();
-            _logger.LogInformation("Created demo1 client 'mrwho_demo1'");
+            _logger.LogInformation("Created demo1 client 'mrwho_demo1' with API scopes");
         }
         else
         {
@@ -461,7 +463,7 @@ public class OidcClientService : IOidcClientService
                 "https://localhost:7037/",
                 "https://localhost:7037/signout-callback-oidc"
             };
-            var requiredScopes = new[] { "openid", "email", "profile", "roles", "offline_access" };
+            var requiredScopes = new[] { "openid", "email", "profile", "roles", "offline_access", "api.read", "api.write" };
             var requiredPermissions = new[]
             {
                 OpenIddictConstants.Permissions.Endpoints.Authorization,
@@ -474,7 +476,9 @@ public class OidcClientService : IOidcClientService
                 OpenIddictConstants.Permissions.Scopes.Email,
                 OpenIddictConstants.Permissions.Scopes.Profile,
                 OpenIddictConstants.Permissions.Scopes.Roles,
-                "scp:offline_access"
+                "scp:offline_access",
+                "scp:api.read",
+                "scp:api.write"
             };
 
             var added = false;
@@ -513,7 +517,7 @@ public class OidcClientService : IOidcClientService
             if (added)
             {
                 await _context.SaveChangesAsync();
-                _logger.LogInformation("Updated existing demo1 client with missing URIs/scopes/permissions");
+                _logger.LogInformation("Updated existing demo1 client with missing URIs/scopes/permissions (API scopes included)");
 
                 // Reload the client
                 demo1Client = await _context.Clients

@@ -1,5 +1,5 @@
 ﻿@page
-@model IndexModel
+@model MrWhoDemo1.Pages.IndexModel
 @using Microsoft.AspNetCore.Authentication
 @{
     ViewData["Title"] = "Home page";
@@ -111,6 +111,21 @@
                                         <p class="text-muted">Not available</p>
                                     }
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-12">
+                        <div class="card mb-4">
+                            <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0"><i class="bi bi-cloud-sun"></i> Call Protected Weather Forecast API</h5>
+                                <button id="btnCallApi" class="btn btn-light btn-sm"><i class="bi bi-play-circle"></i> Call API</button>
+                            </div>
+                            <div class="card-body">
+                                <p class="small text-muted mb-2">Demonstrates calling the protected MrWhoDemoApi using the current user's access token (scopes: api.read, api.write).</p>
+                                <pre id="apiResult" class="bg-dark text-light p-3 rounded" style="min-height:120px; white-space: pre-wrap;"><em>Click "Call API" to fetch data...</em></pre>
                             </div>
                         </div>
                     </div>
@@ -265,3 +280,33 @@
         </div>
     </div>
 </div>
+
+@section Scripts {
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const btn = document.getElementById('btnCallApi');
+        if (!btn) return;
+        btn.addEventListener('click', async () => {
+            const resultEl = document.getElementById('apiResult');
+            resultEl.textContent = 'Calling API...';
+            try {
+                const resp = await fetch('/call-api');
+                const data = await resp.json();
+                if (data.body) {
+                    // If body is a JSON string of the forecast, try to pretty print
+                    let prettyBody = data.body;
+                    try {
+                        const parsed = JSON.parse(data.body);
+                        prettyBody = JSON.stringify(parsed, null, 2);
+                    } catch { }
+                    resultEl.textContent = `Status: ${data.status} (ok=${data.ok})\n${prettyBody}`;
+                } else {
+                    resultEl.textContent = JSON.stringify(data, null, 2);
+                }
+            } catch (e) {
+                resultEl.textContent = 'Error calling API: ' + e;
+            }
+        });
+    });
+</script>
+}
