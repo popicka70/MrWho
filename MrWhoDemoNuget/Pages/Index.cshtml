@@ -4,20 +4,58 @@
     ViewData["Title"] = "Home";
 }
 
-<div class="text-center">
-    <h1 class="display-4">MrWho Demo (NuGet configured)</h1>
-    <p class="lead">This demo app uses the MrWho.ClientAuth NuGet to configure OIDC.</p>
+<div class="container mt-4">
+    <h1 class="display-5 mb-3">MrWho Demo (NuGet configured)</h1>
+    <p class="text-muted">Demonstrates configuration via <code>MrWho.ClientAuth</code> and its M2M helpers.</p>
+
+    <div class="card mb-4 border-success">
+        <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+            <strong><i class="bi bi-cpu"></i> Machine-to-Machine Call (client_credentials)</strong>
+            <button id="btnM2M" class="btn btn-light btn-sm"><i class="bi bi-play-circle"></i> Run</button>
+        </div>
+        <div class="card-body">
+            <p class="small text-muted mb-2">Uses <code>AddMrWhoClientCredentialsApi</code> to get a token for <code>mrwho_demo_api_client</code> then calls <code>WeatherForecast</code>.</p>
+            <pre id="m2mResult" class="bg-dark text-light p-3 rounded" style="min-height:110px; white-space:pre-wrap"><em>Click Run to execute machine-to-machine call...</em></pre>
+        </div>
+    </div>
+
+    <div class="card mb-4 border-primary">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <strong><i class="bi bi-person-check"></i> Delegated User Call</strong>
+            <button id="btnUserCall" class="btn btn-light btn-sm" @(User?.Identity?.IsAuthenticated == true ? "" : "disabled")><i class="bi bi-play-circle"></i> Call</button>
+        </div>
+        <div class="card-body">
+            <p class="small text-muted mb-2">Requires login. Uses <code>AddMrWhoUserAccessTokenApi</code> to forward current user's access token.</p>
+            <pre id="userResult" class="bg-dark text-light p-3 rounded" style="min-height:110px; white-space:pre-wrap"><em>@(User?.Identity?.IsAuthenticated == true ? "Click Call to invoke API..." : "Login first to enable delegated call.")</em></pre>
+        </div>
+    </div>
 
     @if (User?.Identity?.IsAuthenticated == true)
     {
-        <div class="alert alert-success">Authenticated as <strong>@User.Identity.Name</strong></div>
-        <p>
-            <a class="btn btn-outline-secondary" href="/Secure">Secure Page</a>
-            <a class="btn btn-outline-danger" href="/Logout">Logout</a>
-        </p>
+        <div class="alert alert-success">Authenticated as <strong>@User.Identity.Name</strong> <a class="btn btn-outline-danger btn-sm ms-2" href="/Logout">Logout</a></div>
     }
     else
     {
-        <a class="btn btn-primary" href="/Login">Login with MrWho</a>
+        <a class="btn btn-primary" href="/Login"><i class="bi bi-box-arrow-in-right"></i> Login with MrWho</a>
     }
 </div>
+
+@section Scripts {
+<script>
+    async function runCall(url, targetId) {
+        const el = document.getElementById(targetId);
+        el.textContent = 'Calling ' + url + ' ...';
+        try {
+            const resp = await fetch(url);
+            const json = await resp.json();
+            let body = json.body || json.raw || '';
+            try { body = JSON.stringify(JSON.parse(body), null, 2); } catch {}
+            el.textContent = 'Status: ' + json.status + ' (ok=' + json.ok + ')\n' + body;
+        } catch(e) {
+            el.textContent = 'Error: ' + e;
+        }
+    }
+    document.getElementById('btnM2M')?.addEventListener('click', () => runCall('/demo/m2m-call','m2mResult'));
+    document.getElementById('btnUserCall')?.addEventListener('click', () => runCall('/demo/user-call','userResult'));
+</script>
+}
