@@ -26,6 +26,21 @@ builder.Services.AddSession(options =>
     options.Cookie.Name = ".MrWho.Demo1.Session";
 });
 
+// Add HttpClient to call Demo API with user access token
+builder.Services.AddHttpClient("DemoApi", client =>
+{
+    client.BaseAddress = new Uri("https://localhost:7162/"); // Matches Demo API https profile
+});
+
+// Delegating handler to attach access token from current user
+builder.Services.AddTransient<DelegatingHandler, UserAccessTokenHandler>();
+
+// Replace default primary handler pipeline for named client
+builder.Services.AddHttpClient("DemoApiWithAuth", client =>
+{
+    client.BaseAddress = new Uri("https://localhost:7162/");
+}).AddHttpMessageHandler<UserAccessTokenHandler>();
+
 // CRITICAL: Clear default claim mappings to preserve JWT claim names
 Microsoft.IdentityModel.JsonWebTokens.JsonWebTokenHandler.DefaultInboundClaimTypeMap.Clear();
 
@@ -84,7 +99,7 @@ builder.Services.AddAuthentication(options =>
 .AddOpenIdConnect(OpenIdConnectDefaults.AuthenticationScheme, options => // Use standard OIDC scheme
 {
     options.SignInScheme = demo1CookieScheme;
-    options.Authority = "https://localhost:7113"; // "https://mrwho.up.railway.app"; // MrWho OIDC Server (Production)
+    options.Authority = "https://localhost:7113"; // Identity Server
     options.ClientId = "mrwho_demo1";
     options.ClientSecret = "Demo1Secret2024!";
     options.ResponseType = OpenIdConnectResponseType.Code;
@@ -96,8 +111,10 @@ builder.Services.AddAuthentication(options =>
     options.Scope.Add("email");
     options.Scope.Add("roles");
     options.Scope.Add("offline_access");
+    options.Scope.Add("api.read");
+    options.Scope.Add("api.write");
     
-    // Save tokens for display
+    // Save tokens for display and API calls
     options.SaveTokens = true;
     
     // Use PKCE for additional security
@@ -129,62 +146,20 @@ builder.Services.AddAuthentication(options =>
     // CRITICAL FIX: Configure post-logout redirect to home page (which no longer requires auth)
     options.SignedOutRedirectUri = "/?logout=success";
     
-    // CRITICAL: Add comprehensive event handlers for logout debugging
+    // Events for diagnostics
     options.Events = new OpenIdConnectEvents
     {
         OnTokenValidated = context =>
         {
-            // Log the claims for debugging
             var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
             logger.LogDebug("Demo1 claims in ID token: {Claims}", 
                 string.Join(", ", context.Principal?.Claims.Select(c => $"{c.Type}={c.Value}") ?? Array.Empty<string>()));
             return Task.CompletedTask;
         },
-        
-        // CRITICAL: This event is called when initiating logout to the OIDC provider
-        OnRedirectToIdentityProviderForSignOut = context =>
-        {
-            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-            logger.LogInformation("?? DEMO1 LOGOUT STEP 1: Redirecting to identity provider for sign out (server-side isolation via DynamicCookieService)");
-            logger.LogInformation("   - Target logout URL: {LogoutUrl}", context.ProtocolMessage.IssuerAddress);
-            logger.LogInformation("   - Post logout redirect URI: {PostLogoutUri}", context.ProtocolMessage.PostLogoutRedirectUri);
-            logger.LogInformation("   - ID token hint: {HasIdToken}", !string.IsNullOrEmpty(context.ProtocolMessage.IdTokenHint));
-            logger.LogInformation("   - Using standard OIDC with server-side session isolation");
-            return Task.CompletedTask;
-        },
-        
-        // CRITICAL: This event is called when returning from the OIDC provider after logout
-        OnSignedOutCallbackRedirect = context =>
-        {
-            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-            logger.LogInformation("? DEMO1 LOGOUT STEP 2: OIDC logout completed, processing callback redirect");
-            logger.LogInformation("   - Redirecting to: {RedirectUri}", context.Options.SignedOutRedirectUri);
-            logger.LogInformation("   - Demo1 logout successful: User should no longer be authenticated");
-            return Task.CompletedTask;
-        },
-        
-        // NOTE: OnRemoteSignOut is only for remote-initiated logouts (e.g., logout from another app)
-        // It's NOT called during normal client-initiated logout flows
-        OnRemoteSignOut = context =>
-        {
-            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-            logger.LogWarning("?? DEMO1 REMOTE LOGOUT: Received remote sign out notification from OIDC provider");
-            logger.LogWarning("   - This indicates logout was initiated from another application");
-            return Task.CompletedTask;
-        },
-        
-        // Add more logout-related event handlers for comprehensive debugging
         OnAuthenticationFailed = context =>
         {
             var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-            logger.LogError("? Demo1 Authentication failed: {Error}", context.Exception?.Message);
-            return Task.CompletedTask;
-        },
-        
-        OnRemoteFailure = context =>
-        {
-            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-            logger.LogError("? Demo1 Remote failure: {Error}", context.Failure?.Message);
+            logger.LogError("Demo1 Authentication failed: {Error}", context.Exception?.Message);
             return Task.CompletedTask;
         }
     };
@@ -230,6 +205,37 @@ app.MapControllers();
 app.MapStaticAssets();
 app.MapRazorPages()
    .WithStaticAssets();
+
+// Simple endpoint to call the protected Demo API using the user access token
+app.MapGet("/call-api", async (IHttpClientFactory factory, HttpContext http) =>
+{
+    if (http.User.Identity?.IsAuthenticated != true)
+    {
+        return Results.Json(new { error = "not_authenticated" }, statusCode: 401);
+    }
+
+    var accessToken = await http.GetTokenAsync("access_token");
+    if (string.IsNullOrEmpty(accessToken))
+    {
+        return Results.Json(new { error = "no_access_token" }, statusCode: 400);
+    }
+
+    var client = factory.CreateClient("DemoApi");
+    client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+
+    var response = await client.GetAsync("WeatherForecast");
+    var content = await response.Content.ReadAsStringAsync();
+    return Results.Json(new { status = (int)response.StatusCode, ok = response.IsSuccessStatusCode, body = content });
+}).RequireAuthorization();
+
+// Machine-to-machine demo: invoke API's internal client_credentials test endpoint (no user context required)
+app.MapGet("/call-m2m", async (IHttpClientFactory factory) =>
+{
+    var client = factory.CreateClient("DemoApi");
+    var response = await client.GetAsync("m2m-test/obtain-token-and-call");
+    var body = await response.Content.ReadAsStringAsync();
+    return Results.Json(new { status = (int)response.StatusCode, ok = response.IsSuccessStatusCode, raw = body });
+});
 
 // Add health check endpoint
 app.MapGet("/health", () => Results.Ok(new 
@@ -340,3 +346,23 @@ if (app.Environment.IsDevelopment())
 }
 
 app.Run();
+
+// Delegating handler to attach user access token (alternative to manual header set)
+public class UserAccessTokenHandler : DelegatingHandler
+{
+    private readonly IHttpContextAccessor _httpContextAccessor = new HttpContextAccessor();
+
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        var context = _httpContextAccessor.HttpContext;
+        if (context?.User?.Identity?.IsAuthenticated == true)
+        {
+            var token = await context.GetTokenAsync("access_token");
+            if (!string.IsNullOrEmpty(token))
+            {
+                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+            }
+        }
+        return await base.SendAsync(request, cancellationToken);
+    }
+}

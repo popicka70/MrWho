@@ -295,9 +295,14 @@ public static class ServiceCollectionExtensions
                 options.AddDevelopmentEncryptionCertificate()
                        .AddDevelopmentSigningCertificate();
 
+                // For demo/API compatibility: issue plain signed (non-encrypted) access tokens so JwtBearer can validate
+                // (Current tokens are JWE with RSA-OAEP + A256CBC-HS512 making them unparsable by standard decoders against Authority keys.)
+                options.DisableAccessTokenEncryption();
+
                 // Register the ASP.NET Core host and enable passthrough for the authorization endpoint
                 options.UseAspNetCore()
                        .EnableAuthorizationEndpointPassthrough()
+                       .EnableTokenEndpointPassthrough() // ADDED: allow custom minimal API handler for /connect/token
                        .EnableEndSessionEndpointPassthrough();
             })
             .AddValidation(options =>
