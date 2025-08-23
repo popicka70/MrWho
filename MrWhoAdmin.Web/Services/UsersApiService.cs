@@ -145,7 +145,6 @@ public class UsersApiService : IUsersApiService
             var request = new { CurrentPassword = currentPassword, NewPassword = newPassword };
             var json = JsonSerializer.Serialize(request, _jsonOptions);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
-
             var response = await _httpClient.PostAsync($"api/users/{id}/change-password", content);
             return response.IsSuccessStatusCode;
         }
@@ -315,9 +314,19 @@ public class UsersApiService : IUsersApiService
     {
         try
         {
+            // Defensive: ensure userId is set in request body for model validation
+            if (string.IsNullOrWhiteSpace(request.UserId))
+            {
+                request.UserId = userId;
+            }
             var json = JsonSerializer.Serialize(request, _jsonOptions);
             var content = new StringContent(json, Encoding.UTF8, "application/json");
             var response = await _httpClient.PostAsync($"api/users/{userId}/roles", content);
+            if (!response.IsSuccessStatusCode)
+            {
+                var body = await response.Content.ReadAsStringAsync();
+                _logger.LogWarning("Failed to assign role. Status: {Status}. Body: {Body}", response.StatusCode, body);
+            }
             return response.IsSuccessStatusCode;
         }
         catch (Exception ex)

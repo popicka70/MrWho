@@ -264,7 +264,8 @@ public partial class EditUser
         isAssigningRole = true;
         try
         {
-            if (await UsersApiService.AssignUserRoleAsync(Id!, new AssignRoleRequest { RoleId = selectedRoleId }))
+            // Ensure UserId is set in request to satisfy [Required] validation on the API model
+            if (await UsersApiService.AssignUserRoleAsync(Id!, new AssignRoleRequest { UserId = Id!, RoleId = selectedRoleId }))
             {
                 var role = availableRoles.FirstOrDefault(r => r.Id == selectedRoleId);
                 if (role != null)
