@@ -396,6 +396,7 @@ public class ClientsController : ControllerBase
             .Include(c => c.PostLogoutUris)
             .Include(c => c.Scopes)
             .Include(c => c.Permissions)
+            .Include(c => c.Audiences)
             .FirstOrDefaultAsync(c => c.Id == id);
 
         if (client == null) return NotFound();
@@ -457,22 +458,23 @@ public class ClientsController : ControllerBase
             CustomLoginPageUrl = client.CustomLoginPageUrl,
             CustomLogoutPageUrl = client.CustomLogoutPageUrl,
             CustomErrorPageUrl = client.CustomErrorPageUrl,
-
-            // login options
             AllowPasskeyLogin = client.AllowPasskeyLogin,
             AllowQrLoginQuick = client.AllowQrLoginQuick,
             AllowQrLoginSecure = client.AllowQrLoginSecure,
             AllowCodeLogin = client.AllowCodeLogin,
-
             RedirectUris = client.RedirectUris.Select(x => x.Uri).ToList(),
             PostLogoutUris = client.PostLogoutUris.Select(x => x.Uri).ToList(),
             Scopes = client.Scopes.Select(x => x.Scope).ToList(),
             Permissions = client.Permissions.Select(x => x.Permission).ToList(),
+            Audiences = client.Audiences.Select(a => a.Audience).ToList(),
+            AudienceMode = client.AudienceMode,
+            PrimaryAudience = client.PrimaryAudience,
+            IncludeAudInIdToken = client.IncludeAudInIdToken,
+            RequireExplicitAudienceScope = client.RequireExplicitAudienceScope,
             ExportedBy = User?.Identity?.Name ?? "System",
             ExportedAtUtc = DateTime.UtcNow,
-            FormatVersion = "1.1"
+            FormatVersion = "1.2"
         };
-
         // Assigned users (by username/email only)
         var assignedUsers = await _context.ClientUsers
             .Where(cu => cu.ClientId == client.Id)
@@ -481,7 +483,6 @@ public class ClientsController : ControllerBase
         export.AssignedUsers = assignedUsers
             .Select(x => new ClientAssignedUserRef { UserName = x.UserName, Email = x.Email })
             .ToList();
-
         return Ok(export);
     }
 
@@ -972,8 +973,10 @@ public class ClientsController : ControllerBase
                     Scopes = request.Scopes,
                     Permissions = request.Permissions,
                     Audiences = request.Audiences,
-
-                    // login options
+                    AudienceMode = client.AudienceMode,
+                    PrimaryAudience = client.PrimaryAudience,
+                    IncludeAudInIdToken = client.IncludeAudInIdToken,
+                    RequireExplicitAudienceScope = client.RequireExplicitAudienceScope,
                     AllowPasskeyLogin = client.AllowPasskeyLogin,
                     AllowQrLoginQuick = client.AllowQrLoginQuick,
                     AllowQrLoginSecure = client.AllowQrLoginSecure,
