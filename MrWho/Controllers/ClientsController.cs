@@ -48,6 +48,7 @@ public class ClientsController : ControllerBase
             .Include(c => c.PostLogoutUris)
             .Include(c => c.Scopes)
             .Include(c => c.Permissions)
+            .Include(c => c.Audiences)
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(realmId))
@@ -93,7 +94,7 @@ public class ClientsController : ControllerBase
                 PostLogoutUris = c.PostLogoutUris.Select(plu => plu.Uri).ToList(),
                 Scopes = c.Scopes.Select(s => s.Scope).ToList(),
                 Permissions = c.Permissions.Select(p => p.Permission).ToList(),
-
+                Audiences = c.Audiences.Select(a => a.Audience).ToList(),
                 // dynamic fields
                 SessionTimeoutHours = c.SessionTimeoutHours,
                 UseSlidingSessionExpiration = c.UseSlidingSessionExpiration,
@@ -144,12 +145,16 @@ public class ClientsController : ControllerBase
                 CustomLoginPageUrl = c.CustomLoginPageUrl,
                 CustomLogoutPageUrl = c.CustomLogoutPageUrl,
                 CustomErrorPageUrl = c.CustomErrorPageUrl,
-
                 // login options
                 AllowPasskeyLogin = c.AllowPasskeyLogin,
                 AllowQrLoginQuick = c.AllowQrLoginQuick,
                 AllowQrLoginSecure = c.AllowQrLoginSecure,
-                AllowCodeLogin = c.AllowCodeLogin
+                AllowCodeLogin = c.AllowCodeLogin,
+                // audience configuration
+                AudienceMode = c.AudienceMode,
+                PrimaryAudience = c.PrimaryAudience,
+                IncludeAudInIdToken = c.IncludeAudInIdToken,
+                RequireExplicitAudienceScope = c.RequireExplicitAudienceScope
             })
             .ToListAsync();
 
@@ -173,6 +178,7 @@ public class ClientsController : ControllerBase
             .Include(c => c.RedirectUris)
             .Include(c => c.PostLogoutUris)
             .Include(c => c.Scopes)
+            .Include(c => c.Audiences)
             .Include(c => c.Permissions)
             .FirstOrDefaultAsync(c => c.Id == id);
 
@@ -188,7 +194,7 @@ public class ClientsController : ControllerBase
             Name = client.Name,
             Description = client.Description,
             IsEnabled = client.IsEnabled,
-            ClientType = client.ClientType, // Remove cast since now using shared enum
+            ClientType = client.ClientType,
             AllowAuthorizationCodeFlow = client.AllowAuthorizationCodeFlow,
             AllowClientCredentialsFlow = client.AllowClientCredentialsFlow,
             AllowPasswordFlow = client.AllowPasswordFlow,
@@ -208,7 +214,7 @@ public class ClientsController : ControllerBase
             PostLogoutUris = client.PostLogoutUris.Select(plu => plu.Uri).ToList(),
             Scopes = client.Scopes.Select(s => s.Scope).ToList(),
             Permissions = client.Permissions.Select(p => p.Permission).ToList(),
-
+            Audiences = client.Audiences.Select(a => a.Audience).ToList(),
             // dynamic fields
             SessionTimeoutHours = client.SessionTimeoutHours,
             UseSlidingSessionExpiration = client.UseSlidingSessionExpiration,
@@ -259,12 +265,14 @@ public class ClientsController : ControllerBase
             CustomLoginPageUrl = client.CustomLoginPageUrl,
             CustomLogoutPageUrl = client.CustomLogoutPageUrl,
             CustomErrorPageUrl = client.CustomErrorPageUrl,
-
-            // login options
             AllowPasskeyLogin = client.AllowPasskeyLogin,
             AllowQrLoginQuick = client.AllowQrLoginQuick,
             AllowQrLoginSecure = client.AllowQrLoginSecure,
-            AllowCodeLogin = client.AllowCodeLogin
+            AllowCodeLogin = client.AllowCodeLogin,
+            AudienceMode = client.AudienceMode,
+            PrimaryAudience = client.PrimaryAudience,
+            IncludeAudInIdToken = client.IncludeAudInIdToken,
+            RequireExplicitAudienceScope = client.RequireExplicitAudienceScope
         };
 
         return Ok(clientDto);
@@ -507,6 +515,7 @@ public class ClientsController : ControllerBase
                     .Include(c => c.PostLogoutUris)
                     .Include(c => c.Scopes)
                     .Include(c => c.Permissions)
+                    .Include(c => c.Audiences)
                     .FirstOrDefaultAsync(c => c.ClientId == dto.ClientId && c.RealmId == realm.Id);
 
                 var now = DateTime.UtcNow;
@@ -595,6 +604,12 @@ public class ClientsController : ControllerBase
                 client.AllowQrLoginSecure = dto.AllowQrLoginSecure;
                 client.AllowCodeLogin = dto.AllowCodeLogin;
 
+                // Update audience configuration
+                client.AudienceMode = dto.AudienceMode;
+                client.PrimaryAudience = dto.PrimaryAudience;
+                client.IncludeAudInIdToken = dto.IncludeAudInIdToken;
+                client.RequireExplicitAudienceScope = dto.RequireExplicitAudienceScope;
+
                 client.UpdatedAt = now;
                 client.UpdatedBy = userName;
 
@@ -621,6 +636,13 @@ public class ClientsController : ControllerBase
                 foreach (var p in dto.Permissions.Distinct())
                 {
                     _context.ClientPermissions.Add(new ClientPermission { ClientId = client.Id, Permission = p });
+                }
+
+                // Update audiences
+                _context.ClientAudiences.RemoveRange(client.Audiences);
+                foreach (var a in dto.Audiences.Distinct())
+                {
+                    _context.ClientAudiences.Add(new ClientAudience { ClientId = client.Id, Audience = a });
                 }
 
                 await _context.SaveChangesAsync();
@@ -678,6 +700,7 @@ public class ClientsController : ControllerBase
                     .Include(c => c.PostLogoutUris)
                     .Include(c => c.Scopes)
                     .Include(c => c.Permissions)
+                    .Include(c => c.Audiences)
                     .FirstOrDefaultAsync(c => c.Id == client.Id);
 
                 var clientDto = new ClientDto
@@ -707,6 +730,7 @@ public class ClientsController : ControllerBase
                     PostLogoutUris = full.PostLogoutUris.Select(plu => plu.Uri).ToList(),
                     Scopes = full.Scopes.Select(s => s.Scope).ToList(),
                     Permissions = full.Permissions.Select(p => p.Permission).ToList(),
+                    Audiences = full.Audiences.Select(a => a.Audience).ToList(),
 
                     // dynamic fields
                     SessionTimeoutHours = full.SessionTimeoutHours,
@@ -842,7 +866,13 @@ public class ClientsController : ControllerBase
                     AllowPasskeyLogin = request.AllowPasskeyLogin,
                     AllowQrLoginQuick = request.AllowQrLoginQuick,
                     AllowQrLoginSecure = request.AllowQrLoginSecure,
-                    AllowCodeLogin = request.AllowCodeLogin
+                    AllowCodeLogin = request.AllowCodeLogin,
+
+                    // audience configuration
+                    AudienceMode = request.AudienceMode,
+                    PrimaryAudience = request.PrimaryAudience,
+                    IncludeAudInIdToken = request.IncludeAudInIdToken,
+                    RequireExplicitAudienceScope = request.RequireExplicitAudienceScope
                 };
 
                 _context.Clients.Add(client);
@@ -885,6 +915,16 @@ public class ClientsController : ControllerBase
                     {
                         ClientId = client.Id,
                         Permission = permission
+                    });
+                }
+
+                // Add audiences
+                foreach (var audience in request.Audiences)
+                {
+                    _context.ClientAudiences.Add(new ClientAudience
+                    {
+                        ClientId = client.Id,
+                        Audience = audience
                     });
                 }
 
@@ -931,6 +971,7 @@ public class ClientsController : ControllerBase
                     PostLogoutUris = request.PostLogoutUris,
                     Scopes = request.Scopes,
                     Permissions = request.Permissions,
+                    Audiences = request.Audiences,
 
                     // login options
                     AllowPasskeyLogin = client.AllowPasskeyLogin,
@@ -961,6 +1002,7 @@ public class ClientsController : ControllerBase
             .Include(c => c.PostLogoutUris)
             .Include(c => c.Scopes)
             .Include(c => c.Permissions)
+            .Include(c => c.Audiences)
             .FirstOrDefaultAsync(c => c.Id == id);
 
         if (client == null)
@@ -1077,6 +1119,11 @@ public class ClientsController : ControllerBase
                 client.AllowQrLoginSecure = request.AllowQrLoginSecure;
                 client.AllowCodeLogin = request.AllowCodeLogin;
 
+                client.AudienceMode = request.AudienceMode;
+                client.PrimaryAudience = request.PrimaryAudience;
+                client.IncludeAudInIdToken = request.IncludeAudInIdToken;
+                client.RequireExplicitAudienceScope = request.RequireExplicitAudienceScope;
+
                 client.UpdatedAt = DateTime.UtcNow;
                 client.UpdatedBy = User.Identity?.Name;
 
@@ -1136,6 +1183,20 @@ public class ClientsController : ControllerBase
                     }
                 }
 
+                // Update audiences if provided
+                if (request.Audiences != null)
+                {
+                    _context.ClientAudiences.RemoveRange(client.Audiences);
+                    foreach (var audience in request.Audiences)
+                    {
+                        _context.ClientAudiences.Add(new ClientAudience
+                        {
+                            ClientId = client.Id,
+                            Audience = audience
+                        });
+                    }
+                }
+
                 await _context.SaveChangesAsync();
                 _logger.LogInformation("Client '{ClientId}' updated in database", client.ClientId);
                 
@@ -1160,6 +1221,7 @@ public class ClientsController : ControllerBase
                 await _context.Entry(client).Collection(c => c.PostLogoutUris).LoadAsync();
                 await _context.Entry(client).Collection(c => c.Scopes).LoadAsync();
                 await _context.Entry(client).Collection(c => c.Permissions).LoadAsync();
+                await _context.Entry(client).Collection(c => c.Audiences).LoadAsync();
                 
                 var clientDto = new ClientDto
                 {
@@ -1188,6 +1250,7 @@ public class ClientsController : ControllerBase
                     PostLogoutUris = client.PostLogoutUris.Select(plu => plu.Uri).ToList(),
                     Scopes = client.Scopes.Select(s => s.Scope).ToList(),
                     Permissions = client.Permissions.Select(p => p.Permission).ToList(),
+                    Audiences = client.Audiences.Select(a => a.Audience).ToList(),
 
                     // dynamic fields
                     SessionTimeoutHours = client.SessionTimeoutHours,
