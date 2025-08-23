@@ -120,8 +120,7 @@ public static class Extensions
         var googleCloudProject = builder.Configuration["environmentVariables:GOOGLE_CLOUD_PROJECT"];
         Environment.SetEnvironmentVariable("GOOGLE_CLOUD_PROJECT", googleCloudProject);
 
-        var projectId = builder.Configuration["Google:ProjectId"] ??
-                        Environment.GetEnvironmentVariable("GOOGLE_CLOUD_PROJECT");
+        var projectId = googleCloudProject ?? builder.Configuration["Google:ProjectId"];
 
         var loggerConfiguration = new LoggerConfiguration()
             .ReadFrom.Configuration(builder.Configuration)
