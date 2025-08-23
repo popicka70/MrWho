@@ -131,15 +131,17 @@ public static class Extensions
             .MinimumLevel.Override("Microsoft.Hosting.Lifetime", LogEventLevel.Information)
             .WriteTo.Console();
 
+        string loggingMessage = "Serilog logging configured to write to Console";
         if (!string.IsNullOrWhiteSpace(projectId) && !string.IsNullOrWhiteSpace(keyFilePath))
         {
             loggerConfiguration.WriteTo.GoogleCloudLogging(projectId: projectId, logName: "MrWho");
+            loggingMessage += $" and Google Cloud Logging (project: {projectId})";
         }
 
         var logger = loggerConfiguration.CreateLogger();
         Log.Logger = logger; // For static Log usage
 
-        logger.Information("Ready");
+        logger.Information(loggingMessage);
 
         builder.Logging.AddSerilog(logger, dispose: true);
 
