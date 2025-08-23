@@ -1,0 +1,81 @@
+<RadzenStack Gap="0.75rem" class="rz-mb-4">
+    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Session Configuration</RadzenText>
+    <RadzenStack Gap="1rem">
+        <RadzenRow>
+            <RadzenColumn Size="12" SizeMD="6">
+                <RadzenFormField Text="Session Timeout (Hours)" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenNumeric @bind-Value="@model.SessionTimeoutHours" Min="0" Max="168" Style="width: 100%;" Placeholder="Leave empty to use realm default" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                            How long user sessions remain active (0-168 hours)
+                        </RadzenText>
+                    </Helper>
+                </RadzenFormField>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="6">
+                <RadzenFormField Text="Remember Me Duration (Days)" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenNumeric @bind-Value="@model.RememberMeDurationDays" Min="0" Max="365" Style="width: 100%;" Placeholder="Leave empty to use realm default" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                            Duration for "Remember Me" functionality (0-365 days)
+                        </RadzenText>
+                    </Helper>
+                </RadzenFormField>
+            </RadzenColumn>
+        </RadzenRow>
+        <RadzenRow>
+            <RadzenColumn Size="4">
+                <RadzenFormField Text="Session Expiration Type" Variant="Variant.Outlined">
+                    <Start>
+                        <RadzenCheckBox @bind-Value="@model.UseSlidingSessionExpiration" TriState="true" Name="useSliding" />
+                    </Start>
+                    <ChildContent>
+                        <RadzenLabel Text="Use sliding expiration (extends session on activity)" Component="useSliding" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                            When enabled, session timeout resets on user activity (leave unset to use default)
+                        </RadzenText>
+                    </Helper>
+                </RadzenFormField>
+            </RadzenColumn>
+        </RadzenRow>
+    </RadzenStack>
+</RadzenStack>
+<RadzenStack Gap="0.75rem" class="rz-mt-4 rz-mb-4">
+    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Cookie Configuration</RadzenText>
+    <RadzenStack Gap="1rem">
+        <RadzenFormField Text="Cookie SameSite Policy" Variant="Variant.Outlined">
+            <ChildContent>
+                <RadzenDropDown @bind-Value="@model.CookieSameSitePolicy" Data="@editClient.sameSitePolicies" TextProperty="Text" ValueProperty="Value" Style="width: 100%;" Placeholder="Select policy..." />
+            </ChildContent>
+            <Helper>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                    Controls when cookies are sent with cross-site requests
+                </RadzenText>
+            </Helper>
+        </RadzenFormField>
+        <RadzenFormField Text="HTTPS Cookie Requirement" Variant="Variant.Outlined">
+            <Start>
+                <RadzenCheckBox @bind-Value="@model.RequireHttpsForCookies" TriState="true" Name="requireHttpsCookies" />
+            </Start>
+            <ChildContent>
+                <RadzenLabel Text="Require HTTPS for secure cookies" Component="requireHttpsCookies" />
+            </ChildContent>
+            <Helper>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                    Force secure flag on cookies (recommended for production; leave unset to use default)
+                </RadzenText>
+            </Helper>
+        </RadzenFormField>
+    </RadzenStack>
+</RadzenStack>
+
+@code {
+    [Parameter] public EditClient editClient { get; set; } = null!;
+    private CreateClientRequest model => editClient.model;
+}

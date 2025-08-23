@@ -1,0 +1,118 @@
+<RadzenStack Gap="0.75rem" class="rz-mb-4">
+    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Visual Customization</RadzenText>
+    <RadzenStack Gap="1rem">
+        <RadzenFormField Text="Theme" Variant="Variant.Outlined">
+            <ChildContent>
+                <RadzenDropDown @bind-Value="@model.ThemeName" Data="@editClient.availableThemes" TextProperty="Text" ValueProperty="Value" Style="width: 100%;" Placeholder="Use realm default..." AllowClear="true" />
+            </ChildContent>
+            <Helper>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                    Select a predefined theme. Precedence: Client ? Realm ? Server.
+                </RadzenText>
+            </Helper>
+        </RadzenFormField>
+        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" Wrap="Radzen.FlexWrap.Wrap">
+            @foreach (var t in editClient.availableThemes)
+            {
+                <RadzenButton ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" Click="@(() => model.ThemeName = t.Value)">
+                    <RadzenIcon Icon="palette" class="rz-me-1" /> @t.Text
+                </RadzenButton>
+            }
+            <RadzenButton ButtonStyle="ButtonStyle.Secondary" Size="ButtonSize.Small" Click="@(() => model.ThemeName = null)">
+                <RadzenIcon Icon="restore" class="rz-me-1" /> Use realm default
+            </RadzenButton>
+        </RadzenStack>
+        <RadzenFormField Text="Custom CSS URI" Variant="Variant.Outlined">
+            <ChildContent>
+                <RadzenTextBox @bind-Value="@model.CustomCssUrl" Style="width: 100%;" Placeholder="https://cdn.example.com/client-theme.css" />
+            </ChildContent>
+            <Helper>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                    Optional: custom stylesheet loaded after theme for overrides.
+                </RadzenText>
+            </Helper>
+        </RadzenFormField>
+        <RadzenFormField Text="Custom JavaScript URL" Variant="Variant.Outlined">
+            <ChildContent>
+                <RadzenTextBox @bind-Value="@model.CustomJavaScriptUrl" Style="width: 100%;" Placeholder="https://cdn.example.com/client-scripts.js" />
+            </ChildContent>
+            <Helper>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                    URL to custom JavaScript file for client-specific functionality
+                </RadzenText>
+            </Helper>
+        </RadzenFormField>
+        <RadzenFormField Text="Page Title Prefix" Variant="Variant.Outlined">
+            <ChildContent>
+                <RadzenTextBox @bind-Value="@model.PageTitlePrefix" Style="width: 100%;" Placeholder="e.g., Company Name - " />
+            </ChildContent>
+            <Helper>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                    Text to prepend to page titles for this client
+                </RadzenText>
+            </Helper>
+        </RadzenFormField>
+    </RadzenStack>
+</RadzenStack>
+<RadzenStack Gap="0.75rem" class="rz-mt-4 rz-mb-4">
+    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Client Information URLs</RadzenText>
+    <RadzenStack Gap="1rem">
+        <RadzenRow>
+            <RadzenColumn Size="12" SizeMD="6">
+                <RadzenFormField Text="Logo URI" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenTextBox @bind-Value="@model.LogoUri" Style="width: 100%;" Placeholder="https://example.com/logo.png" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                            URL to client logo image
+                        </RadzenText>
+                    </Helper>
+                </RadzenFormField>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="6">
+                <RadzenFormField Text="Client URI" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenTextBox @bind-Value="@model.ClientUri" Style="width: 100%;" Placeholder="https://example.com" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                            URL to client homepage
+                        </RadzenText>
+                    </Helper>
+                </RadzenFormField>
+            </RadzenColumn>
+        </RadzenRow>
+        <RadzenRow>
+            <RadzenColumn Size="12" SizeMD="6">
+                <RadzenFormField Text="Privacy Policy URI" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenTextBox @bind-Value="@model.PolicyUri" Style="width: 100%;" Placeholder="https://example.com/privacy" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                            URL to privacy policy
+                        </RadzenText>
+                    </Helper>
+                </RadzenFormField>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="6">
+                <RadzenFormField Text="Terms of Service URI" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenTextBox @bind-Value="@model.TosUri" Style="width: 100%;" Placeholder="https://example.com/terms" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                            URL to terms of service
+                        </RadzenText>
+                    </Helper>
+                </RadzenFormField>
+            </RadzenColumn>
+        </RadzenRow>
+    </RadzenStack>
+</RadzenStack>
+
+@code {
+    [Parameter] public EditClient editClient { get; set; } = null!;
+    private CreateClientRequest model => editClient.model;
+}

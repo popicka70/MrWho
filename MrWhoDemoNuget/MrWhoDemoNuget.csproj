@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
@@ -7,11 +7,14 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\MrWho.ClientAuth\MrWho.ClientAuth.csproj" />
+    <Compile Remove="Pages\Account\**" />
+    <Content Remove="Pages\Account\**" />
+    <EmbeddedResource Remove="Pages\Account\**" />
+    <None Remove="Pages\Account\**" />
   </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Pages\Account\" />
+    <ProjectReference Include="..\MrWho.ClientAuth\MrWho.ClientAuth.csproj" />
   </ItemGroup>
 
 </Project>

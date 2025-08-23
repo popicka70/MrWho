@@ -96,7 +96,13 @@ else
                     </RadzenStack>
                     <div>
                         <RadzenText TextStyle="TextStyle.Subtitle2">Scopes</RadzenText>
-                        <RadzenChips TValue="string" Value="@scopes" ReadOnly="true" class="rz-mt-1" />
+                        <!-- Render scopes as RadzenBadge items -->
+                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" class="rz-mt-1" Style="flex-wrap: wrap;">
+                            @foreach (var scope in scopes)
+                            {
+                                <RadzenBadge Text="@scope" BadgeStyle="BadgeStyle.Secondary" />
+                            }
+                        </RadzenStack>
                     </div>
                 </RadzenStack>
                 <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" class="rz-mt-2">

@@ -81,6 +81,14 @@ public class ScopeSeederService : IScopeSeederService
             },
             new StandardScopeDefinition
             {
+                Name = "offline_access",
+                DisplayName = "Offline Access",
+                Description = "Request refresh token / offline access",
+                Type = ScopeType.Resource,
+                Claims = Array.Empty<string>()
+            },
+            new StandardScopeDefinition
+            {
                 Name = "api.read",
                 DisplayName = "API Read Access",
                 Description = "Read access to API resources",

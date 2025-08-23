@@ -1,0 +1,65 @@
+<RadzenStack Gap="0.75rem" class="rz-mb-4">
+    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">User Consent</RadzenText>
+    <RadzenStack Gap="1rem">
+        <RadzenFormField Text="Consent Requirements" Variant="Variant.Outlined">
+            <Start>
+                <RadzenCheckBox @bind-Value="@model.RequireConsent" TriState="true" Name="requireConsent" />
+            </Start>
+            <ChildContent>
+                <RadzenLabel Text="Require user consent for authorization" Component="requireConsent" />
+            </ChildContent>
+            <Helper>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                    Controls when users must explicitly approve authorization
+                </RadzenText>
+            </Helper>
+        </RadzenFormField>
+        <RadzenFormField Text="Allow users to remember consent" Variant="Variant.Outlined">
+            <Start>
+                <RadzenCheckBox @bind-Value="@model.AllowRememberConsent" TriState="true" Name="rememberConsent" />
+            </Start>
+            <ChildContent>
+                <RadzenLabel Text="Allow users to remember consent" Component="rememberConsent" />
+            </ChildContent>
+        </RadzenFormField>
+    </RadzenStack>
+</RadzenStack>
+<RadzenStack Gap="0.75rem" class="rz-mt-4 rz-mb-4">
+    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Endpoint Access</RadzenText>
+    <RadzenStack Gap="1rem">
+        <RadzenFormField Text="Allow access to UserInfo endpoint" Variant="Variant.Outlined">
+            <Start>
+                <RadzenCheckBox @bind-Value="@model.AllowAccessToUserInfoEndpoint" TriState="true" Name="allowUserInfo" />
+            </Start>
+            <ChildContent>
+                <RadzenLabel Text="Allow access to UserInfo endpoint" Component="allowUserInfo" />
+            </ChildContent>
+            <Helper>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                    Controls access to OIDC standard endpoints
+                </RadzenText>
+            </Helper>
+        </RadzenFormField>
+        <RadzenFormField Text="Allow token introspection" Variant="Variant.Outlined">
+            <Start>
+                <RadzenCheckBox @bind-Value="@model.AllowAccessToIntrospectionEndpoint" TriState="true" Name="allowIntrospection" />
+            </Start>
+            <ChildContent>
+                <RadzenLabel Text="Allow token introspection" Component="allowIntrospection" />
+            </ChildContent>
+        </RadzenFormField>
+        <RadzenFormField Text="Allow token revocation" Variant="Variant.Outlined">
+            <Start>
+                <RadzenCheckBox @bind-Value="@model.AllowAccessToRevocationEndpoint" TriState="true" Name="allowRevocation" />
+            </Start>
+            <ChildContent>
+                <RadzenLabel Text="Allow token revocation" Component="allowRevocation" />
+            </ChildContent>
+        </RadzenFormField>
+    </RadzenStack>
+</RadzenStack>
+
+@code {
+    [Parameter] public EditClient editClient { get; set; } = null!;
+    private CreateClientRequest model => editClient.model;
+}

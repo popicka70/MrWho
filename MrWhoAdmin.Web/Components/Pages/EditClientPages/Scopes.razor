@@ -1,0 +1,61 @@
+<RadzenStack Gap="0.75rem" class="rz-mb-3">
+    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Allowed Scopes</RadzenText>
+    <RadzenRow class="rz-mb-2">
+        <RadzenColumn Size="12" SizeMD="6">
+            <RadzenFormField Text="Search" Variant="Variant.Outlined">
+                <ChildContent>
+                    <RadzenTextBox @bind-Value="@editClient.scopeSearch" Placeholder="Filter by name or description" Style="width: 100%;" Change="@(_ => editClient.ApplyScopeFilter())" />
+                </ChildContent>
+            </RadzenFormField>
+        </RadzenColumn>
+        <RadzenColumn Size="12" SizeMD="6">
+            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" JustifyContent="JustifyContent.End">
+                <RadzenButton Text="Select All (filtered)" Icon="playlist_add_check" Click="@(() => editClient.SelectAllFilteredScopes(true))" />
+                <RadzenButton Text="Clear All (filtered)" Icon="playlist_remove" ButtonStyle="ButtonStyle.Secondary" Click="@(() => editClient.SelectAllFilteredScopes(false))" />
+            </RadzenStack>
+        </RadzenColumn>
+    </RadzenRow>
+
+    <RadzenDataGrid TItem="EditClient.ScopeSelection" Data="@editClient.FilteredScopeItems" AllowFiltering="false" AllowSorting="true" AllowPaging="true" PageSize="10" Responsive="true">
+        <Columns>
+            <RadzenDataGridColumn TItem="EditClient.ScopeSelection" Title="Allow" Width="90px">
+                <Template Context="s">
+                    <RadzenCheckBox Value="@s.Selected" ValueChanged="@((bool v) => editClient.ToggleScopeSelection(s.Name, v))" />
+                </Template>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="EditClient.ScopeSelection" Property="Name" Title="Scope" Width="220px" />
+            <RadzenDataGridColumn TItem="EditClient.ScopeSelection" Property="DisplayName" Title="Display Name" Width="220px" />
+            <RadzenDataGridColumn TItem="EditClient.ScopeSelection" Property="Type" Title="Type" Width="120px">
+                <Template Context="s">
+                    <RadzenBadge Text="@s.Type.ToString()" BadgeStyle="@(s.Type == ScopeType.Identity ? BadgeStyle.Info : BadgeStyle.Primary)" />
+                </Template>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="EditClient.ScopeSelection" Property="IsStandard" Title="Std" Width="80px">
+                <Template Context="s">
+                    <RadzenBadge Text="@(s.IsStandard ? "Yes" : "No")" BadgeStyle="@(s.IsStandard? BadgeStyle.Info: BadgeStyle.Light)" />
+                </Template>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="EditClient.ScopeSelection" Property="IsEnabled" Title="Status" Width="100px">
+                <Template Context="s">
+                    <RadzenBadge Text="@(s.IsEnabled ? "Enabled" : "Disabled")" BadgeStyle="@(s.IsEnabled? BadgeStyle.Success: BadgeStyle.Danger)" />
+                </Template>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="EditClient.ScopeSelection" Property="Description" Title="Description">
+                <Template Context="s">
+                    <RadzenText Text="@(s.Description ?? "-")" Style="max-width: 400px; overflow: hidden; text-overflow: ellipsis; display: inline-block; white-space: nowrap;" />
+                </Template>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+
+    @if (editClient.selectedScopes?.Any() == true)
+    {
+        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary rz-mt-2">
+            Selected (@editClient.selectedScopes.Count): @string.Join(", ", editClient.selectedScopes)
+        </RadzenText>
+    }
+</RadzenStack>
+
+@code {
+    [Parameter] public EditClient editClient { get; set; } = null!;
+}
