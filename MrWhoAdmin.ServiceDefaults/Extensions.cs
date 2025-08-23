@@ -113,6 +113,8 @@ public static class Extensions
         // Clear default providers so Serilog is the single source (OpenTelemetry provider added separately)
         builder.Logging.ClearProviders();
 
+        Serilog.Debugging.SelfLog.Enable(Console.Error);
+
         var keyFilePath = builder.Configuration["environmentVariables:GOOGLE_APPLICATION_CREDENTIALS"];
         Environment.SetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS", keyFilePath);
         var googleCloudProject = builder.Configuration["environmentVariables:GOOGLE_CLOUD_PROJECT"];
@@ -129,7 +131,7 @@ public static class Extensions
             .MinimumLevel.Override("Microsoft.Hosting.Lifetime", LogEventLevel.Information)
             .WriteTo.Console();
 
-        if (!string.IsNullOrWhiteSpace(projectId))
+        if (!string.IsNullOrWhiteSpace(projectId) && !string.IsNullOrWhiteSpace(keyFilePath))
         {
             loggerConfiguration.WriteTo.GoogleCloudLogging(projectId: projectId, logName: "MrWho");
         }
