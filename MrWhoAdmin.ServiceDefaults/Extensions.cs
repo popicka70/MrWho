@@ -116,9 +116,15 @@ public static class Extensions
         Serilog.Debugging.SelfLog.Enable(Console.Error);
 
         var keyFilePath = builder.Configuration["environmentVariables:GOOGLE_APPLICATION_CREDENTIALS"];
-        Environment.SetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS", keyFilePath);
+        if (!string.IsNullOrEmpty(keyFilePath))
+        {
+            Environment.SetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS", keyFilePath);
+        }
         var googleCloudProject = builder.Configuration["environmentVariables:GOOGLE_CLOUD_PROJECT"];
-        Environment.SetEnvironmentVariable("GOOGLE_CLOUD_PROJECT", googleCloudProject);
+        if (!string.IsNullOrEmpty(googleCloudProject))
+        {
+            Environment.SetEnvironmentVariable("GOOGLE_CLOUD_PROJECT", googleCloudProject);
+        }
 
         var projectId = googleCloudProject ?? builder.Configuration["Google:ProjectId"];
 
@@ -131,6 +137,10 @@ public static class Extensions
             .WriteTo.Console();
 
         string loggingMessage = "Serilog logging configured to write to Console";
+
+        projectId = Environment.GetEnvironmentVariable("GOOGLE_CLOUD_PROJECT");
+        keyFilePath = Environment.GetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS");
+
         if (!string.IsNullOrWhiteSpace(projectId) && !string.IsNullOrWhiteSpace(keyFilePath))
         {
             loggerConfiguration.WriteTo.GoogleCloudLogging(projectId: projectId, logName: "MrWho");
