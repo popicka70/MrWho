@@ -1,44 +1,42 @@
-<div style="padding: 1rem; max-height: 550px; overflow-y: auto;">
-    <RadzenStack Gap="0.75rem" class="rz-mb-4">
-        <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Token Claims</RadzenText>
-        <RadzenStack Gap="1rem">
-            <RadzenFormField Text="Include JWT ID in tokens" Variant="Variant.Outlined">
-                <Start>
-                    <RadzenCheckBox @bind-Value="@model.IncludeJwtId" TriState="true" Name="includeJti" />
-                </Start>
-                <ChildContent>
-                    <RadzenLabel Text="Include JWT ID in tokens" Component="includeJti" />
-                </ChildContent>
-            </RadzenFormField>
-            <RadzenFormField Text="Always send client claims" Variant="Variant.Outlined">
-                <Start>
-                    <RadzenCheckBox @bind-Value="@model.AlwaysSendClientClaims" TriState="true" Name="alwaysSendClientClaims" />
-                </Start>
-                <ChildContent>
-                    <RadzenLabel Text="Always send client claims" Component="alwaysSendClientClaims" />
-                </ChildContent>
-            </RadzenFormField>
-            <RadzenFormField Text="Always include user claims in ID token" Variant="Variant.Outlined">
-                <Start>
-                    <RadzenCheckBox @bind-Value="@model.AlwaysIncludeUserClaimsInIdToken" TriState="true" Name="alwaysIncludeUserClaimsInIdToken" />
-                </Start>
-                <ChildContent>
-                    <RadzenLabel Text="Always include user claims in ID token" Component="alwaysIncludeUserClaimsInIdToken" />
-                </ChildContent>
-            </RadzenFormField>
-            <RadzenFormField Text="Client Claims Prefix" Variant="Variant.Outlined">
-                <ChildContent>
-                    <RadzenTextBox @bind-Value="@model.ClientClaimsPrefix" Style="width: 100%;" Placeholder="e.g., client_" />
-                </ChildContent>
-                <Helper>
-                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                        Prefix for client-specific claims (optional)
-                    </RadzenText>
-                </Helper>
-            </RadzenFormField>
-        </RadzenStack>
+<RadzenStack Gap="0.75rem" class="rz-mb-4">
+    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Token Claims</RadzenText>
+    <RadzenStack Gap="1rem">
+        <RadzenFormField Text="Include JWT ID in tokens" Variant="Variant.Outlined">
+            <Start>
+                <RadzenCheckBox @bind-Value="@model.IncludeJwtId" TriState="true" Name="includeJti" />
+            </Start>
+            <ChildContent>
+                <RadzenLabel Text="Include JWT ID in tokens" Component="includeJti" />
+            </ChildContent>
+        </RadzenFormField>
+        <RadzenFormField Text="Always send client claims" Variant="Variant.Outlined">
+            <Start>
+                <RadzenCheckBox @bind-Value="@model.AlwaysSendClientClaims" TriState="true" Name="alwaysSendClientClaims" />
+            </Start>
+            <ChildContent>
+                <RadzenLabel Text="Always send client claims" Component="alwaysSendClientClaims" />
+            </ChildContent>
+        </RadzenFormField>
+        <RadzenFormField Text="Always include user claims in ID token" Variant="Variant.Outlined">
+            <Start>
+                <RadzenCheckBox @bind-Value="@model.AlwaysIncludeUserClaimsInIdToken" TriState="true" Name="alwaysIncludeUserClaimsInIdToken" />
+            </Start>
+            <ChildContent>
+                <RadzenLabel Text="Always include user claims in ID token" Component="alwaysIncludeUserClaimsInIdToken" />
+            </ChildContent>
+        </RadzenFormField>
+        <RadzenFormField Text="Client Claims Prefix" Variant="Variant.Outlined">
+            <ChildContent>
+                <RadzenTextBox @bind-Value="@model.ClientClaimsPrefix" Style="width: 100%;" Placeholder="e.g., client_" />
+            </ChildContent>
+            <Helper>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                    Prefix for client-specific claims (optional)
+                </RadzenText>
+            </Helper>
+        </RadzenFormField>
     </RadzenStack>
-</div>
+</RadzenStack>
 
 @code {
     [Parameter] public EditClient editClient { get; set; } = null!;

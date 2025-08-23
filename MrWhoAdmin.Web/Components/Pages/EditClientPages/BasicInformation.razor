@@ -1,158 +1,158 @@
-﻿    <RadzenStack Gap="0.75rem" class="rz-mb-4">
-        <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Basic Information</RadzenText>
-        <RadzenStack Gap="1rem">
-            <RadzenRow>
-                <RadzenColumn Size="12" SizeMD="6">
-                    <RadzenFormField Text="Client ID" Variant="Variant.Outlined">
-                        <ChildContent>
-                            <RadzenTextBox @bind-Value="@model.ClientId"
-                                           Placeholder="Enter unique client ID"
-                                           Style="width: 100%;"
-                                           Disabled="@editClient.IsEdit" />
-                        </ChildContent>
-                        <Helper>
-                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                @(editClient.IsEdit ? "Client ID cannot be changed after creation" : "Must be unique across all realms")
-                            </RadzenText>
-                        </Helper>
-                    </RadzenFormField>
-                </RadzenColumn>
-                <RadzenColumn Size="12" SizeMD="6">
-                    <RadzenFormField Text="Name" Variant="Variant.Outlined">
-                        <ChildContent>
-                            <RadzenTextBox @bind-Value="@model.Name"
-                                           Placeholder="Enter client display name"
-                                           Style="width: 100%;" />
-                        </ChildContent>
-                        <Helper>
-                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                Human-readable name for administration
-                            </RadzenText>
-                        </Helper>
-                    </RadzenFormField>
-                </RadzenColumn>
-            </RadzenRow>
+﻿<RadzenStack Gap="0.75rem" class="rz-mb-4">
+    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Basic Information</RadzenText>
+    <RadzenStack Gap="1rem">
+        <RadzenRow>
+            <RadzenColumn Size="12" SizeMD="6">
+                <RadzenFormField Text="Client ID" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenTextBox @bind-Value="@model.ClientId"
+                                       Placeholder="Enter unique client ID"
+                                       Style="width: 100%;"
+                                       Disabled="@editClient.IsEdit" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                            @(editClient.IsEdit ? "Client ID cannot be changed after creation" : "Must be unique across all realms")
+                        </RadzenText>
+                    </Helper>
+                </RadzenFormField>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="6">
+                <RadzenFormField Text="Name" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenTextBox @bind-Value="@model.Name"
+                                       Placeholder="Enter client display name"
+                                       Style="width: 100%;" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                            Human-readable name for administration
+                        </RadzenText>
+                    </Helper>
+                </RadzenFormField>
+            </RadzenColumn>
+        </RadzenRow>
 
-            <RadzenRow>
-                <RadzenColumn Size="12" SizeMD="6">
-                    <RadzenFormField Text="Realm" Variant="Variant.Outlined">
-                        <ChildContent>
-                            <RadzenDropDown @bind-Value="@model.RealmId"
-                                            Data="@editClient.realms"
-                                            TextProperty="Name"
-                                            ValueProperty="Id"
-                                            Style="width: 100%;"
-                                            Placeholder="Select realm..." />
-                        </ChildContent>
-                        <Helper>
-                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                Realm provides default configuration values
-                            </RadzenText>
-                        </Helper>
-                    </RadzenFormField>
-                </RadzenColumn>
-                <RadzenColumn Size="12" SizeMD="6">
-                    <RadzenFormField Text="Client Type" Variant="Variant.Outlined">
-                        <ChildContent>
-                            <RadzenDropDown @bind-Value="@model.ClientType"
-                                            Data="@editClient.clientTypes"
-                                            TextProperty="Text"
-                                            ValueProperty="Value"
-                                            Style="width: 100%;" />
-                        </ChildContent>
-                        <Helper>
-                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                Determines security requirements and available flows
-                            </RadzenText>
-                        </Helper>
-                    </RadzenFormField>
-                </RadzenColumn>
-            </RadzenRow>
+        <RadzenRow>
+            <RadzenColumn Size="12" SizeMD="6">
+                <RadzenFormField Text="Realm" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenDropDown @bind-Value="@model.RealmId"
+                                        Data="@editClient.realms"
+                                        TextProperty="Name"
+                                        ValueProperty="Id"
+                                        Style="width: 100%;"
+                                        Placeholder="Select realm..." />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                            Realm provides default configuration values
+                        </RadzenText>
+                    </Helper>
+                </RadzenFormField>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="6">
+                <RadzenFormField Text="Client Type" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenDropDown @bind-Value="@model.ClientType"
+                                        Data="@editClient.clientTypes"
+                                        TextProperty="Text"
+                                        ValueProperty="Value"
+                                        Style="width: 100%;" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                            Determines security requirements and available flows
+                        </RadzenText>
+                    </Helper>
+                </RadzenFormField>
+            </RadzenColumn>
+        </RadzenRow>
 
-            <!-- Client Secret -->
-            <RadzenFormField Text="Client Secret" Variant="Variant.Outlined">
-                <ChildContent>
-                    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center" Wrap="Radzen.FlexWrap.Wrap">
-                        <RadzenTextBox @bind-Value="@model.ClientSecret" Style="width: 100%; max-width: 520px;" Placeholder="@(editClient.IsEdit ? "Leave blank to keep unchanged" : "Enter or generate a secret")" />
-                        <RadzenButton Icon="password" Text="Generate" ButtonStyle="ButtonStyle.Secondary" Click="@editClient.GenerateSecret" />
-                    </RadzenStack>
-                </ChildContent>
-                <Helper>
-                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                        Required for Confidential and Machine clients when Require Client Secret is enabled. Do not share publicly.
-                    </RadzenText>
-                </Helper>
-            </RadzenFormField>
-
-            <!-- Security banner about secrets -->
-            <RadzenAlert AlertStyle="AlertStyle.Info" ShowIcon="true">
-                <RadzenText TextStyle="TextStyle.Body2">
-                    Client secrets are write-only and will not be displayed on this page. On edit, leave the field empty to keep the current secret. If you generate a new secret, copy and store it securely now.
+        <!-- Client Secret -->
+        <RadzenFormField Text="Client Secret" Variant="Variant.Outlined">
+            <ChildContent>
+                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center" Wrap="Radzen.FlexWrap.Wrap">
+                    <RadzenTextBox @bind-Value="@model.ClientSecret" Style="width: 100%; max-width: 520px;" Placeholder="@(editClient.IsEdit ? "Leave blank to keep unchanged" : "Enter or generate a secret")" />
+                    <RadzenButton Icon="password" Text="Generate" ButtonStyle="ButtonStyle.Secondary" Click="@editClient.GenerateSecret" />
+                </RadzenStack>
+            </ChildContent>
+            <Helper>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                    Required for Confidential and Machine clients when Require Client Secret is enabled. Do not share publicly.
                 </RadzenText>
-            </RadzenAlert>
+            </Helper>
+        </RadzenFormField>
 
-            <RadzenFormField Text="Description" Variant="Variant.Outlined">
-                <ChildContent>
-                    <RadzenTextArea @bind-Value="@model.Description"
-                                    Placeholder="Brief description of the client application"
-                                    Style="width: 100%; height: 80px;" />
-                </ChildContent>
-            </RadzenFormField>
+        <!-- Security banner about secrets -->
+        <RadzenAlert AlertStyle="AlertStyle.Info" ShowIcon="true">
+            <RadzenText TextStyle="TextStyle.Body2">
+                Client secrets are write-only and will not be displayed on this page. On edit, leave the field empty to keep the current secret. If you generate a new secret, copy and store it securely now.
+            </RadzenText>
+        </RadzenAlert>
 
-            <RadzenFormField Text="Status" Variant="Variant.Outlined">
-                <Start>
-                    <RadzenSwitch @bind-Value="@model.IsEnabled" OnLabel="Enabled" OffLabel="Disabled" />
-                </Start>
-                <Helper>
-                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                        Toggle to enable or disable this client
-                    </RadzenText>
-                </Helper>
-            </RadzenFormField>
+        <RadzenFormField Text="Description" Variant="Variant.Outlined">
+            <ChildContent>
+                <RadzenTextArea @bind-Value="@model.Description"
+                                Placeholder="Brief description of the client application"
+                                Style="width: 100%; height: 80px;" />
+            </ChildContent>
+        </RadzenFormField>
 
-            <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Allowed Login Methods</RadzenText>
-            <RadzenFormField Variant="Variant.Outlined">
-                <Start>
-                    <RadzenCheckBox @bind-Value="@model.EnableLocalLogin" TriState="true" Name="allowLocal" />
-                </Start>
-                <ChildContent>
-                    <RadzenLabel Text="Allow local login (username/password)" Component="allowLocal" />
-                </ChildContent>
-            </RadzenFormField>
-            <RadzenFormField Variant="Variant.Outlined">
-                <Start>
-                    <RadzenCheckBox @bind-Value="@model.AllowPasskeyLogin" TriState="true" Name="allowPasskey" />
-                </Start>
-                <ChildContent>
-                    <RadzenLabel Text="Allow passkey (WebAuthn)" Component="allowPasskey" />
-                </ChildContent>
-            </RadzenFormField>
-            <RadzenFormField Variant="Variant.Outlined">
-                <Start>
-                    <RadzenCheckBox @bind-Value="@model.AllowQrLoginQuick" TriState="true" Name="allowQrQuick" />
-                </Start>
-                <ChildContent>
-                    <RadzenLabel Text="Allow Quick QR login" Component="allowQrQuick" />
-                </ChildContent>
-            </RadzenFormField>
-            <RadzenFormField Variant="Variant.Outlined">
-                <Start>
-                    <RadzenCheckBox @bind-Value="@model.AllowQrLoginSecure" TriState="true" Name="allowQrSecure" />
-                </Start>
-                <ChildContent>
-                    <RadzenLabel Text="Allow Secure QR login" Component="allowQrSecure" />
-                </ChildContent>
-            </RadzenFormField>
-            <RadzenFormField Variant="Variant.Outlined">
-                <Start>
-                    <RadzenCheckBox @bind-Value="@model.AllowCodeLogin" TriState="true" Name="allowCode" />
-                </Start>
-                <ChildContent>
-                    <RadzenLabel Text="Allow authenticator code login option" Component="allowCode" />
-                </ChildContent>
-            </RadzenFormField>
-        </RadzenStack>
+        <RadzenFormField Text="Status" Variant="Variant.Outlined">
+            <Start>
+                <RadzenSwitch @bind-Value="@model.IsEnabled" OnLabel="Enabled" OffLabel="Disabled" />
+            </Start>
+            <Helper>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                    Toggle to enable or disable this client
+                </RadzenText>
+            </Helper>
+        </RadzenFormField>
+
+        <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Allowed Login Methods</RadzenText>
+        <RadzenFormField Variant="Variant.Outlined">
+            <Start>
+                <RadzenCheckBox @bind-Value="@model.EnableLocalLogin" TriState="true" Name="allowLocal" />
+            </Start>
+            <ChildContent>
+                <RadzenLabel Text="Allow local login (username/password)" Component="allowLocal" />
+            </ChildContent>
+        </RadzenFormField>
+        <RadzenFormField Variant="Variant.Outlined">
+            <Start>
+                <RadzenCheckBox @bind-Value="@model.AllowPasskeyLogin" TriState="true" Name="allowPasskey" />
+            </Start>
+            <ChildContent>
+                <RadzenLabel Text="Allow passkey (WebAuthn)" Component="allowPasskey" />
+            </ChildContent>
+        </RadzenFormField>
+        <RadzenFormField Variant="Variant.Outlined">
+            <Start>
+                <RadzenCheckBox @bind-Value="@model.AllowQrLoginQuick" TriState="true" Name="allowQrQuick" />
+            </Start>
+            <ChildContent>
+                <RadzenLabel Text="Allow Quick QR login" Component="allowQrQuick" />
+            </ChildContent>
+        </RadzenFormField>
+        <RadzenFormField Variant="Variant.Outlined">
+            <Start>
+                <RadzenCheckBox @bind-Value="@model.AllowQrLoginSecure" TriState="true" Name="allowQrSecure" />
+            </Start>
+            <ChildContent>
+                <RadzenLabel Text="Allow Secure QR login" Component="allowQrSecure" />
+            </ChildContent>
+        </RadzenFormField>
+        <RadzenFormField Variant="Variant.Outlined">
+            <Start>
+                <RadzenCheckBox @bind-Value="@model.AllowCodeLogin" TriState="true" Name="allowCode" />
+            </Start>
+            <ChildContent>
+                <RadzenLabel Text="Allow authenticator code login option" Component="allowCode" />
+            </ChildContent>
+        </RadzenFormField>
     </RadzenStack>
+</RadzenStack>
 
 @code {
     [Parameter]

@@ -1,87 +1,85 @@
-<div style="padding: 1rem; max-height: 550px; overflow-y: auto;">
-    @if (!editClient.IsEdit)
-    {
-        <RadzenAlert AlertStyle="AlertStyle.Info" ShowIcon="true">
-            <RadzenText TextStyle="TextStyle.Body1">Save the client first to manage identity provider links.</RadzenText>
-        </RadzenAlert>
-    }
-    else
-    {
-        <RadzenStack Gap="1rem">
-            <RadzenCard>
-                <RadzenText TextStyle="TextStyle.Subtitle2">Add Link</RadzenText>
-                <RadzenRow Gap="1rem" class="rz-mt-2">
-                    <RadzenColumn Size="12" SizeMD="6">
-                        <RadzenFormField Text="Provider" Variant="Variant.Outlined">
-                            <ChildContent>
-                                <RadzenDropDown Data="@editClient.FilteredProviders" @bind-Value="editClient.selectedProviderId" Style="width:100%" TextProperty="DisplayName" ValueProperty="Id" AllowClear="true" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive" />
-                            </ChildContent>
-                        </RadzenFormField>
-                    </RadzenColumn>
-                    <RadzenColumn Size="12" SizeMD="6">
-                        <RadzenFormField Text="Search Providers" Variant="Variant.Outlined">
-                            <ChildContent>
-                                <RadzenTextBox @bind-Value="editClient.providerSearch" Style="width:100%" Placeholder="type to search..." Change="@(async _ => await editClient.ReloadProviders())" />
-                            </ChildContent>
-                        </RadzenFormField>
-                    </RadzenColumn>
-                </RadzenRow>
-                <RadzenRow Gap="1rem">
-                    <RadzenColumn Size="12" SizeMD="6">
-                        <RadzenFormField Text="Display Name Override" Variant="Variant.Outlined">
-                            <ChildContent>
-                                <RadzenTextBox @bind-Value="editClient.linkDisplayOverride" Style="width:100%" />
-                            </ChildContent>
-                        </RadzenFormField>
-                    </RadzenColumn>
-                    <RadzenColumn Size="12" SizeMD="3">
-                        <RadzenFormField Text="Order" Variant="Variant.Outlined">
-                            <ChildContent>
-                                <RadzenNumeric TValue="int?" @bind-Value="editClient.linkOrder" Style="width:100%" />
-                            </ChildContent>
-                        </RadzenFormField>
-                    </RadzenColumn>
-                    <RadzenColumn Size="12" SizeMD="3">
-                        <RadzenFormField Text="Enabled" Variant="Variant.Outlined">
-                            <Start>
-                                <RadzenSwitch @bind-Value="editClient.linkEnabled" OnLabel="Yes" OffLabel="No" />
-                            </Start>
-                        </RadzenFormField>
-                    </RadzenColumn>
-                </RadzenRow>
-                <RadzenRow>
-                    <RadzenColumn Size="12" class="rz-display-flex rz-justify-content-end">
-                        <RadzenButton Icon="link" Text="Add Link" ButtonStyle="ButtonStyle.Primary" Click="@(async ()=> await editClient.AddIdentityLink())" Disabled="@(!editClient.IsEdit || string.IsNullOrEmpty(editClient.selectedProviderId))" />
-                    </RadzenColumn>
-                </RadzenRow>
-            </RadzenCard>
-            <RadzenCard>
-                <RadzenText TextStyle="TextStyle.Subtitle2">Linked Providers</RadzenText>
-                <RadzenDataGrid TItem="ClientIdentityProviderDto" Data="@editClient.identityLinks" AllowPaging="true" PageSize="10" class="rz-mt-2">
-                    <Columns>
-                        <RadzenDataGridColumn TItem="ClientIdentityProviderDto" Title="Provider">
-                            <Template Context="row">
-                                @editClient.GetProviderName(row.IdentityProviderId)
-                            </Template>
-                        </RadzenDataGridColumn>
-                        <RadzenDataGridColumn TItem="ClientIdentityProviderDto" Property="DisplayNameOverride" Title="Display Name" />
-                        <RadzenDataGridColumn TItem="ClientIdentityProviderDto" Property="Order" Title="Order" Width="100px" />
-                        <RadzenDataGridColumn TItem="ClientIdentityProviderDto" Title="Enabled" Width="120px">
-                            <Template Context="row">
-                                <RadzenBadge Text="@(row.IsEnabled == false ? "No" : "Yes")" BadgeStyle="@(row.IsEnabled == false ? BadgeStyle.Danger : BadgeStyle.Success)" />
-                            </Template>
-                        </RadzenDataGridColumn>
-                        <RadzenDataGridColumn TItem="ClientIdentityProviderDto" Context="row" Title="Actions" Width="160px">
-                            <Template Context="row">
-                                <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.Small" Text="Remove" Click="@(async ()=> await editClient.RemoveIdentityLink(row))" />
-                            </Template>
-                        </RadzenDataGridColumn>
-                    </Columns>
-                </RadzenDataGrid>
-            </RadzenCard>
-        </RadzenStack>
-    }
-</div>
+@if (!editClient.IsEdit)
+{
+    <RadzenAlert AlertStyle="AlertStyle.Info" ShowIcon="true">
+        <RadzenText TextStyle="TextStyle.Body1">Save the client first to manage identity provider links.</RadzenText>
+    </RadzenAlert>
+}
+else
+{
+    <RadzenStack Gap="1rem">
+        <RadzenCard>
+            <RadzenText TextStyle="TextStyle.Subtitle2">Add Link</RadzenText>
+            <RadzenRow Gap="1rem" class="rz-mt-2">
+                <RadzenColumn Size="12" SizeMD="6">
+                    <RadzenFormField Text="Provider" Variant="Variant.Outlined">
+                        <ChildContent>
+                            <RadzenDropDown Data="@editClient.FilteredProviders" @bind-Value="editClient.selectedProviderId" Style="width:100%" TextProperty="DisplayName" ValueProperty="Id" AllowClear="true" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive" />
+                        </ChildContent>
+                    </RadzenFormField>
+                </RadzenColumn>
+                <RadzenColumn Size="12" SizeMD="6">
+                    <RadzenFormField Text="Search Providers" Variant="Variant.Outlined">
+                        <ChildContent>
+                            <RadzenTextBox @bind-Value="editClient.providerSearch" Style="width:100%" Placeholder="type to search..." Change="@(async _ => await editClient.ReloadProviders())" />
+                        </ChildContent>
+                    </RadzenFormField>
+                </RadzenColumn>
+            </RadzenRow>
+            <RadzenRow Gap="1rem">
+                <RadzenColumn Size="12" SizeMD="6">
+                    <RadzenFormField Text="Display Name Override" Variant="Variant.Outlined">
+                        <ChildContent>
+                            <RadzenTextBox @bind-Value="editClient.linkDisplayOverride" Style="width:100%" />
+                        </ChildContent>
+                    </RadzenFormField>
+                </RadzenColumn>
+                <RadzenColumn Size="12" SizeMD="3">
+                    <RadzenFormField Text="Order" Variant="Variant.Outlined">
+                        <ChildContent>
+                            <RadzenNumeric TValue="int?" @bind-Value="editClient.linkOrder" Style="width:100%" />
+                        </ChildContent>
+                    </RadzenFormField>
+                </RadzenColumn>
+                <RadzenColumn Size="12" SizeMD="3">
+                    <RadzenFormField Text="Enabled" Variant="Variant.Outlined">
+                        <Start>
+                            <RadzenSwitch @bind-Value="editClient.linkEnabled" OnLabel="Yes" OffLabel="No" />
+                        </Start>
+                    </RadzenFormField>
+                </RadzenColumn>
+            </RadzenRow>
+            <RadzenRow>
+                <RadzenColumn Size="12" class="rz-display-flex rz-justify-content-end">
+                    <RadzenButton Icon="link" Text="Add Link" ButtonStyle="ButtonStyle.Primary" Click="@(async () => await editClient.AddIdentityLink())" Disabled="@(!editClient.IsEdit || string.IsNullOrEmpty(editClient.selectedProviderId))" />
+                </RadzenColumn>
+            </RadzenRow>
+        </RadzenCard>
+        <RadzenCard>
+            <RadzenText TextStyle="TextStyle.Subtitle2">Linked Providers</RadzenText>
+            <RadzenDataGrid TItem="ClientIdentityProviderDto" Data="@editClient.identityLinks" AllowPaging="true" PageSize="10" class="rz-mt-2">
+                <Columns>
+                    <RadzenDataGridColumn TItem="ClientIdentityProviderDto" Title="Provider">
+                        <Template Context="row">
+                            @editClient.GetProviderName(row.IdentityProviderId)
+                        </Template>
+                    </RadzenDataGridColumn>
+                    <RadzenDataGridColumn TItem="ClientIdentityProviderDto" Property="DisplayNameOverride" Title="Display Name" />
+                    <RadzenDataGridColumn TItem="ClientIdentityProviderDto" Property="Order" Title="Order" Width="100px" />
+                    <RadzenDataGridColumn TItem="ClientIdentityProviderDto" Title="Enabled" Width="120px">
+                        <Template Context="row">
+                            <RadzenBadge Text="@(row.IsEnabled == false ? "No" : "Yes")" BadgeStyle="@(row.IsEnabled == false ? BadgeStyle.Danger : BadgeStyle.Success)" />
+                        </Template>
+                    </RadzenDataGridColumn>
+                    <RadzenDataGridColumn TItem="ClientIdentityProviderDto" Context="row" Title="Actions" Width="160px">
+                        <Template Context="row">
+                            <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.Small" Text="Remove" Click="@(async () => await editClient.RemoveIdentityLink(row))" />
+                        </Template>
+                    </RadzenDataGridColumn>
+                </Columns>
+            </RadzenDataGrid>
+        </RadzenCard>
+    </RadzenStack>
+}
 
 @code {
     [Parameter] public EditClient editClient { get; set; } = null!;

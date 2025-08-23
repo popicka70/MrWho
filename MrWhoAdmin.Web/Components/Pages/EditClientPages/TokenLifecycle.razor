@@ -1,88 +1,86 @@
-<div style="padding: 1rem; max-height: 550px; overflow-y: auto;">
-    <RadzenStack Gap="0.75rem" class="rz-mb-4">
-        <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Token Lifetimes</RadzenText>
-        <RadzenStack Gap="1rem">
-            <RadzenRow>
-                <RadzenColumn Size="12" SizeMD="6">
-                    <RadzenFormField Text="ID Token Lifetime (Minutes)" Variant="Variant.Outlined">
-                        <ChildContent>
-                            <RadzenNumeric @bind-Value="@model.IdTokenLifetimeMinutes" Min="1" Max="1440" Style="width: 100%;" Placeholder="Leave empty to use default" />
-                        </ChildContent>
-                        <Helper>
-                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                How long ID tokens remain valid (1-1440 minutes)
-                            </RadzenText>
-                        </Helper>
-                    </RadzenFormField>
-                </RadzenColumn>
-                <RadzenColumn Size="12" SizeMD="6">
-                    <RadzenFormField Text="Device Code Lifetime (Minutes)" Variant="Variant.Outlined">
-                        <ChildContent>
-                            <RadzenNumeric @bind-Value="@model.DeviceCodeLifetimeMinutes" Min="1" Max="60" Style="width: 100%;" Placeholder="Leave empty to use default" />
-                        </ChildContent>
-                        <Helper>
-                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                Device flow code validity period (1-60 minutes)
-                            </RadzenText>
-                        </Helper>
-                    </RadzenFormField>
-                </RadzenColumn>
-            </RadzenRow>
-            <RadzenRow>
-                <RadzenColumn Size="12" SizeMD="6">
-                    <RadzenFormField Text="Access Token Type" Variant="Variant.Outlined">
-                        <ChildContent>
-                            <RadzenDropDown @bind-Value="@model.AccessTokenType" Data="@editClient.accessTokenTypes" TextProperty="Text" ValueProperty="Value" Style="width: 100%;" Placeholder="Select token type..." />
-                        </ChildContent>
-                        <Helper>
-                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                JWT (self-contained) vs Reference (database lookup)
-                            </RadzenText>
-                        </Helper>
-                    </RadzenFormField>
-                </RadzenColumn>
-                <RadzenColumn Size="12" SizeMD="6">
-                </RadzenColumn>
-            </RadzenRow>
-        </RadzenStack>
+<RadzenStack Gap="0.75rem" class="rz-mb-4">
+    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Token Lifetimes</RadzenText>
+    <RadzenStack Gap="1rem">
+        <RadzenRow>
+            <RadzenColumn Size="12" SizeMD="6">
+                <RadzenFormField Text="ID Token Lifetime (Minutes)" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenNumeric @bind-Value="@model.IdTokenLifetimeMinutes" Min="1" Max="1440" Style="width: 100%;" Placeholder="Leave empty to use default" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                            How long ID tokens remain valid (1-1440 minutes)
+                        </RadzenText>
+                    </Helper>
+                </RadzenFormField>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="6">
+                <RadzenFormField Text="Device Code Lifetime (Minutes)" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenNumeric @bind-Value="@model.DeviceCodeLifetimeMinutes" Min="1" Max="60" Style="width: 100%;" Placeholder="Leave empty to use default" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                            Device flow code validity period (1-60 minutes)
+                        </RadzenText>
+                    </Helper>
+                </RadzenFormField>
+            </RadzenColumn>
+        </RadzenRow>
+        <RadzenRow>
+            <RadzenColumn Size="12" SizeMD="6">
+                <RadzenFormField Text="Access Token Type" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenDropDown @bind-Value="@model.AccessTokenType" Data="@editClient.accessTokenTypes" TextProperty="Text" ValueProperty="Value" Style="width: 100%;" Placeholder="Select token type..." />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                            JWT (self-contained) vs Reference (database lookup)
+                        </RadzenText>
+                    </Helper>
+                </RadzenFormField>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="6">
+            </RadzenColumn>
+        </RadzenRow>
     </RadzenStack>
-    <RadzenStack Gap="0.75rem" class="rz-mt-4 rz-mb-4">
-        <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Refresh Token Behavior</RadzenText>
-        <RadzenStack Gap="1rem">
-            <RadzenRow>
-                <RadzenColumn Size="12" SizeMD="6">
-                    <RadzenFormField Text="Max Refresh Tokens Per User" Variant="Variant.Outlined">
-                        <ChildContent>
-                            <RadzenNumeric @bind-Value="@model.MaxRefreshTokensPerUser" Min="0" Max="100" Style="width: 100%;" Placeholder="Leave empty for unlimited" />
-                        </ChildContent>
-                        <Helper>
-                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                Limit concurrent refresh tokens per user (0 = unlimited)
-                            </RadzenText>
-                        </Helper>
-                    </RadzenFormField>
-                </RadzenColumn>
-                <RadzenColumn Size="12" SizeMD="6">
-                    <RadzenFormField Text="One-time refresh tokens (rotation)" Variant="Variant.Outlined">
-                        <ChildContent>
-                            <RadzenDropDown @bind-Value="@model.UseOneTimeRefreshTokens" Data="@editClient.triStateOptions" TextProperty="Text" ValueProperty="Value" Style="width: 100%;" Placeholder="Use realm default" />
-                        </ChildContent>
-                    </RadzenFormField>
-                    <RadzenFormField Text="Hash access tokens in database" Variant="Variant.Outlined">
-                        <ChildContent>
-                            <RadzenDropDown @bind-Value="@model.HashAccessTokens" Data="@editClient.triStateOptions" TextProperty="Text" ValueProperty="Value" Style="width: 100%;" Placeholder="Use realm default" />
-                        </ChildContent>
-                    </RadzenFormField>
-                    <RadzenFormField Text="Update claims on token refresh" Variant="Variant.Outlined">
-                        <ChildContent>
-                            <RadzenDropDown @bind-Value="@model.UpdateAccessTokenClaimsOnRefresh" Data="@editClient.triStateOptions" TextProperty="Text" ValueProperty="Value" Style="width: 100%;" Placeholder="Use realm default" />
-                        </ChildContent>
-                    </RadzenFormField>
-                </RadzenColumn>
-            </RadzenRow>
-        </RadzenStack>
+</RadzenStack>
+<RadzenStack Gap="0.75rem" class="rz-mt-4 rz-mb-4">
+    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Refresh Token Behavior</RadzenText>
+    <RadzenStack Gap="1rem">
+        <RadzenRow>
+            <RadzenColumn Size="12" SizeMD="6">
+                <RadzenFormField Text="Max Refresh Tokens Per User" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenNumeric @bind-Value="@model.MaxRefreshTokensPerUser" Min="0" Max="100" Style="width: 100%;" Placeholder="Leave empty for unlimited" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                            Limit concurrent refresh tokens per user (0 = unlimited)
+                        </RadzenText>
+                    </Helper>
+                </RadzenFormField>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="6">
+                <RadzenFormField Text="One-time refresh tokens (rotation)" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenDropDown @bind-Value="@model.UseOneTimeRefreshTokens" Data="@editClient.triStateOptions" TextProperty="Text" ValueProperty="Value" Style="width: 100%;" Placeholder="Use realm default" />
+                    </ChildContent>
+                </RadzenFormField>
+                <RadzenFormField Text="Hash access tokens in database" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenDropDown @bind-Value="@model.HashAccessTokens" Data="@editClient.triStateOptions" TextProperty="Text" ValueProperty="Value" Style="width: 100%;" Placeholder="Use realm default" />
+                    </ChildContent>
+                </RadzenFormField>
+                <RadzenFormField Text="Update claims on token refresh" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenDropDown @bind-Value="@model.UpdateAccessTokenClaimsOnRefresh" Data="@editClient.triStateOptions" TextProperty="Text" ValueProperty="Value" Style="width: 100%;" Placeholder="Use realm default" />
+                    </ChildContent>
+                </RadzenFormField>
+            </RadzenColumn>
+        </RadzenRow>
     </RadzenStack>
-</div>
+</RadzenStack>
 
 @code {
     [Parameter] public EditClient editClient { get; set; } = null!;
