@@ -106,4 +106,10 @@ public class ClientDto
     public bool? AllowQrLoginQuick { get; set; }
     public bool? AllowQrLoginSecure { get; set; }
     public bool? AllowCodeLogin { get; set; }
+
+    // Audience Configuration
+    public AudienceMode? AudienceMode { get; set; }
+    public string? PrimaryAudience { get; set; }
+    public bool? IncludeAudInIdToken { get; set; }
+    public bool? RequireExplicitAudienceScope { get; set; }
 }

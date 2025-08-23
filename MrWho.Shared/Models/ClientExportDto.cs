@@ -108,6 +108,12 @@ public class ClientExportDto
     public string ExportedBy { get; set; } = "System";
     public DateTime ExportedAtUtc { get; set; } = DateTime.UtcNow;
     public string FormatVersion { get; set; } = "1.1";
+
+    // Audience configuration
+    public AudienceMode? AudienceMode { get; set; }
+    public string? PrimaryAudience { get; set; }
+    public bool? IncludeAudInIdToken { get; set; }
+    public bool? RequireExplicitAudienceScope { get; set; }
 }
 
 /// <summary>

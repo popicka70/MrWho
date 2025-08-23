@@ -341,4 +341,12 @@ public partial class Client
     {
         return AuthorizationCodeLifetime ?? Realm?.AuthorizationCodeLifetime ?? TimeSpan.FromMinutes(10);
     }
+    
+    // ============================================================================
+    // AUDIENCE CONFIGURATION (CLIENT-LEVEL OVERRIDES)
+    // ============================================================================
+    public AudienceMode? AudienceMode { get; set; }
+    [StringLength(200)] public string? PrimaryAudience { get; set; }
+    public bool? IncludeAudInIdToken { get; set; }
+    public bool? RequireExplicitAudienceScope { get; set; }
 }

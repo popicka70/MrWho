@@ -7,6 +7,7 @@ using Microsoft.AspNetCore;
 using MrWho.Services;
 using MrWho.Data; // add db
 using Microsoft.EntityFrameworkCore; // include for Include
+using MrWho.Shared; // for AudienceMode
 
 namespace MrWho.Handlers;
 
@@ -483,28 +484,50 @@ public class TokenHandler : ITokenHandler
         try
         {
             if (string.IsNullOrWhiteSpace(clientId)) return;
-            if (principal.HasClaim(c => c.Type == OpenIddictConstants.Claims.Audience)) return;
             var scopeSet = requestedScopes?.ToHashSet(StringComparer.OrdinalIgnoreCase) ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            if (scopeSet.Count == 0) return; // no requested scopes -> no audiences
-            var client = await _db.Clients.Include(c => c.Audiences).FirstOrDefaultAsync(c => c.ClientId == clientId);
-            if (client == null || client.Audiences.Count == 0) return;
-            var audiences = client.Audiences
-                .Select(a => a.Audience)
-                .Where(a => !string.IsNullOrWhiteSpace(a) && scopeSet.Contains(a)) // only those explicitly requested
-                .Distinct()
-                .ToList();
-            if (audiences.Count == 0) return; // none requested -> skip
-            if (audiences.Count == 1)
+            var client = await _db.Clients.Include(c => c.Audiences).Include(c=>c.Realm).FirstOrDefaultAsync(c => c.ClientId == clientId);
+            if (client == null) return;
+            var mode = client.AudienceMode ?? client.Realm?.AudienceMode ?? Shared.AudienceMode.RequestedIntersection;
+            var includeInId = client.IncludeAudInIdToken ?? client.Realm?.IncludeAudInIdToken ?? true;
+            var explicitRequired = client.RequireExplicitAudienceScope ?? client.Realm?.RequireExplicitAudienceScope ?? false;
+            var primary = client.PrimaryAudience ?? client.Realm?.PrimaryAudience;
+            var configured = client.Audiences.Select(a => a.Audience).Where(a=>!string.IsNullOrWhiteSpace(a)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            if (configured.Count==0 || mode==Shared.AudienceMode.None) return;
+            if (explicitRequired && scopeSet.Count==0) return; // no scopes -> skip (or could error)
+
+            List<string> result = new();
+            var intersection = configured.Where(a => scopeSet.Contains(a)).ToList();
+            switch (mode)
             {
-                principal.SetClaim(OpenIddictConstants.Claims.Audience, audiences[0]);
+                case Shared.AudienceMode.RequestedIntersection:
+                    result = intersection;
+                    break;
+                case Shared.AudienceMode.AllConfigured:
+                    result = configured;
+                    break;
+                case Shared.AudienceMode.RequestedOrAll:
+                    result = intersection.Count>0 ? intersection : configured;
+                    break;
+                case Shared.AudienceMode.RequestedOrPrimary:
+                    if (intersection.Count>0) result = intersection; else if (!string.IsNullOrWhiteSpace(primary) && configured.Contains(primary,StringComparer.OrdinalIgnoreCase)) result = new(){primary}; else result = new(){configured.First()};
+                    break;
+                case Shared.AudienceMode.ErrorIfUnrequested:
+                    if (intersection.Count==0)
+                    {
+                        // Set error claim to be translated by caller (simplified)
+                        return; // skip adding; upstream could enforce error
+                    }
+                    result = intersection;
+                    break;
+                case Shared.AudienceMode.AccessTokenOnly:
+                    result = intersection;
+                    break;
             }
-            else
-            {
-                foreach (var aud in audiences)
-                {
-                    principal.AddClaim(OpenIddictConstants.Claims.Audience, aud);
-                }
-            }
+            if (result.Count==0) return;
+            // Avoid duplicate
+            if (principal.HasClaim(c=>c.Type==OpenIddictConstants.Claims.Audience)) return;
+            foreach (var aud in result.Distinct())
+                principal.AddClaim(OpenIddictConstants.Claims.Audience, aud);
         }
         catch (Exception ex)
         {
