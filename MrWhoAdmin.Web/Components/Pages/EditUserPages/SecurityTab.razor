@@ -1,0 +1,93 @@
+@using MrWho.Shared.Models
+@if (!editUser.IsEdit)
+{
+    <RadzenAlert AlertStyle="AlertStyle.Info"><RadzenText>Save user first to manage security settings.</RadzenText></RadzenAlert>
+}
+else
+{
+    <div style="padding: 1rem;">
+        <RadzenStack Gap="2rem">
+            <RadzenText TextStyle="TextStyle.H6" Text="Security Management" />
+            <RadzenStack Gap="0.75rem">
+                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Profile Status</RadzenText>
+                <RadzenCard>
+                    <RadzenStack Gap="1rem">
+                        <RadzenText TextStyle="TextStyle.Subtitle2">Current State</RadzenText>
+                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.75rem" AlignItems="AlignItems.Center">
+                            @if (editUser.profileState?.State?.Equals("Active", StringComparison.OrdinalIgnoreCase) == true)
+                            {
+                                <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="ACTIVE" />
+                            }
+                            else if (editUser.profileState?.State?.Equals("Suspended", StringComparison.OrdinalIgnoreCase) == true)
+                            {
+                                <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text="SUSPENDED" />
+                            }
+                            else if (editUser.profileState?.State?.Equals("Disabled", StringComparison.OrdinalIgnoreCase) == true)
+                            {
+                                <RadzenBadge BadgeStyle="BadgeStyle.Danger" Text="DISABLED" />
+                            }
+                            else
+                            {
+                                <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="NEW" />
+                            }
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Only users with state 'Active' can complete OIDC authorization.</RadzenText>
+                        </RadzenStack>
+                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                            <RadzenButton Click="@(async () => await editUser.SetProfileState("Active"))" Icon="check_circle" ButtonStyle="ButtonStyle.Success" Text="Activate" />
+                            <RadzenButton Click="@(async () => await editUser.SetProfileState("Suspended"))" Icon="pause_circle" ButtonStyle="ButtonStyle.Secondary" Text="Suspend" />
+                            <RadzenButton Click="@(async () => await editUser.SetProfileState("Disabled"))" Icon="cancel" ButtonStyle="ButtonStyle.Danger" Text="Deactivate" />
+                        </RadzenStack>
+                    </RadzenStack>
+                </RadzenCard>
+            </RadzenStack>
+            <RadzenStack Gap="0.75rem">
+                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Account Lock Status</RadzenText>
+                <RadzenStack Gap="1rem">
+                    <RadzenRow>
+                        <RadzenColumn Size="12" SizeMD="6">
+                            <RadzenCard>
+                                <RadzenStack Gap="1rem">
+                                    <RadzenText TextStyle="TextStyle.Subtitle1" Text="Account Lock Status" />
+                                    @if (editUser.IsUserLocked())
+                                    {
+                                        <RadzenBadge BadgeStyle="BadgeStyle.Danger" Text="LOCKED" />
+                                        <RadzenText TextStyle="TextStyle.Caption">Locked until: @(editUser.currentUser?.LockoutEnd?.ToString("yyyy-MM-dd HH:mm"))</RadzenText>
+                                        <RadzenButton Click="@(async () => await editUser.UnlockUser())" Icon="lock_open" ButtonStyle="ButtonStyle.Success" Text="Unlock Account" IsBusy="@editUser.isTogglingLock" />
+                                    }
+                                    else
+                                    {
+                                        <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="ACTIVE" />
+                                        <RadzenButton Click="@(async () => await editUser.LockUser())" Icon="lock" ButtonStyle="ButtonStyle.Warning" Text="Lock Account" IsBusy="@editUser.isTogglingLock" />
+                                    }
+                                </RadzenStack>
+                            </RadzenCard>
+                        </RadzenColumn>
+                        <RadzenColumn Size="12" SizeMD="6">
+                            <RadzenCard>
+                                <RadzenStack Gap="1rem">
+                                    <RadzenText TextStyle="TextStyle.Subtitle1" Text="Password Management" />
+                                    <RadzenButton Click="@(async () => await editUser.ResetPassword())" Icon="key" ButtonStyle="ButtonStyle.Primary" Text="Reset Password" IsBusy="@editUser.isResettingPassword" />
+                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Generates a new temporary password and notifies the user</RadzenText>
+                                </RadzenStack>
+                            </RadzenCard>
+                        </RadzenColumn>
+                    </RadzenRow>
+                </RadzenStack>
+            </RadzenStack>
+            <RadzenStack Gap="0.75rem">
+                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Session Management</RadzenText>
+                <RadzenCard>
+                    <RadzenStack Gap="1rem">
+                        <RadzenText TextStyle="TextStyle.Subtitle1" Text="Active Sessions" />
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Force logout will invalidate all active sessions for this user</RadzenText>
+                        <RadzenButton Click="@(async () => await editUser.ForceLogout())" Icon="logout" ButtonStyle="ButtonStyle.Danger" Text="Force Logout All Sessions" IsBusy="@editUser.isForcingLogout" />
+                    </RadzenStack>
+                </RadzenCard>
+            </RadzenStack>
+        </RadzenStack>
+    </div>
+}
+
+@code {
+    [Parameter] public EditUser editUser { get; set; } = null!;
+}

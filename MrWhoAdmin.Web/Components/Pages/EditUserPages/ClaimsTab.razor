@@ -1,0 +1,90 @@
+@using MrWho.Shared.Models
+@if (!editUser.IsEdit)
+{
+    <RadzenAlert AlertStyle="AlertStyle.Info"><RadzenText>Save user first to manage claims.</RadzenText></RadzenAlert>
+}
+else
+{
+    <div style="padding: 1rem;">
+        <RadzenStack Gap="2rem">
+            <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                <RadzenText TextStyle="TextStyle.H6" Text="User Claims Management" />
+                <RadzenBadge BadgeStyle="BadgeStyle.Info" Text="@($"{editUser.userClaims.Count} claims")" />
+            </RadzenStack>
+            <RadzenCard Style="background-color: var(--rz-base-50);">
+                <RadzenStack Gap="1rem">
+                    <RadzenText TextStyle="TextStyle.Subtitle1" Text="Add New Claim" />
+                    <RadzenRow>
+                        <RadzenColumn Size="12" SizeMD="4">
+                            <RadzenFormField Text="Claim Type" Variant="Variant.Outlined">
+                                <RadzenDropDown @bind-Value="editUser.newClaimType" Data="@CommonClaimTypes.StandardClaims" TextProperty="DisplayName" ValueProperty="Type" AllowClear="true" Placeholder="Select or type custom claim type" AllowFiltering="true" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive" Style="width: 100%;" />
+                            </RadzenFormField>
+                        </RadzenColumn>
+                        <RadzenColumn Size="12" SizeMD="4">
+                            <RadzenFormField Text="Claim Value" Variant="Variant.Outlined">
+                                <RadzenTextBox @bind-Value="editUser.newClaimValue" Placeholder="Enter claim value" Style="width: 100%;" />
+                            </RadzenFormField>
+                        </RadzenColumn>
+                        <RadzenColumn Size="12" SizeMD="4">
+                            <RadzenFormField Text="Action" Variant="Variant.Outlined">
+                                <RadzenButton Click="@(async () => await editUser.AddClaim())" Icon="add" ButtonStyle="ButtonStyle.Success" Text="Add Claim" Disabled="@(string.IsNullOrWhiteSpace(editUser.newClaimType) || string.IsNullOrWhiteSpace(editUser.newClaimValue))" IsBusy="@editUser.isAddingClaim" Style="width: 100%;" />
+                            </RadzenFormField>
+                        </RadzenColumn>
+                    </RadzenRow>
+                    @if (!string.IsNullOrWhiteSpace(editUser.newClaimType))
+                    {
+                        var claimInfo = CommonClaimTypes.StandardClaims.FirstOrDefault(c => c.Type == editUser.newClaimType);
+                        if (claimInfo != default)
+                        {
+                            <RadzenAlert AlertStyle="AlertStyle.Info" Size="AlertSize.Small">
+                                <RadzenText><strong>@claimInfo.DisplayName:</strong> @claimInfo.Description</RadzenText>
+                            </RadzenAlert>
+                        }
+                    }
+                </RadzenStack>
+            </RadzenCard>
+            <RadzenStack Gap="0.75rem">
+                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Current Claims</RadzenText>
+                @if (editUser.userClaims.Any())
+                {
+                    <div style="max-height: 400px; overflow-y: auto;">
+                        <RadzenDataGrid Data="@editUser.userClaims" TItem="UserClaimDto" AllowPaging="false" AllowSorting="true">
+                            <Columns>
+                                <RadzenDataGridColumn TItem="UserClaimDto" Property="ClaimType" Title="Claim Type" Width="200px">
+                                    <Template Context="claim">
+                                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
+                                            <RadzenIcon Icon="verified_user" Style="color: var(--rz-info); font-size: 16px;" />
+                                            <RadzenText Text="@claim.ClaimType" />
+                                        </RadzenStack>
+                                    </Template>
+                                </RadzenDataGridColumn>
+                                <RadzenDataGridColumn TItem="UserClaimDto" Property="ClaimValue" Title="Value">
+                                    <Template Context="claim">
+                                        <RadzenText Text="@claim.ClaimValue" Style="word-break: break-all;" />
+                                    </Template>
+                                </RadzenDataGridColumn>
+                                <RadzenDataGridColumn TItem="UserClaimDto" Title="Actions" Width="120px" Sortable="false">
+                                    <Template Context="claim">
+                                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                                            <RadzenButton Click="@(async () => await editUser.RemoveClaim(claim))" Icon="delete" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Danger" Variant="Variant.Text" />
+                                        </RadzenStack>
+                                    </Template>
+                                </RadzenDataGridColumn>
+                            </Columns>
+                        </RadzenDataGrid>
+                    </div>
+                }
+                else
+                {
+                    <RadzenAlert AlertStyle="AlertStyle.Info">
+                        <RadzenText>No claims assigned to this user. Add claims above to provide additional user information.</RadzenText>
+                    </RadzenAlert>
+                }
+            </RadzenStack>
+        </RadzenStack>
+    </div>
+}
+
+@code {
+    [Parameter] public EditUser editUser { get; set; } = null!;
+}
