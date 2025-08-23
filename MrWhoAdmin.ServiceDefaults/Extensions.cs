@@ -136,6 +136,8 @@ public static class Extensions
             .MinimumLevel.Override("Microsoft.Hosting.Lifetime", LogEventLevel.Information)
             .WriteTo.Console();
 
+        // EF Core category overrides now configured via Serilog configuration (appsettings.*.json)
+
         string loggingMessage = "Serilog logging configured to write to Console";
 
         projectId = Environment.GetEnvironmentVariable("GOOGLE_CLOUD_PROJECT");
