@@ -8,19 +8,19 @@ namespace MrWhoAdmin.Web.Components.Pages
     {
         internal CreateClientRequest model = new();
         internal List<RealmDto> realms = new();
-        private List<ScopeDto> availableScopes = new();
-        private List<ScopeSelection> scopeItems = new();
-        private string? scopeSearch;
-        private bool isLoading = false;
-        private int selectedTabIndex = 0;
+        internal List<ScopeDto> availableScopes = new();
+        internal List<ScopeSelection> scopeItems = new();
+        internal string? scopeSearch;
+        private bool isLoading = false; // stays private (only used in main page)
+        private int selectedTabIndex = 0; // stays private (only used in main page)
 
         // Dropdown data
         internal List<DropdownItem<ClientType>> clientTypes = new();
-        private List<DropdownItem<string>> sameSitePolicies = new();
-        private List<DropdownItem<string>> accessTokenTypes = new();
-        private List<DropdownItem<bool?>> triStateOptions = new();
-        private List<DropdownItem<string>> availableMfaMethods = new();
-        private List<DropdownItem<string>> availableThemes = new()
+        internal List<DropdownItem<string>> sameSitePolicies = new();
+        internal List<DropdownItem<string>> accessTokenTypes = new();
+        internal List<DropdownItem<bool?>> triStateOptions = new();
+        internal List<DropdownItem<string>> availableMfaMethods = new();
+        internal List<DropdownItem<string>> availableThemes = new()
         {
             new("Light", "light"),
             new("Dark", "dark"),
@@ -32,24 +32,24 @@ namespace MrWhoAdmin.Web.Components.Pages
         };
 
         // Selections
-        private List<string> selectedScopes = new();
-        private List<string> selectedPermissions = new();
+        internal List<string> selectedScopes = new();
+        internal List<string> selectedPermissions = new();
 
         // Multi-line text backing for URIs
-        private string redirectUrisText = string.Empty;
-        private string postLogoutUrisText = string.Empty;
+        internal string redirectUrisText = string.Empty;
+        internal string postLogoutUrisText = string.Empty;
 
         // Convenience binding for MFA methods serialization (use model's value)
         private string? allowedMfaMethodsSerialized => model.AllowedMfaMethods;
 
         // Identity Provider links state
-        private List<ClientIdentityProviderDto> identityLinks = new();
-        private List<IdentityProviderDto> providers = new();
-        private string? selectedProviderId;
-        private string providerSearch = string.Empty;
-        private string? linkDisplayOverride;
-        private int? linkOrder;
-        private bool linkEnabled = true;
+        internal List<ClientIdentityProviderDto> identityLinks = new();
+        internal List<IdentityProviderDto> providers = new();
+        internal string? selectedProviderId;
+        internal string providerSearch = string.Empty;
+        internal string? linkDisplayOverride;
+        internal int? linkOrder;
+        internal bool linkEnabled = true;
 
         internal bool IsEdit => !string.IsNullOrEmpty(Id);
 
@@ -187,7 +187,7 @@ namespace MrWhoAdmin.Web.Components.Pages
             }
         }
 
-        private async Task ReloadProviders()
+        internal async Task ReloadProviders()
         {
             try
             {
@@ -202,12 +202,12 @@ namespace MrWhoAdmin.Web.Components.Pages
             }
         }
 
-        private IEnumerable<IdentityProviderDto> FilteredProviders => string.IsNullOrWhiteSpace(providerSearch)
+        internal IEnumerable<IdentityProviderDto> FilteredProviders => string.IsNullOrWhiteSpace(providerSearch)
             ? providers
             : providers.Where(p => ((p.DisplayName ?? p.Name)?.Contains(providerSearch, StringComparison.OrdinalIgnoreCase) ?? false)
                                 || p.Name.Contains(providerSearch, StringComparison.OrdinalIgnoreCase));
 
-        private string GetProviderName(string providerId)
+        internal string GetProviderName(string providerId)
         {
             var p = providers.FirstOrDefault(x => x.Id == providerId);
             return p?.DisplayName ?? p?.Name ?? providerId;
@@ -226,7 +226,7 @@ namespace MrWhoAdmin.Web.Components.Pages
             }
         }
 
-        private async Task AddIdentityLink()
+        internal async Task AddIdentityLink()
         {
             if (!IsEdit || string.IsNullOrEmpty(selectedProviderId)) return;
             try
@@ -259,7 +259,7 @@ namespace MrWhoAdmin.Web.Components.Pages
             }
         }
 
-        private async Task RemoveIdentityLink(ClientIdentityProviderDto link)
+        internal async Task RemoveIdentityLink(ClientIdentityProviderDto link)
         {
             try
             {
@@ -512,7 +512,7 @@ namespace MrWhoAdmin.Web.Components.Pages
             };
         }
 
-        private bool IsMethodSelected(string method)
+        internal bool IsMethodSelected(string method)
         {
             if (string.IsNullOrEmpty(model.AllowedMfaMethods))
                 return false;
@@ -524,7 +524,7 @@ namespace MrWhoAdmin.Web.Components.Pages
             catch { return false; }
         }
 
-        private void ToggleMfaMethod(string method, bool selected)
+        internal void ToggleMfaMethod(string method, bool selected)
         {
             var methods = new List<string>();
             if (!string.IsNullOrEmpty(model.AllowedMfaMethods))
@@ -634,7 +634,7 @@ namespace MrWhoAdmin.Web.Components.Pages
             return Task.CompletedTask;
         }
 
-        private void BuildScopeSelections()
+        internal void BuildScopeSelections()
         {
             scopeItems = availableScopes
                 .OrderBy(s => s.IsStandard ? 0 : 1)
@@ -652,9 +652,9 @@ namespace MrWhoAdmin.Web.Components.Pages
                 .ToList();
         }
 
-        private void ApplyScopeFilter() => StateHasChanged();
+        internal void ApplyScopeFilter() => StateHasChanged();
 
-        private void ToggleScopeSelection(string scopeName, bool selected)
+        internal void ToggleScopeSelection(string scopeName, bool selected)
         {
             var item = scopeItems.FirstOrDefault(i => i.Name == scopeName);
             if (item != null) item.Selected = selected;
@@ -668,7 +668,7 @@ namespace MrWhoAdmin.Web.Components.Pages
             }
         }
 
-        private void SelectAllFilteredScopes(bool select)
+        internal void SelectAllFilteredScopes(bool select)
         {
             foreach (var item in FilteredScopeItems.ToList())
             {
@@ -684,7 +684,7 @@ namespace MrWhoAdmin.Web.Components.Pages
             }
         }
 
-        private IEnumerable<ScopeSelection> FilteredScopeItems => string.IsNullOrWhiteSpace(scopeSearch)
+        internal IEnumerable<ScopeSelection> FilteredScopeItems => string.IsNullOrWhiteSpace(scopeSearch)
             ? scopeItems
             : scopeItems.Where(s => (s.Name?.Contains(scopeSearch, StringComparison.OrdinalIgnoreCase) ?? false)
                                  || (s.DisplayName?.Contains(scopeSearch, StringComparison.OrdinalIgnoreCase) ?? false)
@@ -692,7 +692,7 @@ namespace MrWhoAdmin.Web.Components.Pages
 
         internal record DropdownItem<T>(string Text, T Value);
 
-        private class ScopeSelection
+        internal class ScopeSelection
         {
             public string Name { get; set; } = string.Empty;
             public string? DisplayName { get; set; }

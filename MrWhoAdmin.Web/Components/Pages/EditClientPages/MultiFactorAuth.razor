@@ -1,0 +1,70 @@
+<div style="padding: 1rem; max-height: 550px; overflow-y: auto;">
+    <RadzenStack Gap="0.75rem" class="rz-mb-4">
+        <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">MFA Requirements</RadzenText>
+        <RadzenStack Gap="1rem">
+            <RadzenFormField Text="MFA Enforcement" Variant="Variant.Outlined">
+                <Start>
+                    <RadzenCheckBox @bind-Value="@model.RequireMfa" TriState="true" Name="requireMfa" />
+                </Start>
+                <ChildContent>
+                    <RadzenLabel Text="Require multi-factor authentication" Component="requireMfa" />
+                </ChildContent>
+                <Helper>
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                        When enabled, users must complete MFA to access this client
+                    </RadzenText>
+                </Helper>
+            </RadzenFormField>
+            <RadzenRow>
+                <RadzenColumn Size="12" SizeMD="6">
+                    <RadzenFormField Text="MFA Grace Period (Minutes)" Variant="Variant.Outlined">
+                        <ChildContent>
+                            <RadzenNumeric @bind-Value="@model.MfaGracePeriodMinutes" Min="0" Max="1440" Style="width: 100%;" Placeholder="Leave empty to use default" />
+                        </ChildContent>
+                        <Helper>
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                Time before requiring MFA again (0-1440 minutes)
+                            </RadzenText>
+                        </Helper>
+                    </RadzenFormField>
+                </RadzenColumn>
+                <RadzenColumn Size="12" SizeMD="6">
+                    <RadzenFormField Text="Session MFA Memory" Variant="Variant.Outlined">
+                        <Start>
+                            <RadzenCheckBox @bind-Value="@model.RememberMfaForSession" TriState="true" Name="rememberMfa" />
+                        </Start>
+                        <ChildContent>
+                            <RadzenLabel Text="Remember MFA for session duration" Component="rememberMfa" />
+                        </ChildContent>
+                        <Helper>
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                Skip MFA if already completed this session
+                            </RadzenText>
+                        </Helper>
+                    </RadzenFormField>
+                </RadzenColumn>
+            </RadzenRow>
+            <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-font-weight-600">Allowed MFA Methods</RadzenText>
+            @foreach (var method in editClient.availableMfaMethods)
+            {
+                var name = $"mfa_{method.Value}";
+                <RadzenFormField Variant="Variant.Outlined">
+                    <Start>
+                        <RadzenCheckBox Value="@editClient.IsMethodSelected(method.Value)" ValueChanged="@((bool selected) => editClient.ToggleMfaMethod(method.Value, selected))" Name="@name" />
+                    </Start>
+                    <ChildContent>
+                        <RadzenLabel Text="@method.Text" Component="@name" />
+                    </ChildContent>
+                </RadzenFormField>
+            }
+            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                Select which MFA methods users can use for this client
+            </RadzenText>
+        </RadzenStack>
+    </RadzenStack>
+</div>
+
+@code {
+    [Parameter] public EditClient editClient { get; set; } = null!;
+    private CreateClientRequest model => editClient.model;
+}

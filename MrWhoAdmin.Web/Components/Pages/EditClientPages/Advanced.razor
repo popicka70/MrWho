@@ -1,0 +1,87 @@
+<div style="padding: 1rem; max-height: 550px; overflow-y: auto;">
+    <RadzenStack Gap="0.75rem" class="rz-mb-4">
+        <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Protocol Configuration</RadzenText>
+        <RadzenStack Gap="1rem">
+            <RadzenFormField Text="Protocol Type" Variant="Variant.Outlined">
+                <ChildContent>
+                    <RadzenTextBox @bind-Value="@model.ProtocolType" Style="width: 100%;" Disabled="true" />
+                </ChildContent>
+                <Helper>
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                        Protocol type (currently only OIDC is supported)
+                    </RadzenText>
+                </Helper>
+            </RadzenFormField>
+            <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Development Settings</RadzenText>
+            <RadzenFormField Variant="Variant.Outlined">
+                <Start>
+                    <RadzenCheckBox @bind-Value="@model.EnableDetailedErrors" TriState="true" Name="enableDetailedErrors" />
+                </Start>
+                <ChildContent>
+                    <RadzenLabel Text="Enable detailed error responses" Component="enableDetailedErrors" />
+                </ChildContent>
+            </RadzenFormField>
+            <RadzenFormField Variant="Variant.Outlined">
+                <Start>
+                    <RadzenCheckBox @bind-Value="@model.LogSensitiveData" TriState="true" Name="logSensitiveData" />
+                </Start>
+                <ChildContent>
+                    <RadzenLabel Text="Log sensitive data (development only)" Component="logSensitiveData" />
+                </ChildContent>
+            </RadzenFormField>
+            <RadzenFormField Variant="Variant.Outlined">
+                <Start>
+                    <RadzenCheckBox @bind-Value="@model.EnableLocalLogin" TriState="true" Name="enableLocalLogin" />
+                </Start>
+                <ChildContent>
+                    <RadzenLabel Text="Enable local login (username/password)" Component="enableLocalLogin" />
+                </ChildContent>
+            </RadzenFormField>
+            <RadzenAlert AlertStyle="AlertStyle.Warning" ShowIcon="true" class="rz-mt-2">
+                <RadzenText TextStyle="TextStyle.Caption">
+                    Warning: Detailed errors and sensitive data logging should not be enabled in production.
+                </RadzenText>
+            </RadzenAlert>
+        </RadzenStack>
+    </RadzenStack>
+    <RadzenStack Gap="0.75rem" class="rz-mt-4 rz-mb-4">
+        <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Custom Page URLs</RadzenText>
+        <RadzenStack Gap="1rem">
+            <RadzenFormField Text="Custom Login Page" Variant="Variant.Outlined">
+                <ChildContent>
+                    <RadzenTextBox @bind-Value="@model.CustomLoginPageUrl" Style="width: 100%;" Placeholder="https://custom.example.com/login" />
+                </ChildContent>
+                <Helper>
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                        Override default login page for this client
+                    </RadzenText>
+                </Helper>
+            </RadzenFormField>
+            <RadzenFormField Text="Custom Logout Page" Variant="Variant.Outlined">
+                <ChildContent>
+                    <RadzenTextBox @bind-Value="@model.CustomLogoutPageUrl" Style="width: 100%;" Placeholder="https://custom.example.com/logout" />
+                </ChildContent>
+                <Helper>
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                        Override default logout page for this client
+                    </RadzenText>
+                </Helper>
+            </RadzenFormField>
+            <RadzenFormField Text="Custom Error Page" Variant="Variant.Outlined">
+                <ChildContent>
+                    <RadzenTextBox @bind-Value="@model.CustomErrorPageUrl" Style="width: 100%;" Placeholder="https://custom.example.com/error" />
+                </ChildContent>
+                <Helper>
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                        Override default error page for this client
+                    </RadzenText>
+                </Helper>
+            </RadzenFormField>
+        </RadzenStack>
+    </RadzenStack>
+</div>
+
+@code {
+    [Parameter] public EditClient editClient { get; set; } = null!;
+    private CreateClientRequest model => editClient.model;
+}

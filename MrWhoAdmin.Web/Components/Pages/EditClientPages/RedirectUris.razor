@@ -1,0 +1,41 @@
+<div style="padding: 1rem; max-height: 550px; overflow-y: auto;">
+    <RadzenStack Gap="0.75rem">
+        <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Authorization & Logout Redirects</RadzenText>
+
+        <RadzenFormField Text="Redirect URIs" Variant="Variant.Outlined">
+            <ChildContent>
+                <RadzenTextArea @bind-Value="@editClient.redirectUrisText"
+                               Style="width: 100%; height: 140px;"
+                               Placeholder="One URI per line, e.g. https://localhost:7257/signin-oidc" />
+            </ChildContent>
+            <Helper>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                    URIs allowed to receive authorization responses (signin-oidc/callback). One per line.
+                </RadzenText>
+            </Helper>
+        </RadzenFormField>
+
+        <RadzenFormField Text="Post-logout Redirect URIs" Variant="Variant.Outlined">
+            <ChildContent>
+                <RadzenTextArea @bind-Value="@editClient.postLogoutUrisText"
+                               Style="width: 100%; height: 120px;"
+                               Placeholder="One URI per line, e.g. https://localhost:7257/signout-callback-oidc or https://localhost:7257/" />
+            </ChildContent>
+            <Helper>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                    URIs the user can be redirected to after logout. One per line.
+                </RadzenText>
+            </Helper>
+        </RadzenFormField>
+
+        <RadzenAlert AlertStyle="AlertStyle.Info" ShowIcon="true">
+            <RadzenText TextStyle="TextStyle.Caption">
+                Changes here will update OpenIddict application settings immediately after saving.
+            </RadzenText>
+        </RadzenAlert>
+    </RadzenStack>
+</div>
+
+@code {
+    [Parameter] public EditClient editClient { get; set; } = null!;
+}

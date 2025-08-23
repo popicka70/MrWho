@@ -1,0 +1,76 @@
+@using MrWho.Shared
+<div style="padding:1rem; max-height:550px; overflow-y:auto;">
+    <RadzenStack Gap="0.75rem">
+        <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Allowed OAuth/OIDC Flows</RadzenText>
+        <RadzenFormField Text="Authorization Code Flow" Variant="Variant.Outlined">
+            <Start>
+                <RadzenCheckBox @bind-Value="@model.AllowAuthorizationCodeFlow" Name="authCode" />
+            </Start>
+            <ChildContent>
+                <RadzenLabel Text="Enable Authorization Code flow" Component="authCode" />
+            </ChildContent>
+            <Helper>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Recommended for web/native/SPA clients.</RadzenText>
+            </Helper>
+        </RadzenFormField>
+        <RadzenFormField Text="Client Credentials Flow" Variant="Variant.Outlined">
+            <Start>
+                <RadzenCheckBox @bind-Value="@model.AllowClientCredentialsFlow" Name="clientCreds" Disabled="@(model.ClientType != ClientType.Machine)" />
+            </Start>
+            <ChildContent>
+                <RadzenLabel Text="Enable Client Credentials flow" Component="clientCreds" />
+            </ChildContent>
+            <Helper>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Machine-to-machine only. Enabled when client type is Machine.</RadzenText>
+            </Helper>
+        </RadzenFormField>
+        <RadzenFormField Text="Refresh Token Flow" Variant="Variant.Outlined">
+            <Start>
+                <RadzenCheckBox @bind-Value="@model.AllowRefreshTokenFlow" Name="rtFlow" />
+            </Start>
+            <ChildContent>
+                <RadzenLabel Text="Allow issuing refresh tokens" Component="rtFlow" />
+            </ChildContent>
+        </RadzenFormField>
+        <RadzenFormField Text="Resource Owner Password Flow" Variant="Variant.Outlined">
+            <Start>
+                <RadzenCheckBox @bind-Value="@model.AllowPasswordFlow" Name="pwdFlow" Disabled="true" />
+            </Start>
+            <ChildContent>
+                <RadzenLabel Text="(Legacy) Resource Owner Password flow" Component="pwdFlow" />
+            </ChildContent>
+            <Helper>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Disabled (not recommended). Enable only if explicitly required.</RadzenText>
+            </Helper>
+        </RadzenFormField>
+
+        <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600 rz-mt-2">Requirements</RadzenText>
+        <RadzenFormField Text="Require PKCE" Variant="Variant.Outlined">
+            <Start>
+                <RadzenCheckBox @bind-Value="@model.RequirePkce" Name="pkce" Disabled="@(model.ClientType == ClientType.Machine)" />
+            </Start>
+            <ChildContent>
+                <RadzenLabel Text="Require Proof Key for Code Exchange" Component="pkce" />
+            </ChildContent>
+            <Helper>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Mandatory for public/SPA apps. Not used for machine clients.</RadzenText>
+            </Helper>
+        </RadzenFormField>
+        <RadzenFormField Text="Require Client Secret" Variant="Variant.Outlined">
+            <Start>
+                <RadzenCheckBox @bind-Value="@model.RequireClientSecret" Name="reqSecret" Disabled="@(model.ClientType == ClientType.Public)" />
+            </Start>
+            <ChildContent>
+                <RadzenLabel Text="Client must authenticate with a secret" Component="reqSecret" />
+            </ChildContent>
+            <Helper>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Not applicable for public clients.</RadzenText>
+            </Helper>
+        </RadzenFormField>
+    </RadzenStack>
+</div>
+
+@code {
+    [Parameter] public EditClient editClient { get; set; } = null!;
+    private CreateClientRequest model => editClient.model;
+}

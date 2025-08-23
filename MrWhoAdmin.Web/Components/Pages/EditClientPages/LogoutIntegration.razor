@@ -1,0 +1,83 @@
+<div style="padding: 1rem; max-height: 550px; overflow-y: auto;">
+    <RadzenStack Gap="0.75rem" class="rz-mb-4">
+        <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Back-Channel Logout</RadzenText>
+        <RadzenStack Gap="1rem">
+            <RadzenFormField Text="Back-Channel Logout URI" Variant="Variant.Outlined">
+                <ChildContent>
+                    <RadzenTextBox @bind-Value="@model.BackChannelLogoutUri" Style="width: 100%;" Placeholder="https://client.example.com/logout" />
+                </ChildContent>
+                <Helper>
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                        Server-to-server logout notification endpoint
+                    </RadzenText>
+                </Helper>
+            </RadzenFormField>
+            <RadzenFormField Text="Back-Channel Settings" Variant="Variant.Outlined">
+                <Start>
+                    <RadzenCheckBox @bind-Value="@model.BackChannelLogoutSessionRequired" TriState="true" Name="bclSessionRequired" />
+                </Start>
+                <ChildContent>
+                    <RadzenLabel Text="Include session ID in logout tokens" Component="bclSessionRequired" />
+                </ChildContent>
+                <Helper>
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                        Whether to include session_id in logout tokens
+                    </RadzenText>
+                </Helper>
+            </RadzenFormField>
+        </RadzenStack>
+    </RadzenStack>
+    <RadzenStack Gap="0.75rem" class="rz-mt-4 rz-mb-4">
+        <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Front-Channel Logout</RadzenText>
+        <RadzenStack Gap="1rem">
+            <RadzenFormField Text="Front-Channel Logout URI" Variant="Variant.Outlined">
+                <ChildContent>
+                    <RadzenTextBox @bind-Value="@model.FrontChannelLogoutUri" Style="width: 100%;" Placeholder="https://client.example.com/logout-iframe" />
+                </ChildContent>
+                <Helper>
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                        Browser-based logout notification endpoint
+                    </RadzenText>
+                </Helper>
+            </RadzenFormField>
+            <RadzenFormField Text="Front-Channel Settings" Variant="Variant.Outlined">
+                <Start>
+                    <RadzenCheckBox @bind-Value="@model.FrontChannelLogoutSessionRequired" TriState="true" Name="fclSessionRequired" />
+                </Start>
+                <ChildContent>
+                    <RadzenLabel Text="Require session ID for front-channel logout" Component="fclSessionRequired" />
+                </ChildContent>
+            </RadzenFormField>
+        </RadzenStack>
+    </RadzenStack>
+    <RadzenStack Gap="0.75rem" class="rz-mt-4 rz-mb-4">
+        <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">External Integrations</RadzenText>
+        <RadzenStack Gap="1rem">
+            <RadzenFormField Text="Allowed CORS Origins" Variant="Variant.Outlined">
+                <ChildContent>
+                    <RadzenTextArea @bind-Value="@model.AllowedCorsOrigins" Style="width: 100%; height: 80px;" Placeholder="https://app1.example.com&#10;https://app2.example.com" />
+                </ChildContent>
+                <Helper>
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                        One origin per line. Required for browser-based applications.
+                    </RadzenText>
+                </Helper>
+            </RadzenFormField>
+            <RadzenFormField Text="Allowed Identity Providers" Variant="Variant.Outlined">
+                <ChildContent>
+                    <RadzenTextArea @bind-Value="@model.AllowedIdentityProviders" Style="width: 100%; height: 60px;" Placeholder="google&#10;azure&#10;facebook" />
+                </ChildContent>
+                <Helper>
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                        Restrict which external IdPs this client can use (one per line)
+                    </RadzenText>
+                </Helper>
+            </RadzenFormField>
+        </RadzenStack>
+    </RadzenStack>
+</div>
+
+@code {
+    [Parameter] public EditClient editClient { get; set; } = null!;
+    private CreateClientRequest model => editClient.model;
+}
