@@ -5,6 +5,8 @@ using OpenIddict.Server.AspNetCore;
 using System.Security.Claims;
 using Microsoft.AspNetCore;
 using MrWho.Services;
+using MrWho.Data; // add db
+using Microsoft.EntityFrameworkCore; // include for Include
 
 namespace MrWho.Handlers;
 
@@ -20,19 +22,22 @@ public class TokenHandler : ITokenHandler
     private readonly IClientCookieConfigurationService _cookieService;
     private readonly IUserRealmValidationService _realmValidationService;
     private readonly ILogger<TokenHandler> _logger;
+    private readonly ApplicationDbContext _db;
 
     public TokenHandler(
         UserManager<IdentityUser> userManager,
         SignInManager<IdentityUser> signInManager,
         IClientCookieConfigurationService cookieService,
         IUserRealmValidationService realmValidationService,
-        ILogger<TokenHandler> logger)
+        ILogger<TokenHandler> logger,
+        ApplicationDbContext db)
     {
         _userManager = userManager;
         _signInManager = signInManager;
         _cookieService = cookieService;
         _realmValidationService = realmValidationService;
         _logger = logger;
+        _db = db;
     }
 
     public async Task<IResult> HandleTokenRequestAsync(HttpContext context)
@@ -51,7 +56,7 @@ public class TokenHandler : ITokenHandler
 
         if (request.IsClientCredentialsGrantType())
         {
-            return HandleClientCredentialsGrant(request);
+            return await HandleClientCredentialsGrantAsync(request);
         }
 
         if (request.IsAuthorizationCodeGrantType())
@@ -132,6 +137,7 @@ public class TokenHandler : ITokenHandler
 
             var principal = new ClaimsPrincipal(identity);
             principal.SetScopes(request.GetScopes());
+            await ApplyAudiencesAsync(principal, request.ClientId!, request.GetScopes());
 
             // Sign in with client-specific cookie scheme for session management
             try
@@ -159,7 +165,7 @@ public class TokenHandler : ITokenHandler
         return Results.Forbid(properties, new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
     }
 
-    private static IResult HandleClientCredentialsGrant(OpenIddictRequest request)
+    private async Task<IResult> HandleClientCredentialsGrantAsync(OpenIddictRequest request)
     {
         var identity = new ClaimsIdentity(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
         var subClaim = new Claim(OpenIddictConstants.Claims.Subject, request.ClientId!);
@@ -168,7 +174,7 @@ public class TokenHandler : ITokenHandler
 
         var principal = new ClaimsPrincipal(identity);
         principal.SetScopes(request.GetScopes());
-
+        await ApplyAudiencesAsync(principal, request.ClientId!, request.GetScopes());
         return Results.SignIn(principal, authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
     }
 
@@ -266,6 +272,7 @@ public class TokenHandler : ITokenHandler
         
         var newPrincipal = new ClaimsPrincipal(identity);
         newPrincipal.SetScopes(request.GetScopes());
+        await ApplyAudiencesAsync(newPrincipal, request.ClientId!, request.GetScopes());
 
         return Results.SignIn(newPrincipal, authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
     }
@@ -341,6 +348,7 @@ public class TokenHandler : ITokenHandler
 
         var newPrincipal = new ClaimsPrincipal(identity);
         newPrincipal.SetScopes(request.GetScopes());
+        await ApplyAudiencesAsync(newPrincipal, request.ClientId!, request.GetScopes());
 
         // Update client-specific session if available
         var clientId = request.ClientId!;
@@ -468,5 +476,39 @@ public class TokenHandler : ITokenHandler
             word.Length > 0 ? char.ToUpper(word[0]) + word.Substring(1).ToLower() : word);
 
         return string.Join(" ", capitalizedWords);
+    }
+
+    private async Task ApplyAudiencesAsync(ClaimsPrincipal principal, string clientId, IEnumerable<string> requestedScopes)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(clientId)) return;
+            if (principal.HasClaim(c => c.Type == OpenIddictConstants.Claims.Audience)) return;
+            var scopeSet = requestedScopes?.ToHashSet(StringComparer.OrdinalIgnoreCase) ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (scopeSet.Count == 0) return; // no requested scopes -> no audiences
+            var client = await _db.Clients.Include(c => c.Audiences).FirstOrDefaultAsync(c => c.ClientId == clientId);
+            if (client == null || client.Audiences.Count == 0) return;
+            var audiences = client.Audiences
+                .Select(a => a.Audience)
+                .Where(a => !string.IsNullOrWhiteSpace(a) && scopeSet.Contains(a)) // only those explicitly requested
+                .Distinct()
+                .ToList();
+            if (audiences.Count == 0) return; // none requested -> skip
+            if (audiences.Count == 1)
+            {
+                principal.SetClaim(OpenIddictConstants.Claims.Audience, audiences[0]);
+            }
+            else
+            {
+                foreach (var aud in audiences)
+                {
+                    principal.AddClaim(OpenIddictConstants.Claims.Audience, aud);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to apply audiences for client {ClientId}", clientId);
+        }
     }
 }

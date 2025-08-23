@@ -28,6 +28,7 @@ using System.Data;
 using Microsoft.AspNetCore.RateLimiting; // added
 using MrWho.Options; // for CookieSeparationMode
 using MrWho.Shared.Authentication; // for CookieSchemeNaming
+// removed invalid using OpenIddict.Server.Events
 
 namespace MrWho.Extensions;
 
