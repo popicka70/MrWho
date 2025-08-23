@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using MrWho.Shared;
 
 namespace MrWho.Models;
 
@@ -189,4 +190,21 @@ public class Realm
             return new List<string> { "totp", "sms" }; // Fallback on parse error
         }
     }
+
+    // ============================================================================
+    // REALM-LEVEL AUDIENCE CONFIGURATION DEFAULTS
+    // ============================================================================
+    
+    /// <summary>Default audience mode for clients in this realm</summary>
+    public AudienceMode? AudienceMode { get; set; }
+    
+    /// <summary>Default primary audience identifier for clients in this realm</summary>
+    [StringLength(200)]
+    public string? PrimaryAudience { get; set; }
+    
+    /// <summary>Default setting for including audience in ID token</summary>
+    public bool? IncludeAudInIdToken { get; set; }
+    
+    /// <summary>Default requirement for explicit audience scope</summary>
+    public bool? RequireExplicitAudienceScope { get; set; }
 }

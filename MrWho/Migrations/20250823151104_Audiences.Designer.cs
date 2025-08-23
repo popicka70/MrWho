@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using MrWho.Data;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace MrWho.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250823151104_Audiences")]
+    partial class Audiences
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -473,9 +476,6 @@ namespace MrWho.Migrations
                     b.Property<bool?>("AlwaysSendClientClaims")
                         .HasColumnType("boolean");
 
-                    b.Property<int?>("AudienceMode")
-                        .HasColumnType("integer");
-
                     b.Property<double?>("AuthorizationCodeLifetime")
                         .HasColumnType("double precision");
 
@@ -565,9 +565,6 @@ namespace MrWho.Migrations
                     b.Property<int?>("IdTokenLifetimeMinutes")
                         .HasColumnType("integer");
 
-                    b.Property<bool?>("IncludeAudInIdToken")
-                        .HasColumnType("boolean");
-
                     b.Property<bool?>("IncludeJwtId")
                         .HasColumnType("boolean");
 
@@ -603,10 +600,6 @@ namespace MrWho.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
 
-                    b.Property<string>("PrimaryAudience")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
                     b.Property<string>("ProtocolType")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)");
@@ -637,9 +630,6 @@ namespace MrWho.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<bool?>("RequireConsent")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool?>("RequireExplicitAudienceScope")
                         .HasColumnType("boolean");
 
                     b.Property<bool?>("RequireHttpsForCookies")
@@ -1226,9 +1216,6 @@ namespace MrWho.Migrations
                     b.Property<double>("AccessTokenLifetime")
                         .HasColumnType("double precision");
 
-                    b.Property<int?>("AudienceMode")
-                        .HasColumnType("integer");
-
                     b.Property<double>("AuthorizationCodeLifetime")
                         .HasColumnType("double precision");
 
@@ -1316,18 +1303,11 @@ namespace MrWho.Migrations
                     b.Property<TimeSpan>("IdTokenLifetime")
                         .HasColumnType("interval");
 
-                    b.Property<bool?>("IncludeAudInIdToken")
-                        .HasColumnType("boolean");
-
                     b.Property<bool>("IsEnabled")
                         .HasColumnType("boolean");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<string>("PrimaryAudience")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
@@ -1353,9 +1333,6 @@ namespace MrWho.Migrations
 
                     b.Property<double>("RefreshTokenLifetime")
                         .HasColumnType("double precision");
-
-                    b.Property<bool?>("RequireExplicitAudienceScope")
-                        .HasColumnType("boolean");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");

@@ -301,6 +301,7 @@ public partial class Client
     public virtual ICollection<ClientPostLogoutUri> PostLogoutUris { get; set; } = new List<ClientPostLogoutUri>();
     public virtual ICollection<ClientScope> Scopes { get; set; } = new List<ClientScope>();
     public virtual ICollection<ClientPermission> Permissions { get; set; } = new List<ClientPermission>();
+    public virtual ICollection<ClientAudience> Audiences { get; set; } = new List<ClientAudience>();
 
     // ============================================================================
     // HELPER METHODS FOR DYNAMIC CONFIGURATION
@@ -340,4 +341,12 @@ public partial class Client
     {
         return AuthorizationCodeLifetime ?? Realm?.AuthorizationCodeLifetime ?? TimeSpan.FromMinutes(10);
     }
+    
+    // ============================================================================
+    // AUDIENCE CONFIGURATION (CLIENT-LEVEL OVERRIDES)
+    // ============================================================================
+    public AudienceMode? AudienceMode { get; set; }
+    [StringLength(200)] public string? PrimaryAudience { get; set; }
+    public bool? IncludeAudInIdToken { get; set; }
+    public bool? RequireExplicitAudienceScope { get; set; }
 }

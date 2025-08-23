@@ -34,6 +34,13 @@ namespace MrWhoAdmin.Web.Components.Pages
         // Selections
         internal List<string> selectedScopes = new();
         internal List<string> selectedPermissions = new();
+        internal List<string> selectedAudiences = new();
+        public IReadOnlyList<string> SelectedAudiences => selectedAudiences;
+        public void SetAudiences(List<string> audiences)
+        {
+            selectedAudiences = audiences ?? new();
+            StateHasChanged();
+        }
 
         // Multi-line text backing for URIs
         internal string redirectUrisText = string.Empty;
@@ -159,6 +166,253 @@ namespace MrWhoAdmin.Web.Components.Pages
             }
         }
 
+        private CreateClientRequest MapClientToRequest(ClientDto client)
+        {
+            return new CreateClientRequest
+            {
+                ClientId = client.ClientId,
+                Name = client.Name,
+                Description = client.Description,
+                IsEnabled = client.IsEnabled,
+                RealmId = client.RealmId,
+                ClientType = client.ClientType,
+                // Flow/grant fields
+                AllowAuthorizationCodeFlow = client.AllowAuthorizationCodeFlow,
+                AllowClientCredentialsFlow = client.AllowClientCredentialsFlow,
+                AllowPasswordFlow = client.AllowPasswordFlow,
+                AllowRefreshTokenFlow = client.AllowRefreshTokenFlow,
+                RequirePkce = client.RequirePkce,
+                RequireClientSecret = client.RequireClientSecret,
+                // Dynamic fields
+                SessionTimeoutHours = client.SessionTimeoutHours,
+                UseSlidingSessionExpiration = client.UseSlidingSessionExpiration,
+                RememberMeDurationDays = client.RememberMeDurationDays,
+                RequireHttpsForCookies = client.RequireHttpsForCookies,
+                CookieSameSitePolicy = client.CookieSameSitePolicy,
+                IdTokenLifetimeMinutes = client.IdTokenLifetimeMinutes,
+                DeviceCodeLifetimeMinutes = client.DeviceCodeLifetimeMinutes,
+                AccessTokenType = client.AccessTokenType,
+                UseOneTimeRefreshTokens = client.UseOneTimeRefreshTokens,
+                MaxRefreshTokensPerUser = client.MaxRefreshTokensPerUser,
+                HashAccessTokens = client.HashAccessTokens,
+                UpdateAccessTokenClaimsOnRefresh = client.UpdateAccessTokenClaimsOnRefresh,
+                RequireConsent = client.RequireConsent,
+                AllowRememberConsent = client.AllowRememberConsent,
+                AllowAccessToUserInfoEndpoint = client.AllowAccessToUserInfoEndpoint,
+                AllowAccessToIntrospectionEndpoint = client.AllowAccessToIntrospectionEndpoint,
+                AllowAccessToRevocationEndpoint = client.AllowAccessToRevocationEndpoint,
+                IncludeJwtId = client.IncludeJwtId,
+                AlwaysSendClientClaims = client.AlwaysSendClientClaims,
+                AlwaysIncludeUserClaimsInIdToken = client.AlwaysIncludeUserClaimsInIdToken,
+                ClientClaimsPrefix = client.ClientClaimsPrefix,
+                RequireMfa = client.RequireMfa,
+                MfaGracePeriodMinutes = client.MfaGracePeriodMinutes,
+                AllowedMfaMethods = client.AllowedMfaMethods,
+                RememberMfaForSession = client.RememberMfaForSession,
+                RateLimitRequestsPerMinute = client.RateLimitRequestsPerMinute,
+                RateLimitRequestsPerHour = client.RateLimitRequestsPerHour,
+                RateLimitRequestsPerDay = client.RateLimitRequestsPerDay,
+                ThemeName = client.ThemeName,
+                CustomCssUrl = client.CustomCssUrl,
+                CustomJavaScriptUrl = client.CustomJavaScriptUrl,
+                PageTitlePrefix = client.PageTitlePrefix,
+                LogoUri = client.LogoUri,
+                ClientUri = client.ClientUri,
+                PolicyUri = client.PolicyUri,
+                TosUri = client.TosUri,
+                BackChannelLogoutUri = client.BackChannelLogoutUri,
+                BackChannelLogoutSessionRequired = client.BackChannelLogoutSessionRequired,
+                FrontChannelLogoutUri = client.FrontChannelLogoutUri,
+                FrontChannelLogoutSessionRequired = client.FrontChannelLogoutSessionRequired,
+                AllowedCorsOrigins = client.AllowedCorsOrigins,
+                AllowedIdentityProviders = client.AllowedIdentityProviders,
+                ProtocolType = client.ProtocolType,
+                EnableDetailedErrors = client.EnableDetailedErrors,
+                LogSensitiveData = client.LogSensitiveData,
+                EnableLocalLogin = client.EnableLocalLogin,
+                CustomLoginPageUrl = client.CustomLoginPageUrl,
+                CustomLogoutPageUrl = client.CustomLogoutPageUrl,
+                CustomErrorPageUrl = client.CustomErrorPageUrl,
+                // New login options
+                AllowPasskeyLogin = client.AllowPasskeyLogin,
+                AllowQrLoginQuick = client.AllowQrLoginQuick,
+                AllowQrLoginSecure = client.AllowQrLoginSecure,
+                AllowCodeLogin = client.AllowCodeLogin,
+                // Audience configuration
+                AudienceMode = client.AudienceMode,
+                PrimaryAudience = client.PrimaryAudience,
+                IncludeAudInIdToken = client.IncludeAudInIdToken,
+                RequireExplicitAudienceScope = client.RequireExplicitAudienceScope
+            };
+        }
+
+        private UpdateClientRequest BuildUpdateRequestFromModel()
+        {
+            var update = new UpdateClientRequest
+            {
+                Name = model.Name,
+                Description = model.Description,
+                IsEnabled = model.IsEnabled,
+                ClientType = model.ClientType,
+                AllowAuthorizationCodeFlow = model.AllowAuthorizationCodeFlow,
+                AllowClientCredentialsFlow = model.AllowClientCredentialsFlow,
+                AllowPasswordFlow = model.AllowPasswordFlow,
+                AllowRefreshTokenFlow = model.AllowRefreshTokenFlow,
+                RequirePkce = model.RequirePkce,
+                RequireClientSecret = model.RequireClientSecret,
+                RedirectUris = redirectUrisText?.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList() ?? new(),
+                PostLogoutUris = postLogoutUrisText?.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList() ?? new(),
+                Scopes = selectedScopes,
+                Permissions = selectedPermissions,
+                Audiences = selectedAudiences,
+                SessionTimeoutHours = model.SessionTimeoutHours,
+                UseSlidingSessionExpiration = model.UseSlidingSessionExpiration,
+                RememberMeDurationDays = model.RememberMeDurationDays,
+                RequireHttpsForCookies = model.RequireHttpsForCookies,
+                CookieSameSitePolicy = model.CookieSameSitePolicy,
+                IdTokenLifetimeMinutes = model.IdTokenLifetimeMinutes,
+                DeviceCodeLifetimeMinutes = model.DeviceCodeLifetimeMinutes,
+                AccessTokenType = model.AccessTokenType,
+                UseOneTimeRefreshTokens = model.UseOneTimeRefreshTokens,
+                MaxRefreshTokensPerUser = model.MaxRefreshTokensPerUser,
+                HashAccessTokens = model.HashAccessTokens,
+                UpdateAccessTokenClaimsOnRefresh = model.UpdateAccessTokenClaimsOnRefresh,
+                RequireConsent = model.RequireConsent,
+                AllowRememberConsent = model.AllowRememberConsent,
+                AllowAccessToUserInfoEndpoint = model.AllowAccessToUserInfoEndpoint,
+                AllowAccessToIntrospectionEndpoint = model.AllowAccessToIntrospectionEndpoint,
+                AllowAccessToRevocationEndpoint = model.AllowAccessToRevocationEndpoint,
+                IncludeJwtId = model.IncludeJwtId,
+                AlwaysSendClientClaims = model.AlwaysSendClientClaims,
+                AlwaysIncludeUserClaimsInIdToken = model.AlwaysIncludeUserClaimsInIdToken,
+                ClientClaimsPrefix = model.ClientClaimsPrefix,
+                RequireMfa = model.RequireMfa,
+                MfaGracePeriodMinutes = model.MfaGracePeriodMinutes,
+                AllowedMfaMethods = model.AllowedMfaMethods,
+                RememberMfaForSession = model.RememberMfaForSession,
+                RateLimitRequestsPerMinute = model.RateLimitRequestsPerMinute,
+                RateLimitRequestsPerHour = model.RateLimitRequestsPerHour,
+                RateLimitRequestsPerDay = model.RateLimitRequestsPerDay,
+                ThemeName = model.ThemeName,
+                CustomCssUrl = model.CustomCssUrl,
+                CustomJavaScriptUrl = model.CustomJavaScriptUrl,
+                PageTitlePrefix = model.PageTitlePrefix,
+                LogoUri = model.LogoUri,
+                ClientUri = model.ClientUri,
+                PolicyUri = model.PolicyUri,
+                TosUri = model.TosUri,
+                BackChannelLogoutUri = model.BackChannelLogoutUri,
+                BackChannelLogoutSessionRequired = model.BackChannelLogoutSessionRequired,
+                FrontChannelLogoutUri = model.FrontChannelLogoutUri,
+                FrontChannelLogoutSessionRequired = model.FrontChannelLogoutSessionRequired,
+                AllowedCorsOrigins = model.AllowedCorsOrigins,
+                AllowedIdentityProviders = model.AllowedIdentityProviders,
+                ProtocolType = model.ProtocolType,
+                EnableDetailedErrors = model.EnableDetailedErrors,
+                LogSensitiveData = model.LogSensitiveData,
+                EnableLocalLogin = model.EnableLocalLogin,
+                CustomLoginPageUrl = model.CustomLoginPageUrl,
+                CustomLogoutPageUrl = model.CustomLogoutPageUrl,
+                CustomErrorPageUrl = model.CustomErrorPageUrl,
+                // New login options
+                AllowPasskeyLogin = model.AllowPasskeyLogin,
+                AllowQrLoginQuick = model.AllowQrLoginQuick,
+                AllowQrLoginSecure = model.AllowQrLoginSecure,
+                AllowCodeLogin = model.AllowCodeLogin,
+                // Audience configuration
+                AudienceMode = model.AudienceMode,
+                PrimaryAudience = model.PrimaryAudience,
+                IncludeAudInIdToken = model.IncludeAudInIdToken,
+                RequireExplicitAudienceScope = model.RequireExplicitAudienceScope
+            };
+            update.ClientSecret = string.IsNullOrWhiteSpace(model.ClientSecret) ? null : model.ClientSecret;
+            return update;
+        }
+
+        private CreateClientRequest BuildCreateRequestFromModel()
+        {
+            return new CreateClientRequest
+            {
+                ClientId = model.ClientId,
+                ClientSecret = model.ClientSecret,
+                Name = model.Name,
+                Description = model.Description,
+                RealmId = model.RealmId,
+                IsEnabled = model.IsEnabled,
+                ClientType = model.ClientType,
+                AllowAuthorizationCodeFlow = model.AllowAuthorizationCodeFlow,
+                AllowClientCredentialsFlow = model.AllowClientCredentialsFlow,
+                AllowPasswordFlow = model.AllowPasswordFlow,
+                AllowRefreshTokenFlow = model.AllowRefreshTokenFlow,
+                RequirePkce = model.RequirePkce,
+                RequireClientSecret = model.RequireClientSecret,
+                RedirectUris = redirectUrisText?.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList() ?? new(),
+                PostLogoutUris = postLogoutUrisText?.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList() ?? new(),
+                Scopes = selectedScopes,
+                Permissions = selectedPermissions,
+                Audiences = selectedAudiences,
+                SessionTimeoutHours = model.SessionTimeoutHours,
+                UseSlidingSessionExpiration = model.UseSlidingSessionExpiration,
+                RememberMeDurationDays = model.RememberMeDurationDays,
+                RequireHttpsForCookies = model.RequireHttpsForCookies,
+                CookieSameSitePolicy = model.CookieSameSitePolicy,
+                IdTokenLifetimeMinutes = model.IdTokenLifetimeMinutes,
+                DeviceCodeLifetimeMinutes = model.DeviceCodeLifetimeMinutes,
+                AccessTokenType = model.AccessTokenType,
+                UseOneTimeRefreshTokens = model.UseOneTimeRefreshTokens,
+                MaxRefreshTokensPerUser = model.MaxRefreshTokensPerUser,
+                HashAccessTokens = model.HashAccessTokens,
+                UpdateAccessTokenClaimsOnRefresh = model.UpdateAccessTokenClaimsOnRefresh,
+                RequireConsent = model.RequireConsent,
+                AllowRememberConsent = model.AllowRememberConsent,
+                AllowAccessToUserInfoEndpoint = model.AllowAccessToUserInfoEndpoint,
+                AllowAccessToIntrospectionEndpoint = model.AllowAccessToIntrospectionEndpoint,
+                AllowAccessToRevocationEndpoint = model.AllowAccessToRevocationEndpoint,
+                IncludeJwtId = model.IncludeJwtId,
+                AlwaysSendClientClaims = model.AlwaysSendClientClaims,
+                AlwaysIncludeUserClaimsInIdToken = model.AlwaysIncludeUserClaimsInIdToken,
+                ClientClaimsPrefix = model.ClientClaimsPrefix,
+                RequireMfa = model.RequireMfa,
+                MfaGracePeriodMinutes = model.MfaGracePeriodMinutes,
+                AllowedMfaMethods = model.AllowedMfaMethods,
+                RememberMfaForSession = model.RememberMfaForSession,
+                RateLimitRequestsPerMinute = model.RateLimitRequestsPerMinute,
+                RateLimitRequestsPerHour = model.RateLimitRequestsPerHour,
+                RateLimitRequestsPerDay = model.RateLimitRequestsPerDay,
+                ThemeName = model.ThemeName,
+                CustomCssUrl = model.CustomCssUrl,
+                CustomJavaScriptUrl = model.CustomJavaScriptUrl,
+                PageTitlePrefix = model.PageTitlePrefix,
+                LogoUri = model.LogoUri,
+                ClientUri = model.ClientUri,
+                PolicyUri = model.PolicyUri,
+                TosUri = model.TosUri,
+                BackChannelLogoutUri = model.BackChannelLogoutUri,
+                BackChannelLogoutSessionRequired = model.BackChannelLogoutSessionRequired,
+                FrontChannelLogoutUri = model.FrontChannelLogoutUri,
+                FrontChannelLogoutSessionRequired = model.FrontChannelLogoutSessionRequired,
+                AllowedCorsOrigins = model.AllowedCorsOrigins,
+                AllowedIdentityProviders = model.AllowedIdentityProviders,
+                ProtocolType = model.ProtocolType,
+                EnableDetailedErrors = model.EnableDetailedErrors,
+                LogSensitiveData = model.LogSensitiveData,
+                EnableLocalLogin = model.EnableLocalLogin,
+                CustomLoginPageUrl = model.CustomLoginPageUrl,
+                CustomLogoutPageUrl = model.CustomLogoutPageUrl,
+                CustomErrorPageUrl = model.CustomErrorPageUrl,
+                // New login options
+                AllowPasskeyLogin = model.AllowPasskeyLogin,
+                AllowQrLoginQuick = model.AllowQrLoginQuick,
+                AllowQrLoginSecure = model.AllowQrLoginSecure,
+                AllowCodeLogin = model.AllowCodeLogin,
+                // Audience configuration
+                AudienceMode = model.AudienceMode,
+                PrimaryAudience = model.PrimaryAudience,
+                IncludeAudInIdToken = model.IncludeAudInIdToken,
+                RequireExplicitAudienceScope = model.RequireExplicitAudienceScope
+            };
+        }
+
         private async Task LoadClient()
         {
             isLoading = true;
@@ -167,12 +421,12 @@ namespace MrWhoAdmin.Web.Components.Pages
                 var client = await ClientsApiService.GetClientAsync(Id!);
                 if (client != null)
                 {
-                    // Map from ClientDto to CreateClientRequest with all new dynamic parameters
                     model = MapClientToRequest(client);
                     redirectUrisText = string.Join("\n", client.RedirectUris ?? new());
                     postLogoutUrisText = string.Join("\n", client.PostLogoutUris ?? new());
                     selectedScopes = client.Scopes?.ToList() ?? new();
                     selectedPermissions = client.Permissions?.ToList() ?? new();
+                    selectedAudiences = client.Audiences?.ToList() ?? new();
                     BuildScopeSelections();
                 }
             }
@@ -279,237 +533,6 @@ namespace MrWhoAdmin.Web.Components.Pages
                 Logger.LogError(ex, "RemoveIdentityLink failed for client {ClientId}", Id);
                 NotificationService.Notify(NotificationSeverity.Error, "Error", "Remove failed");
             }
-        }
-
-        private CreateClientRequest MapClientToRequest(ClientDto client)
-        {
-            return new CreateClientRequest
-            {
-                ClientId = client.ClientId,
-                Name = client.Name,
-                Description = client.Description,
-                IsEnabled = client.IsEnabled,
-                RealmId = client.RealmId,
-                ClientType = client.ClientType,
-                // Flow/grant fields
-                AllowAuthorizationCodeFlow = client.AllowAuthorizationCodeFlow,
-                AllowClientCredentialsFlow = client.AllowClientCredentialsFlow,
-                AllowPasswordFlow = client.AllowPasswordFlow,
-                AllowRefreshTokenFlow = client.AllowRefreshTokenFlow,
-                RequirePkce = client.RequirePkce,
-                RequireClientSecret = client.RequireClientSecret,
-                // Dynamic fields
-                SessionTimeoutHours = client.SessionTimeoutHours,
-                UseSlidingSessionExpiration = client.UseSlidingSessionExpiration,
-                RememberMeDurationDays = client.RememberMeDurationDays,
-                RequireHttpsForCookies = client.RequireHttpsForCookies,
-                CookieSameSitePolicy = client.CookieSameSitePolicy,
-                IdTokenLifetimeMinutes = client.IdTokenLifetimeMinutes,
-                DeviceCodeLifetimeMinutes = client.DeviceCodeLifetimeMinutes,
-                AccessTokenType = client.AccessTokenType,
-                UseOneTimeRefreshTokens = client.UseOneTimeRefreshTokens,
-                MaxRefreshTokensPerUser = client.MaxRefreshTokensPerUser,
-                HashAccessTokens = client.HashAccessTokens,
-                UpdateAccessTokenClaimsOnRefresh = client.UpdateAccessTokenClaimsOnRefresh,
-                RequireConsent = client.RequireConsent,
-                AllowRememberConsent = client.AllowRememberConsent,
-                AllowAccessToUserInfoEndpoint = client.AllowAccessToUserInfoEndpoint,
-                AllowAccessToIntrospectionEndpoint = client.AllowAccessToIntrospectionEndpoint,
-                AllowAccessToRevocationEndpoint = client.AllowAccessToRevocationEndpoint,
-                IncludeJwtId = client.IncludeJwtId,
-                AlwaysSendClientClaims = client.AlwaysSendClientClaims,
-                AlwaysIncludeUserClaimsInIdToken = client.AlwaysIncludeUserClaimsInIdToken,
-                ClientClaimsPrefix = client.ClientClaimsPrefix,
-                RequireMfa = client.RequireMfa,
-                MfaGracePeriodMinutes = client.MfaGracePeriodMinutes,
-                AllowedMfaMethods = client.AllowedMfaMethods,
-                RememberMfaForSession = client.RememberMfaForSession,
-                RateLimitRequestsPerMinute = client.RateLimitRequestsPerMinute,
-                RateLimitRequestsPerHour = client.RateLimitRequestsPerHour,
-                RateLimitRequestsPerDay = client.RateLimitRequestsPerDay,
-                ThemeName = client.ThemeName,
-                CustomCssUrl = client.CustomCssUrl,
-                CustomJavaScriptUrl = client.CustomJavaScriptUrl,
-                PageTitlePrefix = client.PageTitlePrefix,
-                LogoUri = client.LogoUri,
-                ClientUri = client.ClientUri,
-                PolicyUri = client.PolicyUri,
-                TosUri = client.TosUri,
-                BackChannelLogoutUri = client.BackChannelLogoutUri,
-                BackChannelLogoutSessionRequired = client.BackChannelLogoutSessionRequired,
-                FrontChannelLogoutUri = client.FrontChannelLogoutUri,
-                FrontChannelLogoutSessionRequired = client.FrontChannelLogoutSessionRequired,
-                AllowedCorsOrigins = client.AllowedCorsOrigins,
-                AllowedIdentityProviders = client.AllowedIdentityProviders,
-                ProtocolType = client.ProtocolType,
-                EnableDetailedErrors = client.EnableDetailedErrors,
-                LogSensitiveData = client.LogSensitiveData,
-                EnableLocalLogin = client.EnableLocalLogin,
-                CustomLoginPageUrl = client.CustomLoginPageUrl,
-                CustomLogoutPageUrl = client.CustomLogoutPageUrl,
-                CustomErrorPageUrl = client.CustomErrorPageUrl,
-                // New login options
-                AllowPasskeyLogin = client.AllowPasskeyLogin,
-                AllowQrLoginQuick = client.AllowQrLoginQuick,
-                AllowQrLoginSecure = client.AllowQrLoginSecure,
-                AllowCodeLogin = client.AllowCodeLogin
-            };
-        }
-
-        private UpdateClientRequest BuildUpdateRequestFromModel()
-        {
-            var update = new UpdateClientRequest
-            {
-                Name = model.Name,
-                Description = model.Description,
-                IsEnabled = model.IsEnabled,
-                ClientType = model.ClientType,
-                AllowAuthorizationCodeFlow = model.AllowAuthorizationCodeFlow,
-                AllowClientCredentialsFlow = model.AllowClientCredentialsFlow,
-                AllowPasswordFlow = model.AllowPasswordFlow,
-                AllowRefreshTokenFlow = model.AllowRefreshTokenFlow,
-                RequirePkce = model.RequirePkce,
-                RequireClientSecret = model.RequireClientSecret,
-                RedirectUris = redirectUrisText?.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList() ?? new(),
-                PostLogoutUris = postLogoutUrisText?.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList() ?? new(),
-                Scopes = selectedScopes,
-                Permissions = selectedPermissions,
-                SessionTimeoutHours = model.SessionTimeoutHours,
-                UseSlidingSessionExpiration = model.UseSlidingSessionExpiration,
-                RememberMeDurationDays = model.RememberMeDurationDays,
-                RequireHttpsForCookies = model.RequireHttpsForCookies,
-                CookieSameSitePolicy = model.CookieSameSitePolicy,
-                IdTokenLifetimeMinutes = model.IdTokenLifetimeMinutes,
-                DeviceCodeLifetimeMinutes = model.DeviceCodeLifetimeMinutes,
-                AccessTokenType = model.AccessTokenType,
-                UseOneTimeRefreshTokens = model.UseOneTimeRefreshTokens,
-                MaxRefreshTokensPerUser = model.MaxRefreshTokensPerUser,
-                HashAccessTokens = model.HashAccessTokens,
-                UpdateAccessTokenClaimsOnRefresh = model.UpdateAccessTokenClaimsOnRefresh,
-                RequireConsent = model.RequireConsent,
-                AllowRememberConsent = model.AllowRememberConsent,
-                AllowAccessToUserInfoEndpoint = model.AllowAccessToUserInfoEndpoint,
-                AllowAccessToIntrospectionEndpoint = model.AllowAccessToIntrospectionEndpoint,
-                AllowAccessToRevocationEndpoint = model.AllowAccessToRevocationEndpoint,
-                IncludeJwtId = model.IncludeJwtId,
-                AlwaysSendClientClaims = model.AlwaysSendClientClaims,
-                AlwaysIncludeUserClaimsInIdToken = model.AlwaysIncludeUserClaimsInIdToken,
-                ClientClaimsPrefix = model.ClientClaimsPrefix,
-                RequireMfa = model.RequireMfa,
-                MfaGracePeriodMinutes = model.MfaGracePeriodMinutes,
-                AllowedMfaMethods = model.AllowedMfaMethods,
-                RememberMfaForSession = model.RememberMfaForSession,
-                RateLimitRequestsPerMinute = model.RateLimitRequestsPerMinute,
-                RateLimitRequestsPerHour = model.RateLimitRequestsPerHour,
-                RateLimitRequestsPerDay = model.RateLimitRequestsPerDay,
-                ThemeName = model.ThemeName,
-                CustomCssUrl = model.CustomCssUrl,
-                CustomJavaScriptUrl = model.CustomJavaScriptUrl,
-                PageTitlePrefix = model.PageTitlePrefix,
-                LogoUri = model.LogoUri,
-                ClientUri = model.ClientUri,
-                PolicyUri = model.PolicyUri,
-                TosUri = model.TosUri,
-                BackChannelLogoutUri = model.BackChannelLogoutUri,
-                BackChannelLogoutSessionRequired = model.BackChannelLogoutSessionRequired,
-                FrontChannelLogoutUri = model.FrontChannelLogoutUri,
-                FrontChannelLogoutSessionRequired = model.FrontChannelLogoutSessionRequired,
-                AllowedCorsOrigins = model.AllowedCorsOrigins,
-                AllowedIdentityProviders = model.AllowedIdentityProviders,
-                ProtocolType = model.ProtocolType,
-                EnableDetailedErrors = model.EnableDetailedErrors,
-                LogSensitiveData = model.LogSensitiveData,
-                EnableLocalLogin = model.EnableLocalLogin,
-                CustomLoginPageUrl = model.CustomLoginPageUrl,
-                CustomLogoutPageUrl = model.CustomLogoutPageUrl,
-                CustomErrorPageUrl = model.CustomErrorPageUrl,
-                // New login options
-                AllowPasskeyLogin = model.AllowPasskeyLogin,
-                AllowQrLoginQuick = model.AllowQrLoginQuick,
-                AllowQrLoginSecure = model.AllowQrLoginSecure,
-                AllowCodeLogin = model.AllowCodeLogin
-            };
-
-            update.ClientSecret = string.IsNullOrWhiteSpace(model.ClientSecret) ? null : model.ClientSecret;
-            return update;
-        }
-
-        private CreateClientRequest BuildCreateRequestFromModel()
-        {
-            return new CreateClientRequest
-            {
-                ClientId = model.ClientId,
-                ClientSecret = model.ClientSecret,
-                Name = model.Name,
-                Description = model.Description,
-                RealmId = model.RealmId,
-                IsEnabled = model.IsEnabled,
-                ClientType = model.ClientType,
-                AllowAuthorizationCodeFlow = model.AllowAuthorizationCodeFlow,
-                AllowClientCredentialsFlow = model.AllowClientCredentialsFlow,
-                AllowPasswordFlow = model.AllowPasswordFlow,
-                AllowRefreshTokenFlow = model.AllowRefreshTokenFlow,
-                RequirePkce = model.RequirePkce,
-                RequireClientSecret = model.RequireClientSecret,
-                RedirectUris = redirectUrisText?.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList() ?? new(),
-                PostLogoutUris = postLogoutUrisText?.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList() ?? new(),
-                Scopes = selectedScopes,
-                Permissions = selectedPermissions,
-                SessionTimeoutHours = model.SessionTimeoutHours,
-                UseSlidingSessionExpiration = model.UseSlidingSessionExpiration,
-                RememberMeDurationDays = model.RememberMeDurationDays,
-                RequireHttpsForCookies = model.RequireHttpsForCookies,
-                CookieSameSitePolicy = model.CookieSameSitePolicy,
-                IdTokenLifetimeMinutes = model.IdTokenLifetimeMinutes,
-                DeviceCodeLifetimeMinutes = model.DeviceCodeLifetimeMinutes,
-                AccessTokenType = model.AccessTokenType,
-                UseOneTimeRefreshTokens = model.UseOneTimeRefreshTokens,
-                MaxRefreshTokensPerUser = model.MaxRefreshTokensPerUser,
-                HashAccessTokens = model.HashAccessTokens,
-                UpdateAccessTokenClaimsOnRefresh = model.UpdateAccessTokenClaimsOnRefresh,
-                RequireConsent = model.RequireConsent,
-                AllowRememberConsent = model.AllowRememberConsent,
-                AllowAccessToUserInfoEndpoint = model.AllowAccessToUserInfoEndpoint,
-                AllowAccessToIntrospectionEndpoint = model.AllowAccessToIntrospectionEndpoint,
-                AllowAccessToRevocationEndpoint = model.AllowAccessToRevocationEndpoint,
-                IncludeJwtId = model.IncludeJwtId,
-                AlwaysSendClientClaims = model.AlwaysSendClientClaims,
-                AlwaysIncludeUserClaimsInIdToken = model.AlwaysIncludeUserClaimsInIdToken,
-                ClientClaimsPrefix = model.ClientClaimsPrefix,
-                RequireMfa = model.RequireMfa,
-                MfaGracePeriodMinutes = model.MfaGracePeriodMinutes,
-                AllowedMfaMethods = model.AllowedMfaMethods,
-                RememberMfaForSession = model.RememberMfaForSession,
-                RateLimitRequestsPerMinute = model.RateLimitRequestsPerMinute,
-                RateLimitRequestsPerHour = model.RateLimitRequestsPerHour,
-                RateLimitRequestsPerDay = model.RateLimitRequestsPerDay,
-                ThemeName = model.ThemeName,
-                CustomCssUrl = model.CustomCssUrl,
-                CustomJavaScriptUrl = model.CustomJavaScriptUrl,
-                PageTitlePrefix = model.PageTitlePrefix,
-                LogoUri = model.LogoUri,
-                ClientUri = model.ClientUri,
-                PolicyUri = model.PolicyUri,
-                TosUri = model.TosUri,
-                BackChannelLogoutUri = model.BackChannelLogoutUri,
-                BackChannelLogoutSessionRequired = model.BackChannelLogoutSessionRequired,
-                FrontChannelLogoutUri = model.FrontChannelLogoutUri,
-                FrontChannelLogoutSessionRequired = model.FrontChannelLogoutSessionRequired,
-                AllowedCorsOrigins = model.AllowedCorsOrigins,
-                AllowedIdentityProviders = model.AllowedIdentityProviders,
-                ProtocolType = model.ProtocolType,
-                EnableDetailedErrors = model.EnableDetailedErrors,
-                LogSensitiveData = model.LogSensitiveData,
-                EnableLocalLogin = model.EnableLocalLogin,
-                CustomLoginPageUrl = model.CustomLoginPageUrl,
-                CustomLogoutPageUrl = model.CustomLogoutPageUrl,
-                CustomErrorPageUrl = model.CustomErrorPageUrl,
-                // New login options
-                AllowPasskeyLogin = model.AllowPasskeyLogin,
-                AllowQrLoginQuick = model.AllowQrLoginQuick,
-                AllowQrLoginSecure = model.AllowQrLoginSecure,
-                AllowCodeLogin = model.AllowCodeLogin
-            };
         }
 
         internal bool IsMethodSelected(string method)

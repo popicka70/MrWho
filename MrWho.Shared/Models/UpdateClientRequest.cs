@@ -32,6 +32,7 @@ public class UpdateClientRequest
     public List<string>? PostLogoutUris { get; set; }
     public List<string>? Scopes { get; set; }
     public List<string>? Permissions { get; set; }
+    public List<string>? Audiences { get; set; }
 
     // === DYNAMIC CONFIGURATION PARAMETERS ===
 
@@ -147,4 +148,11 @@ public class UpdateClientRequest
     public bool? AllowQrLoginQuick { get; set; }
     public bool? AllowQrLoginSecure { get; set; }
     public bool? AllowCodeLogin { get; set; }
+
+    // Audience Configuration
+    public AudienceMode? AudienceMode { get; set; }
+    [StringLength(200)]
+    public string? PrimaryAudience { get; set; }
+    public bool? IncludeAudInIdToken { get; set; }
+    public bool? RequireExplicitAudienceScope { get; set; }
 }

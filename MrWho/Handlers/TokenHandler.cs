@@ -5,6 +5,10 @@ using OpenIddict.Server.AspNetCore;
 using System.Security.Claims;
 using Microsoft.AspNetCore;
 using MrWho.Services;
+using MrWho.Data; // add db
+using Microsoft.EntityFrameworkCore; // include for Include
+using MrWho.Shared; // for AudienceMode
+using static OpenIddict.Abstractions.OpenIddictConstants; // for Destinations & claims
 
 namespace MrWho.Handlers;
 
@@ -20,19 +24,22 @@ public class TokenHandler : ITokenHandler
     private readonly IClientCookieConfigurationService _cookieService;
     private readonly IUserRealmValidationService _realmValidationService;
     private readonly ILogger<TokenHandler> _logger;
+    private readonly ApplicationDbContext _db;
 
     public TokenHandler(
         UserManager<IdentityUser> userManager,
         SignInManager<IdentityUser> signInManager,
         IClientCookieConfigurationService cookieService,
         IUserRealmValidationService realmValidationService,
-        ILogger<TokenHandler> logger)
+        ILogger<TokenHandler> logger,
+        ApplicationDbContext db)
     {
         _userManager = userManager;
         _signInManager = signInManager;
         _cookieService = cookieService;
         _realmValidationService = realmValidationService;
         _logger = logger;
+        _db = db;
     }
 
     public async Task<IResult> HandleTokenRequestAsync(HttpContext context)
@@ -51,7 +58,7 @@ public class TokenHandler : ITokenHandler
 
         if (request.IsClientCredentialsGrantType())
         {
-            return HandleClientCredentialsGrant(request);
+            return await HandleClientCredentialsGrantAsync(request);
         }
 
         if (request.IsAuthorizationCodeGrantType())
@@ -132,6 +139,16 @@ public class TokenHandler : ITokenHandler
 
             var principal = new ClaimsPrincipal(identity);
             principal.SetScopes(request.GetScopes());
+            var audienceResult = await ApplyAudiencesAsync(principal, request.ClientId!, request.GetScopes(), context);
+            if (audienceResult.Error)
+            {
+                var forbidProps = new AuthenticationProperties(new Dictionary<string, string?>
+                {
+                    [OpenIddictServerAspNetCoreConstants.Properties.Error] = Errors.InvalidScope,
+                    [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = audienceResult.Description ?? "Required audience scope not requested"
+                });
+                return Results.Forbid(forbidProps, new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
+            }
 
             // Sign in with client-specific cookie scheme for session management
             try
@@ -159,16 +176,25 @@ public class TokenHandler : ITokenHandler
         return Results.Forbid(properties, new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
     }
 
-    private static IResult HandleClientCredentialsGrant(OpenIddictRequest request)
+    private async Task<IResult> HandleClientCredentialsGrantAsync(OpenIddictRequest request)
     {
         var identity = new ClaimsIdentity(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
-        var subClaim = new Claim(OpenIddictConstants.Claims.Subject, request.ClientId!);
-        subClaim.SetDestinations(OpenIddictConstants.Destinations.AccessToken);
+        var subClaim = new Claim(Claims.Subject, request.ClientId!);
+        subClaim.SetDestinations(Destinations.AccessToken);
         identity.AddClaim(subClaim);
 
         var principal = new ClaimsPrincipal(identity);
         principal.SetScopes(request.GetScopes());
-
+        var audienceResult = await ApplyAudiencesAsync(principal, request.ClientId!, request.GetScopes(), null);
+        if (audienceResult.Error)
+        {
+            var forbidProps = new AuthenticationProperties(new Dictionary<string, string?>
+            {
+                [OpenIddictServerAspNetCoreConstants.Properties.Error] = Errors.InvalidScope,
+                [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = audienceResult.Description ?? "Required audience scope not requested"
+            });
+            return Results.Forbid(forbidProps, new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
+        }
         return Results.SignIn(principal, authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
     }
 
@@ -266,7 +292,16 @@ public class TokenHandler : ITokenHandler
         
         var newPrincipal = new ClaimsPrincipal(identity);
         newPrincipal.SetScopes(request.GetScopes());
-
+        var audienceResult = await ApplyAudiencesAsync(newPrincipal, request.ClientId!, request.GetScopes(), context);
+        if (audienceResult.Error)
+        {
+            var forbidProps = new AuthenticationProperties(new Dictionary<string, string?>
+            {
+                [OpenIddictServerAspNetCoreConstants.Properties.Error] = Errors.InvalidScope,
+                [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = audienceResult.Description ?? "Required audience scope not requested"
+            });
+            return Results.Forbid(forbidProps, new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
+        }
         return Results.SignIn(newPrincipal, authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
     }
 
@@ -341,6 +376,16 @@ public class TokenHandler : ITokenHandler
 
         var newPrincipal = new ClaimsPrincipal(identity);
         newPrincipal.SetScopes(request.GetScopes());
+        var audienceResult = await ApplyAudiencesAsync(newPrincipal, request.ClientId!, request.GetScopes(), context);
+        if (audienceResult.Error)
+        {
+            var forbidProps = new AuthenticationProperties(new Dictionary<string, string?>
+            {
+                [OpenIddictServerAspNetCoreConstants.Properties.Error] = Errors.InvalidScope,
+                [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = audienceResult.Description ?? "Required audience scope not requested"
+            });
+            return Results.Forbid(forbidProps, new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
+        }
 
         // Update client-specific session if available
         var clientId = request.ClientId!;
@@ -468,5 +513,76 @@ public class TokenHandler : ITokenHandler
             word.Length > 0 ? char.ToUpper(word[0]) + word.Substring(1).ToLower() : word);
 
         return string.Join(" ", capitalizedWords);
+    }
+
+    private sealed record AudienceApplyResult(bool Error, string? Description = null);
+
+    private async Task<AudienceApplyResult> ApplyAudiencesAsync(ClaimsPrincipal principal, string clientId, IEnumerable<string> requestedScopes, HttpContext? httpContext)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(clientId)) return new(false);
+            var scopeSet = requestedScopes?.ToHashSet(StringComparer.OrdinalIgnoreCase) ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var client = await _db.Clients.Include(c => c.Audiences).Include(c=>c.Realm).FirstOrDefaultAsync(c => c.ClientId == clientId);
+            if (client == null) return new(false);
+            var mode = client.AudienceMode ?? client.Realm?.AudienceMode ?? AudienceMode.RequestedIntersection;
+            var includeInId = client.IncludeAudInIdToken ?? client.Realm?.IncludeAudInIdToken ?? true;
+            var explicitRequired = client.RequireExplicitAudienceScope ?? client.Realm?.RequireExplicitAudienceScope ?? false;
+            var primary = client.PrimaryAudience ?? client.Realm?.PrimaryAudience;
+            var configured = client.Audiences.Select(a => a.Audience).Where(a=>!string.IsNullOrWhiteSpace(a)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            if (configured.Count==0 || mode==AudienceMode.None) return new(false);
+            var intersection = configured.Where(a => scopeSet.Contains(a)).ToList();
+
+            List<string> result = new();
+            switch (mode)
+            {
+                case AudienceMode.RequestedIntersection:
+                    result = intersection; break;
+                case AudienceMode.AllConfigured:
+                    result = configured; break;
+                case AudienceMode.RequestedOrAll:
+                    result = intersection.Count>0 ? intersection : configured; break;
+                case AudienceMode.RequestedOrPrimary:
+                    if (intersection.Count>0) result = intersection;
+                    else if (!string.IsNullOrWhiteSpace(primary) && configured.Contains(primary, StringComparer.OrdinalIgnoreCase)) result = new(){primary!};
+                    else result = new(){configured.First()};
+                    break;
+                case AudienceMode.ErrorIfUnrequested:
+                    if (intersection.Count==0)
+                        return new(true, "Required audience scope missing");
+                    result = intersection; break;
+                case AudienceMode.AccessTokenOnly:
+                    result = intersection; break;
+            }
+
+            if (explicitRequired && intersection.Count==0 && mode != AudienceMode.AllConfigured)
+            {
+                // explicit flag demands at least one requested audience
+                return new(true, "Explicit audience scope required");
+            }
+
+            if (result.Count==0) return new(false);
+            if (principal.HasClaim(c=>c.Type==Claims.Audience)) return new(false);
+
+            foreach (var aud in result.Distinct())
+            {
+                var claim = new Claim(Claims.Audience, aud);
+                if (mode == AudienceMode.AccessTokenOnly || !includeInId)
+                {
+                    claim.SetDestinations(Destinations.AccessToken);
+                }
+                else
+                {
+                    claim.SetDestinations(Destinations.AccessToken, Destinations.IdentityToken);
+                }
+                (principal.Identity as ClaimsIdentity)!.AddClaim(claim);
+            }
+            return new(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to apply audiences for client {ClientId}", clientId);
+            return new(false);
+        }
     }
 }
