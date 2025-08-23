@@ -9,6 +9,9 @@ using OpenTelemetry.Exporter;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
+using Serilog;
+using Serilog.Events;
+using Serilog.Sinks.GoogleCloudLogging; // Added for GoogleCloudLogging sink
 
 namespace Microsoft.Extensions.Hosting;
 
@@ -22,7 +25,8 @@ public static class Extensions
 
     public static TBuilder AddServiceDefaults<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
-        builder.ConfigureOpenTelemetry();
+        builder.ConfigureSerilog();
+        //builder.ConfigureOpenTelemetry();
 
         builder.AddDefaultHealthChecks();
 
@@ -75,19 +79,8 @@ public static class Extensions
                     .AddHttpClientInstrumentation()
                     .AddOtlpExporter(options =>
                     {
-                        // Google Cloud Operations (Cloud Trace) OTLP HTTP endpoint
-                        options.Endpoint = new Uri("https://otlp.googleapis.com/v1/traces");
-                        options.Protocol = OtlpExportProtocol.HttpProtobuf;
                     });
 
-            }).WithLogging(logging =>
-            {
-                logging.AddOtlpExporter(options =>
-                {
-                    // Google Cloud Operations (Cloud Logging) OTLP HTTP endpoint
-                    options.Endpoint = new Uri("https://otlp.googleapis.com/v1/logs");
-                    options.Protocol = OtlpExportProtocol.HttpProtobuf;
-                });
             });
 
         builder.AddOpenTelemetryExporters();
@@ -111,6 +104,42 @@ public static class Extensions
         //    builder.Services.AddOpenTelemetry()
         //       .UseAzureMonitor();
         //}
+
+        return builder;
+    }
+
+    public static TBuilder ConfigureSerilog<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
+    {
+        // Clear default providers so Serilog is the single source (OpenTelemetry provider added separately)
+        builder.Logging.ClearProviders();
+
+        var keyFilePath = builder.Configuration["environmentVariables:GOOGLE_APPLICATION_CREDENTIALS"];
+        Environment.SetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS", keyFilePath);
+        var googleCloudProject = builder.Configuration["environmentVariables:GOOGLE_CLOUD_PROJECT"];
+        Environment.SetEnvironmentVariable("GOOGLE_CLOUD_PROJECT", googleCloudProject);
+
+        var projectId = builder.Configuration["Google:ProjectId"] ??
+                        Environment.GetEnvironmentVariable("GOOGLE_CLOUD_PROJECT");
+
+        var loggerConfiguration = new LoggerConfiguration()
+            .ReadFrom.Configuration(builder.Configuration)
+            .Enrich.FromLogContext()
+            .Enrich.WithProperty("Application", builder.Environment.ApplicationName)
+            .MinimumLevel.Override("Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddleware", LogEventLevel.Error)
+            .MinimumLevel.Override("Microsoft.Hosting.Lifetime", LogEventLevel.Information)
+            .WriteTo.Console();
+
+        if (!string.IsNullOrWhiteSpace(projectId))
+        {
+            loggerConfiguration.WriteTo.GoogleCloudLogging(projectId: projectId, logName: "MrWho");
+        }
+
+        var logger = loggerConfiguration.CreateLogger();
+        Log.Logger = logger; // For static Log usage
+
+        logger.Information("Ready");
+
+        builder.Logging.AddSerilog(logger, dispose: true);
 
         return builder;
     }
