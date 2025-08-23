@@ -301,6 +301,7 @@ public partial class Client
     public virtual ICollection<ClientPostLogoutUri> PostLogoutUris { get; set; } = new List<ClientPostLogoutUri>();
     public virtual ICollection<ClientScope> Scopes { get; set; } = new List<ClientScope>();
     public virtual ICollection<ClientPermission> Permissions { get; set; } = new List<ClientPermission>();
+    public virtual ICollection<ClientAudience> Audiences { get; set; } = new List<ClientAudience>();
 
     // ============================================================================
     // HELPER METHODS FOR DYNAMIC CONFIGURATION

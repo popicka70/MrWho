@@ -34,6 +34,13 @@ namespace MrWhoAdmin.Web.Components.Pages
         // Selections
         internal List<string> selectedScopes = new();
         internal List<string> selectedPermissions = new();
+        internal List<string> selectedAudiences = new();
+        public IReadOnlyList<string> SelectedAudiences => selectedAudiences;
+        public void SetAudiences(List<string> audiences)
+        {
+            selectedAudiences = audiences ?? new();
+            StateHasChanged();
+        }
 
         // Multi-line text backing for URIs
         internal string redirectUrisText = string.Empty;

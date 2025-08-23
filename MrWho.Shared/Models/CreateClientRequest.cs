@@ -40,6 +40,7 @@ public class CreateClientRequest
     public List<string> PostLogoutUris { get; set; } = new();
     public List<string> Scopes { get; set; } = new();
     public List<string> Permissions { get; set; } = new();
+    public List<string> Audiences { get; set; } = new();
 
     // === DYNAMIC CONFIGURATION PARAMETERS ===
 

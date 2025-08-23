@@ -99,6 +99,7 @@ public class ClientExportDto
     public List<string> PostLogoutUris { get; set; } = new();
     public List<string> Scopes { get; set; } = new();
     public List<string> Permissions { get; set; } = new();
+    public List<string> Audiences { get; set; } = new();
 
     // Assigned users (portable references - no DB IDs)
     public List<ClientAssignedUserRef> AssignedUsers { get; set; } = new();

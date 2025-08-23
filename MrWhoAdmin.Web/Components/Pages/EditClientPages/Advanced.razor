@@ -11,6 +11,14 @@
                 </RadzenText>
             </Helper>
         </RadzenFormField>
+        <RadzenFormField Text="Audiences / Resources" Variant="Variant.Outlined">
+            <ChildContent>
+                <RadzenTextArea @bind-Value="audiencesText" Style="width:100%; min-height:120px;" Placeholder="api1\napi2" Change="@(args => OnAudiencesChanged())" />
+            </ChildContent>
+            <Helper>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">One per line. Added as resource indicators (aud) in access tokens (persisted only).</RadzenText>
+            </Helper>
+        </RadzenFormField>
         <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Development Settings</RadzenText>
         <RadzenFormField Variant="Variant.Outlined">
             <Start>
@@ -82,4 +90,19 @@
 @code {
     [Parameter] public EditClient editClient { get; set; } = null!;
     private CreateClientRequest model => editClient.model;
+    private string audiencesText { get; set; } = string.Empty;
+
+    protected override void OnParametersSet()
+    {
+        audiencesText = string.Join("\n", editClient.SelectedAudiences);
+    }
+
+    private void OnAudiencesChanged()
+    {
+        var list = audiencesText.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Distinct()
+            .Where(a => a.Length <= 200)
+            .ToList();
+        editClient.SetAudiences(list);
+    }
 }

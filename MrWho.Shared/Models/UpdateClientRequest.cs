@@ -32,6 +32,7 @@ public class UpdateClientRequest
     public List<string>? PostLogoutUris { get; set; }
     public List<string>? Scopes { get; set; }
     public List<string>? Permissions { get; set; }
+    public List<string>? Audiences { get; set; }
 
     // === DYNAMIC CONFIGURATION PARAMETERS ===
 

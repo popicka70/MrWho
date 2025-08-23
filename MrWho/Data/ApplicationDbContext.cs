@@ -66,6 +66,9 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
     // Data Protection keys for antiforgery/auth cookie encryption persistence
     public DbSet<Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.DataProtectionKey> DataProtectionKeys { get; set; }
 
+    // NEW: Client audiences
+    public DbSet<ClientAudience> ClientAudiences { get; set; }
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
@@ -285,7 +288,7 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
 
         // =========================================================================
         // DEVICE MANAGEMENT CONFIGURATION
-        // =========================================================================
+        // =================================================================
 
         // Configure UserDevice entity
         builder.Entity<UserDevice>(entity =>
@@ -384,6 +387,17 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
         {
             entity.HasKey(k => k.Id);
             entity.Property(k => k.FriendlyName).HasMaxLength(256);
+        });
+
+        // NEW: ClientAudience entity configuration
+        builder.Entity<ClientAudience>(entity =>
+        {
+            entity.HasKey(a => a.Id);
+            entity.HasOne(a => a.Client)
+                  .WithMany(c => c.Audiences)
+                  .HasForeignKey(a => a.ClientId)
+                  .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(a => new { a.ClientId, a.Audience }).IsUnique();
         });
 
         // Provider-specific tuning: MySQL row size limits -> move large strings to longtext
