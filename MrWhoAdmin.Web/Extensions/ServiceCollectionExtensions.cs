@@ -224,6 +224,23 @@ public static class ServiceCollectionExtensions
         })
         .AddHttpMessageHandler<AuthenticationDelegatingHandler>();
 
+        // Client Roles API service
+        services.AddHttpClient<IClientRolesApiService, ClientRolesApiService>(client =>
+        {
+            client.BaseAddress = new Uri(mrWhoApiBaseUrl);
+            client.DefaultRequestHeaders.Add("Accept", "application/json");
+            client.Timeout = defaultTimeout;
+        })
+        .AddHttpMessageHandler<AuthenticationDelegatingHandler>();
+
+        services.AddHttpClient<IClientRoleUsersApiService, ClientRoleUsersApiService>(client =>
+        {
+            client.BaseAddress = new Uri(mrWhoApiBaseUrl);
+            client.DefaultRequestHeaders.Add("Accept", "application/json");
+            client.Timeout = defaultTimeout;
+        })
+        .AddHttpMessageHandler<AuthenticationDelegatingHandler>();
+
         // Health API service - local endpoints
         services.AddHttpClient<IHealthApiService, HealthApiService>(client =>
         {

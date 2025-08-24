@@ -69,10 +69,39 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
     // NEW: Client audiences
     public DbSet<ClientAudience> ClientAudiences { get; set; }
 
+    // NEW: Client scoped roles
+    public DbSet<ClientRole> ClientRoles { get; set; } = null!;
+    public DbSet<UserClientRole> UserClientRoles { get; set; } = null!;
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
         builder.UseOpenIddict();
+
+        // Configure ClientRole entity
+        builder.Entity<ClientRole>(entity =>
+        {
+            entity.HasKey(r => r.Id);
+            entity.Property(r => r.Name).HasMaxLength(256).IsRequired();
+            entity.Property(r => r.NormalizedName).HasMaxLength(256).IsRequired();
+            entity.Property(r => r.ClientId).IsRequired();
+            entity.HasIndex(r => new { r.ClientId, r.NormalizedName }).IsUnique();
+            entity.HasOne(r => r.Client)
+                  .WithMany(c => c.ClientRoles)
+                  .HasForeignKey(r => r.ClientId)
+                  .HasPrincipalKey(c => c.ClientId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<UserClientRole>(entity =>
+        {
+            entity.HasKey(ucr => new { ucr.UserId, ucr.ClientRoleId });
+            entity.HasOne(ucr => ucr.ClientRole)
+                  .WithMany(r => r.UserClientRoles)
+                  .HasForeignKey(ucr => ucr.ClientRoleId)
+                  .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(ucr => new { ucr.ClientRoleId, ucr.UserId });
+        });
 
         // Configure UserProfile entity
         builder.Entity<UserProfile>(entity =>
@@ -104,6 +133,7 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
         {
             entity.HasKey(c => c.Id);
             entity.HasIndex(c => c.ClientId).IsUnique();
+            entity.HasAlternateKey(c => c.ClientId); // allow foreign keys to reference public ClientId
             entity.HasOne(c => c.Realm)
                   .WithMany(r => r.Clients)
                   .HasForeignKey(c => c.RealmId)

@@ -88,6 +88,10 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ITokenStatisticsSnapshotService, TokenStatisticsSnapshotService>();
         services.AddHostedService<TokenStatisticsSnapshotHostedService>();
 
+        // Client role service
+        services.AddMemoryCache();
+        services.AddScoped<IClientRoleService, ClientRoleService>();
+
         return services;
     }
 
@@ -300,7 +304,10 @@ public static class ServiceCollectionExtensions
                                       OpenIddictConstants.Scopes.OfflineAccess, // CRITICAL: Required for refresh tokens
                                       StandardScopes.ApiRead,   // Use constant
                                       StandardScopes.ApiWrite,  // Use constant
-                                      StandardScopes.MrWhoUse); // Add mrwho.use scope
+                                      StandardScopes.MrWhoUse,
+                                      "roles.global",
+                                      "roles.client",
+                                      "roles.all");
 
                 // Register the signing and encryption credentials
                 options.AddDevelopmentEncryptionCertificate()

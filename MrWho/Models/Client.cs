@@ -302,6 +302,7 @@ public partial class Client
     public virtual ICollection<ClientScope> Scopes { get; set; } = new List<ClientScope>();
     public virtual ICollection<ClientPermission> Permissions { get; set; } = new List<ClientPermission>();
     public virtual ICollection<ClientAudience> Audiences { get; set; } = new List<ClientAudience>();
+    public virtual ICollection<ClientRole> ClientRoles { get; set; } = new List<ClientRole>();
 
     // ============================================================================
     // HELPER METHODS FOR DYNAMIC CONFIGURATION
