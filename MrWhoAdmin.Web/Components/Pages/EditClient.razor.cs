@@ -242,7 +242,8 @@ namespace MrWhoAdmin.Web.Components.Pages
                 AudienceMode = client.AudienceMode,
                 PrimaryAudience = client.PrimaryAudience,
                 IncludeAudInIdToken = client.IncludeAudInIdToken,
-                RequireExplicitAudienceScope = client.RequireExplicitAudienceScope
+                RequireExplicitAudienceScope = client.RequireExplicitAudienceScope,
+                RoleInclusionOverride = client.RoleInclusionOverride
             };
         }
 
@@ -323,7 +324,8 @@ namespace MrWhoAdmin.Web.Components.Pages
                 AudienceMode = model.AudienceMode,
                 PrimaryAudience = model.PrimaryAudience,
                 IncludeAudInIdToken = model.IncludeAudInIdToken,
-                RequireExplicitAudienceScope = model.RequireExplicitAudienceScope
+                RequireExplicitAudienceScope = model.RequireExplicitAudienceScope,
+                RoleInclusionOverride = model.RoleInclusionOverride
             };
             update.ClientSecret = string.IsNullOrWhiteSpace(model.ClientSecret) ? null : model.ClientSecret;
             return update;
@@ -409,7 +411,8 @@ namespace MrWhoAdmin.Web.Components.Pages
                 AudienceMode = model.AudienceMode,
                 PrimaryAudience = model.PrimaryAudience,
                 IncludeAudInIdToken = model.IncludeAudInIdToken,
-                RequireExplicitAudienceScope = model.RequireExplicitAudienceScope
+                RequireExplicitAudienceScope = model.RequireExplicitAudienceScope,
+                RoleInclusionOverride = model.RoleInclusionOverride
             };
         }
 

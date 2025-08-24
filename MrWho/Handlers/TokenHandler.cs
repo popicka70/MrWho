@@ -84,14 +84,29 @@ public class TokenHandler : ITokenHandler
             return RoleInclusion.GlobalAndClient;
         if (set.Contains("roles.client")) return RoleInclusion.ClientOnly;
         if (set.Contains("roles.global")) return RoleInclusion.GlobalOnly;
-        // default include both for backward compatibility when standard roles scope requested
         if (set.Contains(Scopes.Roles)) return RoleInclusion.GlobalAndClient;
-        return RoleInclusion.GlobalOnly; // fallback conservative
+        return RoleInclusion.GlobalOnly;
     }
 
     private async Task AddRolesAsync(ClaimsIdentity identity, IdentityUser user, string clientId, IEnumerable<string> scopes)
     {
-        var inclusion = ResolveRoleInclusion(scopes);
+        // Load client once to inspect override
+        var client = await _db.Clients.FirstOrDefaultAsync(c => c.ClientId == clientId);
+        RoleInclusion inclusion;
+        if (client?.RoleInclusionOverride != null)
+        {
+            inclusion = client.RoleInclusionOverride.Value switch
+            {
+                ClientRoleInclusionOverride.GlobalOnly => RoleInclusion.GlobalOnly,
+                ClientRoleInclusionOverride.ClientOnly => RoleInclusion.ClientOnly,
+                ClientRoleInclusionOverride.GlobalAndClient => RoleInclusion.GlobalAndClient,
+                _ => ResolveRoleInclusion(scopes)
+            };
+        }
+        else
+        {
+            inclusion = ResolveRoleInclusion(scopes);
+        }
         if (inclusion == RoleInclusion.GlobalOnly || inclusion == RoleInclusion.GlobalAndClient || scopes.Contains(Scopes.Roles))
         {
             var globalRoles = await _userManager.GetRolesAsync(user);

@@ -1,3 +1,5 @@
+@using MrWho.Shared
+
 <RadzenStack Gap="0.75rem" class="rz-mb-4">
     <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Token Claims</RadzenText>
     <RadzenStack Gap="1rem">
@@ -35,10 +37,25 @@
                 </RadzenText>
             </Helper>
         </RadzenFormField>
+        <RadzenFormField Text="Role Inclusion Override" Variant="Variant.Outlined">
+            <ChildContent>
+                <RadzenDropDown @bind-Value="model.RoleInclusionOverride" Data="roleInclusionOptions" TextProperty="Text" ValueProperty="Value" Style="width: 100%;" AllowClear="true" />
+            </ChildContent>
+            <Helper>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                    When set, overrides scope-based role resolution. Null = use scopes (roles / roles.global / roles.client / roles.all)
+                </RadzenText>
+            </Helper>
+        </RadzenFormField>
     </RadzenStack>
 </RadzenStack>
 
 @code {
     [Parameter] public EditClient editClient { get; set; } = null!;
     private CreateClientRequest model => editClient.model;
+    private IEnumerable<object> roleInclusionOptions => new [] {
+        new { Text = "Global only", Value = (ClientRoleInclusionOverride?)ClientRoleInclusionOverride.GlobalOnly },
+        new { Text = "Client only", Value = (ClientRoleInclusionOverride?)ClientRoleInclusionOverride.ClientOnly },
+        new { Text = "Global + Client", Value = (ClientRoleInclusionOverride?)ClientRoleInclusionOverride.GlobalAndClient }
+    };
 }

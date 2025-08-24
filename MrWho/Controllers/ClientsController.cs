@@ -154,7 +154,8 @@ public class ClientsController : ControllerBase
                 AudienceMode = c.AudienceMode,
                 PrimaryAudience = c.PrimaryAudience,
                 IncludeAudInIdToken = c.IncludeAudInIdToken,
-                RequireExplicitAudienceScope = c.RequireExplicitAudienceScope
+                RequireExplicitAudienceScope = c.RequireExplicitAudienceScope,
+                RoleInclusionOverride = c.RoleInclusionOverride
             })
             .ToListAsync();
 
@@ -272,7 +273,8 @@ public class ClientsController : ControllerBase
             AudienceMode = client.AudienceMode,
             PrimaryAudience = client.PrimaryAudience,
             IncludeAudInIdToken = client.IncludeAudInIdToken,
-            RequireExplicitAudienceScope = client.RequireExplicitAudienceScope
+            RequireExplicitAudienceScope = client.RequireExplicitAudienceScope,
+            RoleInclusionOverride = client.RoleInclusionOverride
         };
 
         return Ok(clientDto);
@@ -610,6 +612,7 @@ public class ClientsController : ControllerBase
                 client.PrimaryAudience = dto.PrimaryAudience;
                 client.IncludeAudInIdToken = dto.IncludeAudInIdToken;
                 client.RequireExplicitAudienceScope = dto.RequireExplicitAudienceScope;
+                client.RoleInclusionOverride = dto.RoleInclusionOverride;
 
                 client.UpdatedAt = now;
                 client.UpdatedBy = userName;
@@ -873,7 +876,8 @@ public class ClientsController : ControllerBase
                     AudienceMode = request.AudienceMode,
                     PrimaryAudience = request.PrimaryAudience,
                     IncludeAudInIdToken = request.IncludeAudInIdToken,
-                    RequireExplicitAudienceScope = request.RequireExplicitAudienceScope
+                    RequireExplicitAudienceScope = request.RequireExplicitAudienceScope,
+                    RoleInclusionOverride = request.RoleInclusionOverride
                 };
 
                 _context.Clients.Add(client);
@@ -977,6 +981,7 @@ public class ClientsController : ControllerBase
                     PrimaryAudience = client.PrimaryAudience,
                     IncludeAudInIdToken = client.IncludeAudInIdToken,
                     RequireExplicitAudienceScope = client.RequireExplicitAudienceScope,
+                    RoleInclusionOverride = client.RoleInclusionOverride,
                     AllowPasskeyLogin = client.AllowPasskeyLogin,
                     AllowQrLoginQuick = client.AllowQrLoginQuick,
                     AllowQrLoginSecure = client.AllowQrLoginSecure,
@@ -1126,6 +1131,7 @@ public class ClientsController : ControllerBase
                 client.PrimaryAudience = request.PrimaryAudience;
                 client.IncludeAudInIdToken = request.IncludeAudInIdToken;
                 client.RequireExplicitAudienceScope = request.RequireExplicitAudienceScope;
+                client.RoleInclusionOverride = request.RoleInclusionOverride;
 
                 client.UpdatedAt = DateTime.UtcNow;
                 client.UpdatedBy = User.Identity?.Name;
