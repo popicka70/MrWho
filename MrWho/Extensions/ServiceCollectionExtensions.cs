@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies; // ensure CookieAuthenticationOptions is available
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics; // added for RelationalEventId
@@ -9,26 +8,10 @@ using MrWho.Data;
 using MrWho.Handlers;
 using MrWho.Handlers.Users; // added for user handler interfaces/implementations
 using MrWho.Services;
-using MrWho.Services.Mediator;
-using MrWho.Endpoints;
-using MrWho.Middleware;
 using OpenIddict.Abstractions;
-using OpenIddict.Server.AspNetCore;
-using Microsoft.AspNetCore;
-using System.Linq;
-using System.Reflection;
-using System.Runtime.Loader; // added for AssemblyLoadContext
-using System.Security.Claims;
-using Microsoft.AspNetCore.Mvc;
-using static OpenIddict.Abstractions.OpenIddictConstants;
 using MrWho.Shared;
-using Microsoft.AspNetCore.HttpOverrides;
-using MrWho.Models; // added for UserProfile, UserState
-using System.Data;
-using Microsoft.AspNetCore.RateLimiting; // added
 using MrWho.Options; // for CookieSeparationMode
 using MrWho.Shared.Authentication; // for CookieSchemeNaming
-// removed invalid using OpenIddict.Server.Events
 
 namespace MrWho.Extensions;
 
@@ -57,7 +40,8 @@ public static class ServiceCollectionExtensions
 
         // CORRECTED: Add complete dynamic client cookie registration system
         services.AddHostedService<DynamicClientCookieService>();
-        
+        services.AddSingleton<IDynamicClientCookieRegistrar, DynamicClientCookieRegistrar>();
+
         // Add infrastructure for dynamic cookie options
         services.AddSingleton<IConfigureNamedOptions<CookieAuthenticationOptions>, DynamicCookieOptionsConfigurator>();
 

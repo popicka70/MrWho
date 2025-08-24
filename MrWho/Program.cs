@@ -34,20 +34,17 @@ builder.Services.AddDataProtection()
 
 // Use new client-specific cookie configuration instead of standard Identity
 builder.Services.AddMrWhoIdentityWithClientCookies();
-builder.Services.AddMrWhoServices(); // This now includes device management services
-builder.Services.AddMrWhoClientCookies(builder.Configuration); // Add client-specific cookies using config-driven naming
+builder.Services.AddMrWhoServices(); // includes registrar & hosted service
+builder.Services.AddMrWhoClientCookies(builder.Configuration); // config-driven naming
 builder.Services.AddMrWhoOpenIddict(builder.Configuration);
 
-// Add OpenIddict client for upstream OIDC brokering
+// OpenIddict client for upstream OIDC
 builder.Services.AddOpenIddict()
     .AddClient(options =>
     {
-        // Enable the authorization code flow and map the redirection URIs
         options.AllowAuthorizationCodeFlow();
         options.SetRedirectionEndpointUris("/connect/external/callback");
         options.SetPostLogoutRedirectionEndpointUris("/connect/external/signout-callback");
-
-        // Register development or ephemeral keys required for interactive flows
         if (builder.Environment.IsDevelopment())
         {
             options.AddDevelopmentEncryptionCertificate()
@@ -58,54 +55,39 @@ builder.Services.AddOpenIddict()
             options.AddEphemeralEncryptionKey()
                    .AddEphemeralSigningKey();
         }
-
-        // Register the System.Net.Http integration for discovery/back-channel
         options.UseSystemNetHttp();
-
-        // Enable the ASP.NET Core host integration
         options.UseAspNetCore()
                .EnableRedirectionEndpointPassthrough()
                .EnablePostLogoutRedirectionEndpointPassthrough();
-
-        // Register the web provider integrations container
         options.UseWebProviders();
-
-        // Registrations will be added later from DB via the configurator
     });
 
-// Register dynamic client registrations from database
 builder.Services.AddSingleton<IConfigureOptions<OpenIddictClientOptions>, ExternalIdpClientOptionsConfigurator>();
-// Ensure redirect URIs are absolute if missing in registrations
 builder.Services.AddSingleton<IPostConfigureOptions<OpenIddictClientOptions>, OpenIddictClientOptionsPostConfigurator>();
 
-builder.Services.AddMrWhoAuthorizationWithClientCookies(); // Use authorization with client cookie support
-builder.Services.AddMrWhoMediator(); // Lightweight mediator + endpoint handlers
+builder.Services.AddMrWhoAuthorizationWithClientCookies();
+builder.Services.AddMrWhoMediator();
 
-// Register helpers
 builder.Services.AddScoped<ILogoutHelper, LogoutHelper>();
 builder.Services.AddScoped<ILoginHelper, LoginHelper>();
 
-// Global cookie overrides from configuration (domain, HTTPS)
 var configuredCookieDomain = builder.Configuration["Cookie:Domain"];
 var configuredRequireHttps = string.Equals(builder.Configuration["Cookie:RequireHttps"], "true", StringComparison.OrdinalIgnoreCase);
 
 builder.Services.PostConfigureAll<CookieAuthenticationOptions>(options =>
 {
-    // Only apply an explicit cookie domain when not running in Development.
-    // In Development we typically use https://localhost which cannot set a cookie for another domain.
     if (!builder.Environment.IsDevelopment() && !string.IsNullOrWhiteSpace(configuredCookieDomain))
     {
         options.Cookie.Domain = configuredCookieDomain;
     }
-    // Respect RequireHttps override (safe in dev too, we use https://localhost)
     if (configuredRequireHttps)
     {
         options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-        options.Cookie.SameSite = SameSiteMode.Lax; // keep Lax for OIDC redirects
+        options.Cookie.SameSite = SameSiteMode.Lax;
     }
 });
 
-// WebAuthn/FIDO2 config (attestation none, userVerification required)
+// WebAuthn
 var rpId = builder.Configuration["WebAuthn:RelyingPartyId"] ?? new Uri(builder.Configuration["OpenIddict:Issuer"] ?? "https://localhost:7113").Host;
 var rpName = builder.Configuration["WebAuthn:RelyingPartyName"] ?? "MrWho";
 var origins = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "https://localhost:7113", "http://localhost:7113" };
@@ -118,18 +100,13 @@ builder.Services.AddSingleton(new Fido2(new Fido2Configuration
     Origins = origins
 }));
 
-// Honor X-Forwarded-* headers from the hosting platform (Railway/reverse proxies)
-// so Request.Scheme becomes https and OpenIddict doesn't reject requests.
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
-    // Trust all proxy networks by default (Railway manages TLS). If you have fixed proxies,
-    // replace with explicit KnownNetworks/KnownProxies entries.
     options.KnownNetworks.Clear();
     options.KnownProxies.Clear();
 });
 
-// Add distributed cache and session support for client tracking
 builder.Services.AddDistributedMemoryCache();
 builder.Services.AddSession(options =>
 {
@@ -137,7 +114,6 @@ builder.Services.AddSession(options =>
     options.Cookie.HttpOnly = true;
     options.Cookie.IsEssential = true;
     options.Cookie.Name = ".MrWho.Session";
-    // Only apply cookie domain outside Development to avoid localhost domain mismatch
     if (!builder.Environment.IsDevelopment() && !string.IsNullOrWhiteSpace(configuredCookieDomain))
     {
         options.Cookie.Domain = configuredCookieDomain;
@@ -149,8 +125,6 @@ builder.Services.AddSession(options =>
     }
 });
 
-// Configure per-IP rate limiting for sensitive endpoints (login, register, token, etc.)
-// Limits are configurable via appsettings: RateLimiting:LoginPerHour, RegisterPerHour, TokenPerHour, AuthorizePerHour, UserInfoPerHour
 var rlSection = builder.Configuration.GetSection("RateLimiting");
 int loginPerHour = rlSection.GetValue<int?>("LoginPerHour") ?? 20;
 int registerPerHour = rlSection.GetValue<int?>("RegisterPerHour") ?? 5;
@@ -158,108 +132,36 @@ int tokenPerHour = rlSection.GetValue<int?>("TokenPerHour") ?? 60;
 int authorizePerHour = rlSection.GetValue<int?>("AuthorizePerHour") ?? 120;
 int userInfoPerHour = rlSection.GetValue<int?>("UserInfoPerHour") ?? 240;
 
-static string GetIp(HttpContext context)
-{
-    var ip = context.Connection.RemoteIpAddress?.ToString();
-    if (string.IsNullOrWhiteSpace(ip)) return "unknown";
-    return ip;
-}
+static string GetIp(HttpContext context) => context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
 
 builder.Services.AddRateLimiter(options =>
 {
-    options.OnRejected = (context, token) =>
-    {
-        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
-        return ValueTask.CompletedTask;
-    };
-
-    // Fixed 1-hour windows per IP
-    options.AddPolicy("rl.login", httpContext =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: GetIp(httpContext),
-            factory: _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = Math.Max(1, loginPerHour),
-                Window = TimeSpan.FromHours(1),
-                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-                QueueLimit = 0,
-                AutoReplenishment = true
-            }));
-
-    options.AddPolicy("rl.register", httpContext =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: GetIp(httpContext),
-            factory: _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = Math.Max(1, registerPerHour),
-                Window = TimeSpan.FromHours(1),
-                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-                QueueLimit = 0,
-                AutoReplenishment = true
-            }));
-
-    options.AddPolicy("rl.token", httpContext =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: GetIp(httpContext),
-            factory: _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = Math.Max(1, tokenPerHour),
-                Window = TimeSpan.FromHours(1),
-                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-                QueueLimit = 0,
-                AutoReplenishment = true
-            }));
-
-    options.AddPolicy("rl.authorize", httpContext =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: GetIp(httpContext),
-            factory: _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = Math.Max(1, authorizePerHour),
-                Window = TimeSpan.FromHours(1),
-                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-                QueueLimit = 0,
-                AutoReplenishment = true
-            }));
-
-    options.AddPolicy("rl.userinfo", httpContext =>
-        RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: GetIp(httpContext),
-            factory: _ => new FixedWindowRateLimiterOptions
-            {
-                PermitLimit = Math.Max(1, userInfoPerHour),
-                Window = TimeSpan.FromHours(1),
-                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-                QueueLimit = 0,
-                AutoReplenishment = true
-            }));
+    options.OnRejected = (context, token) => { context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests; return ValueTask.CompletedTask; };
+    options.AddPolicy("rl.login", ctx => RateLimitPartition.GetFixedWindowLimiter(GetIp(ctx), _ => new FixedWindowRateLimiterOptions { PermitLimit = Math.Max(1, loginPerHour), Window = TimeSpan.FromHours(1), QueueProcessingOrder = QueueProcessingOrder.OldestFirst, QueueLimit = 0, AutoReplenishment = true }));
+    options.AddPolicy("rl.register", ctx => RateLimitPartition.GetFixedWindowLimiter(GetIp(ctx), _ => new FixedWindowRateLimiterOptions { PermitLimit = Math.Max(1, registerPerHour), Window = TimeSpan.FromHours(1), QueueProcessingOrder = QueueProcessingOrder.OldestFirst, QueueLimit = 0, AutoReplenishment = true }));
+    options.AddPolicy("rl.token", ctx => RateLimitPartition.GetFixedWindowLimiter(GetIp(ctx), _ => new FixedWindowRateLimiterOptions { PermitLimit = Math.Max(1, tokenPerHour), Window = TimeSpan.FromHours(1), QueueProcessingOrder = QueueProcessingOrder.OldestFirst, QueueLimit = 0, AutoReplenishment = true }));
+    options.AddPolicy("rl.authorize", ctx => RateLimitPartition.GetFixedWindowLimiter(GetIp(ctx), _ => new FixedWindowRateLimiterOptions { PermitLimit = Math.Max(1, authorizePerHour), Window = TimeSpan.FromHours(1), QueueProcessingOrder = QueueProcessingOrder.OldestFirst, QueueLimit = 0, AutoReplenishment = true }));
+    options.AddPolicy("rl.userinfo", ctx => RateLimitPartition.GetFixedWindowLimiter(GetIp(ctx), _ => new FixedWindowRateLimiterOptions { PermitLimit = Math.Max(1, userInfoPerHour), Window = TimeSpan.FromHours(1), QueueProcessingOrder = QueueProcessingOrder.OldestFirst, QueueLimit = 0, AutoReplenishment = true }));
 });
 
-// Authorization policies
 builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("RequireMfa", policy => policy.RequireClaim("amr", "mfa"));
 });
 
-// Register claims transformation service
 builder.Services.AddScoped<Microsoft.AspNetCore.Authentication.IClaimsTransformation, MrWho.Services.AmrClaimsTransformation>();
 
 var app = builder.Build();
 
-// Log current environment information
+// Explicitly register dynamic client cookie schemes BEFORE pipeline / first auth
+using (var scope = app.Services.CreateScope())
+{
+    var registrar = scope.ServiceProvider.GetRequiredService<IDynamicClientCookieRegistrar>();
+    await registrar.RegisterAllAsync();
+}
+
 var logger = app.Services.GetRequiredService<ILogger<Program>>();
-logger.LogInformation("?? MrWho OIDC Server starting up...");
-logger.LogInformation("?? Environment: {Environment}", app.Environment.EnvironmentName);
-logger.LogInformation("?? Application Name: {ApplicationName}", app.Environment.ApplicationName);
-logger.LogInformation("?? Content Root: {ContentRoot}", app.Environment.ContentRootPath);
-logger.LogInformation("?? Web Root: {WebRoot}", app.Environment.WebRootPath);
-logger.LogInformation("?? Is Development: {IsDevelopment}", app.Environment.IsDevelopment());
-logger.LogInformation("?? Is Production: {IsProduction}", app.Environment.IsProduction());
-logger.LogInformation("?? Is Staging: {IsStaging}", app.Environment.IsStaging());
-logger.LogInformation("?? Device Management: Enhanced QR login with persistent device pairing enabled");
+logger.LogInformation("MrWho OIDC Server starting...");
 
-// Configure the HTTP request pipeline using the new client-cookie-aware method
 await app.ConfigureMrWhoPipelineWithClientCookiesAsync();
-
-// Run the app
 app.Run();
