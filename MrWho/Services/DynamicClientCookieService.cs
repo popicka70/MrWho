@@ -6,6 +6,7 @@ using MrWho.Data;
 using Microsoft.EntityFrameworkCore;
 using MrWho.Shared.Authentication; // use centralized naming
 using Microsoft.AspNetCore.DataProtection; // ensure data protection is available
+using Microsoft.AspNetCore.Identity; // for IdentityConstants
 
 namespace MrWho.Services;
 
@@ -309,14 +310,38 @@ public class DynamicCookieOptionsConfigurator : IConfigureNamedOptions<CookieAut
 
     public void Configure(string? name, CookieAuthenticationOptions options)
     {
-        if (string.IsNullOrEmpty(name) || !name.StartsWith("Identity.Application."))
+        // Handle both the default Identity scheme and dynamic client schemes
+        if (string.IsNullOrEmpty(name) || 
+            (!name.StartsWith("Identity.Application") && 
+             !name.Equals(IdentityConstants.ApplicationScheme, StringComparison.Ordinal)))
         {
             return;
         }
 
         _logger.LogDebug("Configuring dynamic cookie options for scheme: {SchemeName}", name);
 
-        if (options.Cookie.Name == null)
+        // Check if this is the default Identity scheme that needs basic configuration
+        if (name.Equals(IdentityConstants.ApplicationScheme, StringComparison.Ordinal))
+        {
+            // Default Identity scheme should already be configured by ConfigureApplicationCookie
+            // Only ensure critical properties are set if they're missing
+            if (options.Cookie.Name == null)
+            {
+                _logger.LogDebug("Setting default cookie name for Identity.Application scheme");
+                options.Cookie.Name = CookieSchemeNaming.DefaultCookieName;
+            }
+            
+            // Ensure TicketDataFormat is configured for data protection
+            if (options.TicketDataFormat == null)
+            {
+                _logger.LogWarning("TicketDataFormat is null for default Identity scheme, this may cause authentication issues");
+            }
+            
+            return;
+        }
+
+        // Handle dynamic client schemes (Identity.Application.{clientId})
+        if (name.StartsWith("Identity.Application.") && options.Cookie.Name == null)
         {
             _logger.LogWarning("Cookie options not properly configured for scheme {SchemeName}, applying defaults", name);
 
@@ -332,7 +357,7 @@ public class DynamicCookieOptionsConfigurator : IConfigureNamedOptions<CookieAut
             options.LogoutPath = "/connect/logout";
             options.AccessDeniedPath = "/connect/access-denied";
         }
-        else
+        else if (name.StartsWith("Identity.Application."))
         {
             // Ensure SameSite is compatible even if name was set elsewhere
             if (options.Cookie.SameSite != SameSiteMode.None)

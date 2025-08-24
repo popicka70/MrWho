@@ -159,6 +159,32 @@ public static class ServiceCollectionExtensions
             options.SlidingExpiration = true;
             options.Cookie.SameSite = SameSiteMode.None; // Required for external IdP (cross-site) login/logout
             options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+            options.Cookie.Name = CookieSchemeNaming.DefaultCookieName; // Ensure cookie name is explicitly set
+            options.Cookie.HttpOnly = true; // Security best practice
+            options.ExpireTimeSpan = TimeSpan.FromHours(8); // Consistent with client cookies
+            
+            // Add error handling for authentication events
+            options.Events = new CookieAuthenticationEvents
+            {
+                OnRedirectToLogin = context =>
+                {
+                    // Log when redirecting to login to help debug auth issues
+                    var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<CookieAuthenticationEvents>>();
+                    logger.LogDebug("Redirecting to login from {Path} using scheme {Scheme}", 
+                        context.Request.Path, context.Scheme.Name);
+                    return Task.CompletedTask;
+                },
+                OnValidatePrincipal = context =>
+                {
+                    // This can help catch issues with malformed cookies
+                    if (context.Principal?.Identity?.IsAuthenticated != true)
+                    {
+                        var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<CookieAuthenticationEvents>>();
+                        logger.LogDebug("Principal validation failed for scheme {Scheme}", context.Scheme.Name);
+                    }
+                    return Task.CompletedTask;
+                }
+            };
         });
 
         // Add support for multiple cookie configurations
