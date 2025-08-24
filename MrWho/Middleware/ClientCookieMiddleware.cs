@@ -32,6 +32,13 @@ public class ClientCookieMiddleware
             try
             {
                 var clientId = await cookieService.GetClientIdFromRequestAsync(context);
+                
+                // If no client_id found, try to infer it from context
+                if (string.IsNullOrEmpty(clientId))
+                {
+                    clientId = InferClientIdFromContext(context);
+                }
+                
                 if (!string.IsNullOrEmpty(clientId))
                 {
                     var cookieScheme = cookieService.GetCookieSchemeForClient(clientId);
@@ -125,6 +132,50 @@ public class ClientCookieMiddleware
         }
 
         await _next(context);
+    }
+
+    /// <summary>
+    /// Attempts to infer the client_id from request context when not explicitly provided
+    /// </summary>
+    private string? InferClientIdFromContext(HttpContext context)
+    {
+        // Check referrer to see if request came from admin app
+        var referrer = context.Request.Headers.Referer.FirstOrDefault();
+        if (!string.IsNullOrEmpty(referrer))
+        {
+            try
+            {
+                var referrerUri = new Uri(referrer);
+                
+                // If referrer contains admin-related paths, assume admin client
+                if (referrerUri.AbsolutePath.Contains("/admin", StringComparison.OrdinalIgnoreCase) ||
+                    referrerUri.AbsolutePath.Contains("token-inspector", StringComparison.OrdinalIgnoreCase))
+                {
+                    _logger.LogDebug("Inferred admin client from referrer: {Referrer}", referrer);
+                    return "mrwho_admin_web";
+                }
+                
+                // Could add more inference logic here for other clients
+            }
+            catch (UriFormatException)
+            {
+                _logger.LogDebug("Invalid referrer URI format: {Referrer}", referrer);
+            }
+        }
+
+        // Check for existing authentication cookies to infer client
+        foreach (var cookie in context.Request.Cookies)
+        {
+            // Admin client cookie pattern
+            if (cookie.Key.Contains("MrWho.Admin", StringComparison.OrdinalIgnoreCase) ||
+                cookie.Key.Contains("mrwho_admin_web", StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogDebug("Inferred admin client from cookie: {CookieName}", cookie.Key);
+                return "mrwho_admin_web";
+            }
+        }
+
+        return null;
     }
 
     private static bool IsOidcEndpoint(PathString path)
