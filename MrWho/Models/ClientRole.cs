@@ -1,5 +1,4 @@
 using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
 
 namespace MrWho.Models;
 
@@ -17,10 +16,9 @@ public class ClientRole
     public string NormalizedName { get; set; } = string.Empty;
 
     [Required]
-    public string ClientId { get; set; } = string.Empty;
+    public string ClientId { get; set; } = string.Empty; // references Client.ClientId (alternate key)
 
-    [ForeignKey(nameof(ClientId))]
-    public Client Client { get; set; } = null!;
+    public Client Client { get; set; } = null!; // navigation
 
     [StringLength(40)]
     public string? ConcurrencyStamp { get; set; } = Guid.NewGuid().ToString("N");

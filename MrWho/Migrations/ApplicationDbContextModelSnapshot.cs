@@ -849,11 +849,7 @@ namespace MrWho.Migrations
 
                     b.Property<string>("ClientId")
                         .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("ClientId1")
-                        .IsRequired()
-                        .HasColumnType("text");
+                        .HasColumnType("character varying(200)");
 
                     b.Property<string>("ConcurrencyStamp")
                         .HasMaxLength(40)
@@ -870,8 +866,6 @@ namespace MrWho.Migrations
                         .HasColumnType("character varying(256)");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("ClientId1");
 
                     b.HasIndex("ClientId", "NormalizedName")
                         .IsUnique();
@@ -2085,15 +2079,10 @@ namespace MrWho.Migrations
 
             modelBuilder.Entity("MrWho.Models.ClientRole", b =>
                 {
-                    b.HasOne("MrWho.Models.Client", null)
+                    b.HasOne("MrWho.Models.Client", "Client")
                         .WithMany("ClientRoles")
                         .HasForeignKey("ClientId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("MrWho.Models.Client", "Client")
-                        .WithMany()
-                        .HasForeignKey("ClientId1")
+                        .HasPrincipalKey("ClientId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 

@@ -86,9 +86,10 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
             entity.Property(r => r.NormalizedName).HasMaxLength(256).IsRequired();
             entity.Property(r => r.ClientId).IsRequired();
             entity.HasIndex(r => new { r.ClientId, r.NormalizedName }).IsUnique();
-            entity.HasOne<Client>()
+            entity.HasOne(r => r.Client)
                   .WithMany(c => c.ClientRoles)
                   .HasForeignKey(r => r.ClientId)
+                  .HasPrincipalKey(c => c.ClientId)
                   .OnDelete(DeleteBehavior.Cascade);
         });
 
@@ -132,6 +133,7 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
         {
             entity.HasKey(c => c.Id);
             entity.HasIndex(c => c.ClientId).IsUnique();
+            entity.HasAlternateKey(c => c.ClientId); // allow foreign keys to reference public ClientId
             entity.HasOne(c => c.Realm)
                   .WithMany(r => r.Clients)
                   .HasForeignKey(c => c.RealmId)

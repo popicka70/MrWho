@@ -11,6 +11,11 @@ namespace MrWho.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.AddUniqueConstraint(
+                name: "AK_Clients_ClientId",
+                table: "Clients",
+                column: "ClientId");
+
             migrationBuilder.CreateTable(
                 name: "ClientRoles",
                 columns: table => new
@@ -18,8 +23,7 @@ namespace MrWho.Migrations
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     Name = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
                     NormalizedName = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
-                    ClientId = table.Column<string>(type: "text", nullable: false),
-                    ClientId1 = table.Column<string>(type: "text", nullable: false),
+                    ClientId = table.Column<string>(type: "character varying(200)", nullable: false),
                     ConcurrencyStamp = table.Column<string>(type: "character varying(40)", maxLength: 40, nullable: true)
                 },
                 constraints: table =>
@@ -29,13 +33,7 @@ namespace MrWho.Migrations
                         name: "FK_ClientRoles_Clients_ClientId",
                         column: x => x.ClientId,
                         principalTable: "Clients",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(
-                        name: "FK_ClientRoles_Clients_ClientId1",
-                        column: x => x.ClientId1,
-                        principalTable: "Clients",
-                        principalColumn: "Id",
+                        principalColumn: "ClientId",
                         onDelete: ReferentialAction.Cascade);
                 });
 
@@ -64,11 +62,6 @@ namespace MrWho.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "IX_ClientRoles_ClientId1",
-                table: "ClientRoles",
-                column: "ClientId1");
-
-            migrationBuilder.CreateIndex(
                 name: "IX_UserClientRoles_ClientRoleId_UserId",
                 table: "UserClientRoles",
                 columns: new[] { "ClientRoleId", "UserId" });
@@ -82,6 +75,10 @@ namespace MrWho.Migrations
 
             migrationBuilder.DropTable(
                 name: "ClientRoles");
+
+            migrationBuilder.DropUniqueConstraint(
+                name: "AK_Clients_ClientId",
+                table: "Clients");
         }
     }
 }
