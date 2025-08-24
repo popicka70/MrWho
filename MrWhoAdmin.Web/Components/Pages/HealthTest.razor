@@ -1,0 +1,175 @@
+@page "/debug/health-test"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inherits AuthenticatedComponentBase
+
+@inject IServiceProvider ServiceProvider
+@inject Radzen.NotificationService NotificationService
+@inject ILogger<HealthTest> Logger
+
+<PageTitle>Health Endpoints Test</PageTitle>
+
+<RadzenText TextStyle="TextStyle.H3" class="rz-mb-3">
+    <RadzenIcon Icon="bug_report" class="rz-me-2" />
+    Health Endpoints Test
+</RadzenText>
+
+<RadzenCard class="rz-mb-3">
+    <RadzenStack Gap="1rem">
+        <RadzenText TextStyle="TextStyle.Subtitle1">Direct Controller Test</RadzenText>
+        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+            <RadzenButton Text="Test Basic Health" Icon="health_and_safety" ButtonStyle="ButtonStyle.Primary" 
+                          Click="@(async () => await TestBasicHealthAsync())" IsBusy="@testingBasic" />
+            <RadzenButton Text="Test Liveness" Icon="favorite" ButtonStyle="ButtonStyle.Success" 
+                          Click="@(async () => await TestLivenessAsync())" IsBusy="@testingLiveness" />
+            <RadzenButton Text="Test Readiness" Icon="check_circle" ButtonStyle="ButtonStyle.Info" 
+                          Click="@(async () => await TestReadinessAsync())" IsBusy="@testingReadiness" />
+        </RadzenStack>
+    </RadzenStack>
+</RadzenCard>
+
+@if (!string.IsNullOrEmpty(testResults))
+{
+    <RadzenCard>
+        <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-mb-2">Test Results</RadzenText>
+        <pre style="background: #f5f5f5; padding: 1rem; border-radius: 4px; overflow-x: auto;">@testResults</pre>
+    </RadzenCard>
+}
+
+@code {
+    private bool testingBasic = false;
+    private bool testingLiveness = false;
+    private bool testingReadiness = false;
+    private string testResults = "";
+
+    private async Task TestBasicHealthAsync()
+    {
+        testingBasic = true;
+        testResults = "";
+        StateHasChanged();
+
+        try
+        {
+            Logger.LogInformation("Testing basic health endpoint directly");
+            
+            using var scope = ServiceProvider.CreateScope();
+            var healthController = scope.ServiceProvider.GetRequiredService<MrWhoAdmin.Web.Controllers.HealthController>();
+            
+            var result = healthController.Get();
+            
+            if (result is Microsoft.AspNetCore.Mvc.OkObjectResult okResult)
+            {
+                var json = System.Text.Json.JsonSerializer.Serialize(okResult.Value, 
+                    new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+                testResults = $"? Basic Health Test PASSED\n\n{json}";
+                NotificationService.Notify(NotificationSeverity.Success, "Success", "Basic health test passed", 3000);
+            }
+            else
+            {
+                testResults = $"? Basic Health Test FAILED\n\nUnexpected result type: {result?.GetType().Name}";
+                NotificationService.Notify(NotificationSeverity.Error, "Failed", "Basic health test failed", 3000);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error testing basic health");
+            testResults = $"? Basic Health Test ERROR\n\n{ex.Message}\n\nStack Trace:\n{ex.StackTrace}";
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Basic health test error: {ex.Message}", 5000);
+        }
+        finally
+        {
+            testingBasic = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task TestLivenessAsync()
+    {
+        testingLiveness = true;
+        testResults = "";
+        StateHasChanged();
+
+        try
+        {
+            Logger.LogInformation("Testing liveness endpoint directly");
+            
+            using var scope = ServiceProvider.CreateScope();
+            var healthController = scope.ServiceProvider.GetRequiredService<MrWhoAdmin.Web.Controllers.HealthController>();
+            
+            var result = healthController.GetLiveness();
+            
+            if (result is Microsoft.AspNetCore.Mvc.OkObjectResult okResult)
+            {
+                var json = System.Text.Json.JsonSerializer.Serialize(okResult.Value, 
+                    new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+                testResults = $"? Liveness Test PASSED\n\n{json}";
+                NotificationService.Notify(NotificationSeverity.Success, "Success", "Liveness test passed", 3000);
+            }
+            else
+            {
+                testResults = $"? Liveness Test FAILED\n\nUnexpected result type: {result?.GetType().Name}";
+                NotificationService.Notify(NotificationSeverity.Error, "Failed", "Liveness test failed", 3000);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error testing liveness");
+            testResults = $"? Liveness Test ERROR\n\n{ex.Message}\n\nStack Trace:\n{ex.StackTrace}";
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Liveness test error: {ex.Message}", 5000);
+        }
+        finally
+        {
+            testingLiveness = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task TestReadinessAsync()
+    {
+        testingReadiness = true;
+        testResults = "";
+        StateHasChanged();
+
+        try
+        {
+            Logger.LogInformation("Testing readiness endpoint directly");
+            
+            using var scope = ServiceProvider.CreateScope();
+            var healthController = scope.ServiceProvider.GetRequiredService<MrWhoAdmin.Web.Controllers.HealthController>();
+            
+            var result = await healthController.GetReadiness();
+            
+            if (result is Microsoft.AspNetCore.Mvc.OkObjectResult okResult)
+            {
+                var json = System.Text.Json.JsonSerializer.Serialize(okResult.Value, 
+                    new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+                testResults = $"? Readiness Test PASSED\n\n{json}";
+                NotificationService.Notify(NotificationSeverity.Success, "Success", "Readiness test passed", 3000);
+            }
+            else if (result is Microsoft.AspNetCore.Mvc.ObjectResult objResult)
+            {
+                var json = System.Text.Json.JsonSerializer.Serialize(objResult.Value, 
+                    new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+                testResults = $"?? Readiness Test RETURNED STATUS {objResult.StatusCode}\n\n{json}";
+                NotificationService.Notify(NotificationSeverity.Warning, "Warning", 
+                    $"Readiness test returned status {objResult.StatusCode}", 4000);
+            }
+            else
+            {
+                testResults = $"? Readiness Test FAILED\n\nUnexpected result type: {result?.GetType().Name}";
+                NotificationService.Notify(NotificationSeverity.Error, "Failed", "Readiness test failed", 3000);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error testing readiness");
+            testResults = $"? Readiness Test ERROR\n\n{ex.Message}\n\nStack Trace:\n{ex.StackTrace}";
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Readiness test error: {ex.Message}", 5000);
+        }
+        finally
+        {
+            testingReadiness = false;
+            StateHasChanged();
+        }
+    }
+}

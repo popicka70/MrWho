@@ -50,6 +50,12 @@ public static class ServiceCollectionExtensions
         // This should be automatic with Blazor Server, but we'll add it explicitly to fix the error
         services.AddAntiforgery();
         
+        // Add direct health service for local health checks
+        services.AddScoped<IDirectHealthService, DirectHealthService>();
+        
+        // Register HealthController for direct service calls
+        services.AddScoped<MrWhoAdmin.Web.Controllers.HealthController>();
+        
         // Configure HttpClient defaults for better connection management
         services.ConfigureHttpClientDefaults(builder =>
         {
@@ -218,6 +224,16 @@ public static class ServiceCollectionExtensions
         })
         .AddHttpMessageHandler<AuthenticationDelegatingHandler>();
 
+        // Health API service - local endpoints
+        services.AddHttpClient<IHealthApiService, HealthApiService>(client =>
+        {
+            // Health endpoints are local to this web application
+            // We'll set the base address dynamically in the service
+            client.DefaultRequestHeaders.Add("Accept", "application/json");
+            client.Timeout = defaultTimeout;
+        });
+        // Note: No authentication handler needed for local health endpoints
+        
         return services;
     }
 

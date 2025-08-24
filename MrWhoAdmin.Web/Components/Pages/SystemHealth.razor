@@ -1,0 +1,472 @@
+@page "/system/health"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inherits AuthenticatedComponentBase
+
+@inject IDirectHealthService DirectHealthService
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@inject Radzen.NotificationService NotificationService
+@inject ILogger<SystemHealth> _logger
+
+<PageTitle>System Health Check</PageTitle>
+
+@if (IsLoading)
+{
+    <div class="d-flex justify-content-center align-items-center" style="min-height: 50vh;">
+        <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+        <RadzenText class="rz-ml-2">Loading health checks...</RadzenText>
+    </div>
+}
+else if (!IsAuthenticated)
+{
+    @RenderAuthenticationStatus()
+}
+else
+{
+    <RadzenText TextStyle="TextStyle.H3" class="rz-mb-3">
+        <RadzenIcon Icon="health_and_safety" class="rz-me-2" />
+        System Health Check
+    </RadzenText>
+
+    <RadzenRow Gap="1.5rem" class="rz-mb-3">
+        <RadzenColumn Size="12" SizeLG="3" SizeMD="6">
+            <RadzenCard class="rz-p-3 rz-text-center">
+                @if (basicHealth != null)
+                {
+                    <RadzenIcon Icon="@(basicHealth.Status == "healthy" ? "check_circle" : "error")" 
+                               Style="@($"font-size: 2rem; color: {(basicHealth.Status == "healthy" ? "var(--rz-success)" : "var(--rz-danger)")}")" />
+                    <RadzenText TextStyle="TextStyle.H6" class="rz-mt-2 rz-mb-1">Basic Health</RadzenText>
+                    <RadzenBadge Text="@basicHealth.Status.ToUpper()" 
+                                BadgeStyle="@(basicHealth.Status == "healthy" ? BadgeStyle.Success : BadgeStyle.Danger)" />
+                }
+                else
+                {
+                    <RadzenIcon Icon="help" Style="font-size: 2rem; color: var(--rz-warning)" />
+                    <RadzenText TextStyle="TextStyle.H6" class="rz-mt-2 rz-mb-1">Basic Health</RadzenText>
+                    <RadzenBadge Text="UNKNOWN" BadgeStyle="BadgeStyle.Warning" />
+                }
+            </RadzenCard>
+        </RadzenColumn>
+
+        <RadzenColumn Size="12" SizeLG="3" SizeMD="6">
+            <RadzenCard class="rz-p-3 rz-text-center">
+                @if (livenessStatus != null)
+                {
+                    <RadzenIcon Icon="@(livenessStatus.Status == "alive" ? "favorite" : "error")" 
+                               Style="@($"font-size: 2rem; color: {(livenessStatus.Status == "alive" ? "var(--rz-success)" : "var(--rz-danger)")}")" />
+                    <RadzenText TextStyle="TextStyle.H6" class="rz-mt-2 rz-mb-1">Liveness</RadzenText>
+                    <RadzenBadge Text="@livenessStatus.Status.ToUpper()" 
+                                BadgeStyle="@(livenessStatus.Status == "alive" ? BadgeStyle.Success : BadgeStyle.Danger)" />
+                }
+                else
+                {
+                    <RadzenIcon Icon="help" Style="font-size: 2rem; color: var(--rz-warning)" />
+                    <RadzenText TextStyle="TextStyle.H6" class="rz-mt-2 rz-mb-1">Liveness</RadzenText>
+                    <RadzenBadge Text="UNKNOWN" BadgeStyle="BadgeStyle.Warning" />
+                }
+            </RadzenCard>
+        </RadzenColumn>
+
+        <RadzenColumn Size="12" SizeLG="3" SizeMD="6">
+            <RadzenCard class="rz-p-3 rz-text-center">
+                @if (readinessStatus != null)
+                {
+                    <RadzenIcon Icon="@(readinessStatus.Status == "ready" ? "check_circle" : "error")" 
+                               Style="@($"font-size: 2rem; color: {(readinessStatus.Status == "ready" ? "var(--rz-success)" : "var(--rz-danger)")}")" />
+                    <RadzenText TextStyle="TextStyle.H6" class="rz-mt-2 rz-mb-1">Readiness</RadzenText>
+                    <RadzenBadge Text="@readinessStatus.Status.ToUpper()" 
+                                BadgeStyle="@(readinessStatus.Status == "ready" ? BadgeStyle.Success : BadgeStyle.Danger)" />
+                }
+                else
+                {
+                    <RadzenIcon Icon="help" Style="font-size: 2rem; color: var(--rz-warning)" />
+                    <RadzenText TextStyle="TextStyle.H6" class="rz-mt-2 rz-mb-1">Readiness</RadzenText>
+                    <RadzenBadge Text="UNKNOWN" BadgeStyle="BadgeStyle.Warning" />
+                }
+            </RadzenCard>
+        </RadzenColumn>
+
+        <RadzenColumn Size="12" SizeLG="3" SizeMD="6">
+            <RadzenCard class="rz-p-3 rz-text-center">
+                @if (authSchemes != null)
+                {
+                    <RadzenIcon Icon="@(authSchemes.User.IsAuthenticated ? "verified_user" : "error")" 
+                               Style="@($"font-size: 2rem; color: {(authSchemes.User.IsAuthenticated ? "var(--rz-success)" : "var(--rz-danger)")}")" />
+                    <RadzenText TextStyle="TextStyle.H6" class="rz-mt-2 rz-mb-1">Authentication</RadzenText>
+                    <RadzenBadge Text="@(authSchemes.User.IsAuthenticated ? "AUTHENTICATED" : "NOT AUTHENTICATED")" 
+                                BadgeStyle="@(authSchemes.User.IsAuthenticated ? BadgeStyle.Success : BadgeStyle.Danger)" />
+                }
+                else
+                {
+                    <RadzenIcon Icon="help" Style="font-size: 2rem; color: var(--rz-warning)" />
+                    <RadzenText TextStyle="TextStyle.H6" class="rz-mt-2 rz-mb-1">Authentication</RadzenText>
+                    <RadzenBadge Text="UNKNOWN" BadgeStyle="BadgeStyle.Warning" />
+                }
+            </RadzenCard>
+        </RadzenColumn>
+    </RadzenRow>
+
+    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" class="rz-mb-3">
+        <RadzenButton Text="Refresh All" Icon="refresh" ButtonStyle="ButtonStyle.Primary" 
+                      Click="@(async () => await RefreshAllAsync())" IsBusy="@isRefreshing" />
+        <RadzenButton Text="Copy Health Report" Icon="content_copy" ButtonStyle="ButtonStyle.Light" 
+                      Click="@(async () => await CopyHealthReportAsync())" />
+        <RadzenButton Text="Download Report" Icon="download" ButtonStyle="ButtonStyle.Secondary" 
+                      Click="@(async () => await DownloadHealthReportAsync())" />
+    </RadzenStack>
+
+    @if (detailedHealth != null)
+    {
+        <RadzenRow Gap="1.5rem">
+            <!-- Detailed Health Checks -->
+            <RadzenColumn Size="12" SizeLG="8">
+                <RadzenCard class="rz-p-3">
+                    <RadzenText TextStyle="TextStyle.H6" class="rz-mb-3">
+                        <RadzenIcon Icon="analytics" class="rz-me-1" />
+                        Detailed Health Checks
+                    </RadzenText>
+                    
+                    @if (detailedHealth.Checks.Any())
+                    {
+                        @foreach (var check in detailedHealth.Checks)
+                        {
+                            var checkData = GetCheckData(check.Value);
+                            <RadzenCard Variant="Variant.Outlined" class="rz-mb-2">
+                                <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                                        <RadzenIcon Icon="@GetCheckIcon(checkData.Status)" 
+                                                   Style="@($"color: {GetCheckColor(checkData.Status)}")" />
+                                        <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-bold">
+                                            @FormatCheckName(check.Key)
+                                        </RadzenText>
+                                    </RadzenStack>
+                                    <RadzenBadge Text="@checkData.Status.ToUpper()" 
+                                                BadgeStyle="@GetCheckBadgeStyle(checkData.Status)" />
+                                </RadzenStack>
+                                
+                                @if (!string.IsNullOrEmpty(checkData.Message))
+                                {
+                                    <RadzenText class="rz-mt-2">@checkData.Message</RadzenText>
+                                }
+                                
+                                @if (checkData.AdditionalInfo.Any())
+                                {
+                                    <div class="rz-mt-2">
+                                        @foreach (var info in checkData.AdditionalInfo)
+                                        {
+                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary rz-display-block">
+                                                @info.Key: @info.Value
+                                            </RadzenText>
+                                        }
+                                    </div>
+                                }
+                            </RadzenCard>
+                        }
+                    }
+                    else
+                    {
+                        <RadzenText class="rz-color-secondary">No detailed checks available</RadzenText>
+                    }
+                </RadzenCard>
+            </RadzenColumn>
+
+            <!-- Environment Information -->
+            <RadzenColumn Size="12" SizeLG="4">
+                <RadzenCard class="rz-p-3">
+                    <RadzenText TextStyle="TextStyle.H6" class="rz-mb-3">
+                        <RadzenIcon Icon="computer" class="rz-me-1" />
+                        Environment
+                    </RadzenText>
+                    <RadzenStack Gap="0.5rem">
+                        <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                            <RadzenText>Machine Name</RadzenText>
+                            <RadzenText class="rz-color-secondary">@detailedHealth.Environment.MachineName</RadzenText>
+                        </RadzenStack>
+                        <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                            <RadzenText>OS Version</RadzenText>
+                            <RadzenText class="rz-color-secondary">@detailedHealth.Environment.OsVersion</RadzenText>
+                        </RadzenStack>
+                        <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                            <RadzenText>Processor Count</RadzenText>
+                            <RadzenText class="rz-color-secondary">@detailedHealth.Environment.ProcessorCount</RadzenText>
+                        </RadzenStack>
+                        <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                            <RadzenText>Working Set</RadzenText>
+                            <RadzenText class="rz-color-secondary">@FormatBytes(detailedHealth.Environment.WorkingSet)</RadzenText>
+                        </RadzenStack>
+                        <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                            <RadzenText>Managed Memory</RadzenText>
+                            <RadzenText class="rz-color-secondary">@FormatBytes(detailedHealth.Environment.ManagedMemory)</RadzenText>
+                        </RadzenStack>
+                    </RadzenStack>
+                </RadzenCard>
+
+                @if (authSchemes != null)
+                {
+                    <RadzenCard class="rz-p-3 rz-mt-3">
+                        <RadzenText TextStyle="TextStyle.H6" class="rz-mb-3">
+                            <RadzenIcon Icon="security" class="rz-me-1" />
+                            Authentication Details
+                        </RadzenText>
+                        <RadzenStack Gap="0.5rem">
+                            <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                                <RadzenText>User</RadzenText>
+                                <RadzenText class="rz-color-secondary">@(authSchemes.User.Name ?? "N/A")</RadzenText>
+                            </RadzenStack>
+                            <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                                <RadzenText>Auth Type</RadzenText>
+                                <RadzenText class="rz-color-secondary">@(authSchemes.User.AuthenticationType ?? "N/A")</RadzenText>
+                            </RadzenStack>
+                            <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                                <RadzenText>Claims Count</RadzenText>
+                                <RadzenText class="rz-color-secondary">@authSchemes.User.ClaimsCount</RadzenText>
+                            </RadzenStack>
+                            <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
+                                <RadzenText>Default Scheme</RadzenText>
+                                <RadzenText class="rz-color-secondary">@authSchemes.Schemes.DefaultScheme</RadzenText>
+                            </RadzenStack>
+                            
+                            @if (authSchemes.Cookies.Any())
+                            {
+                                <div class="rz-mt-2">
+                                    <RadzenText TextStyle="TextStyle.Subtitle2">Active Cookies</RadzenText>
+                                    @foreach (var cookie in authSchemes.Cookies)
+                                    {
+                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary rz-display-block">
+                                            @cookie.Name (@cookie.Length chars)
+                                        </RadzenText>
+                                    }
+                                </div>
+                            }
+                        </RadzenStack>
+                    </RadzenCard>
+                }
+            </RadzenColumn>
+        </RadzenRow>
+    }
+
+    @if (lastRefreshed.HasValue)
+    {
+        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary rz-mt-3">
+            Last refreshed: @lastRefreshed.Value.ToString("HH:mm:ss")
+        </RadzenText>
+    }
+}
+
+@code {
+    private HealthStatus? basicHealth;
+    private DetailedHealthStatus? detailedHealth;
+    private LivenessStatus? livenessStatus;
+    private ReadinessStatus? readinessStatus;
+    private AuthSchemesInfo? authSchemes;
+    private DateTime? lastRefreshed;
+    private bool isRefreshing = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+        if (!IsAuthenticated)
+            return;
+
+        await RefreshAllAsync();
+    }
+
+    private async Task RefreshAllAsync()
+    {
+        if (isRefreshing) return;
+        
+        isRefreshing = true;
+        StateHasChanged();
+
+        try
+        {
+            _logger.LogInformation("Starting health checks refresh");
+
+            // Execute all health checks concurrently
+            var basicHealthTask = DirectHealthService.GetBasicHealthAsync();
+            var detailedHealthTask = DirectHealthService.GetDetailedHealthAsync();
+            var livenessTask = DirectHealthService.GetLivenessAsync();
+            var readinessTask = DirectHealthService.GetReadinessAsync();
+            var authSchemesTask = DirectHealthService.GetAuthSchemesAsync();
+
+            await Task.WhenAll(basicHealthTask, detailedHealthTask, livenessTask, readinessTask, authSchemesTask);
+            
+            basicHealth = basicHealthTask.Result;
+            detailedHealth = detailedHealthTask.Result;
+            livenessStatus = livenessTask.Result;
+            readinessStatus = readinessTask.Result;
+            authSchemes = authSchemesTask.Result;
+
+            lastRefreshed = DateTime.Now;
+            
+            var successCount = new object?[] { basicHealth, detailedHealth, livenessStatus, readinessStatus, authSchemes }
+                .Count(result => result != null);
+            
+            _logger.LogInformation("Health checks completed: {SuccessCount}/5 successful", successCount);
+            
+            if (successCount > 0)
+            {
+                NotificationService.Notify(NotificationSeverity.Success, "Refreshed", 
+                    $"Health checks updated successfully ({successCount}/5)", 3000);
+            }
+            else
+            {
+                NotificationService.Notify(NotificationSeverity.Warning, "Warning", 
+                    "Some health checks failed to load", 4000);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error refreshing health checks");
+            NotificationService.Notify(NotificationSeverity.Error, "Error", 
+                $"Failed to refresh health checks: {ex.Message}", 5000);
+        }
+        finally
+        {
+            isRefreshing = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task CopyHealthReportAsync()
+    {
+        try
+        {
+            var report = GenerateHealthReport();
+            var json = System.Text.Json.JsonSerializer.Serialize(report, new System.Text.Json.JsonSerializerOptions
+            {
+                WriteIndented = true
+            });
+
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", json);
+            NotificationService.Notify(NotificationSeverity.Success, "Copied", "Health report copied to clipboard", 3000);
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to copy report: {ex.Message}", 5000);
+        }
+    }
+
+    private async Task DownloadHealthReportAsync()
+    {
+        try
+        {
+            var report = GenerateHealthReport();
+            var json = System.Text.Json.JsonSerializer.Serialize(report, new System.Text.Json.JsonSerializerOptions
+            {
+                WriteIndented = true
+            });
+
+            var fileName = $"health-report-{DateTime.Now:yyyyMMdd-HHmmss}.json";
+            await JS.InvokeVoidAsync("downloadFile", fileName, json, "application/json");
+            
+            NotificationService.Notify(NotificationSeverity.Success, "Downloaded", "Health report downloaded successfully", 3000);
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to download report: {ex.Message}", 5000);
+        }
+    }
+
+    private object GenerateHealthReport()
+    {
+        return new
+        {
+            Timestamp = DateTime.UtcNow,
+            BasicHealth = basicHealth,
+            DetailedHealth = detailedHealth,
+            Liveness = livenessStatus,
+            Readiness = readinessStatus,
+            Authentication = authSchemes
+        };
+    }
+
+    private (string Status, string Message, Dictionary<string, object> AdditionalInfo) GetCheckData(object checkValue)
+    {
+        var additionalInfo = new Dictionary<string, object>();
+        
+        if (checkValue is System.Text.Json.JsonElement jsonElement)
+        {
+            var status = "unknown";
+            var message = "";
+
+            if (jsonElement.TryGetProperty("status", out var statusProp))
+            {
+                status = statusProp.GetString() ?? "unknown";
+            }
+
+            if (jsonElement.TryGetProperty("message", out var messageProp))
+            {
+                message = messageProp.GetString() ?? "";
+            }
+
+            // Extract additional properties
+            foreach (var property in jsonElement.EnumerateObject())
+            {
+                if (property.Name != "status" && property.Name != "message")
+                {
+                    additionalInfo[property.Name] = property.Value.ToString();
+                }
+            }
+
+            return (status, message, additionalInfo);
+        }
+
+        return ("unknown", "", additionalInfo);
+    }
+
+    private string GetCheckIcon(string status) => status.ToLower() switch
+    {
+        "healthy" => "check_circle",
+        "unhealthy" => "error",
+        "warning" => "warning",
+        "info" => "info",
+        _ => "help"
+    };
+
+    private string GetCheckColor(string status) => status.ToLower() switch
+    {
+        "healthy" => "var(--rz-success)",
+        "unhealthy" => "var(--rz-danger)",
+        "error" => "var(--rz-danger)",
+        "warning" => "var(--rz-warning)",
+        "info" => "var(--rz-info)",
+        _ => "var(--rz-secondary)"
+    };
+
+    private BadgeStyle GetCheckBadgeStyle(string status) => status.ToLower() switch
+    {
+        "healthy" => BadgeStyle.Success,
+        "unhealthy" => BadgeStyle.Danger,
+        "error" => BadgeStyle.Danger,
+        "warning" => BadgeStyle.Warning,
+        "info" => BadgeStyle.Info,
+        _ => BadgeStyle.Secondary
+    };
+
+    private string FormatCheckName(string checkName)
+    {
+        return checkName
+            .Replace("_", " ")
+            .Replace("-", " ")
+            .Split(' ')
+            .Select(word => char.ToUpper(word[0]) + word.Substring(1).ToLower())
+            .Aggregate((a, b) => $"{a} {b}");
+    }
+
+    private string FormatBytes(long bytes)
+    {
+        string[] units = { "B", "KB", "MB", "GB", "TB" };
+        double size = bytes;
+        int unitIndex = 0;
+
+        while (size >= 1024 && unitIndex < units.Length - 1)
+        {
+            size /= 1024;
+            unitIndex++;
+        }
+
+        return $"{size:F1} {units[unitIndex]}";
+    }
+}
