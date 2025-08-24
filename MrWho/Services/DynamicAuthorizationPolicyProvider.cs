@@ -3,6 +3,8 @@ using Microsoft.Extensions.Options;
 using OpenIddict.Validation.AspNetCore;
 using System.Security.Claims;
 using MrWho.Shared;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 
 namespace MrWho.Services;
 
@@ -60,12 +62,10 @@ public class DynamicAuthorizationPolicyProvider : IAuthorizationPolicyProvider
                 return _defaultPolicy;
             }
 
-            _logger.LogInformation("?? Creating dynamic default authorization policy with database-loaded client schemes");
+            _logger.LogInformation("Creating dynamic default authorization policy (loading client schemes)");
 
-            // Load all client schemes from database
             var allSchemes = await GetAllAuthenticationSchemesAsync();
-
-            _logger.LogInformation("? Loaded {SchemeCount} authentication schemes for default policy", allSchemes.Count);
+            _logger.LogInformation("Loaded {SchemeCount} authentication schemes for default policy", allSchemes.Count);
 
             _defaultPolicy = new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()
@@ -82,106 +82,68 @@ public class DynamicAuthorizationPolicyProvider : IAuthorizationPolicyProvider
 
     public async Task<AuthorizationPolicy?> GetPolicyAsync(string policyName)
     {
-        // ====================================================================
-        // CENTRALIZED STATIC POLICY CONFIGURATION
-        // All static authorization policies are defined here in one place
-        // ====================================================================
-        
-    switch (policyName)
+        switch (policyName)
         {
             case "UserInfoPolicy":
-                // SECURITY: UserInfo endpoint must only use OpenIddict validation (no cookie auth)
                 return new AuthorizationPolicyBuilder()
                     .RequireAuthenticatedUser()
                     .AddAuthenticationSchemes(OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme)
                     .Build();
-
             case "AdminOnly":
-                // Admin-only access using the admin web client cookie authentication
                 return new AuthorizationPolicyBuilder()
                     .RequireAuthenticatedUser()
                     .AddAuthenticationSchemes("Identity.Application.mrwho_admin_web")
                     .Build();
-
             case "DemoAccess":
-                // Demo client access using the demo client cookie authentication
                 return new AuthorizationPolicyBuilder()
                     .RequireAuthenticatedUser()
                     .AddAuthenticationSchemes("Identity.Application.mrwho_demo1")
                     .Build();
-
             case "ApiAccess":
-                // API access supporting both Postman client cookies and OpenIddict token validation
                 return new AuthorizationPolicyBuilder()
                     .RequireAuthenticatedUser()
-                    .AddAuthenticationSchemes("Identity.Application.postman_client", 
-                                            OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme)
+                    .AddAuthenticationSchemes("Identity.Application.postman_client", OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme)
                     .Build();
-
             case AuthorizationPolicies.AdminClientApi:
-                // Strict API/debug access: require OpenIddict token with mrwho.use scope and admin client presenter
                 return new AuthorizationPolicyBuilder()
                     .RequireAuthenticatedUser()
                     .AddAuthenticationSchemes(OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme)
                     .RequireAssertion(ctx =>
                     {
                         var user = ctx.User;
-                        if (user?.Identity?.IsAuthenticated != true)
-                            return false;
-
-                        // Scope check: allow multiple 'scope' claims or space-delimited values
+                        if (user?.Identity?.IsAuthenticated != true) return false;
                         bool hasMrWhoUse = user.FindAll("scope")
                             .Any(c => c.Value.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                                               .Contains(StandardScopes.MrWhoUse));
-
-                        if (!hasMrWhoUse)
-                            return false;
-
-                        // Client check: accept azp or client_id matching the admin client id
+                        if (!hasMrWhoUse) return false;
                         string adminClientId = MrWhoConstants.AdminClientId;
                         bool isAdminClient = user.HasClaim(c => (c.Type == "azp" || c.Type == "client_id") && c.Value == adminClientId);
-
                         return isAdminClient;
                     })
                     .Build();
         }
 
-        // ====================================================================
-        // DYNAMIC CLIENT POLICY CONFIGURATION  
-        // Format: "Client_{clientId}" - automatically creates policies for any database client
-        // ====================================================================
-        
-        if (policyName.StartsWith("Client_"))
+        if (policyName.StartsWith("Client_", StringComparison.Ordinal))
         {
-            var clientId = policyName.Replace("Client_", "");
+            var clientId = policyName[7..];
             var schemeName = $"Identity.Application.{clientId}";
-            
-            _logger.LogDebug("?? Creating dynamic policy for client: {ClientId} (Scheme: {SchemeName})", clientId, schemeName);
-            
+            _logger.LogDebug("Creating dynamic client policy for {ClientId} (Scheme {SchemeName})", clientId, schemeName);
             return new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()
                 .AddAuthenticationSchemes(schemeName)
                 .Build();
         }
 
-        // ====================================================================
-        // FALLBACK TO DEFAULT PROVIDER
-        // ====================================================================
-        
-        // Fall back to default provider for unknown policies
         return await _fallbackPolicyProvider.GetPolicyAsync(policyName);
     }
 
-    public Task<AuthorizationPolicy?> GetFallbackPolicyAsync()
-    {
-        return _fallbackPolicyProvider.GetFallbackPolicyAsync();
-    }
+    public Task<AuthorizationPolicy?> GetFallbackPolicyAsync() => _fallbackPolicyProvider.GetFallbackPolicyAsync();
 
     private async Task<List<string>> GetAllAuthenticationSchemesAsync()
     {
         var schemes = new List<string>
         {
-            // Base schemes that are always available
+            // Always include base identity app scheme (default) and token validation scheme
             "Identity.Application",
             OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme
         };
@@ -190,35 +152,51 @@ public class DynamicAuthorizationPolicyProvider : IAuthorizationPolicyProvider
         {
             using var scope = _serviceScopeFactory.CreateScope();
             var oidcClientService = scope.ServiceProvider.GetRequiredService<IOidcClientService>();
+            var schemeProvider = scope.ServiceProvider.GetRequiredService<IAuthenticationSchemeProvider>();
+            var cookieOptionsMonitor = scope.ServiceProvider.GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>();
 
-            // Load all enabled clients from database
             var enabledClients = await oidcClientService.GetEnabledClientsAsync();
-
             foreach (var client in enabledClients)
             {
                 var schemeName = $"Identity.Application.{client.ClientId}";
+
+                // Only include scheme if registered
+                var registered = await schemeProvider.GetSchemeAsync(schemeName);
+                if (registered == null)
+                {
+                    _logger.LogDebug("Skipping scheme {SchemeName} (not yet registered)", schemeName);
+                    continue;
+                }
+
+                // Ensure cookie options exist & have a cookie name to avoid CookieAuthenticationHandler NRE
+                try
+                {
+                    var opts = cookieOptionsMonitor.Get(schemeName);
+                    if (string.IsNullOrWhiteSpace(opts.Cookie?.Name))
+                    {
+                        _logger.LogWarning("Skipping scheme {SchemeName} due to missing cookie name", schemeName);
+                        continue;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Skipping scheme {SchemeName}; unable to resolve CookieAuthenticationOptions", schemeName);
+                    continue;
+                }
+
                 schemes.Add(schemeName);
-                
-                _logger.LogDebug("?? Added dynamic scheme to default policy: {SchemeName} (Client: {ClientId})", 
-                    schemeName, client.ClientId);
+                _logger.LogDebug("Added dynamic scheme to default policy: {SchemeName}", schemeName);
             }
 
-            _logger.LogInformation("?? Dynamic authorization policy configured with {TotalSchemes} authentication schemes ({DynamicSchemes} from database)", 
-                schemes.Count, enabledClients.Count());
+            _logger.LogInformation("Dynamic authorization policy configured with {Total} schemes ({Dynamic} dynamic)", schemes.Count, schemes.Count - 2);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "? Failed to load client schemes from database, using static schemes only");
-            
-            // Fallback to essential static schemes if database access fails
-            schemes.AddRange(new[]
-            {
-                "Identity.Application.mrwho_admin_web"
-            });
+            _logger.LogError(ex, "Failed loading dynamic schemes; using static only");
+            // Fallback essential static scheme of admin
+            schemes.Add("Identity.Application.mrwho_admin_web");
         }
 
-        schemes = schemes.Distinct().ToList();
-
-        return schemes;
+        return schemes.Distinct().ToList();
     }
 }
