@@ -350,4 +350,8 @@ public partial class Client
     [StringLength(200)] public string? PrimaryAudience { get; set; }
     public bool? IncludeAudInIdToken { get; set; }
     public bool? RequireExplicitAudienceScope { get; set; }
+
+    // === ROLE INCLUSION OVERRIDE ===
+    /// <summary>Optional override for role inclusion behaviour (null = scope based)</summary>
+    public ClientRoleInclusionOverride? RoleInclusionOverride { get; set; }
 }

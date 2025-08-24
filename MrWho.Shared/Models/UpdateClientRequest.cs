@@ -155,4 +155,7 @@ public class UpdateClientRequest
     public string? PrimaryAudience { get; set; }
     public bool? IncludeAudInIdToken { get; set; }
     public bool? RequireExplicitAudienceScope { get; set; }
+
+    // Role inclusion override
+    public ClientRoleInclusionOverride? RoleInclusionOverride { get; set; }
 }

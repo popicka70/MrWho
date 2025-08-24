@@ -35,7 +35,8 @@ public class ClientsController : ControllerBase
                 AudienceMode = c.AudienceMode,
                 PrimaryAudience = c.PrimaryAudience,
                 IncludeAudInIdToken = c.IncludeAudInIdToken,
-                RequireExplicitAudienceScope = c.RequireExplicitAudienceScope
+                RequireExplicitAudienceScope = c.RequireExplicitAudienceScope,
+                RoleInclusionOverride = c.RoleInclusionOverride
                 // ...existing mapped properties after audiences...
             })
             .ToListAsync();
@@ -57,7 +58,8 @@ public class ClientsController : ControllerBase
             AudienceMode = client.AudienceMode,
             PrimaryAudience = client.PrimaryAudience,
             IncludeAudInIdToken = client.IncludeAudInIdToken,
-            RequireExplicitAudienceScope = client.RequireExplicitAudienceScope
+            RequireExplicitAudienceScope = client.RequireExplicitAudienceScope,
+            RoleInclusionOverride = client.RoleInclusionOverride
             // ...existing mappings...
         };
         return dto;
@@ -73,7 +75,8 @@ public class ClientsController : ControllerBase
             AudienceMode = request.AudienceMode,
             PrimaryAudience = request.PrimaryAudience,
             IncludeAudInIdToken = request.IncludeAudInIdToken,
-            RequireExplicitAudienceScope = request.RequireExplicitAudienceScope
+            RequireExplicitAudienceScope = request.RequireExplicitAudienceScope,
+            RoleInclusionOverride = request.RoleInclusionOverride
         };
         // Audiences
         if (request.Audiences?.Any() == true)
@@ -93,7 +96,8 @@ public class ClientsController : ControllerBase
             AudienceMode = client.AudienceMode,
             PrimaryAudience = client.PrimaryAudience,
             IncludeAudInIdToken = client.IncludeAudInIdToken,
-            RequireExplicitAudienceScope = client.RequireExplicitAudienceScope
+            RequireExplicitAudienceScope = client.RequireExplicitAudienceScope,
+            RoleInclusionOverride = client.RoleInclusionOverride
             // ...existing mappings...
         };
         return CreatedAtAction(nameof(GetClient), new { id = client.Id }, dto);
@@ -112,6 +116,7 @@ public class ClientsController : ControllerBase
         if (request.PrimaryAudience != null) client.PrimaryAudience = request.PrimaryAudience;
         if (request.IncludeAudInIdToken.HasValue) client.IncludeAudInIdToken = request.IncludeAudInIdToken;
         if (request.RequireExplicitAudienceScope.HasValue) client.RequireExplicitAudienceScope = request.RequireExplicitAudienceScope;
+        if (request.RoleInclusionOverride != null) client.RoleInclusionOverride = request.RoleInclusionOverride;
         // Sync audiences list
         if (request.Audiences != null)
         {
@@ -132,7 +137,8 @@ public class ClientsController : ControllerBase
             AudienceMode = client.AudienceMode,
             PrimaryAudience = client.PrimaryAudience,
             IncludeAudInIdToken = client.IncludeAudInIdToken,
-            RequireExplicitAudienceScope = client.RequireExplicitAudienceScope
+            RequireExplicitAudienceScope = client.RequireExplicitAudienceScope,
+            RoleInclusionOverride = client.RoleInclusionOverride
             // ...existing mappings...
         };
         return dto;
@@ -150,7 +156,8 @@ public class ClientsController : ControllerBase
             AudienceMode = client.AudienceMode,
             PrimaryAudience = client.PrimaryAudience,
             IncludeAudInIdToken = client.IncludeAudInIdToken,
-            RequireExplicitAudienceScope = client.RequireExplicitAudienceScope
+            RequireExplicitAudienceScope = client.RequireExplicitAudienceScope,
+            RoleInclusionOverride = client.RoleInclusionOverride,
             // ...existing mappings...
         };
         return export;
@@ -165,6 +172,7 @@ public class ClientsController : ControllerBase
         client.PrimaryAudience = dto.PrimaryAudience;
         client.IncludeAudInIdToken = dto.IncludeAudInIdToken;
         client.RequireExplicitAudienceScope = dto.RequireExplicitAudienceScope;
+        client.RoleInclusionOverride = dto.RoleInclusionOverride;
         // Sync audiences from export
         if (dto.Audiences != null)
         {
