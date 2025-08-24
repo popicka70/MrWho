@@ -25,6 +25,7 @@ public class TokenHandler : ITokenHandler
     private readonly IUserRealmValidationService _realmValidationService;
     private readonly ILogger<TokenHandler> _logger;
     private readonly ApplicationDbContext _db;
+    private readonly IClientRoleService _clientRoleService;
 
     public TokenHandler(
         UserManager<IdentityUser> userManager,
@@ -32,7 +33,8 @@ public class TokenHandler : ITokenHandler
         IClientCookieConfigurationService cookieService,
         IUserRealmValidationService realmValidationService,
         ILogger<TokenHandler> logger,
-        ApplicationDbContext db)
+        ApplicationDbContext db,
+        IClientRoleService clientRoleService)
     {
         _userManager = userManager;
         _signInManager = signInManager;
@@ -40,6 +42,7 @@ public class TokenHandler : ITokenHandler
         _realmValidationService = realmValidationService;
         _logger = logger;
         _db = db;
+        _clientRoleService = clientRoleService;
     }
 
     public async Task<IResult> HandleTokenRequestAsync(HttpContext context)
@@ -72,6 +75,46 @@ public class TokenHandler : ITokenHandler
         }
 
         throw new InvalidOperationException($"The specified grant type '{request.GrantType}' is not supported.");
+    }
+
+    private RoleInclusion ResolveRoleInclusion(IEnumerable<string> scopes)
+    {
+        var set = scopes.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (set.Contains("roles.all") || (set.Contains("roles.global") && set.Contains("roles.client")))
+            return RoleInclusion.GlobalAndClient;
+        if (set.Contains("roles.client")) return RoleInclusion.ClientOnly;
+        if (set.Contains("roles.global")) return RoleInclusion.GlobalOnly;
+        // default include both for backward compatibility when standard roles scope requested
+        if (set.Contains(Scopes.Roles)) return RoleInclusion.GlobalAndClient;
+        return RoleInclusion.GlobalOnly; // fallback conservative
+    }
+
+    private async Task AddRolesAsync(ClaimsIdentity identity, IdentityUser user, string clientId, IEnumerable<string> scopes)
+    {
+        var inclusion = ResolveRoleInclusion(scopes);
+        if (inclusion == RoleInclusion.GlobalOnly || inclusion == RoleInclusion.GlobalAndClient || scopes.Contains(Scopes.Roles))
+        {
+            var globalRoles = await _userManager.GetRolesAsync(user);
+            foreach (var role in globalRoles)
+            {
+                var roleClaim = new Claim(Claims.Role, role);
+                roleClaim.SetDestinations(Destinations.AccessToken, Destinations.IdentityToken);
+                identity.AddClaim(roleClaim);
+            }
+        }
+        if (inclusion == RoleInclusion.ClientOnly || inclusion == RoleInclusion.GlobalAndClient)
+        {
+            var clientRoles = await _clientRoleService.GetClientRolesAsync(user.Id, clientId);
+            foreach (var role in clientRoles)
+            {
+                var roleClaim = new Claim(Claims.Role, role);
+                roleClaim.SetDestinations(Destinations.AccessToken, Destinations.IdentityToken);
+                identity.AddClaim(roleClaim);
+                var crClaim = new Claim("client_role", role);
+                crClaim.SetDestinations(Destinations.AccessToken, Destinations.IdentityToken);
+                identity.AddClaim(crClaim);
+            }
+        }
     }
 
     private async Task<IResult> HandlePasswordGrantAsync(HttpContext context, OpenIddictRequest request)
@@ -128,14 +171,8 @@ public class TokenHandler : ITokenHandler
             // Add other profile claims if available
             await AddProfileClaimsAsync(identity, user, scopes);
 
-            // Add roles
-            var roles = await _userManager.GetRolesAsync(user);
-            foreach (var role in roles)
-            {
-                var roleClaim = new Claim(OpenIddictConstants.Claims.Role, role);
-                roleClaim.SetDestinations(OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken);
-                identity.AddClaim(roleClaim);
-            }
+            // Add roles (global + client-scoped based on requested scopes)
+            await AddRolesAsync(identity, user, clientId, scopes);
 
             var principal = new ClaimsPrincipal(identity);
             principal.SetScopes(request.GetScopes());
@@ -281,13 +318,16 @@ public class TokenHandler : ITokenHandler
             identity.AddClaim(newFamilyNameClaim);
         }
 
-        // Copy role claims
-        var roleClaims = principal.FindAll(OpenIddictConstants.Claims.Role);
-        foreach (var roleClaim in roleClaims)
+        // Re-hydrate roles fresh (global + client) to ensure up-to-date assignments
+        var userId = subjectClaim?.Value;
+        if (!string.IsNullOrEmpty(userId))
         {
-            var newRoleClaim = new Claim(OpenIddictConstants.Claims.Role, roleClaim.Value);
-            newRoleClaim.SetDestinations(OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken);
-            identity.AddClaim(newRoleClaim);
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user != null)
+            {
+                var scopes = request.GetScopes();
+                await AddRolesAsync(identity, user, clientId, scopes);
+            }
         }
         
         var newPrincipal = new ClaimsPrincipal(identity);
@@ -365,14 +405,8 @@ public class TokenHandler : ITokenHandler
         // Add other profile claims if available
         await AddProfileClaimsAsync(identity, user, scopes);
 
-        // Add any additional claims you might need (roles, etc.)
-        var roles = await _userManager.GetRolesAsync(user);
-        foreach (var role in roles)
-        {
-            var roleClaim = new Claim(OpenIddictConstants.Claims.Role, role);
-            roleClaim.SetDestinations(OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken);
-            identity.AddClaim(roleClaim);
-        }
+        // Add roles
+        await AddRolesAsync(identity, user, request.ClientId!, scopes);
 
         var newPrincipal = new ClaimsPrincipal(identity);
         newPrincipal.SetScopes(request.GetScopes());
