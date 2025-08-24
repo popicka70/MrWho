@@ -72,6 +72,27 @@ body {
     color: white;
 }
 
+/* External provider buttons - ensure visibility (esp. dark theme) */
+.external-provider-btn {
+    background: linear-gradient(135deg, color-mix(in srgb, var(--mr-primary) 8%, transparent), color-mix(in srgb, var(--mr-primary) 15%, transparent));
+    border-color: color-mix(in srgb, var(--mr-primary) 60%, transparent);
+    color: var(--mr-primary);
+}
+body.theme-dark .external-provider-btn {
+    background: linear-gradient(135deg, color-mix(in srgb, var(--mr-primary) 25%, #000 75%), color-mix(in srgb, var(--mr-primary) 15%, #000 85%));
+    border-color: color-mix(in srgb, var(--mr-primary) 70%, #000 30%);
+    color: #e6f0ff;
+}
+.external-provider-btn:hover {
+    background: var(--mr-primary);
+    color: #fff !important;
+    border-color: var(--mr-primary);
+    box-shadow: 0 4px 14px color-mix(in srgb, var(--mr-primary) 35%, transparent);
+}
+body.theme-dark .external-provider-btn:hover {
+    box-shadow: 0 4px 16px color-mix(in srgb, var(--mr-primary) 55%, transparent);
+}
+
 /* QR Login Button Specific Styles */
 .qr-login-quick {
     border-color: var(--mr-primary);
