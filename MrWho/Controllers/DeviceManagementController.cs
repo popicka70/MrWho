@@ -18,13 +18,13 @@ namespace MrWho.Controllers;
 public class DeviceManagementController : ControllerBase
 {
     private readonly IDeviceManagementService _deviceService;
-    private readonly IEnhancedQrLoginService _qrService;
+    private readonly IPersistentQrLoginService _qrService; // updated
     private readonly UserManager<IdentityUser> _userManager;
     private readonly ILogger<DeviceManagementController> _logger;
 
     public DeviceManagementController(
         IDeviceManagementService deviceService,
-        IEnhancedQrLoginService qrService,
+        IPersistentQrLoginService qrService, // updated
         UserManager<IdentityUser> userManager,
         ILogger<DeviceManagementController> logger)
     {
@@ -196,20 +196,13 @@ public class DeviceManagementController : ControllerBase
     {
         try
         {
-            var token = await _qrService.CreatePersistentQrAsync(
-                userId: null, // Will be set when approved
-                clientId: request.ClientId,
-                returnUrl: request.ReturnUrl,
-                ttl: TimeSpan.FromMinutes(request.ExpirationMinutes ?? 5)
-            );
-
+            var dto = await _qrService.CreateAsync(request.ClientId, request.ReturnUrl, null, TimeSpan.FromMinutes(request.ExpirationMinutes ?? 5), HttpContext.Connection.RemoteIpAddress?.ToString());
             return Ok(new CreateQrResponse
             {
-                Token = token,
-                QrCodeUrl = Url.Action("QrPng", "QrLogin", new { token }, Request.Scheme),
-                // Point approval to the Web UI controller so users can select a device
-                ApprovalUrl = Url.Action("ApprovePersistent", "DeviceManagementWeb", new { token }, Request.Scheme),
-                ExpiresAt = DateTime.UtcNow.AddMinutes(request.ExpirationMinutes ?? 5)
+                Token = dto.Token,
+                QrCodeUrl = $"/api/devices/qr/{dto.Token}/code", // new endpoint you can add later
+                ApprovalUrl = $"/device-management/approve-persistent/{dto.Token}",
+                ExpiresAt = dto.ExpiresAt
             });
         }
         catch (Exception ex)
@@ -228,25 +221,20 @@ public class DeviceManagementController : ControllerBase
     {
         try
         {
-            var sessionInfo = await _qrService.GetQrSessionInfoAsync(token);
-            
+            var dto = await _qrService.GetAsync(token);
+            if (dto == null) return NotFound(new { status = "expired" });
             return Ok(new QrSessionStatusResponse
             {
-                Status = sessionInfo.Status.ToString(),
-                IsApproved = sessionInfo.Status == QrSessionStatusEnum.Approved || 
-                           sessionInfo.Status == QrSessionStatusEnum.Completed,
-                ApprovedAt = sessionInfo.ApprovedAt,
-                DeviceName = sessionInfo.DeviceName,
-                ExpiresAt = sessionInfo.ExpiresAt
+                Status = dto.Status.ToString(),
+                IsApproved = dto.Status == MrWho.Shared.QrSessionStatus.Approved || dto.Status == MrWho.Shared.QrSessionStatus.Completed,
+                ApprovedAt = dto.ApprovedAt,
+                DeviceName = dto.DeviceId,
+                ExpiresAt = dto.ExpiresAt
             });
-        }
-        catch (ArgumentException)
-        {
-            return NotFound(new { status = "expired" });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting QR status for token {Token}", token);
+            _logger.LogError(ex, "Error getting QR status {Token}", token);
             return StatusCode(500, new { error = "Failed to get QR status" });
         }
     }
@@ -258,25 +246,13 @@ public class DeviceManagementController : ControllerBase
     public async Task<ActionResult> ApproveQrSession(string token, [FromBody] ApproveQrRequest request)
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user == null)
-            return Unauthorized();
-
-        try
-        {
-            var success = await _qrService.ApproveQrAsync(token, user.Id, request.DeviceId);
-            if (!success)
-                return BadRequest(new { error = "Failed to approve QR session. Session may be expired or device invalid." });
-
-            _logger.LogInformation("QR session {Token} approved by user {UserId} with device {DeviceId}", 
-                token, user.Id, request.DeviceId);
-
-            return Ok(new { message = "QR session approved successfully" });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error approving QR session {Token} for user {UserId}", token, user.Id);
-            return StatusCode(500, new { error = "Failed to approve QR session" });
-        }
+        if (user == null) return Unauthorized();
+        // For API approval we need CSRF secret from client; assume client passes it in header X-QR-CSRF
+        var csrf = Request.Headers["X-QR-CSRF"].ToString();
+        if (string.IsNullOrEmpty(csrf)) return BadRequest(new { error = "Missing CSRF" });
+        var ok = await _qrService.ApproveAsync(token, user.Id, request.DeviceId, csrf);
+        if (!ok) return BadRequest(new { error = "Unable to approve" });
+        return Ok();
     }
 
     /// <summary>
@@ -286,25 +262,12 @@ public class DeviceManagementController : ControllerBase
     public async Task<ActionResult> RejectQrSession(string token, [FromBody] RejectQrRequest request)
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user == null)
-            return Unauthorized();
-
-        try
-        {
-            var success = await _qrService.RejectPersistentQrAsync(token, user.Id, request.DeviceId);
-            if (!success)
-                return BadRequest(new { error = "Failed to reject QR session. Session may be expired or device invalid." });
-
-            _logger.LogInformation("QR session {Token} rejected by user {UserId} with device {DeviceId}", 
-                token, user.Id, request.DeviceId);
-
-            return Ok(new { message = "QR session rejected successfully" });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error rejecting QR session {Token} for user {UserId}", token, user.Id);
-            return StatusCode(500, new { error = "Failed to reject QR session" });
-        }
+        if (user == null) return Unauthorized();
+        var csrf = Request.Headers["X-QR-CSRF"].ToString();
+        if (string.IsNullOrEmpty(csrf)) return BadRequest(new { error = "Missing CSRF" });
+        var ok = await _qrService.RejectAsync(token, user.Id, request.DeviceId, csrf);
+        if (!ok) return BadRequest(new { error = "Unable to reject" });
+        return Ok();
     }
 
     // ============================================================================

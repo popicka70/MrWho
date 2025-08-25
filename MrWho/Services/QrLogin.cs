@@ -1,341 +1,138 @@
-using System.Collections.Concurrent;
+using MrWho.Data;
+using Microsoft.EntityFrameworkCore;
+using MrWho.Models;
 using MrWho.Shared;
 
 namespace MrWho.Services;
 
-public sealed class QrLoginTicket
+// New persistent QR session DTO
+public sealed class QrLoginDto
 {
     public required string Token { get; init; }
-    public DateTimeOffset ExpiresAt { get; init; }
-    public string? ReturnUrl { get; init; }
+    public required string Csrf { get; init; }
     public string? ClientId { get; init; }
-    public string? ApprovedUserId { get; set; }
-    public bool Completed { get; set; }
+    public string? ReturnUrl { get; init; }
+    public DateTime ExpiresAt { get; init; }
+    public MrWho.Shared.QrSessionStatus Status { get; init; }
+    public string? DeviceId { get; init; }
+    public string? UserId { get; init; }
+    public DateTime? ApprovedAt { get; init; }
+    public DateTime? CompletedAt { get; init; }
 }
 
-public interface IQrLoginStore
+public interface IPersistentQrLoginService
 {
-    QrLoginTicket Create(string? returnUrl, string? clientId, TimeSpan? ttl = null);
-    QrLoginTicket? Get(string token);
-    bool Approve(string token, string userId);
-    bool Complete(string token);
+    Task<QrLoginDto> CreateAsync(string? clientId, string? returnUrl, string? deviceId, TimeSpan? ttl = null, string? initiatorIp = null, CancellationToken ct = default);
+    Task<QrLoginDto?> GetAsync(string token, CancellationToken ct = default);
+    Task<bool> ApproveAsync(string token, string approverUserId, string deviceId, string csrf, CancellationToken ct = default);
+    Task<bool> CompleteAsync(string token, string csrf, CancellationToken ct = default);
+    Task<bool> RejectAsync(string token, string approverUserId, string deviceId, string csrf, CancellationToken ct = default);
 }
 
-/// <summary>
-/// Enhanced QR login store that supports both session-based and persistent QR codes
-/// </summary>
-public interface IEnhancedQrLoginService
+public sealed class PersistentQrLoginService : IPersistentQrLoginService
 {
-    // Session-based QR (original implementation)
-    QrLoginTicket CreateSessionQr(string? returnUrl, string? clientId, TimeSpan? ttl = null);
-    QrLoginTicket? GetSessionQr(string token);
-    bool ApproveSessionQr(string token, string userId);
-    bool CompleteSessionQr(string token);
+    private readonly ApplicationDbContext _db;
+    private readonly ILogger<PersistentQrLoginService> _logger;
 
-    // Persistent QR (new implementation)
-    Task<string> CreatePersistentQrAsync(string? userId, string? clientId, string? returnUrl, TimeSpan? ttl = null);
-    Task<Models.PersistentQrSession?> GetPersistentQrAsync(string token);
-    Task<bool> ApprovePersistentQrAsync(string token, string userId, string deviceId);
-    Task<bool> RejectPersistentQrAsync(string token, string userId, string deviceId);
-    Task<bool> CompletePersistentQrAsync(string token);
-
-    // Unified interface
-    Task<QrSessionInfo> GetQrSessionInfoAsync(string token);
-    Task<bool> ApproveQrAsync(string token, string userId, string? deviceId = null);
-    Task<bool> CompleteQrAsync(string token);
-}
-
-public class EnhancedQrLoginService : IEnhancedQrLoginService
-{
-    private readonly IQrLoginStore _sessionStore;
-    private readonly IDeviceManagementService _deviceService;
-    private readonly ILogger<EnhancedQrLoginService> _logger;
-
-    public EnhancedQrLoginService(
-        IQrLoginStore sessionStore,
-        IDeviceManagementService deviceService,
-        ILogger<EnhancedQrLoginService> logger)
+    public PersistentQrLoginService(ApplicationDbContext db, ILogger<PersistentQrLoginService> logger)
     {
-        _sessionStore = sessionStore;
-        _deviceService = deviceService;
-        _logger = logger;
+        _db = db; _logger = logger;
     }
 
-    // ============================================================================
-    // SESSION-BASED QR (ORIGINAL IMPLEMENTATION)
-    // ============================================================================
-
-    public QrLoginTicket CreateSessionQr(string? returnUrl, string? clientId, TimeSpan? ttl = null)
+    public async Task<QrLoginDto> CreateAsync(string? clientId, string? returnUrl, string? deviceId, TimeSpan? ttl = null, string? initiatorIp = null, CancellationToken ct = default)
     {
-        var ticket = _sessionStore.Create(returnUrl, clientId, ttl);
-        _logger.LogDebug("Created session-based QR ticket {Token} for client {ClientId}", ticket.Token, clientId);
-        return ticket;
-    }
-
-    public QrLoginTicket? GetSessionQr(string token)
-    {
-        return _sessionStore.Get(token);
-    }
-
-    public bool ApproveSessionQr(string token, string userId)
-    {
-        var result = _sessionStore.Approve(token, userId);
-        if (result)
-        {
-            _logger.LogDebug("Session-based QR {Token} approved by user {UserId}", token, userId);
-        }
-        return result;
-    }
-
-    public bool CompleteSessionQr(string token)
-    {
-        var result = _sessionStore.Complete(token);
-        if (result)
-        {
-            _logger.LogDebug("Session-based QR {Token} completed", token);
-        }
-        return result;
-    }
-
-    // ============================================================================
-    // PERSISTENT QR (NEW IMPLEMENTATION)
-    // ============================================================================
-
-    public async Task<string> CreatePersistentQrAsync(string? userId, string? clientId, string? returnUrl, TimeSpan? ttl = null)
-    {
-        var request = new CreateQrSessionRequest
-        {
-            UserId = userId,
-            ClientId = clientId,
-            ReturnUrl = returnUrl,
-            ExpirationDuration = ttl ?? TimeSpan.FromMinutes(5)
-        };
-
-        var session = await _deviceService.CreateQrSessionAsync(request);
-        _logger.LogDebug("Created persistent QR session {SessionId} (token: {Token}) for client {ClientId}", 
-            session.Id, session.Token, clientId);
-        return session.Token;
-    }
-
-    public async Task<Models.PersistentQrSession?> GetPersistentQrAsync(string token)
-    {
-        return await _deviceService.GetQrSessionAsync(token);
-    }
-
-    public async Task<bool> ApprovePersistentQrAsync(string token, string userId, string deviceId)
-    {
-        var result = await _deviceService.ApproveQrSessionAsync(token, userId, deviceId);
-        if (result)
-        {
-            _logger.LogDebug("Persistent QR {Token} approved by user {UserId} device {DeviceId}", token, userId, deviceId);
-        }
-        return result;
-    }
-
-    public async Task<bool> RejectPersistentQrAsync(string token, string userId, string deviceId)
-    {
-        var result = await _deviceService.RejectQrSessionAsync(token, userId, deviceId);
-        if (result)
-        {
-            _logger.LogDebug("Persistent QR {Token} rejected by user {UserId} device {DeviceId}", token, userId, deviceId);
-        }
-        return result;
-    }
-
-    public async Task<bool> CompletePersistentQrAsync(string token)
-    {
-        var result = await _deviceService.CompleteQrSessionAsync(token);
-        if (result)
-        {
-            _logger.LogDebug("Persistent QR {Token} completed", token);
-        }
-        return result;
-    }
-
-    // ============================================================================
-    // UNIFIED INTERFACE
-    // ============================================================================
-
-    public async Task<QrSessionInfo> GetQrSessionInfoAsync(string token)
-    {
-        // First check if it's a persistent QR session
-        var persistentSession = await GetPersistentQrAsync(token);
-        if (persistentSession != null)
-        {
-            return new QrSessionInfo
-            {
-                Token = token,
-                Type = QrSessionType.Persistent,
-                Status = MapPersistentStatus(persistentSession.Status),
-                UserId = persistentSession.UserId,
-                ClientId = persistentSession.ClientId,
-                ReturnUrl = persistentSession.ReturnUrl,
-                ExpiresAt = persistentSession.ExpiresAt,
-                ApprovedAt = persistentSession.ApprovedAt,
-                DeviceId = persistentSession.ApprovedByDevice?.DeviceId,
-                DeviceName = persistentSession.ApprovedByDevice?.DeviceName
-            };
-        }
-
-        // Check if it's a session-based QR
-        var sessionTicket = GetSessionQr(token);
-        if (sessionTicket != null)
-        {
-            return new QrSessionInfo
-            {
-                Token = token,
-                Type = QrSessionType.Session,
-                Status = MapSessionStatus(sessionTicket),
-                UserId = sessionTicket.ApprovedUserId,
-                ClientId = sessionTicket.ClientId,
-                ReturnUrl = sessionTicket.ReturnUrl,
-                ExpiresAt = sessionTicket.ExpiresAt.UtcDateTime,
-                ApprovedAt = !string.IsNullOrEmpty(sessionTicket.ApprovedUserId) ? DateTime.UtcNow : null
-            };
-        }
-
-        throw new ArgumentException($"QR session with token {token} not found or expired", nameof(token));
-    }
-
-    public async Task<bool> ApproveQrAsync(string token, string userId, string? deviceId = null)
-    {
-        // Try persistent QR first
-        if (!string.IsNullOrEmpty(deviceId))
-        {
-            var persistentResult = await ApprovePersistentQrAsync(token, userId, deviceId);
-            if (persistentResult)
-                return true;
-        }
-
-        // Fallback to session-based QR
-        return ApproveSessionQr(token, userId);
-    }
-
-    public async Task<bool> CompleteQrAsync(string token)
-    {
-        // Try persistent QR first
-        var persistentResult = await CompletePersistentQrAsync(token);
-        if (persistentResult)
-            return true;
-
-        // Fallback to session-based QR
-        return CompleteSessionQr(token);
-    }
-
-    // ============================================================================
-    // HELPER METHODS
-    // ============================================================================
-
-    private static QrSessionStatusEnum MapPersistentStatus(QrSessionStatus persistentStatus)
-    {
-        return persistentStatus switch
-        {
-            QrSessionStatus.Pending => QrSessionStatusEnum.Pending,
-            QrSessionStatus.Approved => QrSessionStatusEnum.Approved,
-            QrSessionStatus.Completed => QrSessionStatusEnum.Completed,
-            QrSessionStatus.Expired => QrSessionStatusEnum.Expired,
-            QrSessionStatus.Rejected => QrSessionStatusEnum.Rejected,
-            QrSessionStatus.Failed => QrSessionStatusEnum.Failed,
-            _ => QrSessionStatusEnum.Failed
-        };
-    }
-
-    private static QrSessionStatusEnum MapSessionStatus(QrLoginTicket sessionTicket)
-    {
-        if (sessionTicket.Completed)
-            return QrSessionStatusEnum.Completed;
-        
-        if (!string.IsNullOrEmpty(sessionTicket.ApprovedUserId))
-            return QrSessionStatusEnum.Approved;
-        
-        return QrSessionStatusEnum.Pending;
-    }
-}
-
-public sealed class InMemoryQrLoginStore : IQrLoginStore
-{
-    private readonly ConcurrentDictionary<string, QrLoginTicket> _tickets = new();
-    private static string NewToken() => Convert.ToBase64String(Guid.NewGuid().ToByteArray())
-        .Replace("+", "-").Replace("/", "_").TrimEnd('=');
-
-    public QrLoginTicket Create(string? returnUrl, string? clientId, TimeSpan? ttl = null)
-    {
-        var token = NewToken();
-        var ticket = new QrLoginTicket
+        var token = GenerateToken();
+        var csrf = GenerateToken();
+        var entity = new PersistentQrSession
         {
             Token = token,
-            ExpiresAt = DateTimeOffset.UtcNow.Add(ttl ?? TimeSpan.FromMinutes(3)),
+            ClientId = clientId,
             ReturnUrl = returnUrl,
-            ClientId = clientId
+            ExpiresAt = DateTime.UtcNow.Add(ttl ?? TimeSpan.FromMinutes(5)),
+            InitiatorIpAddress = initiatorIp,
+            Metadata = csrf // store CSRF secret in Metadata field (simple reuse)
         };
-        _tickets[token] = ticket;
-        return ticket;
+        _db.PersistentQrSessions.Add(entity);
+        await _db.SaveChangesAsync(ct);
+        _logger.LogInformation("[QR] Created persistent QR token {Token} client {ClientId} exp {Exp}", token, clientId, entity.ExpiresAt);
+        return ToDto(entity, csrf);
     }
 
-    public QrLoginTicket? Get(string token)
+    public async Task<QrLoginDto?> GetAsync(string token, CancellationToken ct = default)
     {
-        if (_tickets.TryGetValue(token, out var t))
+        var entity = await _db.PersistentQrSessions.Include(s=>s.ApprovedByDevice).FirstOrDefaultAsync(s=>s.Token==token, ct);
+        if (entity == null) return null;
+        if (entity.ExpiresAt <= DateTime.UtcNow && entity.Status == MrWho.Shared.QrSessionStatus.Pending)
         {
-            if (t.ExpiresAt <= DateTimeOffset.UtcNow || t.Completed)
-            {
-                _tickets.TryRemove(token, out _);
-                return null;
-            }
-            return t;
+            entity.Status = MrWho.Shared.QrSessionStatus.Expired;
+            await _db.SaveChangesAsync(ct);
         }
-        return null;
+        return ToDto(entity, entity.Metadata); // Metadata holds csrf
     }
 
-    public bool Approve(string token, string userId)
+    public async Task<bool> ApproveAsync(string token, string approverUserId, string deviceId, string csrf, CancellationToken ct = default)
     {
-        var t = Get(token);
-        if (t is null) return false;
-        t.ApprovedUserId = userId;
+        var entity = await _db.PersistentQrSessions.FirstOrDefaultAsync(s=>s.Token==token, ct);
+        if (entity == null) return false;
+        if (!Validate(entity, csrf, MrWho.Shared.QrSessionStatus.Pending)) return false;
+        var device = await _db.UserDevices.FirstOrDefaultAsync(d=>d.UserId==approverUserId && d.DeviceId==deviceId && d.CanApproveLogins && d.IsActive, ct);
+        if (device == null) return false;
+        entity.UserId = approverUserId;
+        entity.ApprovedByDeviceId = device.Id;
+        entity.Status = MrWho.Shared.QrSessionStatus.Approved;
+        entity.ApprovedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync(ct);
+        _logger.LogInformation("[QR] Approved token {Token} by device {DeviceId} user {UserId}", token, deviceId, approverUserId);
         return true;
     }
 
-    public bool Complete(string token)
+    public async Task<bool> CompleteAsync(string token, string csrf, CancellationToken ct = default)
     {
-        if (_tickets.TryGetValue(token, out var t))
-        {
-            t.Completed = true;
-            _tickets.TryRemove(token, out _);
-            return true;
-        }
-        return false;
+        var entity = await _db.PersistentQrSessions.FirstOrDefaultAsync(s=>s.Token==token, ct);
+        if (entity == null) return false;
+        if (!Validate(entity, csrf, MrWho.Shared.QrSessionStatus.Approved)) return false;
+        entity.Status = MrWho.Shared.QrSessionStatus.Completed;
+        entity.CompletedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync(ct);
+        _logger.LogInformation("[QR] Completed token {Token}", token);
+        return true;
     }
-}
 
-// ============================================================================
-// SUPPORTING TYPES
-// ============================================================================
+    public async Task<bool> RejectAsync(string token, string approverUserId, string deviceId, string csrf, CancellationToken ct = default)
+    {
+        var entity = await _db.PersistentQrSessions.FirstOrDefaultAsync(s=>s.Token==token, ct);
+        if (entity == null) return false;
+        if (!Validate(entity, csrf, MrWho.Shared.QrSessionStatus.Pending)) return false;
+        var device = await _db.UserDevices.FirstOrDefaultAsync(d=>d.UserId==approverUserId && d.DeviceId==deviceId && d.IsActive, ct);
+        if (device == null) return false;
+        entity.Status = MrWho.Shared.QrSessionStatus.Rejected;
+        entity.ApprovedAt = DateTime.UtcNow;
+        await _db.SaveChangesAsync(ct);
+        _logger.LogInformation("[QR] Rejected token {Token} by device {DeviceId} user {UserId}", token, deviceId, approverUserId);
+        return true;
+    }
 
-public enum QrSessionType
-{
-    Session,    // In-memory session-based QR (original)
-    Persistent  // Database-backed persistent QR (new)
-}
+    private static string GenerateToken() => Convert.ToBase64String(Guid.NewGuid().ToByteArray()).Replace('+','-').Replace('/','_').TrimEnd('=');
 
-public enum QrSessionStatusEnum
-{
-    Pending,
-    Approved,
-    Completed,
-    Expired,
-    Rejected,
-    Failed
-}
+    private static bool Validate(PersistentQrSession entity, string csrf, MrWho.Shared.QrSessionStatus required)
+    {
+        if (entity.Metadata != csrf) return false; // CSRF mismatch
+        if (entity.Status != required) return false;
+        if (entity.ExpiresAt <= DateTime.UtcNow && entity.Status == MrWho.Shared.QrSessionStatus.Pending) return false;
+        return true;
+    }
 
-public class QrSessionInfo
-{
-    public required string Token { get; set; }
-    public required QrSessionType Type { get; set; }
-    public required QrSessionStatusEnum Status { get; set; }
-    public string? UserId { get; set; }
-    public string? ClientId { get; set; }
-    public string? ReturnUrl { get; set; }
-    public DateTime ExpiresAt { get; set; }
-    public DateTime? ApprovedAt { get; set; }
-    public string? DeviceId { get; set; }
-    public string? DeviceName { get; set; }
+    private static QrLoginDto ToDto(PersistentQrSession e, string? csrf) => new()
+    {
+        Token = e.Token,
+        Csrf = csrf ?? string.Empty,
+        ClientId = e.ClientId,
+        ReturnUrl = e.ReturnUrl,
+        ExpiresAt = e.ExpiresAt,
+        Status = e.Status,
+        DeviceId = e.ApprovedByDeviceId,
+        UserId = e.UserId,
+        ApprovedAt = e.ApprovedAt,
+        CompletedAt = e.CompletedAt
+    };
 }

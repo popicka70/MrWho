@@ -75,11 +75,9 @@ public static class ServiceCollectionExtensions
         // Register device management service
         services.AddScoped<IDeviceManagementService, DeviceManagementService>();
 
-        // Register enhanced QR login service (supports both session-based and persistent QR)
-        services.AddScoped<IEnhancedQrLoginService, EnhancedQrLoginService>();
+        // Replace old QR services with new persistent-only implementation
+        services.AddScoped<IPersistentQrLoginService, PersistentQrLoginService>();
 
-        // Keep the original QR login store for backwards compatibility
-        services.AddSingleton<IQrLoginStore, InMemoryQrLoginStore>();
 
         // Register QR code service (if not already registered)
         services.AddSingleton<IQrCodeService, QrCodeService>();

@@ -1,0 +1,51 @@
+@{
+    ViewData["Title"] = "Approve QR Login";
+    var token = ViewData["Token"] as string;
+    var csrf = ViewData["Csrf"] as string;
+}
+<div class="container mt-5">
+  <div class="row justify-content-center">
+    <div class="col-md-7 col-lg-5">
+      <div class="card shadow-sm">
+        <div class="card-header bg-success text-white">
+          <h4 class="mb-0"><i class="bi bi-shield-check"></i> Approve Login Request</h4>
+        </div>
+        <div class="card-body">
+          <p class="text-muted small">You are about to approve a login on another device/browser. Confirm this was you.</p>
+          <dl class="row small mb-3">
+            <dt class="col-4">Token</dt><dd class="col-8"><code>@token</code></dd>
+          </dl>
+          <div class="alert alert-warning small">
+            Only approve if YOU initiated the login. If suspicious, simply close this page.
+          </div>
+          <button id="approveBtn" class="btn btn-success w-100 mb-2"><i class="bi bi-check-circle"></i> Approve</button>
+          <button id="rejectBtn" class="btn btn-outline-danger w-100"><i class="bi bi-x-circle"></i> Reject</button>
+          <div id="result" class="small mt-3"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+ (function(){
+   const token='@token';
+   const csrf='@csrf';
+   const result=document.getElementById('result');
+   async function call(action){
+     result.textContent='Processing...';
+     try{
+       const body={ deviceId: 'web:'+navigator.userAgent.substring(0,40) };// simple pseudo device id
+       const r=await fetch(`/api/devices/qr/${token}/${action}`,{method:'POST',headers:{'Content-Type':'application/json','X-QR-CSRF':csrf},body:JSON.stringify(body)});
+       if(!r.ok){const t=await r.text();result.textContent='Error: '+t;return;}
+       result.textContent= action==='approve' ? 'Approved. You may return to the original device.' : 'Rejected.';
+       if(action==='approve'){
+         result.className='small text-success';
+       } else {
+         result.className='small text-danger';
+       }
+     }catch(e){result.textContent='Failure: '+e;}
+   }
+   document.getElementById('approveBtn').addEventListener('click',()=>call('approve'));
+   document.getElementById('rejectBtn').addEventListener('click',()=>call('reject'));
+ })();
+</script>

@@ -239,8 +239,7 @@ public class ClientCookieMiddleware
                path.StartsWithSegments("/admin") ||
                path.StartsWithSegments("/account") ||
                path.StartsWithSegments("/profile") ||
-               path.StartsWithSegments("/qr-login") || // added to support QR approval [Authorize]
-               path.StartsWithSegments("/device-management"); // added to support device management UI
+               path.StartsWithSegments("/device-management"); // device management UI
     }
 
     private static bool IsAdminEndpoint(PathString path)
