@@ -182,6 +182,17 @@ public static class WebApplicationExtensions
             return await mediator.Send(new OidcAuthorizeRequest(http));
         }).AllowAnonymous();
 
+        // NEW: Friendly invalid scopes page
+        app.MapGet("/connect/invalid-scopes", async (HttpContext http, IMediator mediator) =>
+        {
+            var q = http.Request.Query;
+            var returnUrl = q["returnUrl"].ToString();
+            var clientId = q["clientId"].ToString();
+            var missing = q["missing"].ToString();
+            var requested = q["requested"].ToString();
+            return await mediator.Send(new MrWho.Handlers.Auth.InvalidScopesGetRequest(http, returnUrl, clientId, missing, requested));
+        }).AllowAnonymous();
+
         // Map OIDC token endpoint for OpenIddict passthrough (supports client_credentials, password, refresh, code exchange)
         app.MapPost("/connect/token", async (HttpContext http, IMediator mediator) =>
         {
@@ -241,7 +252,7 @@ public static class WebApplicationExtensions
         {
             var registrations = options.CurrentValue.Registrations;
 
-            // Try resolve by ProviderName (case-insensitive)
+            // Try resolve by ProviderName (case-insitive)
             var registration = registrations.FirstOrDefault(r =>
                 !string.IsNullOrWhiteSpace(r.ProviderName) &&
                 string.Equals(r.ProviderName, provider, StringComparison.OrdinalIgnoreCase));
@@ -338,7 +349,18 @@ public static class WebApplicationExtensions
             return await mediator.Send(new OidcAuthorizeRequest(http));
         }).AllowAnonymous();
 
-        // Map OIDC token endpoint for OpenIddict passthrough
+        // NEW: Friendly invalid scopes page
+        app.MapGet("/connect/invalid-scopes", async (HttpContext http, IMediator mediator) =>
+        {
+            var q = http.Request.Query;
+            var returnUrl = q["returnUrl"].ToString();
+            var clientId = q["clientId"].ToString();
+            var missing = q["missing"].ToString();
+            var requested = q["requested"].ToString();
+            return await mediator.Send(new MrWho.Handlers.Auth.InvalidScopesGetRequest(http, returnUrl, clientId, missing, requested));
+        }).AllowAnonymous();
+
+        // Map OIDC token endpoint for OpenIddict passthrough (supports client_credentials, password, refresh, code exchange)
         app.MapPost("/connect/token", async (HttpContext http, IMediator mediator) =>
         {
             return await mediator.Send(new OidcTokenRequest(http));

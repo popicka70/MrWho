@@ -1,0 +1,75 @@
+@{
+    ViewData["Title"] = "Invalid / Disallowed Scopes";
+    var clientId = ViewData["ClientId"] as string;
+    var clientName = ViewData["ClientName"] as string ?? clientId;
+    var returnUrl = ViewData["ReturnUrl"] as string;
+    var missing = ViewData["MissingScopes"] as string[] ?? Array.Empty<string>();
+    var requested = ViewData["RequestedScopes"] as string[] ?? Array.Empty<string>();
+    var allowed = ViewData["AllowedScopes"] as IEnumerable<string> ?? Enumerable.Empty<string>();
+}
+<div class="row justify-content-center">
+  <div class="col-md-10 col-lg-8">
+    <div class="card border-danger mb-4">
+      <div class="card-header bg-danger text-white">
+        <h4 class="mb-0"><i class="bi bi-shield-exclamation"></i> Scope Validation Failed</h4>
+      </div>
+      <div class="card-body">
+        <p class="lead mb-3">The authorization request cannot proceed because the application requested scopes that are not allowed for this client.</p>
+        @if (!string.IsNullOrEmpty(clientName)) { <p class="mb-2"><strong>Client:</strong> <code>@clientName</code></p>; }
+        <p class="mb-4 text-muted small">Scopes are space separated identifiers that represent permissions or sets of claims. A client may only request scopes explicitly configured for it.</p>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="card h-100 border-warning">
+              <div class="card-header bg-warning"><strong>Disallowed (Missing) Scopes (@missing.Length)</strong></div>
+              <div class="card-body p-2">
+                @if (missing.Length == 0) {
+                  <div class="text-success small">None</div>
+                } else {
+                  <ul class="small mb-0">
+                    @foreach (var s in missing) { <li><code>@s</code></li> }
+                  </ul>
+                }
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="card h-100 border-success">
+              <div class="card-header bg-success text-white"><strong>Allowed Scopes (@allowed.Count())</strong></div>
+              <div class="card-body p-2">
+                @if (!allowed.Any()) {
+                  <div class="small text-danger">Client has no configured scopes.</div>
+                } else {
+                  <ul class="small mb-0">
+                    @foreach (var s in allowed) { <li><code>@s</code></li> }
+                  </ul>
+                }
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="mt-4">
+          <details>
+            <summary class="fw-semibold">Show full requested scope list (@requested.Length)</summary>
+            <div class="small mt-2"><code>@string.Join(' ', requested)</code></div>
+          </details>
+        </div>
+        <hr />
+        <p class="mb-2"><strong>How to fix:</strong></p>
+        <ul class="mb-3">
+          <li>Remove the disallowed scopes from the request OR</li>
+          <li>Add the required scopes to the client's allowed scopes in the admin portal</li>
+        </ul>
+        @if (!string.IsNullOrEmpty(returnUrl)) {
+          <div class="alert alert-secondary small">Original return URL:<br /><span class="text-break">@returnUrl</span></div>
+        }
+        <div class="d-flex gap-2">
+          <a href="/" class="btn btn-outline-secondary"><i class="bi bi-house"></i> Home</a>
+          <a href="/connect/login@(string.IsNullOrEmpty(returnUrl)?"":"?returnUrl=" + Uri.EscapeDataString(returnUrl))" class="btn btn-primary"><i class="bi bi-arrow-repeat"></i> Retry Login</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<style>
+  .text-break { word-break: break-all; }
+</style>

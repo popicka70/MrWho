@@ -53,6 +53,41 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         var clientId = request.ClientId!;
         _logger.LogDebug("Authorization request received for client {ClientId}", clientId);
 
+        // ---------------------------------------------------------------------
+        // NEW: Early validation of requested scopes against client allowed list
+        // ---------------------------------------------------------------------
+        try
+        {
+            var requestedScopes = request.GetScopes().ToList();
+            if (!string.IsNullOrWhiteSpace(clientId) && requestedScopes.Count > 0)
+            {
+                var dbClient = await _context.Clients
+                    .AsNoTracking()
+                    .Include(c => c.Scopes)
+                    .FirstOrDefaultAsync(c => c.ClientId == clientId);
+                if (dbClient != null)
+                {
+                    var allowed = dbClient.Scopes.Select(s => s.Scope).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                    var missing = requestedScopes.Where(s => !allowed.Contains(s)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+                    if (missing.Count > 0)
+                    {
+                        _logger.LogInformation("Authorization request for client {ClientId} contains disallowed scopes: {Scopes}", clientId, string.Join(", ", missing));
+                        var currentUrl = context.Request.GetDisplayUrl();
+                        var url = "/connect/invalid-scopes?clientId=" + Uri.EscapeDataString(clientId) +
+                                  "&returnUrl=" + Uri.EscapeDataString(currentUrl) +
+                                  "&missing=" + Uri.EscapeDataString(string.Join(" ", missing)) +
+                                  "&requested=" + Uri.EscapeDataString(string.Join(" ", requestedScopes));
+                        return Results.Redirect(url);
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed during early scope validation for client {ClientId}", clientId);
+        }
+        // ---------------------------------------------------------------------
+
         ClaimsPrincipal? clientPrincipal = null;
         IdentityUser? authUser = null; // The user we will authorize
         ClaimsPrincipal? amrSource = null; // For AMR propagation
