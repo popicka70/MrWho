@@ -330,6 +330,7 @@ public static class ServiceCollectionExtensions
     public static IServiceCollection AddAuthorizationServices(this IServiceCollection services)
     {
         services.AddAuthorization();
+        services.AddCascadingAuthenticationState();
         return services;
     }
 
