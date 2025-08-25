@@ -16,8 +16,6 @@ namespace MrWho.Handlers.Auth;
 
 public sealed class LoginGetHandler : IRequestHandler<MrWho.Endpoints.Auth.LoginGetRequest, IActionResult>
 {
-    private readonly IClientCookieConfigurationService _cookieService;
-    private readonly IDynamicCookieService _dynamicCookieService;
     private readonly IOpenIddictApplicationManager _applicationManager;
     private readonly ApplicationDbContext _db;
     private readonly ILogger<LoginGetHandler> _logger;
@@ -25,16 +23,12 @@ public sealed class LoginGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Login
     private readonly IOptions<MrWhoOptions> _mrWhoOptions;
 
     public LoginGetHandler(
-        IClientCookieConfigurationService cookieService,
-        IDynamicCookieService dynamicCookieService,
         IOpenIddictApplicationManager applicationManager,
         ApplicationDbContext db,
         ILogger<LoginGetHandler> logger,
         ILoginHelper loginHelper,
         IOptions<MrWhoOptions> mrWhoOptions)
     {
-        _cookieService = cookieService;
-        _dynamicCookieService = dynamicCookieService;
         _applicationManager = applicationManager;
         _db = db;
         _logger = logger;

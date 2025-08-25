@@ -22,6 +22,12 @@ public static class ServiceCollectionExtensions
         // Register shared accessors
         services.AddHttpContextAccessor();
 
+        // Realm validation service (required by login handlers & troubleshoot)
+        services.AddScoped<IUserRealmValidationService, UserRealmValidationService>();
+
+        // Dynamic client cookie registrar (no-op in simplified single-cookie mode)
+        services.AddSingleton<IDynamicClientCookieRegistrar, DynamicClientCookieRegistrar>();
+
         // Register database access layer
         services.AddScoped<ISeedingService, SeedingService>();
         services.AddScoped<IScopeSeederService, ScopeSeederService>();
@@ -31,33 +37,6 @@ public static class ServiceCollectionExtensions
         // Register client services
         services.AddScoped<IOidcClientService, OidcClientService>();
         services.AddScoped<IOpenIddictScopeSyncService, OpenIddictScopeSyncService>();
-
-        // Register client cookie services
-        services.AddScoped<IDynamicCookieService, DynamicCookieService>();
-        
-        // Register dynamic client configuration service
-        services.AddScoped<IDynamicClientConfigurationService, DynamicClientConfigurationService>();
-
-        // CORRECTED: Add complete dynamic client cookie registration system
-        services.AddHostedService<DynamicClientCookieService>();
-        services.AddSingleton<IDynamicClientCookieRegistrar, DynamicClientCookieRegistrar>();
-
-        // Add infrastructure for dynamic cookie options
-        services.AddSingleton<IConfigureNamedOptions<CookieAuthenticationOptions>, DynamicCookieOptionsConfigurator>();
-
-        // CORRECTED: Add dynamic authorization policy provider that loads schemes from database
-        // ? SINGLE SOURCE OF TRUTH: All authorization policies (static + dynamic) centralized here
-        services.AddSingleton<IAuthorizationPolicyProvider, DynamicAuthorizationPolicyProvider>();
-
-        // Register realm validation service
-        services.AddScoped<IUserRealmValidationService, UserRealmValidationService>();
-
-        // Register user handlers
-        services.AddScoped<IGetUsersHandler, GetUsersHandler>();
-        services.AddScoped<IGetUserHandler, GetUserHandler>();
-        services.AddScoped<ICreateUserHandler, CreateUserHandler>();
-        services.AddScoped<IUpdateUserHandler, UpdateUserHandler>();
-        services.AddScoped<IDeleteUserHandler, DeleteUserHandler>();
 
         // Register authorization, token and userinfo handlers
         services.AddScoped<IOidcAuthorizationHandler, OidcAuthorizationHandler>();
@@ -189,9 +168,6 @@ public static class ServiceCollectionExtensions
             };
         });
 
-        // Add support for multiple cookie configurations
-        services.AddScoped<IClientCookieConfigurationService, ClientCookieConfigurationService>();
-
         return services;
     }
 
@@ -203,24 +179,7 @@ public static class ServiceCollectionExtensions
         string? cookieName = null,
         Action<CookieAuthenticationOptions>? configureOptions = null)
     {
-        var schemeName = CookieSchemeNaming.BuildClientScheme(clientId);
-        var actualCookieName = cookieName ?? CookieSchemeNaming.BuildClientCookie(clientId);
-
-        services.AddAuthentication()
-            .AddCookie(schemeName, options =>
-            {
-                options.Cookie.Name = actualCookieName;
-                options.Cookie.HttpOnly = true;
-                options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
-                options.Cookie.SameSite = SameSiteMode.None; // Required for cross-site OIDC redirects
-                options.ExpireTimeSpan = TimeSpan.FromHours(24);
-                options.SlidingExpiration = true;
-                
-                // Custom configuration
-                configureOptions?.Invoke(options);
-            });
-
-        return services;
+        return services; // no-op after simplification
     }
 
     /// <summary>
@@ -229,31 +188,7 @@ public static class ServiceCollectionExtensions
     /// </summary>
     public static IServiceCollection AddMrWhoClientCookies(this IServiceCollection services, IConfiguration? configuration = null)
     {
-        // Determine cookie separation mode from configuration (fallback to ByClient)
-        var modeString = configuration?["MrWho:CookieSeparationMode"] ?? "ByClient";
-        var mode = Enum.TryParse<CookieSeparationMode>(modeString, ignoreCase: true, out var parsed)
-            ? parsed
-            : CookieSeparationMode.ByClient;
-
-        // Compute the bootstrap cookie name for the admin client without resolving services
-        string adminCookieName = mode switch
-        {
-            CookieSeparationMode.None => CookieSchemeNaming.DefaultCookieName,
-            CookieSeparationMode.ByRealm => CookieSchemeNaming.BuildRealmCookie("admin"), // admin client lives in the 'admin' realm
-            _ => CookieSchemeNaming.BuildClientCookie("mrwho_admin_web") // ByClient (default)
-        };
-
-        services.AddClientSpecificCookie("mrwho_admin_web", adminCookieName, options =>
-        {
-            options.LoginPath = "/connect/login";
-            options.LogoutPath = "/connect/logout";
-            options.AccessDeniedPath = "/connect/access-denied";
-            options.Cookie.Domain = null; // Same domain only; domain overrides applied globally in Program.cs
-            options.ExpireTimeSpan = TimeSpan.FromHours(8); // Work day session
-        });
-
-        // Note: Remaining clients are registered dynamically by DynamicClientCookieService from the database.
-        return services;
+        return services; // no-op
     }
 
     public static IServiceCollection AddMrWhoOpenIddict(this IServiceCollection services, IConfiguration configuration)
@@ -336,24 +271,9 @@ public static class ServiceCollectionExtensions
     /// </summary>
     public static IServiceCollection AddMrWhoAuthorizationWithClientCookies(this IServiceCollection services)
     {
-        // Configure authorization - all policies handled by DynamicAuthorizationPolicyProvider
         services.AddAuthorization();
 
-        // The DynamicAuthorizationPolicyProvider (registered in AddMrWhoServices) handles:
-        // ? UserInfoPolicy - Static security policy for OpenIddict validation
-        // ? AdminOnly - Static policy for admin client authentication  
-        // ? DemoAccess - Static policy for demo client authentication
-        // ? ApiAccess - Static policy for API client + OpenIddict validation
-        // ? Default Policy - Dynamic policy loading ALL client schemes from database
-        // ? Client_{clientId} - Dynamic policies for any client (e.g., "Client_my_custom_client")
-        //
-        // Benefits:
-        // ?? Single source of truth for all authorization configuration
-        // ?? Database-driven default policy with automatic client inclusion
-        // ?? No code changes needed when adding new clients to database
-        // ?? Centralized policy logic with proper fallback handling
-
-        return services;
+        return services; // simplified
     }
 
     public static IServiceCollection AddMrWhoAntiforgery(this IServiceCollection services)

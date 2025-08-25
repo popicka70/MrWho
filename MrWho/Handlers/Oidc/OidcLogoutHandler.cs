@@ -14,12 +14,10 @@ namespace MrWho.Handlers.Oidc;
 
 public sealed class OidcLogoutHandler : IRequestHandler<MrWho.Endpoints.OidcLogoutRequest, IResult>
 {
-    private readonly IDynamicCookieService _dynamicCookieService;
     private readonly ILogger<OidcLogoutHandler> _logger;
 
-    public OidcLogoutHandler(IDynamicCookieService dynamicCookieService, ILogger<OidcLogoutHandler> logger)
+    public OidcLogoutHandler(ILogger<OidcLogoutHandler> logger)
     {
-        _dynamicCookieService = dynamicCookieService;
         _logger = logger;
     }
 
@@ -73,7 +71,6 @@ public sealed class OidcLogoutHandler : IRequestHandler<MrWho.Endpoints.OidcLogo
                 return Results.SignOut(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
             }
 
-            await _dynamicCookieService.SignOutFromClientAsync(clientId);
             return Results.SignOut(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
         }
         catch (Exception ex)

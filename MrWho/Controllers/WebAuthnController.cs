@@ -229,21 +229,6 @@ public class WebAuthnController : Controller
             await _userManager.UpdateSecurityStampAsync(user);
             await HttpContext.SignInAsync(IdentityConstants.ApplicationScheme, await BuildPrincipalAsync(user, "fido2"));
 
-            // Also sign into client-specific cookie if present
-            if (!string.IsNullOrEmpty(clientId))
-            {
-                try
-                {
-                    var dynCookieService = HttpContext.RequestServices.GetService<IDynamicCookieService>();
-                    if (dynCookieService != null)
-                        await dynCookieService.SignInWithClientCookieAsync(clientId, user, rememberMe: true);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed client-specific cookie sign-in for client {ClientId}", clientId);
-                }
-            }
-
             _assertionOptions.Remove(key);
 
             if (!string.IsNullOrEmpty(returnUrl))

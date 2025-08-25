@@ -16,20 +16,17 @@ public class ExternalAuthController : ControllerBase
 {
     private readonly UserManager<IdentityUser> _userManager;
     private readonly SignInManager<IdentityUser> _signInManager;
-    private readonly IDynamicCookieService _dynamicCookieService;
     private readonly ILogger<ExternalAuthController> _logger;
     private readonly ApplicationDbContext _db;
 
     public ExternalAuthController(
         UserManager<IdentityUser> userManager,
         SignInManager<IdentityUser> signInManager,
-        IDynamicCookieService dynamicCookieService,
         ILogger<ExternalAuthController> logger,
         ApplicationDbContext db)
     {
         _userManager = userManager;
         _signInManager = signInManager;
-        _dynamicCookieService = dynamicCookieService;
         _logger = logger;
         _db = db;
     }
@@ -310,19 +307,6 @@ public class ExternalAuthController : ControllerBase
 
         // Sign in locally with added session claims
         await _signInManager.SignInWithClaimsAsync(user, isPersistent: false, sessionClaims);
-
-        // Also create client-specific cookie if clientId provided
-        if (!string.IsNullOrEmpty(clientId))
-        {
-            try
-            {
-                await _dynamicCookieService.SignInWithClientCookieAsync(clientId, user, rememberMe: false);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to sign in with client cookie for client {ClientId}", clientId);
-            }
-        }
 
         // Ensure the user is linked to the client when a clientId is provided
         try

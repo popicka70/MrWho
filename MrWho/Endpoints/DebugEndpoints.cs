@@ -105,61 +105,6 @@ public sealed class DebugIndexHandler : IRequestHandler<DebugIndexRequest, IResu
     }
 }
 
-// /debug/client-cookies
-public sealed record ClientCookiesDebugRequest(HttpContext HttpContext) : IRequest<IResult>;
-public sealed class ClientCookiesDebugHandler : IRequestHandler<ClientCookiesDebugRequest, IResult>
-{
-    private readonly IClientCookieConfigurationService _cookieService;
-
-    public ClientCookiesDebugHandler(IClientCookieConfigurationService cookieService)
-        => _cookieService = cookieService;
-
-    public Task<IResult> Handle(ClientCookiesDebugRequest request, CancellationToken cancellationToken)
-    {
-        var context = request.HttpContext;
-        var configurations = _cookieService.GetAllClientConfigurations();
-        var currentClientId = context.Items["ClientId"]?.ToString();
-        var currentScheme = context.Items["ClientCookieScheme"]?.ToString();
-        var currentCookieName = context.Items["ClientCookieName"]?.ToString();
-
-        var activeCookies = new List<object>();
-        foreach (var config in configurations)
-        {
-            var cookieValue = context.Request.Cookies[config.Value.CookieName];
-            activeCookies.Add(new
-            {
-                ClientId = config.Key,
-                CookieName = config.Value.CookieName,
-                SchemeName = config.Value.SchemeName,
-                HasCookie = !string.IsNullOrEmpty(cookieValue),
-                CookieLength = cookieValue?.Length ?? 0
-            });
-        }
-
-        var result = new
-        {
-            CurrentRequest = new
-            {
-                Path = context.Request.Path.ToString(),
-                ClientId = currentClientId,
-                CookieScheme = currentScheme,
-                CookieName = currentCookieName
-            },
-            ConfiguredClients = configurations.Select(kvp => new
-            {
-                ClientId = kvp.Key,
-                SchemeName = kvp.Value.SchemeName,
-                CookieName = kvp.Value.CookieName
-            }),
-            ActiveCookies = activeCookies,
-            AllRequestCookies = context.Request.Cookies.Select(c => new { Name = c.Key, Length = c.Value.Length }),
-            Timestamp = DateTime.UtcNow
-        };
-
-        return Task.FromResult(Results.Ok(result) as IResult);
-    }
-}
-
 // /debug/client-info (postman)
 public sealed record ClientInfoRequest() : IRequest<IResult>;
 public sealed class ClientInfoHandler : IRequestHandler<ClientInfoRequest, IResult>

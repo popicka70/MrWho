@@ -8,7 +8,6 @@ using MrWho.Handlers;
 using MrWho.Services;
 using MrWho.Services.Mediator;
 using MrWho.Endpoints;
-using MrWho.Middleware;
 using OpenIddict.Abstractions;
 using OpenIddict.Server.AspNetCore;
 using Microsoft.AspNetCore;
@@ -59,9 +58,6 @@ public static class WebApplicationExtensions
 
         // Enable session before custom middleware that uses it
         app.UseSession();
-
-        // Add client cookie middleware before authentication
-        app.UseMiddleware<ClientCookieMiddleware>();
 
         // Add antiforgery middleware
         app.UseAntiforgery();
@@ -233,7 +229,6 @@ public static class WebApplicationExtensions
         // Enable session before custom middleware that uses it
         app.UseSession();
 
-        app.UseMiddleware<ClientCookieMiddleware>();
         app.UseAntiforgery();
 
         app.UseAuthentication();
