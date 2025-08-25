@@ -4,6 +4,7 @@ using MrWho.Services;
 using QRCoder;
 using MrWho.Models; // add
 using MrWho.Shared; // ensure shared enums
+using Microsoft.AspNetCore.Identity;
 
 namespace MrWho.Controllers;
 
@@ -11,11 +12,14 @@ namespace MrWho.Controllers;
 public class QrController : Controller
 {
     private readonly IPersistentQrLoginService _qr;
+    private readonly IDynamicCookieService _dynamicCookieService;
+    private readonly SignInManager<IdentityUser> _signInManager;
+    private readonly UserManager<IdentityUser> _userManager;
     private readonly ILogger<QrController> _logger;
 
-    public QrController(IPersistentQrLoginService qr, ILogger<QrController> logger)
+    public QrController(IPersistentQrLoginService qr, IDynamicCookieService dynamicCookieService, SignInManager<IdentityUser> signInManager, UserManager<IdentityUser> userManager, ILogger<QrController> logger)
     {
-        _qr = qr; _logger = logger;
+        _qr = qr; _dynamicCookieService = dynamicCookieService; _signInManager = signInManager; _userManager = userManager; _logger = logger;
     }
 
     // Start a new persistent QR login session (anonymous; approval requires auth)
@@ -49,12 +53,68 @@ public class QrController : Controller
     public async Task<IActionResult> Complete([FromForm] string token, [FromForm] string csrf)
     {
         var dto = await _qr.GetAsync(token);
-        if (dto == null) return NotFound();
-        if (dto.Status != MrWho.Shared.QrSessionStatus.Approved) return BadRequest(new { error = "not_approved" });
-        var ok = await _qr.CompleteAsync(token, csrf);
-        if (!ok) return BadRequest(new { error = "complete_failed" });
-        // Do NOT sign user in here because approval-side signed user context (on device). Full SSO still requires normal OIDC authorize redirect
-        return Ok(new { status = "completed" });
+        if (dto == null)
+        {
+            _logger.LogDebug("[QR] Complete failed - token {Token} not found", token);
+            return NotFound();
+        }
+        if (dto.Status != MrWho.Shared.QrSessionStatus.Approved)
+        {
+            _logger.LogDebug("[QR] Complete denied - token {Token} status {Status}", token, dto.Status);
+            return BadRequest(new { error = "not_approved" });
+        }
+        if (string.IsNullOrEmpty(dto.UserId))
+        {
+            _logger.LogWarning("[QR] Complete aborted - approved session {Token} missing user id", token);
+            return BadRequest(new { error = "no_user" });
+        }
+        var user = await _userManager.FindByIdAsync(dto.UserId);
+        if (user == null)
+        {
+            _logger.LogWarning("[QR] Complete aborted - user {UserId} not found", dto.UserId);
+            return BadRequest(new { error = "user_not_found" });
+        }
+
+        // Sign-in default identity cookie
+        await _signInManager.SignInAsync(user, isPersistent: false);
+        _logger.LogInformation("[QR] Signed in user {UserName} via QR token {Token}", user.UserName, token);
+
+        // Sign-in client-specific cookie if clientId present
+        if (!string.IsNullOrWhiteSpace(dto.ClientId))
+        {
+            try
+            {
+                await _dynamicCookieService.SignInWithClientCookieAsync(dto.ClientId, user, rememberMe: false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "[QR] Failed to issue client cookie for client {ClientId} token {Token}", dto.ClientId, token);
+            }
+        }
+
+        // Mark session completed (idempotent if already done)
+        var completed = await _qr.CompleteAsync(token, csrf);
+        if (!completed)
+        {
+            _logger.LogWarning("[QR] CompleteAsync returned false for token {Token}", token);
+        }
+
+        // Redirect logic (Option A)
+        if (!string.IsNullOrEmpty(dto.ReturnUrl))
+        {
+            if (dto.ReturnUrl.Contains("/connect/authorize", StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogDebug("[QR] Redirecting to OIDC authorize: {ReturnUrl}", dto.ReturnUrl);
+                return Redirect(dto.ReturnUrl);
+            }
+            if (Url.IsLocalUrl(dto.ReturnUrl))
+            {
+                _logger.LogDebug("[QR] Redirecting to local returnUrl: {ReturnUrl}", dto.ReturnUrl);
+                return Redirect(dto.ReturnUrl);
+            }
+        }
+
+        return RedirectToAction("Index", "Home");
     }
 
     // Approval UI (opened on authenticated device after scanning code) - shows data and allows JS call to API approve endpoint
