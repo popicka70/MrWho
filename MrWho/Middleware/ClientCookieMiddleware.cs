@@ -5,6 +5,7 @@ using MrWho.Options;
 using Microsoft.AspNetCore.Identity;
 using MrWho.Shared.Authentication; // unify defaults
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies; // added
 
 namespace MrWho.Middleware;
 
@@ -52,6 +53,27 @@ public class ClientCookieMiddleware
                             cookieScheme, clientId);
                         cookieScheme = IdentityConstants.ApplicationScheme;
                         cookieName = CookieSchemeNaming.DefaultCookieName;
+                    }
+                    else
+                    {
+                        // EXTRA DEFENSE: ensure options (especially TicketDataFormat) are present; otherwise fallback
+                        try
+                        {
+                            var optMonitor = context.RequestServices.GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>();
+                            var schemeOptions = optMonitor.Get(cookieScheme);
+                            if (schemeOptions?.TicketDataFormat == null)
+                            {
+                                _logger.LogWarning("Cookie scheme {Scheme} for client {ClientId} has null TicketDataFormat (options not initialized) - falling back to default scheme", cookieScheme, clientId);
+                                cookieScheme = IdentityConstants.ApplicationScheme;
+                                cookieName = CookieSchemeNaming.DefaultCookieName;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Failed to retrieve options for scheme {Scheme}; falling back to default", cookieScheme);
+                            cookieScheme = IdentityConstants.ApplicationScheme;
+                            cookieName = CookieSchemeNaming.DefaultCookieName;
+                        }
                     }
                     
                     // Store client information in context for use by other components
@@ -115,6 +137,23 @@ public class ClientCookieMiddleware
                         // Don't set context items if the scheme doesn't exist
                         await _next(context);
                         return;
+                    }
+                    else
+                    {
+                        // Double-check options health
+                        try
+                        {
+                            var optMonitor = context.RequestServices.GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>();
+                            var schemeOptions = optMonitor.Get(defaultScheme);
+                            if (schemeOptions?.TicketDataFormat == null)
+                            {
+                                _logger.LogError("Default scheme {Scheme} TicketDataFormat is null; cookie auth will fail.", defaultScheme);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Could not retrieve options for default scheme {Scheme}", defaultScheme);
+                        }
                     }
                     
                     context.Items["ClientCookieScheme"] = defaultScheme;
