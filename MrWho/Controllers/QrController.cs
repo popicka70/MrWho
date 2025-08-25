@@ -24,6 +24,7 @@ public class QrController : Controller
 
     // Start a new persistent QR login session (anonymous; approval requires auth)
     [HttpGet("start")]
+    [HttpGet("/qr-login/start")] // legacy alias
     [AllowAnonymous]
     public async Task<IActionResult> Start([FromQuery] string? clientId = null, [FromQuery] string? returnUrl = null)
     {
@@ -38,6 +39,7 @@ public class QrController : Controller
 
     // Simple status endpoint used by JS poller (no auth needed)
     [HttpGet("status/{token}")]
+    [HttpGet("/qr-login/status/{token}")] // legacy alias
     [AllowAnonymous]
     public async Task<IActionResult> Status(string token)
     {
@@ -49,6 +51,7 @@ public class QrController : Controller
 
     // Completion endpoint: invoked by initiating browser once approved
     [HttpPost("complete")]
+    [HttpPost("/qr-login/complete")] // legacy alias
     [AllowAnonymous]
     public async Task<IActionResult> Complete([FromForm] string token, [FromForm] string csrf)
     {
@@ -119,6 +122,7 @@ public class QrController : Controller
 
     // Approval UI (opened on authenticated device after scanning code) - shows data and allows JS call to API approve endpoint
     [HttpGet("approve")]
+    [HttpGet("/qr-login/approve")] // legacy alias
     [Authorize]
     public IActionResult Approve([FromQuery] string token, [FromQuery] string csrf)
     {
@@ -128,6 +132,7 @@ public class QrController : Controller
     }
 
     [HttpGet("code/{token}.png")]
+    [HttpGet("/qr-login/code/{token}.png")] // legacy alias
     [AllowAnonymous]
     public IActionResult Code(string token, [FromQuery] string csrf)
     {
