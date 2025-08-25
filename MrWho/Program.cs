@@ -153,13 +153,7 @@ builder.Services.AddScoped<Microsoft.AspNetCore.Authentication.IClaimsTransforma
 
 var app = builder.Build();
 
-// Explicitly register dynamic client cookie schemes BEFORE pipeline / first auth
-using (var scope = app.Services.CreateScope())
-{
-    var registrar = scope.ServiceProvider.GetRequiredService<IDynamicClientCookieRegistrar>();
-    await registrar.RegisterAllAsync();
-}
-
+// NOTE: Dynamic client cookie schemes now registered after database seeding inside InitializeDatabaseAsync()
 var logger = app.Services.GetRequiredService<ILogger<Program>>();
 logger.LogInformation("MrWho OIDC Server starting...");
 

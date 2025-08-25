@@ -157,7 +157,6 @@ public class QrLoginController : Controller
     /// Process QR approval for session-based QR codes
     /// </summary>
     [HttpPost("approve")]
-    [Authorize]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ApprovePost([FromForm] string token, [FromForm] string action)
     {

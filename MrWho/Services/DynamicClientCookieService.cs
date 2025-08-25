@@ -1,12 +1,12 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.Extensions.Options;
-using MrWho.Options;
-using MrWho.Data;
-using Microsoft.EntityFrameworkCore;
-using MrWho.Shared.Authentication; // use centralized naming
 using Microsoft.AspNetCore.DataProtection; // ensure data protection is available
 using Microsoft.AspNetCore.Identity; // for IdentityConstants
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using MrWho.Data;
+using MrWho.Options;
+using MrWho.Shared.Authentication; // use centralized naming
 
 namespace MrWho.Services;
 

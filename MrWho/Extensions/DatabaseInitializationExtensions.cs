@@ -26,6 +26,19 @@ public static class DatabaseInitializationExtensions
             await seed.InitializeEssentialDataAsync();
             await seed.InitializeDefaultRealmAndClientsAsync();
 
+            // AFTER seeding, register all dynamic client/realm cookie schemes (idempotent)
+            try
+            {
+                var registrar = services.GetRequiredService<IDynamicClientCookieRegistrar>();
+                await registrar.RegisterAllAsync();
+                logger.LogInformation("Dynamic client cookie schemes registered after seeding");
+            }
+            catch (Exception regEx)
+            {
+                logger.LogError(regEx, "Failed to register dynamic client cookie schemes after seeding");
+                throw; // rethrow so startup fails clearly if schemes missing
+            }
+
             logger.LogInformation("Database initialized successfully");
         }
         catch (Exception ex)
