@@ -1,9 +1,11 @@
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using MrWho.Services;
 using QRCoder;
 using System.Text;
+using System.Web;
 
 namespace MrWho.Controllers;
 
@@ -132,8 +134,12 @@ public class QrLoginController : Controller
             }
 
             var user = await _userManager.GetUserAsync(User);
-            if (user == null) 
-                return Challenge(IdentityConstants.ApplicationScheme);
+            if (user is null)
+            {
+                return Redirect($"/connect/login?returnUrl={HttpUtility.UrlEncode(Request.Path + Request.QueryString)}");
+            }
+            //if (user == null)
+            //    return Challenge(IdentityConstants.ApplicationScheme);
 
             // Instead of auto-approving, show the approval form
             ViewData["Token"] = token;
