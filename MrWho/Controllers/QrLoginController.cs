@@ -18,6 +18,7 @@ public class QrLoginController : Controller
     private readonly SignInManager<IdentityUser> _signInManager;
     private readonly ILogger<QrLoginController> _logger;
     private readonly IDynamicCookieService _dynamicCookieService;
+    private readonly IUserRealmValidationService _realmValidationService; // added
 
     public QrLoginController(
         IEnhancedQrLoginService enhancedQrService,
@@ -25,6 +26,7 @@ public class QrLoginController : Controller
         UserManager<IdentityUser> userManager,
         SignInManager<IdentityUser> signInManager,
         IDynamicCookieService dynamicCookieService,
+        IUserRealmValidationService realmValidationService, // added
         ILogger<QrLoginController> logger)
     {
         _enhancedQrService = enhancedQrService;
@@ -32,6 +34,7 @@ public class QrLoginController : Controller
         _userManager = userManager;
         _signInManager = signInManager;
         _dynamicCookieService = dynamicCookieService;
+        _realmValidationService = realmValidationService; // added
         _logger = logger;
     }
 
@@ -145,6 +148,28 @@ public class QrLoginController : Controller
                 return Redirect($"/connect/login?returnUrl={HttpUtility.UrlEncode(Request.Path + Request.QueryString)}");
             }
 
+            // Eligibility check when clientId present
+            if (!string.IsNullOrEmpty(sessionInfo.ClientId))
+            {
+                try
+                {
+                    var validation = await _realmValidationService.ValidateUserRealmAccessAsync(user, sessionInfo.ClientId);
+                    if (!validation.IsValid)
+                    {
+                        _logger.LogWarning("QR login approval denied: user {User} not eligible for client {ClientId}. Reason: {Reason}", user.UserName, sessionInfo.ClientId, validation.Reason);
+                        ViewData["Token"] = token;
+                        ViewData["SessionInfo"] = sessionInfo;
+                        ViewData["UserName"] = user.UserName;
+                        return View("Approve", model: "denied");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error validating eligibility for user {User} and client {ClientId} during QR approve GET", user.Id, sessionInfo.ClientId);
+                    return View("Approve", model: "error");
+                }
+            }
+
             ViewData["Token"] = token;
             ViewData["SessionInfo"] = sessionInfo;
             ViewData["UserName"] = user.UserName;
@@ -172,8 +197,33 @@ public class QrLoginController : Controller
 
         try
         {
+            // Get session info to perform status and client eligibility checks
+            var sessionInfo = await _enhancedQrService.GetQrSessionInfoAsync(token);
+            if (sessionInfo.Status != QrSessionStatusEnum.Pending)
+            {
+                return View("Approve", model: "expired");
+            }
+
             if (action == "approve")
             {
+                if (!string.IsNullOrEmpty(sessionInfo.ClientId))
+                {
+                    try
+                    {
+                        var validation = await _realmValidationService.ValidateUserRealmAccessAsync(user, sessionInfo.ClientId);
+                        if (!validation.IsValid)
+                        {
+                            _logger.LogWarning("QR login approval denied (POST): user {User} not eligible for client {ClientId}. Reason: {Reason}", user.UserName, sessionInfo.ClientId, validation.Reason);
+                            return View("Approve", model: "denied");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error validating eligibility for user {User} and client {ClientId} during QR approve POST", user.Id, sessionInfo.ClientId);
+                        return View("Approve", model: "error");
+                    }
+                }
+
                 var success = await _enhancedQrService.ApproveQrAsync(token, user.Id);
                 if (!success)
                 {
@@ -235,6 +285,25 @@ public class QrLoginController : Controller
                 return RedirectToAction("Start");
             }
 
+            // Re-validate eligibility at completion time (user could have been revoked meanwhile)
+            if (!string.IsNullOrEmpty(sessionInfo.ClientId))
+            {
+                try
+                {
+                    var validation = await _realmValidationService.ValidateUserRealmAccessAsync(user, sessionInfo.ClientId);
+                    if (!validation.IsValid)
+                    {
+                        _logger.LogWarning("QR login completion denied: user {User} not eligible for client {ClientId}. Reason: {Reason}", user.UserName, sessionInfo.ClientId, validation.Reason);
+                        return Redirect(BuildAccessDeniedUrl(sessionInfo.ReturnUrl, sessionInfo.ClientId));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error validating eligibility for user {User} and client {ClientId} during QR completion", user.Id, sessionInfo.ClientId);
+                    return Redirect(BuildAccessDeniedUrl(sessionInfo.ReturnUrl, sessionInfo.ClientId));
+                }
+            }
+
             await _signInManager.SignInAsync(user, isPersistent: false);
 
             if (!string.IsNullOrEmpty(sessionInfo.ClientId))
@@ -282,5 +351,16 @@ public class QrLoginController : Controller
             _logger.LogError(ex, "Error completing QR session {Token}", token);
             return RedirectToAction("Start");
         }
+    }
+
+    private static string BuildAccessDeniedUrl(string? returnUrl, string? clientId)
+    {
+        var ret = !string.IsNullOrEmpty(returnUrl) ? Uri.EscapeDataString(returnUrl) : string.Empty;
+        var cid = !string.IsNullOrEmpty(clientId) ? Uri.EscapeDataString(clientId) : string.Empty;
+        var url = "/connect/access-denied";
+        var hasQuery = false;
+        if (!string.IsNullOrEmpty(ret)) { url += $"?returnUrl={ret}"; hasQuery = true; }
+        if (!string.IsNullOrEmpty(cid)) { url += hasQuery ? $"&clientId={cid}" : $"?clientId={cid}"; }
+        return url;
     }
 }
