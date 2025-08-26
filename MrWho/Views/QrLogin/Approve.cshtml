@@ -33,6 +33,17 @@
                         The login attempt has been declined.
                     </div>
                 }
+                else if (Model == "denied")
+                {
+                    <div class="alert alert-danger">
+                        <i class="bi bi-shield-lock"></i> <strong>Access Denied</strong><br/>
+                        You are not authorized to sign in to this application via QR login.<br/>
+                        @if (!string.IsNullOrEmpty(sessionInfo?.ClientId))
+                        {
+                            <small class="text-muted">Client: @sessionInfo.ClientId</small>
+                        }
+                    </div>
+                }
                 else if (Model == "error")
                 {
                     <div class="alert alert-danger">
