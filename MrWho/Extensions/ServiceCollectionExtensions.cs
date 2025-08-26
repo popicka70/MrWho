@@ -12,11 +12,18 @@ using OpenIddict.Abstractions;
 using MrWho.Shared;
 using MrWho.Options; // for CookieSeparationMode
 using MrWho.Shared.Authentication; // for CookieSchemeNaming
+using OpenIddict.Client; // added for client options
+using OpenIddict.Client.AspNetCore; // added for aspnetcore integration
+using OpenIddict.Client.SystemNetHttp; // added for http integration
+using Microsoft.AspNetCore.RateLimiting; // rate limiting
+using System.Threading.RateLimiting; // rate limiting options
 
 namespace MrWho.Extensions;
 
 public static class ServiceCollectionExtensions
 {
+    private static string GetRemoteIp(HttpContext context) => context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
     public static IServiceCollection AddMrWhoServices(this IServiceCollection services)
     {
         // Register shared accessors
@@ -337,6 +344,111 @@ public static class ServiceCollectionExtensions
                 options.UseLocalServer();
                 options.UseAspNetCore();
             });
+
+        return services;
+    }
+
+    /// <summary>
+    /// Adds and configures the OpenIddict client (upstream external providers) using a consistent extension pattern.
+    /// Mirrors the inline configuration previously in Program.cs.
+    /// </summary>
+    /// <param name="services">Service collection</param>
+    /// <param name="configuration">App configuration (for future use)</param>
+    /// <param name="environment">Hosting environment for dev/prod cert decisions</param>
+    public static IServiceCollection AddMrWhoOpenIddictClient(this IServiceCollection services, IConfiguration configuration, IWebHostEnvironment environment)
+    {
+        services.AddOpenIddict()
+            .AddClient(options =>
+            {
+                options.AllowAuthorizationCodeFlow();
+                options.SetRedirectionEndpointUris("/connect/external/callback");
+                options.SetPostLogoutRedirectionEndpointUris("/connect/external/signout-callback");
+
+                if (environment.IsDevelopment())
+                {
+                    options.AddDevelopmentEncryptionCertificate()
+                           .AddDevelopmentSigningCertificate();
+                }
+                else
+                {
+                    options.AddEphemeralEncryptionKey()
+                           .AddEphemeralSigningKey();
+                }
+
+                options.UseSystemNetHttp();
+                options.UseAspNetCore()
+                       .EnableRedirectionEndpointPassthrough()
+                       .EnablePostLogoutRedirectionEndpointPassthrough();
+                options.UseWebProviders();
+            });
+
+        // Upstream client option configurators (already used in Program.cs) stay consistent here so caller just registers them once.
+        services.AddSingleton<IConfigureOptions<OpenIddictClientOptions>, ExternalIdpClientOptionsConfigurator>();
+        services.AddSingleton<IPostConfigureOptions<OpenIddictClientOptions>, OpenIddictClientOptionsPostConfigurator>();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Adds standardized rate limiting policies for login, register, token, authorize, userinfo endpoints.
+    /// Reads values from configuration section "RateLimiting" with sensible defaults.
+    /// </summary>
+    public static IServiceCollection AddMrWhoRateLimiting(this IServiceCollection services, IConfiguration configuration)
+    {
+        var section = configuration.GetSection("RateLimiting");
+        int loginPerHour = section.GetValue<int?>("LoginPerHour") ?? 20;
+        int registerPerHour = section.GetValue<int?>("RegisterPerHour") ?? 5;
+        int tokenPerHour = section.GetValue<int?>("TokenPerHour") ?? 60;
+        int authorizePerHour = section.GetValue<int?>("AuthorizePerHour") ?? 120;
+        int userInfoPerHour = section.GetValue<int?>("UserInfoPerHour") ?? 240;
+
+        services.AddRateLimiter(options =>
+        {
+            options.OnRejected = (context, token) => {
+                context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+                return ValueTask.CompletedTask;
+            };
+            options.AddPolicy("rl.login", ctx => RateLimitPartition.GetFixedWindowLimiter(GetRemoteIp(ctx), _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = Math.Max(1, loginPerHour),
+                Window = TimeSpan.FromHours(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+            options.AddPolicy("rl.register", ctx => RateLimitPartition.GetFixedWindowLimiter(GetRemoteIp(ctx), _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = Math.Max(1, registerPerHour),
+                Window = TimeSpan.FromHours(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+            options.AddPolicy("rl.token", ctx => RateLimitPartition.GetFixedWindowLimiter(GetRemoteIp(ctx), _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = Math.Max(1, tokenPerHour),
+                Window = TimeSpan.FromHours(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+            options.AddPolicy("rl.authorize", ctx => RateLimitPartition.GetFixedWindowLimiter(GetRemoteIp(ctx), _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = Math.Max(1, authorizePerHour),
+                Window = TimeSpan.FromHours(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+            options.AddPolicy("rl.userinfo", ctx => RateLimitPartition.GetFixedWindowLimiter(GetRemoteIp(ctx), _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = Math.Max(1, userInfoPerHour),
+                Window = TimeSpan.FromHours(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+        });
 
         return services;
     }

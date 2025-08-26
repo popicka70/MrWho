@@ -38,32 +38,11 @@ builder.Services.AddMrWhoServices(); // includes registrar & hosted service
 builder.Services.AddMrWhoClientCookies(builder.Configuration); // config-driven naming
 builder.Services.AddMrWhoOpenIddict(builder.Configuration);
 
-// OpenIddict client for upstream OIDC
-builder.Services.AddOpenIddict()
-    .AddClient(options =>
-    {
-        options.AllowAuthorizationCodeFlow();
-        options.SetRedirectionEndpointUris("/connect/external/callback");
-        options.SetPostLogoutRedirectionEndpointUris("/connect/external/signout-callback");
-        if (builder.Environment.IsDevelopment())
-        {
-            options.AddDevelopmentEncryptionCertificate()
-                   .AddDevelopmentSigningCertificate();
-        }
-        else
-        {
-            options.AddEphemeralEncryptionKey()
-                   .AddEphemeralSigningKey();
-        }
-        options.UseSystemNetHttp();
-        options.UseAspNetCore()
-               .EnableRedirectionEndpointPassthrough()
-               .EnablePostLogoutRedirectionEndpointPassthrough();
-        options.UseWebProviders();
-    });
+// OpenIddict client for upstream OIDC (moved to extension for consistency)
+builder.Services.AddMrWhoOpenIddictClient(builder.Configuration, builder.Environment);
 
-builder.Services.AddSingleton<IConfigureOptions<OpenIddictClientOptions>, ExternalIdpClientOptionsConfigurator>();
-builder.Services.AddSingleton<IPostConfigureOptions<OpenIddictClientOptions>, OpenIddictClientOptionsPostConfigurator>();
+// Rate limiting
+builder.Services.AddMrWhoRateLimiting(builder.Configuration);
 
 builder.Services.AddMrWhoAuthorizationWithClientCookies();
 builder.Services.AddMrWhoMediator();
@@ -123,25 +102,6 @@ builder.Services.AddSession(options =>
         options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
         options.Cookie.SameSite = SameSiteMode.Lax;
     }
-});
-
-var rlSection = builder.Configuration.GetSection("RateLimiting");
-int loginPerHour = rlSection.GetValue<int?>("LoginPerHour") ?? 20;
-int registerPerHour = rlSection.GetValue<int?>("RegisterPerHour") ?? 5;
-int tokenPerHour = rlSection.GetValue<int?>("TokenPerHour") ?? 60;
-int authorizePerHour = rlSection.GetValue<int?>("AuthorizePerHour") ?? 120;
-int userInfoPerHour = rlSection.GetValue<int?>("UserInfoPerHour") ?? 240;
-
-static string GetIp(HttpContext context) => context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-
-builder.Services.AddRateLimiter(options =>
-{
-    options.OnRejected = (context, token) => { context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests; return ValueTask.CompletedTask; };
-    options.AddPolicy("rl.login", ctx => RateLimitPartition.GetFixedWindowLimiter(GetIp(ctx), _ => new FixedWindowRateLimiterOptions { PermitLimit = Math.Max(1, loginPerHour), Window = TimeSpan.FromHours(1), QueueProcessingOrder = QueueProcessingOrder.OldestFirst, QueueLimit = 0, AutoReplenishment = true }));
-    options.AddPolicy("rl.register", ctx => RateLimitPartition.GetFixedWindowLimiter(GetIp(ctx), _ => new FixedWindowRateLimiterOptions { PermitLimit = Math.Max(1, registerPerHour), Window = TimeSpan.FromHours(1), QueueProcessingOrder = QueueProcessingOrder.OldestFirst, QueueLimit = 0, AutoReplenishment = true }));
-    options.AddPolicy("rl.token", ctx => RateLimitPartition.GetFixedWindowLimiter(GetIp(ctx), _ => new FixedWindowRateLimiterOptions { PermitLimit = Math.Max(1, tokenPerHour), Window = TimeSpan.FromHours(1), QueueProcessingOrder = QueueProcessingOrder.OldestFirst, QueueLimit = 0, AutoReplenishment = true }));
-    options.AddPolicy("rl.authorize", ctx => RateLimitPartition.GetFixedWindowLimiter(GetIp(ctx), _ => new FixedWindowRateLimiterOptions { PermitLimit = Math.Max(1, authorizePerHour), Window = TimeSpan.FromHours(1), QueueProcessingOrder = QueueProcessingOrder.OldestFirst, QueueLimit = 0, AutoReplenishment = true }));
-    options.AddPolicy("rl.userinfo", ctx => RateLimitPartition.GetFixedWindowLimiter(GetIp(ctx), _ => new FixedWindowRateLimiterOptions { PermitLimit = Math.Max(1, userInfoPerHour), Window = TimeSpan.FromHours(1), QueueProcessingOrder = QueueProcessingOrder.OldestFirst, QueueLimit = 0, AutoReplenishment = true }));
 });
 
 builder.Services.AddAuthorization(options =>
