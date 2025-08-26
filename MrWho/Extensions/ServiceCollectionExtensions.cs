@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies; // ensure CookieAuthenticationOptions is available
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -226,7 +227,7 @@ public static class ServiceCollectionExtensions
                 options.Cookie.SameSite = SameSiteMode.None; // Required for cross-site OIDC redirects
                 options.ExpireTimeSpan = TimeSpan.FromHours(24);
                 options.SlidingExpiration = true;
-                
+
                 // Custom configuration
                 configureOptions?.Invoke(options);
             });

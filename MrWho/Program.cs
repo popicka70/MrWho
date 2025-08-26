@@ -25,12 +25,13 @@ builder.Services.Configure<MrWhoOptions>(builder.Configuration.GetSection("MrWho
 
 // Add services to the container using extension methods
 builder.Services.AddControllersWithViews();
-builder.Services.AddMrWhoAntiforgery();
 builder.AddMrWhoDatabase();
 
 // Persist Data Protection keys in the application database so tokens/cookies are stable across restarts
 builder.Services.AddDataProtection()
     .PersistKeysToDbContext<MrWho.Data.ApplicationDbContext>();
+// Must follow AddDataProtection()
+builder.Services.AddMrWhoAntiforgery();
 
 // Use new client-specific cookie configuration instead of standard Identity
 builder.Services.AddMrWhoIdentityWithClientCookies();
