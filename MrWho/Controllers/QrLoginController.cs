@@ -78,13 +78,19 @@ public class QrLoginController : Controller
         string deepLink;
         if (persistent)
         {
-            // For persistent QR, link to the device management approve endpoint (Web UI controller)
-            deepLink = Url.Action("ApprovePersistent", "DeviceManagementWeb", new { token }, Request.Scheme, Request.Host.ToString())!;
+            // NEW: force login first for persistent QR approval as well
+            var approvePersistentRelative = Url.Action("ApprovePersistent", "DeviceManagementWeb", new { token });
+            var encodedReturn = Uri.EscapeDataString(approvePersistentRelative ?? $"/device-management/approve-persistent/{Uri.EscapeDataString(token)}");
+            deepLink = $"{Request.Scheme}://{Request.Host}/connect/login?returnUrl={encodedReturn}";
+            _logger.LogDebug("Persistent QR deep link (login first) generated for token {Token}: {DeepLink}", token, deepLink);
         }
         else
         {
-            // For session QR, use the original approve endpoint
-            deepLink = Url.Action("Approve", "QrLogin", new { token }, Request.Scheme, Request.Host.ToString())!;
+            // For session QR, force user through the login endpoint first.
+            var approveRelative = Url.Action("Approve", "QrLogin", new { token });
+            var encodedReturn = Uri.EscapeDataString(approveRelative ?? $"/qr-login/approve?token={Uri.EscapeDataString(token)}");
+            deepLink = $"{Request.Scheme}://{Request.Host}/connect/login?returnUrl={encodedReturn}";
+            _logger.LogDebug("Session QR deep link (login first) generated for token {Token}: {DeepLink}", token, deepLink);
         }
 
         using var generator = new QRCodeGenerator();
@@ -138,10 +144,7 @@ public class QrLoginController : Controller
             {
                 return Redirect($"/connect/login?returnUrl={HttpUtility.UrlEncode(Request.Path + Request.QueryString)}");
             }
-            //if (user == null)
-            //    return Challenge(IdentityConstants.ApplicationScheme);
 
-            // Instead of auto-approving, show the approval form
             ViewData["Token"] = token;
             ViewData["SessionInfo"] = sessionInfo;
             ViewData["UserName"] = user.UserName;
@@ -159,9 +162,6 @@ public class QrLoginController : Controller
         }
     }
 
-    /// <summary>
-    /// Process QR approval for session-based QR codes
-    /// </summary>
     [HttpPost("approve")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ApprovePost([FromForm] string token, [FromForm] string action)
@@ -185,8 +185,6 @@ public class QrLoginController : Controller
             }
             else if (action == "reject")
             {
-                // For session-based QR, we don't have a formal reject mechanism,
-                // but we can just show a rejection message
                 _logger.LogInformation("QR session {Token} rejected by user {UserId}", token, user.Id);
                 return View("Approve", model: "rejected");
             }
@@ -237,10 +235,8 @@ public class QrLoginController : Controller
                 return RedirectToAction("Start");
             }
 
-            // Sign in the user
             await _signInManager.SignInAsync(user, isPersistent: false);
 
-            // If we have a client ID, sign in with client-specific cookie using the dynamic service
             if (!string.IsNullOrEmpty(sessionInfo.ClientId))
             {
                 try
@@ -255,12 +251,10 @@ public class QrLoginController : Controller
                 }
             }
 
-            // Mark session as completed
             await _enhancedQrService.CompleteQrAsync(token);
 
             _logger.LogInformation("QR login completed for user {UserName} (session: {Token})", user.UserName, token);
 
-            // Redirect to the original return URL
             if (!string.IsNullOrEmpty(sessionInfo.ReturnUrl))
             {
                 if (sessionInfo.ReturnUrl.Contains("/connect/authorize"))
