@@ -169,14 +169,30 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         // 3) If we still don't have a user, issue an authentication challenge to the client-specific cookie scheme
         if (authUser == null)
         {
-            _logger.LogDebug("No authenticated user found for client {ClientId}, issuing challenge to login", clientId);
+            _logger.LogDebug("No authenticated user found for client {ClientId}; preparing redirect to login", clientId);
             var cookieScheme = _cookieService.GetCookieSchemeForClient(clientId);
-            var props = new AuthenticationProperties
+
+            var schemeProvider = context.RequestServices.GetRequiredService<IAuthenticationSchemeProvider>();
+            var schemeExists = await schemeProvider.GetSchemeAsync(cookieScheme) != null;
+            if (!schemeExists)
             {
-                RedirectUri = context.Request.GetDisplayUrl()
-            };
-            // Challenge will redirect to options.LoginPath (configured to /connect/login) and mark the request as handled
+                _logger.LogWarning("Requested cookie scheme {Scheme} for client {ClientId} not registered. Falling back to manual redirect.", cookieScheme, clientId);
+            }
+
+            // Build original authorize URL (absolute) to round-trip as returnUrl
+            var originalAuthorizeUrl = context.Request.GetDisplayUrl();
+            var loginUrl = "/connect/login?" +
+                           $"returnUrl={Uri.EscapeDataString(originalAuthorizeUrl)}" +
+                           (string.IsNullOrEmpty(clientId) ? string.Empty : $"&clientId={Uri.EscapeDataString(clientId)}");
+
+            // Prefer explicit redirect over Challenge because Challenge inside the authorization endpoint
+            // (with OpenIddict passthrough) produced a blank page in some configurations.
+            return Results.Redirect(loginUrl);
+
+            /* Previous behaviour (kept for reference):
+            var props = new AuthenticationProperties { RedirectUri = context.Request.GetDisplayUrl() };
             return Results.Challenge(props, new[] { cookieScheme });
+            */
         }
 
         // 4) Realm and profile checks (defense-in-depth)
