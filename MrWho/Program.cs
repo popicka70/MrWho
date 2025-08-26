@@ -12,6 +12,7 @@ using OpenIddict.Client.AspNetCore;
 using OpenIddict.Client.SystemNetHttp;
 using Microsoft.Extensions.Options;
 using MrWho.Options;
+using Microsoft.AspNetCore.Identity; // added for IdentityConstants
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -38,6 +39,15 @@ builder.Services.AddMrWhoIdentityWithClientCookies();
 builder.Services.AddMrWhoServices(); // includes registrar & hosted service
 builder.Services.AddMrWhoClientCookies(builder.Configuration); // config-driven naming
 builder.Services.AddMrWhoOpenIddict(builder.Configuration);
+
+// Ensure Challenge() uses the Identity application cookie (redirects to login page)
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultScheme = IdentityConstants.ApplicationScheme;
+    options.DefaultAuthenticateScheme = IdentityConstants.ApplicationScheme;
+    options.DefaultChallengeScheme = IdentityConstants.ApplicationScheme; // critical for Challenge()
+    options.DefaultSignInScheme = IdentityConstants.ApplicationScheme;
+});
 
 // OpenIddict client for upstream OIDC (moved to extension for consistency)
 builder.Services.AddMrWhoOpenIddictClient(builder.Configuration, builder.Environment);

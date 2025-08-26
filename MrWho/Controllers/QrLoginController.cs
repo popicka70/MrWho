@@ -133,7 +133,7 @@ public class QrLoginController : Controller
 
             var user = await _userManager.GetUserAsync(User);
             if (user == null) 
-                return Challenge();
+                return Challenge(IdentityConstants.ApplicationScheme);
 
             // Instead of auto-approving, show the approval form
             ViewData["Token"] = token;
