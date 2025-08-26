@@ -92,6 +92,8 @@ public static class ServiceCollectionExtensions
         services.AddMemoryCache();
         services.AddScoped<IClientRoleService, ClientRoleService>();
 
+        services.AddHostedService<UserProfileBackfillHostedService>();
+
         return services;
     }
 
@@ -237,10 +239,17 @@ public static class ServiceCollectionExtensions
             ? parsed
             : CookieSeparationMode.ByClient;
 
+        // IMPORTANT: In None mode we want ONLY the default Identity scheme/cookie. Do NOT register a client-specific scheme
+        // that reuses the same cookie name (.AspNetCore.Identity.Application) or we get two schemes sharing one cookie
+        // which can break Authenticate/Challenge flows and prevent the login page from rendering.
+        if (mode == CookieSeparationMode.None)
+        {
+            return services; // default Identity cookie already configured in AddMrWhoIdentityWithClientCookies
+        }
+
         // Compute the bootstrap cookie name for the admin client without resolving services
         string adminCookieName = mode switch
         {
-            CookieSeparationMode.None => CookieSchemeNaming.DefaultCookieName,
             CookieSeparationMode.ByRealm => CookieSchemeNaming.BuildRealmCookie("admin"), // admin client lives in the 'admin' realm
             _ => CookieSchemeNaming.BuildClientCookie("mrwho_admin_web") // ByClient (default)
         };
