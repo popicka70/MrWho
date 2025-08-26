@@ -1,21 +1,21 @@
+using Microsoft.AspNetCore.Authentication.Cookies; // ensure CookieAuthenticationOptions is available
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Authentication.Cookies; // ensure CookieAuthenticationOptions is available
+using Microsoft.AspNetCore.RateLimiting; // rate limiting
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics; // added for RelationalEventId
 using Microsoft.Extensions.Options;
 using MrWho.Data;
 using MrWho.Handlers;
 using MrWho.Handlers.Users; // added for user handler interfaces/implementations
-using MrWho.Services;
-using OpenIddict.Abstractions;
-using MrWho.Shared;
 using MrWho.Options; // for CookieSeparationMode
+using MrWho.Services;
+using MrWho.Shared;
 using MrWho.Shared.Authentication; // for CookieSchemeNaming
+using OpenIddict.Abstractions;
 using OpenIddict.Client; // added for client options
 using OpenIddict.Client.AspNetCore; // added for aspnetcore integration
 using OpenIddict.Client.SystemNetHttp; // added for http integration
-using Microsoft.AspNetCore.RateLimiting; // rate limiting
 using System.Threading.RateLimiting; // rate limiting options
 
 namespace MrWho.Extensions;
