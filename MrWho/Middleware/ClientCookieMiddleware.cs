@@ -56,26 +56,26 @@ public class ClientCookieMiddleware
                     }
                     else
                     {
-                        // EXTRA DEFENSE: ensure options (especially TicketDataFormat) are present; otherwise fallback
-                        try
+                    }
+                    // EXTRA DEFENSE: ensure options (especially TicketDataFormat) are present; otherwise fallback
+                    try
+                    {
+                        var optMonitor = context.RequestServices.GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>();
+                        var schemeOptions = optMonitor.Get(cookieScheme);
+                        if (schemeOptions?.TicketDataFormat == null)
                         {
-                            var optMonitor = context.RequestServices.GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>();
-                            var schemeOptions = optMonitor.Get(cookieScheme);
-                            if (schemeOptions?.TicketDataFormat == null)
-                            {
-                                _logger.LogWarning("Cookie scheme {Scheme} for client {ClientId} has null TicketDataFormat (options not initialized) - falling back to default scheme", cookieScheme, clientId);
-                                cookieScheme = IdentityConstants.ApplicationScheme;
-                                cookieName = CookieSchemeNaming.DefaultCookieName;
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogWarning(ex, "Failed to retrieve options for scheme {Scheme}; falling back to default", cookieScheme);
+                            _logger.LogWarning("Cookie scheme {Scheme} for client {ClientId} has null TicketDataFormat (options not initialized) - falling back to default scheme", cookieScheme, clientId);
                             cookieScheme = IdentityConstants.ApplicationScheme;
                             cookieName = CookieSchemeNaming.DefaultCookieName;
                         }
                     }
-                    
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to retrieve options for scheme {Scheme}; falling back to default", cookieScheme);
+                        cookieScheme = IdentityConstants.ApplicationScheme;
+                        cookieName = CookieSchemeNaming.DefaultCookieName;
+                    }
+
                     // Store client information in context for use by other components
                     context.Items["ClientCookieScheme"] = cookieScheme;
                     context.Items["ClientId"] = clientId;
