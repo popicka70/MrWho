@@ -1,0 +1,41 @@
+@using MrWho.Shared
+@using MrWho.Shared.Models
+
+<RadzenStack Gap="0.75rem" class="rz-mb-4">
+    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Development Settings</RadzenText>
+    <RadzenStack Gap="1rem">
+        <RadzenFormField Variant="Variant.Outlined" Text="Error & Logging">
+            <Start>
+                <RadzenCheckBox @bind-Value="model.EnableDetailedErrors" TriState="true" Name="enableDetailedErrors" />
+            </Start>
+            <ChildContent>
+                <RadzenLabel Text="Enable detailed error responses" Component="enableDetailedErrors" />
+            </ChildContent>
+            <Start>
+                <RadzenCheckBox @bind-Value="model.LogSensitiveData" TriState="true" Name="logSensitiveData" />
+            </Start>
+            <ChildContent>
+                <RadzenLabel Text="Log sensitive data (development only)" Component="logSensitiveData" />
+            </ChildContent>
+            <Helper>
+                <RadzenAlert AlertStyle="AlertStyle.Warning" ShowIcon="true" class="rz-mt-2">
+                    <RadzenText TextStyle="TextStyle.Caption">Detailed errors & sensitive data logging should not be enabled in production.</RadzenText>
+                </RadzenAlert>
+            </Helper>
+        </RadzenFormField>
+
+        <RadzenFormField Variant="Variant.Outlined" Text="Local Authentication">
+            <Start>
+                <RadzenCheckBox @bind-Value="model.EnableLocalLogin" TriState="true" Name="enableLocalLogin" />
+            </Start>
+            <ChildContent>
+                <RadzenLabel Text="Enable local login (username/password)" Component="enableLocalLogin" />
+            </ChildContent>
+        </RadzenFormField>
+    </RadzenStack>
+</RadzenStack>
+
+@code {
+    [Parameter] public EditClient editClient { get; set; } = null!;
+    private CreateClientRequest model => editClient.model;
+}
