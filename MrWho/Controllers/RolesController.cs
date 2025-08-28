@@ -47,6 +47,9 @@ public class RolesController : ControllerBase
         }
 
         var totalCount = await query.CountAsync();
+        // Ensure deterministic ordering before pagination
+        query = query.OrderBy(r => r.Name); // Name indexed via NormalizedName; acceptable for stable paging
+
         var roles = await query
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
@@ -398,7 +401,7 @@ public class RolesController : ControllerBase
             return NotFound($"Role with ID '{id}' not found.");
         }
 
-        // Get all users in the role
+        // Get all users in the role (identity API returns list already in-memory)
         var usersInRole = await _userManager.GetUsersInRoleAsync(role.Name!);
         
         // Apply search filter if provided
@@ -406,9 +409,12 @@ public class RolesController : ControllerBase
         if (!string.IsNullOrWhiteSpace(search))
         {
             filteredUsers = usersInRole.Where(u => 
-                (u.UserName != null && u.UserName.Contains(search, StringComparison.OrdinalIgnoreCase)) ||
-                (u.Email != null && u.Email.Contains(search, StringComparison.OrdinalIgnoreCase)));
+                (u.UserName != null && u.UserName.IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0) ||
+                (u.Email != null && u.Email.IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0));
         }
+
+        // Deterministic ordering for paging
+        filteredUsers = filteredUsers.OrderBy(u => u.UserName, StringComparer.OrdinalIgnoreCase);
 
         var totalCount = filteredUsers.Count();
         var pagedUsers = filteredUsers

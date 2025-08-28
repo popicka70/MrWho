@@ -1,9 +1,11 @@
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using MrWho.Services;
 using QRCoder;
 using System.Text;
+using System.Web;
 
 namespace MrWho.Controllers;
 
@@ -16,6 +18,7 @@ public class QrLoginController : Controller
     private readonly SignInManager<IdentityUser> _signInManager;
     private readonly ILogger<QrLoginController> _logger;
     private readonly IDynamicCookieService _dynamicCookieService;
+    private readonly IUserRealmValidationService _realmValidationService; // added
 
     public QrLoginController(
         IEnhancedQrLoginService enhancedQrService,
@@ -23,6 +26,7 @@ public class QrLoginController : Controller
         UserManager<IdentityUser> userManager,
         SignInManager<IdentityUser> signInManager,
         IDynamicCookieService dynamicCookieService,
+        IUserRealmValidationService realmValidationService, // added
         ILogger<QrLoginController> logger)
     {
         _enhancedQrService = enhancedQrService;
@@ -30,6 +34,7 @@ public class QrLoginController : Controller
         _userManager = userManager;
         _signInManager = signInManager;
         _dynamicCookieService = dynamicCookieService;
+        _realmValidationService = realmValidationService; // added
         _logger = logger;
     }
 
@@ -76,13 +81,19 @@ public class QrLoginController : Controller
         string deepLink;
         if (persistent)
         {
-            // For persistent QR, link to the device management approve endpoint (Web UI controller)
-            deepLink = Url.Action("ApprovePersistent", "DeviceManagementWeb", new { token }, Request.Scheme, Request.Host.ToString())!;
+            // NEW: force login first for persistent QR approval as well
+            var approvePersistentRelative = Url.Action("ApprovePersistent", "DeviceManagementWeb", new { token });
+            var encodedReturn = Uri.EscapeDataString(approvePersistentRelative ?? $"/device-management/approve-persistent/{Uri.EscapeDataString(token)}");
+            deepLink = $"{Request.Scheme}://{Request.Host}/connect/login?returnUrl={encodedReturn}";
+            _logger.LogDebug("Persistent QR deep link (login first) generated for token {Token}: {DeepLink}", token, deepLink);
         }
         else
         {
-            // For session QR, use the original approve endpoint
-            deepLink = Url.Action("Approve", "QrLogin", new { token }, Request.Scheme, Request.Host.ToString())!;
+            // For session QR, force user through the login endpoint first.
+            var approveRelative = Url.Action("Approve", "QrLogin", new { token });
+            var encodedReturn = Uri.EscapeDataString(approveRelative ?? $"/qr-login/approve?token={Uri.EscapeDataString(token)}");
+            deepLink = $"{Request.Scheme}://{Request.Host}/connect/login?returnUrl={encodedReturn}";
+            _logger.LogDebug("Session QR deep link (login first) generated for token {Token}: {DeepLink}", token, deepLink);
         }
 
         using var generator = new QRCodeGenerator();
@@ -132,10 +143,33 @@ public class QrLoginController : Controller
             }
 
             var user = await _userManager.GetUserAsync(User);
-            if (user == null) 
-                return Challenge();
+            if (user is null)
+            {
+                return Redirect($"/connect/login?returnUrl={HttpUtility.UrlEncode(Request.Path + Request.QueryString)}");
+            }
 
-            // Instead of auto-approving, show the approval form
+            // Eligibility check when clientId present
+            if (!string.IsNullOrEmpty(sessionInfo.ClientId))
+            {
+                try
+                {
+                    var validation = await _realmValidationService.ValidateUserRealmAccessAsync(user, sessionInfo.ClientId);
+                    if (!validation.IsValid)
+                    {
+                        _logger.LogWarning("QR login approval denied: user {User} not eligible for client {ClientId}. Reason: {Reason}", user.UserName, sessionInfo.ClientId, validation.Reason);
+                        ViewData["Token"] = token;
+                        ViewData["SessionInfo"] = sessionInfo;
+                        ViewData["UserName"] = user.UserName;
+                        return View("Approve", model: "denied");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error validating eligibility for user {User} and client {ClientId} during QR approve GET", user.Id, sessionInfo.ClientId);
+                    return View("Approve", model: "error");
+                }
+            }
+
             ViewData["Token"] = token;
             ViewData["SessionInfo"] = sessionInfo;
             ViewData["UserName"] = user.UserName;
@@ -153,9 +187,6 @@ public class QrLoginController : Controller
         }
     }
 
-    /// <summary>
-    /// Process QR approval for session-based QR codes
-    /// </summary>
     [HttpPost("approve")]
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ApprovePost([FromForm] string token, [FromForm] string action)
@@ -166,8 +197,33 @@ public class QrLoginController : Controller
 
         try
         {
+            // Get session info to perform status and client eligibility checks
+            var sessionInfo = await _enhancedQrService.GetQrSessionInfoAsync(token);
+            if (sessionInfo.Status != QrSessionStatusEnum.Pending)
+            {
+                return View("Approve", model: "expired");
+            }
+
             if (action == "approve")
             {
+                if (!string.IsNullOrEmpty(sessionInfo.ClientId))
+                {
+                    try
+                    {
+                        var validation = await _realmValidationService.ValidateUserRealmAccessAsync(user, sessionInfo.ClientId);
+                        if (!validation.IsValid)
+                        {
+                            _logger.LogWarning("QR login approval denied (POST): user {User} not eligible for client {ClientId}. Reason: {Reason}", user.UserName, sessionInfo.ClientId, validation.Reason);
+                            return View("Approve", model: "denied");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error validating eligibility for user {User} and client {ClientId} during QR approve POST", user.Id, sessionInfo.ClientId);
+                        return View("Approve", model: "error");
+                    }
+                }
+
                 var success = await _enhancedQrService.ApproveQrAsync(token, user.Id);
                 if (!success)
                 {
@@ -179,8 +235,6 @@ public class QrLoginController : Controller
             }
             else if (action == "reject")
             {
-                // For session-based QR, we don't have a formal reject mechanism,
-                // but we can just show a rejection message
                 _logger.LogInformation("QR session {Token} rejected by user {UserId}", token, user.Id);
                 return View("Approve", model: "rejected");
             }
@@ -231,10 +285,27 @@ public class QrLoginController : Controller
                 return RedirectToAction("Start");
             }
 
-            // Sign in the user
+            // Re-validate eligibility at completion time (user could have been revoked meanwhile)
+            if (!string.IsNullOrEmpty(sessionInfo.ClientId))
+            {
+                try
+                {
+                    var validation = await _realmValidationService.ValidateUserRealmAccessAsync(user, sessionInfo.ClientId);
+                    if (!validation.IsValid)
+                    {
+                        _logger.LogWarning("QR login completion denied: user {User} not eligible for client {ClientId}. Reason: {Reason}", user.UserName, sessionInfo.ClientId, validation.Reason);
+                        return Redirect(BuildAccessDeniedUrl(sessionInfo.ReturnUrl, sessionInfo.ClientId));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error validating eligibility for user {User} and client {ClientId} during QR completion", user.Id, sessionInfo.ClientId);
+                    return Redirect(BuildAccessDeniedUrl(sessionInfo.ReturnUrl, sessionInfo.ClientId));
+                }
+            }
+
             await _signInManager.SignInAsync(user, isPersistent: false);
 
-            // If we have a client ID, sign in with client-specific cookie using the dynamic service
             if (!string.IsNullOrEmpty(sessionInfo.ClientId))
             {
                 try
@@ -249,12 +320,10 @@ public class QrLoginController : Controller
                 }
             }
 
-            // Mark session as completed
             await _enhancedQrService.CompleteQrAsync(token);
 
             _logger.LogInformation("QR login completed for user {UserName} (session: {Token})", user.UserName, token);
 
-            // Redirect to the original return URL
             if (!string.IsNullOrEmpty(sessionInfo.ReturnUrl))
             {
                 if (sessionInfo.ReturnUrl.Contains("/connect/authorize"))
@@ -282,5 +351,16 @@ public class QrLoginController : Controller
             _logger.LogError(ex, "Error completing QR session {Token}", token);
             return RedirectToAction("Start");
         }
+    }
+
+    private static string BuildAccessDeniedUrl(string? returnUrl, string? clientId)
+    {
+        var ret = !string.IsNullOrEmpty(returnUrl) ? Uri.EscapeDataString(returnUrl) : string.Empty;
+        var cid = !string.IsNullOrEmpty(clientId) ? Uri.EscapeDataString(clientId) : string.Empty;
+        var url = "/connect/access-denied";
+        var hasQuery = false;
+        if (!string.IsNullOrEmpty(ret)) { url += $"?returnUrl={ret}"; hasQuery = true; }
+        if (!string.IsNullOrEmpty(cid)) { url += hasQuery ? $"&clientId={cid}" : $"?clientId={cid}"; }
+        return url;
     }
 }

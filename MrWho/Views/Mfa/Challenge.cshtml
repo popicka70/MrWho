@@ -1,6 +1,36 @@
 @model MrWho.Controllers.VerifyMfaInput
 @{
     ViewData["Title"] = "Two-factor authentication";
+    // Correct login endpoint is /connect/login (not /auth/login)
+    var loginBase = "/connect/login";
+    string? clientId = null;
+    if (!string.IsNullOrEmpty(Model.ReturnUrl))
+    {
+        try
+        {
+            if (Uri.TryCreate(Model.ReturnUrl, UriKind.Absolute, out var abs))
+            {
+                var qp = System.Web.HttpUtility.ParseQueryString(abs.Query);
+                clientId = qp["client_id"];
+            }
+            else
+            {
+                var idx = Model.ReturnUrl.IndexOf('?');
+                if (idx >= 0)
+                {
+                    var qp = System.Web.HttpUtility.ParseQueryString(Model.ReturnUrl.Substring(idx));
+                    clientId = qp["client_id"];
+                }
+            }
+        }
+        catch { }
+    }
+
+    var queryParts = new List<string>();
+    if (!string.IsNullOrEmpty(Model.ReturnUrl)) queryParts.Add("returnUrl=" + Uri.EscapeDataString(Model.ReturnUrl));
+    if (!string.IsNullOrEmpty(clientId)) queryParts.Add("clientId=" + Uri.EscapeDataString(clientId));
+    if (Model.RememberMe) queryParts.Add("RememberMe=true");
+    var backToLoginUrl = queryParts.Count == 0 ? loginBase : loginBase + "?" + string.Join('&', queryParts);
 }
 
 <div class="row justify-content-center">
@@ -66,7 +96,8 @@
                             <a href="/mfa/recovery-codes" class="btn btn-outline-warning auth-button">
                                 <i class="bi bi-key me-2"></i>Use recovery code instead
                             </a>
-                            <a href="/auth/logout" class="btn btn-outline-secondary auth-button">
+                            <!-- Updated: correct login endpoint + preserve returnUrl/clientId -->
+                            <a href="@backToLoginUrl" class="btn btn-outline-secondary auth-button">
                                 <i class="bi bi-arrow-left me-2"></i>Back to login
                             </a>
                         </div>

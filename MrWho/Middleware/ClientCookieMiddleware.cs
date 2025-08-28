@@ -1,11 +1,13 @@
-using MrWho.Services;
-using Microsoft.AspNetCore.Http.Features;
-using Microsoft.Extensions.Options;
-using MrWho.Options;
-using Microsoft.AspNetCore.Identity;
-using MrWho.Shared.Authentication; // unify defaults
+using Google.Protobuf.WellKnownTypes;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies; // added
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Http.Features;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Options;
+using MrWho.Options;
+using MrWho.Services;
+using MrWho.Shared.Authentication; // unify defaults
 
 namespace MrWho.Middleware;
 
@@ -56,26 +58,30 @@ public class ClientCookieMiddleware
                     }
                     else
                     {
-                        // EXTRA DEFENSE: ensure options (especially TicketDataFormat) are present; otherwise fallback
-                        try
+                    }
+                    // EXTRA DEFENSE: ensure options (especially TicketDataFormat) are present; otherwise fallback
+                    try
+                    {
+                        var optMonitor = context.RequestServices.GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>();
+                        var schemeOptions = optMonitor.Get(cookieScheme);
+                        if (schemeOptions?.TicketDataFormat == null && schemeOptions is not null)
                         {
-                            var optMonitor = context.RequestServices.GetRequiredService<IOptionsMonitor<CookieAuthenticationOptions>>();
-                            var schemeOptions = optMonitor.Get(cookieScheme);
-                            if (schemeOptions?.TicketDataFormat == null)
-                            {
-                                _logger.LogWarning("Cookie scheme {Scheme} for client {ClientId} has null TicketDataFormat (options not initialized) - falling back to default scheme", cookieScheme, clientId);
-                                cookieScheme = IdentityConstants.ApplicationScheme;
-                                cookieName = CookieSchemeNaming.DefaultCookieName;
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger.LogWarning(ex, "Failed to retrieve options for scheme {Scheme}; falling back to default", cookieScheme);
-                            cookieScheme = IdentityConstants.ApplicationScheme;
-                            cookieName = CookieSchemeNaming.DefaultCookieName;
+                            _logger.LogWarning("Cookie scheme {Scheme} for client {ClientId} has null TicketDataFormat (options not initialized) - initializing manually", 
+                                cookieScheme, clientId);
+                            var provider = context.RequestServices.GetService<IDataProtectionProvider>() ?? throw new Exception("DataProtectionProvider not found");
+                            schemeOptions.TicketDataFormat = new TicketDataFormat(provider.CreateProtector("Cookies"));
+                            //_logger.LogWarning("Cookie scheme {Scheme} for client {ClientId} has null TicketDataFormat (options not initialized) - falling back to default scheme", cookieScheme, clientId);
+                            //cookieScheme = IdentityConstants.ApplicationScheme;
+                            //cookieName = CookieSchemeNaming.DefaultCookieName;
                         }
                     }
-                    
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to retrieve options for scheme {Scheme}; falling back to default", cookieScheme);
+                        cookieScheme = IdentityConstants.ApplicationScheme;
+                        cookieName = CookieSchemeNaming.DefaultCookieName;
+                    }
+
                     // Store client information in context for use by other components
                     context.Items["ClientCookieScheme"] = cookieScheme;
                     context.Items["ClientId"] = clientId;

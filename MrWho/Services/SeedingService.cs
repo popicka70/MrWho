@@ -217,10 +217,10 @@ public class SeedingService : ISeedingService
     private async Task SeedDefaultUser()
     {
         const string defaultEmail = "admin@mrwho.local";
-        // Stronger, more random-looking development seed password
         const string defaultPassword = "Adm1n#2025!G7x";
 
-        if (await _userManager.FindByEmailAsync(defaultEmail) == null)
+        var existing = await _userManager.FindByEmailAsync(defaultEmail);
+        if (existing == null)
         {
             var user = new IdentityUser
             {
@@ -232,14 +232,42 @@ public class SeedingService : ISeedingService
             var result = await _userManager.CreateAsync(user, defaultPassword);
             if (result.Succeeded)
             {
-                // Assign Administrator role to default user
                 await _userManager.AddToRoleAsync(user, "Administrator");
                 _logger.LogInformation("Created default admin user: {Email}", defaultEmail);
+
+                // Ensure profile (ACTIVE so admin can log in immediately)
+                if (!await _context.UserProfiles.AnyAsync(p => p.UserId == user.Id))
+                {
+                    _context.UserProfiles.Add(new UserProfile
+                    {
+                        UserId = user.Id,
+                        DisplayName = "System Administrator",
+                        State = UserState.Active,
+                        CreatedAt = DateTime.UtcNow
+                    });
+                    await _context.SaveChangesAsync();
+                    _logger.LogInformation("Created ACTIVE user profile for admin user {UserId}", user.Id);
+                }
             }
             else
             {
-                _logger.LogError("Failed to create default user: {Errors}", 
-                    string.Join(", ", result.Errors.Select(e => e.Description)));
+                _logger.LogError("Failed to create default user: {Errors}", string.Join(", ", result.Errors.Select(e => e.Description)));
+            }
+        }
+        else
+        {
+            // Backfill profile if missing (set Active for admin)
+            if (!await _context.UserProfiles.AnyAsync(p => p.UserId == existing.Id))
+            {
+                _context.UserProfiles.Add(new UserProfile
+                {
+                    UserId = existing.Id,
+                    DisplayName = "System Administrator",
+                    State = UserState.Active,
+                    CreatedAt = DateTime.UtcNow
+                });
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Backfilled ACTIVE user profile for existing admin user {UserId}", existing.Id);
             }
         }
     }

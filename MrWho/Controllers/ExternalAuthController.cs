@@ -19,19 +19,22 @@ public class ExternalAuthController : ControllerBase
     private readonly IDynamicCookieService _dynamicCookieService;
     private readonly ILogger<ExternalAuthController> _logger;
     private readonly ApplicationDbContext _db;
+    private readonly IUserRealmValidationService _realmValidationService; // added
 
     public ExternalAuthController(
         UserManager<IdentityUser> userManager,
         SignInManager<IdentityUser> signInManager,
         IDynamicCookieService dynamicCookieService,
         ILogger<ExternalAuthController> logger,
-        ApplicationDbContext db)
+        ApplicationDbContext db,
+        IUserRealmValidationService realmValidationService) // added
     {
         _userManager = userManager;
         _signInManager = signInManager;
         _dynamicCookieService = dynamicCookieService;
         _logger = logger;
         _db = db;
+        _realmValidationService = realmValidationService; // added
     }
 
     [HttpGet("callback")]
@@ -259,13 +262,11 @@ public class ExternalAuthController : ControllerBase
                 var client = await _db.Clients.AsNoTracking().FirstOrDefaultAsync(c => c.ClientId == clientId || c.Id == clientId);
                 if (client != null)
                 {
-                    // Find link record to resolve per-client mapping
                     var link = await _db.ClientIdentityProviders.AsNoTracking()
                         .Include(l => l.IdentityProvider)
                         .Where(l => l.ClientId == client.Id && l.IdentityProvider.Type == MrWho.Shared.IdentityProviderType.Oidc)
                         .FirstOrDefaultAsync(l => l.IdentityProvider.ClientId == regId || l.IdentityProvider.Name == providerName);
 
-                    // Prefer per-client mapping, fallback to provider-level mapping
                     string? mappingJson = link?.ClaimMappingsJson ?? link?.IdentityProvider?.ClaimMappingsJson;
                     if (!string.IsNullOrWhiteSpace(mappingJson))
                     {
@@ -280,7 +281,6 @@ public class ExternalAuthController : ControllerBase
                                 var val = principal.FindFirst(src)?.Value;
                                 if (!string.IsNullOrEmpty(val) && !string.IsNullOrEmpty(dst))
                                 {
-                                    // Only add if user doesn't already have it
                                     var existing = await _userManager.GetClaimsAsync(user);
                                     if (!existing.Any(c => c.Type == dst && c.Value == val))
                                     {
@@ -302,16 +302,37 @@ public class ExternalAuthController : ControllerBase
             _logger.LogWarning(ex, "Failed applying claim mappings for client {ClientId} and provider {Provider}", clientId, regId);
         }
 
+        // Eligibility validation BEFORE local sign-in / dynamic cookie
+        if (!string.IsNullOrEmpty(clientId))
+        {
+            try
+            {
+                var validation = await _realmValidationService.ValidateUserRealmAccessAsync(user, clientId);
+                if (!validation.IsValid)
+                {
+                    _logger.LogWarning("External login denied: user {User} not eligible for client {ClientId}. Reason: {Reason}", user.UserName, clientId, validation.Reason);
+                    // Sign out external temp principal to avoid lingering state
+                    await HttpContext.SignOutAsync(OpenIddictClientAspNetCoreDefaults.AuthenticationScheme);
+                    return Redirect(BuildAccessDeniedUrl(returnUrl, clientId));
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error validating eligibility for user {User} and client {ClientId} during external callback", user.Id, clientId);
+                await HttpContext.SignOutAsync(OpenIddictClientAspNetCoreDefaults.AuthenticationScheme);
+                return Redirect(BuildAccessDeniedUrl(returnUrl, clientId));
+            }
+        }
+
         // Build additional per-session claims to remember external provider for cascade sign-out
         var sessionClaims = new List<Claim>();
         if (!string.IsNullOrWhiteSpace(regId)) sessionClaims.Add(new Claim("ext_reg_id", regId));
         if (!string.IsNullOrWhiteSpace(providerName)) sessionClaims.Add(new Claim("ext_provider", providerName));
         if (!string.IsNullOrWhiteSpace(subject)) sessionClaims.Add(new Claim("ext_sub", subject));
 
-        // Sign in locally with added session claims
         await _signInManager.SignInWithClaimsAsync(user, isPersistent: false, sessionClaims);
 
-        // Also create client-specific cookie if clientId provided
+        // Dynamic client cookie only after eligibility validated
         if (!string.IsNullOrEmpty(clientId))
         {
             try
@@ -324,47 +345,15 @@ public class ExternalAuthController : ControllerBase
             }
         }
 
-        // Ensure the user is linked to the client when a clientId is provided
-        try
-        {
-            if (!string.IsNullOrWhiteSpace(clientId))
-            {
-                var client = await _db.Clients.FirstOrDefaultAsync(c => c.Id == clientId || c.ClientId == clientId);
-                if (client != null)
-                {
-                    var exists = await _db.ClientUsers.AnyAsync(cu => cu.ClientId == client.Id && cu.UserId == user.Id);
-                    if (!exists)
-                    {
-                        _db.ClientUsers.Add(new MrWho.Models.ClientUser
-                        {
-                            ClientId = client.Id,
-                            UserId = user.Id,
-                            CreatedAt = DateTime.UtcNow,
-                            CreatedBy = providerName ?? "external"
-                        });
-                        await _db.SaveChangesAsync();
-                        _logger.LogInformation("Linked user {UserId} to client {ClientPublicId} ({ClientDbId})", user.Id, client.ClientId, client.Id);
-                    }
-                }
-                else
-                {
-                    _logger.LogDebug("Client not found for id/publicId '{ClientId}' - skipping client link", clientId);
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to link user {UserId} to client '{ClientId}'", user?.Id, clientId);
-        }
+        // IMPORTANT: Removed automatic user-to-client linking to prevent privilege escalation.
+        // Admin must assign users to clients explicitly; validator enforces assignment.
 
-        // If this is a new external user, notify that enrollment is pending
         if (newlyCreated)
         {
             _logger.LogInformation("External user {UserId} created; redirecting to registration success notification", user.Id);
             return RedirectToAction("RegisterSuccess", "Auth");
         }
 
-        // Redirect back to original OIDC authorization or local URL
         if (!string.IsNullOrEmpty(returnUrl))
         {
             if (returnUrl.Contains("/connect/authorize", StringComparison.OrdinalIgnoreCase))
@@ -384,14 +373,12 @@ public class ExternalAuthController : ControllerBase
     [IgnoreAntiforgeryToken]
     public IActionResult SignoutCallback([FromQuery] string? returnUrl = null)
     {
-        // Clear the external registration marker so we don't attempt sign-out again
         try
         {
             HttpContext.Session.Remove("ExternalRegistrationId");
         }
-        catch { /* ignore */ }
+        catch { }
 
-        // If a resume URL was stored, prefer redirecting to it to continue the flow
         try
         {
             var resume = HttpContext.Session.GetString("ExternalSignoutResumeUrl");
@@ -401,7 +388,7 @@ public class ExternalAuthController : ControllerBase
                 return Redirect(resume);
             }
         }
-        catch { /* ignore */ }
+        catch { }
 
         if (!string.IsNullOrEmpty(returnUrl))
         {
@@ -419,5 +406,16 @@ public class ExternalAuthController : ControllerBase
         var friendly = source.Replace('.', ' ').Replace('_', ' ').Replace('-', ' ');
         var words = friendly.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         return string.Join(' ', words.Select(w => char.ToUpper(w[0]) + w.Substring(1).ToLower()));
+    }
+
+    private static string BuildAccessDeniedUrl(string? returnUrl, string? clientId)
+    {
+        var ret = !string.IsNullOrEmpty(returnUrl) ? Uri.EscapeDataString(returnUrl) : string.Empty;
+        var cid = !string.IsNullOrEmpty(clientId) ? Uri.EscapeDataString(clientId) : string.Empty;
+        var url = "/connect/access-denied";
+        var hasQuery = false;
+        if (!string.IsNullOrEmpty(ret)) { url += $"?returnUrl={ret}"; hasQuery = true; }
+        if (!string.IsNullOrEmpty(cid)) { url += hasQuery ? $"&clientId={cid}" : $"?clientId={cid}"; }
+        return url;
     }
 }

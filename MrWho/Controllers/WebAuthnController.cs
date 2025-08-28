@@ -26,12 +26,23 @@ public class WebAuthnController : Controller
     private readonly ILogger<WebAuthnController> _logger;
     private readonly string _rpId;
     private readonly string _rpName;
+    private readonly IUserRealmValidationService _realmValidationService; // added
+    private readonly IDynamicCookieService _dynamicCookieService; // added
 
-    public WebAuthnController(IConfiguration config, ApplicationDbContext db, UserManager<IdentityUser> userManager, ILogger<WebAuthnController> logger)
+    public WebAuthnController(
+        IConfiguration config,
+        ApplicationDbContext db,
+        UserManager<IdentityUser> userManager,
+        ILogger<WebAuthnController> logger,
+        IUserRealmValidationService realmValidationService, // added
+        IDynamicCookieService dynamicCookieService // added
+        )
     {
         _db = db;
         _userManager = userManager;
         _logger = logger;
+        _realmValidationService = realmValidationService; // added
+        _dynamicCookieService = dynamicCookieService; // added
 
         _rpId = config["WebAuthn:RelyingPartyId"] ?? new Uri(config["OpenIddict:Issuer"] ?? "https://localhost:7113").Host;
         _rpName = config["WebAuthn:RelyingPartyName"] ?? "MrWho";
@@ -222,6 +233,27 @@ public class WebAuthnController : Controller
             var user = await _userManager.FindByIdAsync(cred.UserId);
             if (user == null) return Unauthorized();
 
+            // Eligibility validation BEFORE sign-in or client cookie
+            if (!string.IsNullOrEmpty(clientId))
+            {
+                try
+                {
+                    var validation = await _realmValidationService.ValidateUserRealmAccessAsync(user, clientId);
+                    if (!validation.IsValid)
+                    {
+                        _logger.LogWarning("WebAuthn login denied: user {User} not eligible for client {ClientId}. Reason: {Reason}", user.UserName, clientId, validation.Reason);
+                        _assertionOptions.Remove(key);
+                        return Redirect(BuildAccessDeniedUrl(returnUrl, clientId));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error validating eligibility for user {User} and client {ClientId} during WebAuthn verify", user.Id, clientId);
+                    _assertionOptions.Remove(key);
+                    return Redirect(BuildAccessDeniedUrl(returnUrl, clientId));
+                }
+            }
+
             // Passwordless sign-in with amr=fido2
             await HttpContext.SignOutAsync(IdentityConstants.TwoFactorUserIdScheme); // ensure clean
             await HttpContext.SignOutAsync(IdentityConstants.ApplicationScheme);
@@ -229,14 +261,12 @@ public class WebAuthnController : Controller
             await _userManager.UpdateSecurityStampAsync(user);
             await HttpContext.SignInAsync(IdentityConstants.ApplicationScheme, await BuildPrincipalAsync(user, "fido2"));
 
-            // Also sign into client-specific cookie if present
+            // Client-specific cookie only after eligibility validation
             if (!string.IsNullOrEmpty(clientId))
             {
                 try
                 {
-                    var dynCookieService = HttpContext.RequestServices.GetService<IDynamicCookieService>();
-                    if (dynCookieService != null)
-                        await dynCookieService.SignInWithClientCookieAsync(clientId, user, rememberMe: true);
+                    await _dynamicCookieService.SignInWithClientCookieAsync(clientId, user, rememberMe: true);
                 }
                 catch (Exception ex)
                 {
@@ -273,5 +303,16 @@ public class WebAuthnController : Controller
         var principal = new ClaimsPrincipal(identity);
         await Task.CompletedTask;
         return principal;
+    }
+
+    private static string BuildAccessDeniedUrl(string? returnUrl, string? clientId)
+    {
+        var ret = !string.IsNullOrEmpty(returnUrl) ? Uri.EscapeDataString(returnUrl) : string.Empty;
+        var cid = !string.IsNullOrEmpty(clientId) ? Uri.EscapeDataString(clientId) : string.Empty;
+        var url = "/connect/access-denied";
+        var hasQuery = false;
+        if (!string.IsNullOrEmpty(ret)) { url += $"?returnUrl={ret}"; hasQuery = true; }
+        if (!string.IsNullOrEmpty(cid)) { url += hasQuery ? $"&clientId={cid}" : $"?clientId={cid}"; }
+        return url;
     }
 }
