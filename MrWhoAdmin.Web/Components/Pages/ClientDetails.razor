@@ -11,19 +11,6 @@
 @inject DialogService DialogService
 @inject IJSRuntime JS
 
-@code {
-    private RenderFragment RenderBoolBadge(bool? value) => builder =>
-    {
-        var seq = 0;
-        var text = value.HasValue ? (value.Value ? "Enabled" : "Disabled") : "Default";
-        var style = value.HasValue ? (value.Value ? BadgeStyle.Success : BadgeStyle.Danger) : BadgeStyle.Info;
-        builder.OpenComponent<RadzenBadge>(seq++);
-        builder.AddAttribute(seq++, nameof(RadzenBadge.Text), text);
-        builder.AddAttribute(seq++, nameof(RadzenBadge.BadgeStyle), style);
-        builder.CloseComponent();
-    };
-}
-
 <PageTitle>Client Details - MrWho Admin</PageTitle>
 
 <RadzenStack>
@@ -285,11 +272,11 @@
                             <RadzenRow>
                                 <RadzenColumn Size="12" SizeMD="3">
                                     <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Require Consent</RadzenText>
-                                    @RenderBoolBadge(client.RequireConsent)
+                                    <RadzenBadge BadgeStyle="@GetBoolBadge(client.RequireConsent)" Text="@FormatBool(client.RequireConsent)" />
                                 </RadzenColumn>
                                 <RadzenColumn Size="12" SizeMD="3">
                                     <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Remember Consent</RadzenText>
-                                    @RenderBoolBadge(client.AllowRememberConsent)
+                                    <RadzenBadge BadgeStyle="@GetBoolBadge(client.AllowRememberConsent)" Text="@FormatBool(client.AllowRememberConsent)" />
                                 </RadzenColumn>
                             </RadzenRow>
 
@@ -297,15 +284,15 @@
                             <RadzenRow>
                                 <RadzenColumn Size="12" SizeMD="4">
                                     <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">UserInfo Endpoint</RadzenText>
-                                    @RenderBoolBadge(client.AllowAccessToUserInfoEndpoint)
+                                    <RadzenBadge BadgeStyle="@GetBoolBadge(client.AllowAccessToUserInfoEndpoint)" Text="@FormatBool(client.AllowAccessToUserInfoEndpoint)" />
                                 </RadzenColumn>
                                 <RadzenColumn Size="12" SizeMD="4">
                                     <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Introspection Endpoint</RadzenText>
-                                    @RenderBoolBadge(client.AllowAccessToIntrospectionEndpoint)
+                                    <RadzenBadge BadgeStyle="@GetBoolBadge(client.AllowAccessToIntrospectionEndpoint)" Text="@FormatBool(client.AllowAccessToIntrospectionEndpoint)" />
                                 </RadzenColumn>
                                 <RadzenColumn Size="12" SizeMD="4">
                                     <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Revocation Endpoint</RadzenText>
-                                    @RenderBoolBadge(client.AllowAccessToRevocationEndpoint)
+                                    <RadzenBadge BadgeStyle="@GetBoolBadge(client.AllowAccessToRevocationEndpoint)" Text="@FormatBool(client.AllowAccessToRevocationEndpoint)" />
                                 </RadzenColumn>
                             </RadzenRow>
 
