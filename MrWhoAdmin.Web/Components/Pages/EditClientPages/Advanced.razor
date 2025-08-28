@@ -14,57 +14,6 @@
                 </RadzenText>
             </Helper>
         </RadzenFormField>
-
-        <RadzenFormField Text="Audiences / Resources" Variant="Variant.Outlined">
-            <ChildContent>
-                <RadzenTextArea @bind-Value="audiencesText" Style="width:100%; min-height:120px;" Placeholder="api1&#10;api2" Change="@(args => OnAudiencesChanged())" />
-            </ChildContent>
-            <Helper>
-                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">One per line. Stored and used for aud claim emission.</RadzenText>
-            </Helper>
-        </RadzenFormField>
-
-        <RadzenFormField Text="Audience Mode" Variant="Variant.Outlined">
-            <ChildContent>
-                <RadzenDropDown @bind-Value="model.AudienceMode" Data="audienceModeOptions" TextProperty="Text" ValueProperty="Value" Style="width:100%;" AllowClear="true" />
-            </ChildContent>
-            <Helper>
-                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">How audiences are emitted: RequestedIntersection (default), AllConfigured, RequestedOrAll, RequestedOrPrimary, ErrorIfUnrequested, AccessTokenOnly, None.</RadzenText>
-            </Helper>
-        </RadzenFormField>
-
-        <RadzenFormField Text="Primary Audience" Variant="Variant.Outlined">
-            <ChildContent>
-                <RadzenTextBox @bind-Value="model.PrimaryAudience" Style="width:100%;" Placeholder="primary-api" />
-            </ChildContent>
-            <Helper>
-                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Used by RequestedOrPrimary; must match a listed audience.</RadzenText>
-            </Helper>
-        </RadzenFormField>
-
-        <RadzenFormField Variant="Variant.Outlined">
-            <Start>
-                <RadzenCheckBox @bind-Value="model.IncludeAudInIdToken" TriState="true" Name="includeAudId" />
-            </Start>
-            <ChildContent>
-                <RadzenLabel Text="Include audiences in ID token" Component="includeAudId" />
-            </ChildContent>
-            <Helper>
-                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">If unchecked, aud only in access token (server enforcement pending).</RadzenText>
-            </Helper>
-        </RadzenFormField>
-
-        <RadzenFormField Variant="Variant.Outlined">
-            <Start>
-                <RadzenCheckBox @bind-Value="model.RequireExplicitAudienceScope" TriState="true" Name="requireExplicitAud" />
-            </Start>
-            <ChildContent>
-                <RadzenLabel Text="Require explicit audience scope" Component="requireExplicitAud" />
-            </ChildContent>
-            <Helper>
-                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">When true and none requested: audiences omitted (future rejection option).</RadzenText>
-            </Helper>
-        </RadzenFormField>
     </RadzenStack>
 </RadzenStack>
 
@@ -101,23 +50,4 @@
 @code {
     [Parameter] public EditClient editClient { get; set; } = null!;
     private CreateClientRequest model => editClient.model;
-    private string audiencesText { get; set; } = string.Empty;
-
-    private IEnumerable<object> audienceModeOptions => Enum.GetValues(typeof(AudienceMode))
-        .Cast<AudienceMode>()
-        .Select(v => new { Text = v.ToString(), Value = (AudienceMode?)v });
-
-    protected override void OnParametersSet()
-    {
-        audiencesText = string.Join("\n", editClient.SelectedAudiences);
-    }
-
-    private void OnAudiencesChanged()
-    {
-        var list = audiencesText.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Distinct()
-            .Where(a => a.Length <= 200)
-            .ToList();
-        editClient.SetAudiences(list);
-    }
 }
