@@ -1,0 +1,261 @@
+@page "/users/roles"
+@page "/roles-management"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using MrWho.Shared.Models
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Rendering
+@inject IRolesApiService RolesApi
+@inject NotificationService NotificationService
+@inject DialogService DialogService
+@inject ILogger<UserRoles> Logger
+
+<PageTitle>User Roles - MrWho Admin</PageTitle>
+
+<RadzenText TextStyle="TextStyle.H3" TagName="TagName.H1" class="rz-pt-8">
+    <RadzenIcon Icon="security" class="rz-me-1" />
+    Global User Roles
+</RadzenText>
+
+<RadzenCard class="rz-my-4">
+    <RadzenStack Gap="1.5rem">
+        <!-- Create / Search -->
+        <RadzenRow>
+            <RadzenColumn Size="12" SizeMD="6">
+                <RadzenFormField Text="Search" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenTextBox @bind-Value="search" Placeholder="Search roles..." Style="width:100%" />
+                    </ChildContent>
+                </RadzenFormField>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="2" class="rz-display-flex rz-align-items-end">
+                <RadzenButton Icon="search" ButtonStyle="ButtonStyle.Secondary" Text="Search" Click="@(async ()=> await LoadRoles())" />
+            </RadzenColumn>
+        </RadzenRow>
+
+        <RadzenCard Style="background-color: var(--rz-base-50);">
+            <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Add Role</RadzenText>
+            <RadzenRow class="rz-mt-2" Gap="1rem">
+                <RadzenColumn Size="12" SizeMD="3">
+                    <RadzenFormField Text="Name" Variant="Variant.Outlined">
+                        <ChildContent>
+                            <RadzenTextBox @bind-Value="createModel.Name" Style="width:100%" />
+                        </ChildContent>
+                    </RadzenFormField>
+                </RadzenColumn>
+                <RadzenColumn Size="12" SizeMD="5">
+                    <RadzenFormField Text="Description" Variant="Variant.Outlined">
+                        <ChildContent>
+                            <RadzenTextBox @bind-Value="createModel.Description" Style="width:100%" />
+                        </ChildContent>
+                    </RadzenFormField>
+                </RadzenColumn>
+                <RadzenColumn Size="12" SizeMD="2">
+                    <RadzenFormField Text="Status" Variant="Variant.Outlined">
+                        <Start>
+                            <RadzenSwitch @bind-Value="createModel.IsEnabled" OnLabel="Enabled" OffLabel="Disabled" />
+                        </Start>
+                        <ChildContent>
+                            <RadzenLabel Text="Role enabled" />
+                        </ChildContent>
+                    </RadzenFormField>
+                </RadzenColumn>
+                <RadzenColumn Size="12" SizeMD="2" class="rz-display-flex rz-align-items-end">
+                    <RadzenButton Icon="add" ButtonStyle="ButtonStyle.Primary" Text="Create" Click="@(async ()=> await CreateRole())" Disabled="@string.IsNullOrWhiteSpace(createModel.Name)" IsBusy="@creating" />
+                </RadzenColumn>
+            </RadzenRow>
+        </RadzenCard>
+
+        <!-- Roles Grid -->
+        @if (loading)
+        {
+            <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+        }
+        else if (!roles.Any())
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Info"><RadzenText>No roles found.</RadzenText></RadzenAlert>
+        }
+        else
+        {
+            <RadzenDataGrid Data="roles" TItem="RoleDto" AllowPaging="true" PageSize="10" AllowSorting="true" ColumnWidth="200px">
+                <Columns>
+                    <RadzenDataGridColumn TItem="RoleDto" Property="Name" Title="Role" />
+                    <RadzenDataGridColumn TItem="RoleDto" Property="Description" Title="Description" />
+                    <RadzenDataGridColumn TItem="RoleDto" Title="Enabled" Width="90px">
+                        <Template Context="r">
+                            <RadzenBadge BadgeStyle="@(r.IsEnabled ? BadgeStyle.Success : BadgeStyle.Danger)" Text="@(r.IsEnabled ? "Yes" : "No")" />
+                        </Template>
+                    </RadzenDataGridColumn>
+                    <RadzenDataGridColumn TItem="RoleDto" Title="Actions" Width="260px">
+                        <Template Context="r">
+                            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                                <RadzenButton Icon="edit" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Text="Edit" Click="@(async ()=> await OpenEdit(r))" />
+                                <RadzenButton Icon="group" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Secondary" Text="Users" Click="@(async ()=> await ViewUsers(r))" />
+                                <RadzenButton Icon="delete" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Danger" Text="Delete" Click="@(async ()=> await DeleteRole(r))" Disabled="@IsDeleteDisabled(r)" />
+                            </RadzenStack>
+                        </Template>
+                    </RadzenDataGridColumn>
+                </Columns>
+            </RadzenDataGrid>
+        }
+    </RadzenStack>
+</RadzenCard>
+
+@code {
+    private List<RoleDto> roles = new();
+    private string? search;
+    private bool loading;
+    private bool creating;
+
+    private CreateRoleRequest createModel = new(){ IsEnabled = true };
+
+    private RoleDto? editing;
+    private UpdateRoleRequest editModel = new();
+    private bool editBusy;
+
+    protected override async Task OnInitializedAsync() => await LoadRoles();
+
+    private async Task LoadRoles()
+    {
+        loading = true;
+        try
+        {
+            var res = await RolesApi.GetRolesAsync(page:1,pageSize:200,search:search);
+            roles = res?.Items ?? new();
+        }
+        catch (Exception ex){ Logger.LogError(ex,"LoadRoles failed"); NotificationService.Notify(NotificationSeverity.Error,"Error","Failed to load roles"); }
+        finally { loading = false; }
+    }
+
+    private async Task CreateRole()
+    {
+        creating = true;
+        try
+        {
+            var created = await RolesApi.CreateRoleAsync(createModel);
+            if (created != null)
+            {
+                NotificationService.Notify(NotificationSeverity.Success,"Created",$"Role '{created.Name}' created");
+                roles.Add(created); roles = roles.OrderBy(r=>r.Name).ToList();
+                createModel = new CreateRoleRequest{ IsEnabled = true };
+            }
+            else NotificationService.Notify(NotificationSeverity.Error,"Error","Create failed");
+        }
+        catch (Exception ex){ Logger.LogError(ex,"CreateRole failed"); NotificationService.Notify(NotificationSeverity.Error,"Error",ex.Message); }
+        finally { creating = false; }
+    }
+
+    private async Task OpenEdit(RoleDto r)
+    {
+        editing = r;
+        editModel = new UpdateRoleRequest{ Name = r.Name, Description = r.Description, IsEnabled = r.IsEnabled};
+        await DialogService.OpenAsync<RoleEditDialog>("Edit Role", new Dictionary<string,object>{{"Parent", this}}, new DialogOptions{ Width="600px", Height="400px"});
+    }
+
+    internal async Task SaveEdit()
+    {
+        if (editing == null) return;
+        editBusy = true;
+        try
+        {
+            var updated = await RolesApi.UpdateRoleAsync(editing.Id, editModel);
+            if (updated != null)
+            {
+                editing.Name = updated.Name; editing.Description = updated.Description; editing.IsEnabled = updated.IsEnabled; 
+                NotificationService.Notify(NotificationSeverity.Success,"Updated","Role updated");
+                await LoadRoles();
+                DialogService.Close(true);
+            }
+            else NotificationService.Notify(NotificationSeverity.Error,"Error","Update failed");
+        }
+        catch (Exception ex){ Logger.LogError(ex,"UpdateRole failed"); NotificationService.Notify(NotificationSeverity.Error,"Error",ex.Message); }
+        finally { editBusy = false; }
+    }
+
+    private bool IsDeleteDisabled(RoleDto r) => r.Name is "Administrator" or "User";
+
+    private async Task DeleteRole(RoleDto r)
+    {
+        var ok = await DialogService.Confirm($"Delete role '{r.Name}'?","Delete Role", new ConfirmOptions{ OkButtonText="Delete", CancelButtonText="Cancel"});
+        if (ok != true) return;
+        try
+        {
+            if (await RolesApi.DeleteRoleAsync(r.Id))
+            { roles.Remove(r); NotificationService.Notify(NotificationSeverity.Success,"Deleted","Role deleted"); }
+            else NotificationService.Notify(NotificationSeverity.Error,"Error","Delete failed");
+        }
+        catch (Exception ex){ Logger.LogError(ex,"DeleteRole failed"); NotificationService.Notify(NotificationSeverity.Error,"Error",ex.Message); }
+    }
+
+    private async Task ViewUsers(RoleDto r)
+    {
+        await DialogService.OpenAsync<RoleUsersDialog>($"Role Users - {r.Name}", new Dictionary<string,object>{{"Role", r}}, new DialogOptions{ Width="800px", Height="600px"});
+    }
+
+    // Nested dialog components
+    public class RoleEditDialog : ComponentBase
+    {
+        [CascadingParameter] public Radzen.DialogService DialogService { get; set; } = default!;
+        [Parameter] public UserRoles Parent { get; set; } = default!;
+        private bool Enabled
+        {
+            get => Parent.editModel.IsEnabled ?? true;
+            set => Parent.editModel.IsEnabled = value;
+        }
+        protected override void BuildRenderTree(RenderTreeBuilder __builder)
+        {
+            <RadzenStack Gap="1rem" class="rz-mt-2">
+                <RadzenFormField Text="Name" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenTextBox @bind-Value="Parent.editModel.Name" Style="width:100%" />
+                    </ChildContent>
+                </RadzenFormField>
+                <RadzenFormField Text="Description" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenTextArea @bind-Value="Parent.editModel.Description" Rows="3" Style="width:100%" />
+                    </ChildContent>
+                </RadzenFormField>
+                <RadzenFormField Text="Status" Variant="Variant.Outlined">
+                    <Start>
+                        <RadzenSwitch @bind-Value="Enabled" OnLabel="Enabled" OffLabel="Disabled" />
+                    </Start>
+                    <ChildContent>
+                        <RadzenLabel Text="Role enabled" />
+                    </ChildContent>
+                </RadzenFormField>
+                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" JustifyContent="JustifyContent.End">
+                    <RadzenButton Text="Cancel" Icon="close" ButtonStyle="ButtonStyle.Light" Click="@(()=> DialogService.Close(false))" />
+                    <RadzenButton Text="Save" Icon="save" ButtonStyle="ButtonStyle.Primary" IsBusy="@Parent.editBusy" Disabled="@string.IsNullOrWhiteSpace(Parent.editModel.Name)" Click="@(async ()=> await Parent.SaveEdit())" />
+                </RadzenStack>
+            </RadzenStack>;
+        }
+    }
+
+    public class RoleUsersDialog : ComponentBase
+    {
+        [Inject] public IRolesApiService RolesApi { get; set; } = default!;
+        [Parameter] public RoleDto Role { get; set; } = default!;
+        private List<UserDto> users = new();
+        private bool loading;
+        protected override async Task OnInitializedAsync()
+        {
+            loading = true;
+            var res = await RolesApi.GetRoleUsersAsync(Role.Id, page:1, pageSize:200);
+            users = res?.Items ?? new();
+            loading = false;
+        }
+        protected override void BuildRenderTree(RenderTreeBuilder __builder)
+        {
+            if (loading) { <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" /> }
+            else if (!users.Any()) { <RadzenAlert AlertStyle="AlertStyle.Info"><RadzenText>No users in this role.</RadzenText></RadzenAlert> }
+            else {
+                <RadzenDataGrid Data="users" TItem="UserDto" AllowPaging="true" PageSize="10">
+                    <Columns>
+                        <RadzenDataGridColumn TItem="UserDto" Property="UserName" Title="User" />
+                        <RadzenDataGridColumn TItem="UserDto" Property="Email" Title="Email" />
+                    </Columns>
+                </RadzenDataGrid>;
+            }
+        }
+    }
+}
