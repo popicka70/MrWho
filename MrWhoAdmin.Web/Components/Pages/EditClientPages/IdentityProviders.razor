@@ -58,11 +58,7 @@ else
             <RadzenText TextStyle="TextStyle.Subtitle2">Linked Providers</RadzenText>
             <RadzenDataGrid TItem="ClientIdentityProviderDto" Data="@editClient.identityLinks" AllowPaging="true" PageSize="10" class="rz-mt-2">
                 <Columns>
-                    <RadzenDataGridColumn TItem="ClientIdentityProviderDto" Title="Provider">
-                        <Template Context="row">
-                            @editClient.GetProviderName(row.IdentityProviderId)
-                        </Template>
-                    </RadzenDataGridColumn>
+                    <RadzenDataGridColumn TItem="ClientIdentityProviderDto" Property="IdentityProviderId" Title="IdentityProviderId" />
                     <RadzenDataGridColumn TItem="ClientIdentityProviderDto" Property="DisplayNameOverride" Title="Display Name" />
                     <RadzenDataGridColumn TItem="ClientIdentityProviderDto" Property="Order" Title="Order" Width="100px" />
                     <RadzenDataGridColumn TItem="ClientIdentityProviderDto" Title="Enabled" Width="120px">

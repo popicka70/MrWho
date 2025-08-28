@@ -65,35 +65,6 @@
                 <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">When true and none requested: audiences omitted (future rejection option).</RadzenText>
             </Helper>
         </RadzenFormField>
-
-        <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Development Settings</RadzenText>
-        <RadzenFormField Variant="Variant.Outlined">
-            <Start>
-                <RadzenCheckBox @bind-Value="model.EnableDetailedErrors" TriState="true" Name="enableDetailedErrors" />
-            </Start>
-            <ChildContent>
-                <RadzenLabel Text="Enable detailed error responses" Component="enableDetailedErrors" />
-            </ChildContent>
-        </RadzenFormField>
-        <RadzenFormField Variant="Variant.Outlined">
-            <Start>
-                <RadzenCheckBox @bind-Value="model.LogSensitiveData" TriState="true" Name="logSensitiveData" />
-            </Start>
-            <ChildContent>
-                <RadzenLabel Text="Log sensitive data (development only)" Component="logSensitiveData" />
-            </ChildContent>
-        </RadzenFormField>
-        <RadzenFormField Variant="Variant.Outlined">
-            <Start>
-                <RadzenCheckBox @bind-Value="model.EnableLocalLogin" TriState="true" Name="enableLocalLogin" />
-            </Start>
-            <ChildContent>
-                <RadzenLabel Text="Enable local login (username/password)" Component="enableLocalLogin" />
-            </ChildContent>
-        </RadzenFormField>
-        <RadzenAlert AlertStyle="AlertStyle.Warning" ShowIcon="true" class="rz-mt-2">
-            <RadzenText TextStyle="TextStyle.Caption">Detailed errors & sensitive data logging should not be enabled in production.</RadzenText>
-        </RadzenAlert>
     </RadzenStack>
 </RadzenStack>
 
