@@ -39,6 +39,8 @@
 
 @code {
     private List<IdentityProviderDto> _items = new();
+    private const string DialogWidth = "1200px";
+    private const string DialogHeight = "820px";
 
     protected override async Task OnInitializedAsync()
     {
@@ -57,7 +59,7 @@
     {
         var result = await DialogService.OpenAsync<EditIdentityProviderDialog>("Create Identity Provider",
             new Dictionary<string, object> { { "Provider", null! } },
-            new DialogOptions { Width = "900px", Height = "720px", Resizable = true, Draggable = true });
+            new DialogOptions { Width = DialogWidth, Height = DialogHeight, Resizable = true, Draggable = true });
 
         if (result is bool b && b)
         {
@@ -69,7 +71,7 @@
     {
         var result = await DialogService.OpenAsync<EditIdentityProviderDialog>("Edit Identity Provider",
             new Dictionary<string, object> { { "Provider", ip } },
-            new DialogOptions { Width = "900px", Height = "720px", Resizable = true, Draggable = true });
+            new DialogOptions { Width = DialogWidth, Height = DialogHeight, Resizable = true, Draggable = true });
         if (result is bool b && b)
         {
             await Load();
