@@ -132,6 +132,44 @@ public class TokenHandler : ITokenHandler
         }
     }
 
+    // NEW: Add claims defined by enabled IdentityResources matching requested scopes
+    private async Task AddIdentityResourceClaimsAsync(ClaimsIdentity identity, IdentityUser user, IEnumerable<string> scopes)
+    {
+        try
+        {
+            var scopeSet = scopes.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            // Fetch enabled identity resources whose names were requested
+            var idResources = await _db.IdentityResources
+                .Include(r => r.UserClaims)
+                .Where(r => r.IsEnabled && scopeSet.Contains(r.Name))
+                .ToListAsync();
+            if (idResources.Count == 0) return;
+
+            var userClaims = await _userManager.GetClaimsAsync(user);
+            var userClaimLookup = userClaims.GroupBy(c => c.Type)
+                                            .ToDictionary(g => g.Key, g => g.First().Value, StringComparer.OrdinalIgnoreCase);
+            var existingTypes = identity.Claims.Select(c => c.Type).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var claimType in idResources.SelectMany(r => r.UserClaims.Select(uc => uc.ClaimType)).Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                if (existingTypes.Contains(claimType)) continue; // already added elsewhere (e.g., sub, email, name)
+                if (!userClaimLookup.TryGetValue(claimType, out var value) || string.IsNullOrWhiteSpace(value)) continue;
+
+                var claim = new Claim(claimType, value);
+                // For identity resource claims we default to id + access tokens so APIs can consume if needed
+                claim.SetDestinations(Destinations.IdentityToken, Destinations.AccessToken);
+                identity.AddClaim(claim);
+                existingTypes.Add(claimType);
+            }
+
+            _logger.LogDebug("Added {Count} identity resource claims for user {UserId}", idResources.Sum(r => r.UserClaims.Count), user.Id);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed adding identity resource claims for user {UserId}", user.Id);
+        }
+    }
+
     private async Task<IResult> HandlePasswordGrantAsync(HttpContext context, OpenIddictRequest request)
     {
         var user = await _userManager.FindByNameAsync(request.Username!);
@@ -185,6 +223,9 @@ public class TokenHandler : ITokenHandler
 
             // Add other profile claims if available
             await AddProfileClaimsAsync(identity, user, scopes);
+
+            // NEW: Add claims from requested identity resources
+            await AddIdentityResourceClaimsAsync(identity, user, scopes);
 
             // Add roles (global + client-scoped based on requested scopes)
             await AddRolesAsync(identity, user, clientId, scopes);
@@ -341,6 +382,8 @@ public class TokenHandler : ITokenHandler
             if (user != null)
             {
                 var scopes = request.GetScopes();
+                // NEW: identity resource claims
+                await AddIdentityResourceClaimsAsync(identity, user, scopes);
                 await AddRolesAsync(identity, user, clientId, scopes);
             }
         }
@@ -419,6 +462,9 @@ public class TokenHandler : ITokenHandler
 
         // Add other profile claims if available
         await AddProfileClaimsAsync(identity, user, scopes);
+
+        // NEW: Add claims from requested identity resources
+        await AddIdentityResourceClaimsAsync(identity, user, scopes);
 
         // Add roles
         await AddRolesAsync(identity, user, request.ClientId!, scopes);
