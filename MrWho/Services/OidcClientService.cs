@@ -27,6 +27,41 @@ public class OidcClientService : IOidcClientService
         _logger = logger;
     }
 
+    private async Task BackfillEndpointAccessFlagsAsync()
+    {
+        try
+        {
+            var clients = await _context.Clients.Where(c =>
+                c.AllowAccessToUserInfoEndpoint == null ||
+                c.AllowAccessToRevocationEndpoint == null ||
+                c.AllowAccessToIntrospectionEndpoint == null).ToListAsync();
+            if (clients.Count == 0) return;
+            int updated = 0;
+            foreach (var c in clients)
+            {
+                var isMachine = c.ClientType == ClientType.Machine || (c.AllowClientCredentialsFlow && !c.AllowAuthorizationCodeFlow && !c.AllowPasswordFlow);
+                if (c.AllowAccessToUserInfoEndpoint == null)
+                    c.AllowAccessToUserInfoEndpoint = !isMachine; // interactive clients get userinfo
+                if (c.AllowAccessToRevocationEndpoint == null)
+                    c.AllowAccessToRevocationEndpoint = true; // generally safe
+                if (c.AllowAccessToIntrospectionEndpoint == null)
+                    c.AllowAccessToIntrospectionEndpoint = isMachine; // machines often need introspection
+                c.UpdatedAt = DateTime.UtcNow;
+                c.UpdatedBy ??= "Backfill";
+                updated++;
+            }
+            if (updated > 0)
+            {
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Backfilled endpoint access flags for {Count} clients", updated);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error backfilling endpoint access flags");
+        }
+    }
+
     /// <summary>
     /// Initialize essential data that must always be present (admin realm, admin client, admin user)
     /// </summary>
