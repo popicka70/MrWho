@@ -5,6 +5,7 @@ using MrWhoAdmin.Web.Services;
 using MrWhoAdmin.Web.Extensions;
 using Radzen;
 using System.Security.Claims; // Added for claim manipulation
+using System.Text.Json; // For JsonElement processing
 
 namespace MrWhoAdmin.Web.Extensions;
 
@@ -503,7 +504,6 @@ public static class ServiceCollectionExtensions
                 logger.LogInformation("? ADMIN: Token validated successfully for user: {UserName}. Claims count: {ClaimsCount}", 
                     context.Principal?.Identity?.Name ?? "Unknown", context.Principal?.Claims?.Count() ?? 0);
                 
-                // Log the claims we have at this context
                 if (context.Principal?.Claims != null)
                 {
                     foreach (var claim in context.Principal.Claims)
@@ -518,13 +518,92 @@ public static class ServiceCollectionExtensions
             OnUserInformationReceived = context =>
             {
                 var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+                var root = context.User.RootElement;
                 logger.LogInformation("?? ADMIN: UserInfo received from endpoint. User document contains {PropertyCount} properties", 
-                    context.User.RootElement.EnumerateObject().Count());
+                    root.EnumerateObject().Count());
                 
-                // Log what we received from UserInfo endpoint
-                foreach (var property in context.User.RootElement.EnumerateObject())
+                foreach (var property in root.EnumerateObject())
                 {
                     logger.LogDebug("ADMIN UserInfo property: {PropertyName} = {PropertyValue}", property.Name, property.Value.ToString());
+                }
+
+                // OPTION 2 IMPLEMENTATION: dynamically project unmapped custom claims (e.g. myclaim) into the principal
+                if (context.Principal?.Identity is ClaimsIdentity identity)
+                {
+                    try
+                    {
+                        var known = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                        {
+                            "sub","name","given_name","family_name","email","email_verified","preferred_username","phone_number","phone_number_verified","role","roles"
+                        };
+
+                        foreach (var prop in root.EnumerateObject())
+                        {
+                            if (known.Contains(prop.Name))
+                            {
+                                continue;
+                            }
+                            if (prop.Value.ValueKind == JsonValueKind.Null || prop.Value.ValueKind == JsonValueKind.Undefined)
+                            {
+                                continue;
+                            }
+
+                            bool AlreadyHas(string type, string value) => identity.HasClaim(c => c.Type == type && c.Value == value);
+                            void AddStringClaim(string type, string value)
+                            {
+                                if (string.IsNullOrWhiteSpace(value)) return;
+                                if (AlreadyHas(type, value)) return;
+                                identity.AddClaim(new Claim(type, value));
+                                logger.LogDebug("ADMIN UserInfo dynamic claim added: {Type} = {Value}", type, value);
+                            }
+
+                            switch (prop.Value.ValueKind)
+                            {
+                                case JsonValueKind.String:
+                                    AddStringClaim(prop.Name, prop.Value.GetString()!);
+                                    break;
+                                case JsonValueKind.True:
+                                case JsonValueKind.False:
+                                    AddStringClaim(prop.Name, prop.Value.GetBoolean().ToString());
+                                    break;
+                                case JsonValueKind.Array:
+                                    foreach (var elem in prop.Value.EnumerateArray())
+                                    {
+                                        if (elem.ValueKind == JsonValueKind.String)
+                                            AddStringClaim(prop.Name, elem.GetString()!);
+                                        else if (elem.ValueKind == JsonValueKind.True || elem.ValueKind == JsonValueKind.False)
+                                            AddStringClaim(prop.Name, elem.GetBoolean().ToString());
+                                    }
+                                    break;
+                                case JsonValueKind.Number:
+                                    if (prop.Value.TryGetInt64(out var l)) AddStringClaim(prop.Name, l.ToString());
+                                    else if (prop.Value.TryGetDouble(out var d)) AddStringClaim(prop.Name, d.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                                    break;
+                                case JsonValueKind.Object:
+                                    try
+                                    {
+                                        var json = prop.Value.GetRawText();
+                                        AddStringClaim(prop.Name, json);
+                                    }
+                                    catch { }
+                                    break;
+                            }
+                        }
+
+                        logger.LogInformation("ADMIN UserInfo dynamic claim mapping complete. Total claims now: {Count}", identity.Claims.Count());
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogWarning(ex, "ADMIN: Exception while dynamically mapping UserInfo claims");
+                    }
+                }
+
+                if (context.Principal?.Claims != null)
+                {
+                    foreach (var claim in context.Principal.Claims)
+                    {
+                        logger.LogDebug("ADMIN UserInfo final claim: {ClaimType} = {ClaimValue}", claim.Type, claim.Value);
+                    }
                 }
 
                 return Task.CompletedTask;
