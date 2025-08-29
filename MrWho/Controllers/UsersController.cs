@@ -199,8 +199,6 @@ public class UsersController : ControllerBase
         return NoContent();
     }
 
-    #region User Claims Management
-
     /// <summary>
     /// Get all claims for a specific user
     /// </summary>
@@ -362,10 +360,6 @@ public class UsersController : ControllerBase
         return Ok($"Claim updated successfully for user '{user.UserName}'.");
     }
 
-    #endregion
-
-    #region Claim Types Management
-
     /// <summary>
     /// Get distinct claim types used in the system
     /// </summary>
@@ -409,10 +403,6 @@ public class UsersController : ControllerBase
             return StatusCode(500, "An error occurred while retrieving claim types.");
         }
     }
-
-    #endregion
-
-    #region Roles Management
 
     /// <summary>
     /// Get roles for a specific user
@@ -532,10 +522,6 @@ public class UsersController : ControllerBase
         return Ok($"Role '{role.Name}' removed from user '{user.UserName}' successfully.");
     }
 
-    #endregion
-
-    #region Roles Management
-
     /// <summary>
     /// Get all roles with pagination
     /// </summary>
@@ -624,10 +610,6 @@ public class UsersController : ControllerBase
         return Ok(roleDto);
     }
 
-    #endregion
-
-    #region Profile State Management
-
     /// <summary>
     /// Get the UserProfile.State for the specified user
     /// </summary>
@@ -672,8 +654,6 @@ public class UsersController : ControllerBase
         _logger.LogInformation("Changed profile state for user {UserId} to {State} by {Admin}", id, newState, User.Identity?.Name);
         return Ok(new UserProfileStateDto { State = profile.State.ToString() });
     }
-
-    #endregion
 }
 
 /// <summary>
