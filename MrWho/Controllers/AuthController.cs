@@ -69,6 +69,19 @@ public class AuthController : Controller
     [AllowAnonymous]
     public async Task<IActionResult> RegisterSuccess([FromQuery] string? returnUrl = null, [FromQuery] string? clientId = null)
         => await _mediator.Send(new MrWho.Endpoints.Auth.RegisterSuccessGetRequest(HttpContext));
+
+    [HttpGet("userinfo")]
+    [HttpPost("userinfo")]
+    [Authorize]
+    public async Task<IActionResult> Userinfo()
+    {
+        // This will trigger the OpenIddict pipeline including your handler
+        var request = HttpContext.GetOpenIddictServerRequest();
+        var result = await HttpContext.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+
+        // The handler should process this
+        return Ok(); // OpenIddict will handle the actual response
+    }
 }
 
 public class LoginViewModel

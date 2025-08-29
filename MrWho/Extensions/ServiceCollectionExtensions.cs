@@ -35,6 +35,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IScopeSeederService, ScopeSeederService>();
         services.AddScoped<IApiResourceSeederService, ApiResourceSeederService>();
         services.AddScoped<IIdentityResourceSeederService, IdentityResourceSeederService>();
+        services.AddScoped<IClaimTypeSeederService, ClaimTypeSeederService>();
 
         // Register client services
         services.AddScoped<IOidcClientService, OidcClientService>();
@@ -70,7 +71,6 @@ public static class ServiceCollectionExtensions
         // Register authorization, token and userinfo handlers
         services.AddScoped<IOidcAuthorizationHandler, OidcAuthorizationHandler>();
         services.AddScoped<ITokenHandler, TokenHandler>();
-        services.AddScoped<IUserInfoHandler, MrWho.Handlers.UserInfoHandler>(); // disambiguate
 
         // Register back-channel logout service
         services.AddScoped<IBackChannelLogoutService, BackChannelLogoutService>();
@@ -293,6 +293,9 @@ public static class ServiceCollectionExtensions
                     options.SetIssuer(new Uri(issuer, UriKind.Absolute));
                 }
 
+                // Custom UserInfo handler descriptor (uses IUserInfoHandler)
+                options.AddEventHandler(CustomUserInfoHandler.Descriptor);
+
                 // Enable the authorization and token endpoints
                 options.SetAuthorizationEndpointUris("/connect/authorize")
                        .SetTokenEndpointUris("/connect/token")
@@ -331,7 +334,6 @@ public static class ServiceCollectionExtensions
                        .AddDevelopmentSigningCertificate();
 
                 // For demo/API compatibility: issue plain signed (non-encrypted) access tokens so JwtBearer can validate
-                // (Current tokens are JWE with RSA-OAEP + A256CBC-HS512 making them unparsable by standard decoders against Authority keys.)
                 options.DisableAccessTokenEncryption();
 
                 // Register the ASP.NET Core host and enable passthrough for the authorization endpoint
@@ -339,6 +341,7 @@ public static class ServiceCollectionExtensions
                        .EnableAuthorizationEndpointPassthrough()
                        .EnableTokenEndpointPassthrough() // ADDED: allow custom minimal API handler for /connect/token
                        .EnableEndSessionEndpointPassthrough();
+                       //.EnableUserInfoEndpointPassthrough();
             })
             .AddValidation(options =>
             {

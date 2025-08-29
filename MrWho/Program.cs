@@ -124,7 +124,10 @@ builder.Services.AddScoped<Microsoft.AspNetCore.Authentication.IClaimsTransforma
 
 var app = builder.Build();
 
-// NOTE: Dynamic client cookie schemes now registered after database seeding inside InitializeDatabaseAsync()
+// Initialize database & seed (consolidated single entry point)
+await app.InitializeDatabaseAsync();
+
+// NOTE: Dynamic client cookie schemes now registered during InitializeDatabaseAsync()
 var logger = app.Services.GetRequiredService<ILogger<Program>>();
 logger.LogInformation("MrWho OIDC Server starting...");
 

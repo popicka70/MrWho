@@ -43,7 +43,7 @@
             <RadzenDataGrid @ref="grid" Data="@identityResources" TItem="IdentityResourceDto" AllowSorting="true" AllowPaging="true" 
                            PageSize="20" PagerHorizontalAlign="HorizontalAlign.Left" ShowPagingSummary="true">
                 <Columns>
-                    <RadzenDataGridColumn TItem="IdentityResourceDto" Property="Name" Title="Name" Width="150px">
+                    <RadzenDataGridColumn TItem="IdentityResourceDto" Property="Name" Title="Scope Name" Width="150px">
                         <Template Context="identityResource">
                             <RadzenBadge BadgeStyle="@(identityResource.IsStandard ? BadgeStyle.Info : BadgeStyle.Secondary)" 
                                        Text="@identityResource.Name" />
@@ -132,8 +132,7 @@
     <RadzenCard class="rz-p-4">
         <RadzenAlert AlertStyle="AlertStyle.Info" ShowIcon="true">
             <RadzenText>
-                <strong>Identity Resources</strong> define user information (claims) that can be requested by OIDC clients through ID tokens.
-                Standard identity resources are automatically managed by the system and cannot be modified or deleted.
+                <strong>Identity Resources</strong> map directly to OIDC scope names. The <strong>Scope Name</strong> field is the exact value clients request (e.g. openid, profile, email, custom_profile). Each resource lists the user claims released when that scope is granted. Standard identity resources are automatically managed by the system and cannot be modified or deleted.
             </RadzenText>
         </RadzenAlert>
     </RadzenCard>

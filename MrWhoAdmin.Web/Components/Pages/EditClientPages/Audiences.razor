@@ -5,16 +5,19 @@
     <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Audience / Resource Configuration</RadzenText>
     <RadzenAlert AlertStyle="AlertStyle.Info" ShowIcon="true">
         <RadzenText TextStyle="TextStyle.Caption">
-            Configure resource audiences emitted as aud claims in tokens. Behavior depends on selected Audience Mode.
+            Configure resource audiences emitted as aud claims. Behavior controlled by Audience Mode. List only stable API/resource identifiers.
         </RadzenText>
     </RadzenAlert>
     <RadzenStack Gap="1rem">
         <RadzenFormField Text="Audiences / Resources" Variant="Variant.Outlined">
             <ChildContent>
-                <RadzenTextArea @bind-Value="audiencesText" Style="width:100%; min-height:160px;" Placeholder="api1&#10;api2" Change="@(args => OnAudiencesChanged())" />
+                <RadzenTextArea @bind-Value="audiencesText" Style="width:100%; min-height:160px;" Placeholder="api.read&#10;api.write" Change="@(args => OnAudiencesChanged())" />
             </ChildContent>
             <Helper>
-                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">One per line. Stored and used for aud claim emission.</RadzenText>
+                <RadzenStack Gap="0.25rem">
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">One per line. Example: inventory.api, billing.api.v2</RadzenText>
+                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Configured: <strong>@editClient.SelectedAudiences.Count</strong></RadzenText>
+                </RadzenStack>
             </Helper>
         </RadzenFormField>
 
@@ -23,7 +26,7 @@
                 <RadzenDropDown @bind-Value="model.AudienceMode" Data="audienceModeOptions" TextProperty="Text" ValueProperty="Value" Style="width:100%;" AllowClear="true" />
             </ChildContent>
             <Helper>
-                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">RequestedIntersection (default), AllConfigured, RequestedOrAll, RequestedOrPrimary, ErrorIfUnrequested, AccessTokenOnly, None.</RadzenText>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Select strategy for emitting audiences. Default = RequestedIntersection.</RadzenText>
             </Helper>
         </RadzenFormField>
 
@@ -32,7 +35,7 @@
                 <RadzenTextBox @bind-Value="model.PrimaryAudience" Style="width:100%;" Placeholder="primary-api" />
             </ChildContent>
             <Helper>
-                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Used by RequestedOrPrimary; must match a listed audience.</RadzenText>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Used by RequestedOrPrimary. Should match one of the listed audiences.</RadzenText>
             </Helper>
         </RadzenFormField>
 
@@ -44,7 +47,7 @@
                 <RadzenLabel Text="Include audiences in ID token" Component="includeAudId" />
             </ChildContent>
             <Helper>
-                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">If unchecked, aud only in access token.</RadzenText>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Unchecked: aud only in access token.</RadzenText>
             </Helper>
         </RadzenFormField>
 
@@ -56,7 +59,7 @@
                 <RadzenLabel Text="Require explicit audience scope" Component="requireExplicitAud" />
             </ChildContent>
             <Helper>
-                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">When true and none requested: audiences omitted (future rejection option).</RadzenText>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">When true and none requested: audiences omitted (or may cause rejection depending on server).</RadzenText>
             </Helper>
         </RadzenFormField>
     </RadzenStack>
@@ -79,7 +82,7 @@
     private void OnAudiencesChanged()
     {
         var list = audiencesText.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Distinct()
+            .Distinct(StringComparer.OrdinalIgnoreCase)
             .Where(a => a.Length <= 200)
             .ToList();
         editClient.SetAudiences(list);
