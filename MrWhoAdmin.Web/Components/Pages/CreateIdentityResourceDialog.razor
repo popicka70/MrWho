@@ -6,9 +6,13 @@
 @using MrWho.Shared.Models
 
 <RadzenStack Gap="1rem">
-    <RadzenFormField Text="Name" Variant="Variant.Outlined">
-        <RadzenTextBox @bind-Value="@request.Name" MaxLength="200" Style="width: 100%;" />
-        <RadzenRequiredValidator Component="Name" Text="Name is required" />
+    <RadzenFormField Text="Scope Name" Variant="Variant.Outlined">
+        <RadzenDropDown @bind-Value="@request.Name" Data="@scopeNames" Name="scopeName"
+                        Placeholder="Select scope name..." Style="width: 100%;"
+                        AllowClear="true" AllowFiltering="true"
+                        FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive" />
+        <RadzenRequiredValidator Component="scopeName" Text="Scope name is required" />
+        <RadzenText TextStyle="TextStyle.Caption" class="rz-text-secondary-color">Choose an existing OIDC scope identifier (e.g. employee_profile). Name will be used as-is.</RadzenText>
     </RadzenFormField>
 
     <RadzenFormField Text="Display Name" Variant="Variant.Outlined">
@@ -125,7 +129,6 @@
                 </RadzenText>
             }
 
-            <!-- Custom claim input for advanced users -->
             <RadzenStack Gap="0.5rem">
                 <RadzenButton Text="@(showCustomClaimInput ? "Hide Custom Claim Type" : "Add Custom Claim Type")" 
                              Icon="@(showCustomClaimInput ? "expand_less" : "expand_more")" 
@@ -221,6 +224,9 @@
     private string newPropertyValue = string.Empty;
     private bool isCreating = false;
 
+    // Existing scope names for dropdown
+    private List<string> scopeNames = new();
+
     // Claim type selection
     private ClaimTypeInfo? selectedClaimType;
     private string customClaimType = string.Empty;
@@ -228,12 +234,10 @@
     private bool isLoadingClaimTypes = true;
     private bool showCustomClaimInput = false;
 
-    // Computed properties
     private string ClaimTypePlaceholder => isLoadingClaimTypes ? "Loading claim types..." : "Select a claim type...";
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        // Initialize request with proper default values
         request = new CreateIdentityResourceRequest
         {
             Name = string.Empty,
@@ -247,8 +251,21 @@
             Properties = new Dictionary<string, string>()
         };
 
-        // Load available claim types from database
-        _ = LoadClaimTypesAsync();
+        var _ = LoadClaimTypesAsync();
+        await LoadScopeNamesAsync();
+    }
+
+    private async Task LoadScopeNamesAsync()
+    {
+        try
+        {
+            var result = await IdentityResourcesApi.GetIdentityResourcesAsync(1, 1000);
+            scopeNames = result.Items?.Select(r => r.Name).OrderBy(n => n).ToList() ?? new List<string>();
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError(ex, "Error loading existing scope names");
+        }
     }
 
     private async Task LoadClaimTypesAsync()
@@ -265,14 +282,12 @@
             }
             else
             {
-                // Fallback to standard claims if API call fails
                 availableClaimTypes = CommonClaimTypes.StandardClaims.ToList();
             }
         }
         catch (Exception ex)
         {
             Logger?.LogError(ex, "Error loading claim types");
-            // Fallback to standard claims if error occurs
             availableClaimTypes = CommonClaimTypes.StandardClaims.ToList();
         }
         finally
@@ -287,7 +302,7 @@
         if (selectedClaimType != null && request?.UserClaims != null && !request.UserClaims.Contains(selectedClaimType.Type))
         {
             request.UserClaims.Add(selectedClaimType.Type);
-            selectedClaimType = null; // Clear selection
+            selectedClaimType = null;
             StateHasChanged();
         }
         await Task.CompletedTask;
@@ -359,7 +374,6 @@
     {
         try
         {
-            // Validate required services
             if (IdentityResourcesApi == null)
             {
                 Logger?.LogError("IdentityResourcesApi service is null");
@@ -392,7 +406,7 @@
                 {
                     Severity = NotificationSeverity.Warning,
                     Summary = "Validation Error",
-                    Detail = "Identity resource name is required",
+                    Detail = "Scope name is required",
                     Duration = 5000
                 });
                 return;
@@ -448,4 +462,4 @@
         DialogService?.Close(false);
         await Task.CompletedTask;
     }
-}
+}}

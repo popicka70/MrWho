@@ -15,7 +15,6 @@ public static class MediatorServiceCollectionExtensions
         services.AddTransient<IRequestHandler<OidcAuthorizeRequest, IResult>, MrWho.Handlers.Oidc.OidcAuthorizeHandler>();
         services.AddTransient<IRequestHandler<OidcTokenRequest, IResult>, MrWho.Handlers.Oidc.OidcTokenHandler>();
         services.AddTransient<IRequestHandler<OidcLogoutRequest, IResult>, MrWho.Handlers.Oidc.OidcLogoutHandler>();
-        services.AddTransient<IRequestHandler<UserInfoRequest, IResult>, MrWho.Handlers.Oidc.UserInfoEndpointHandler>();
 
         // Auth handlers
         services.AddTransient<IRequestHandler<MrWho.Endpoints.Auth.LoginGetRequest, IActionResult>, MrWho.Handlers.Auth.LoginGetHandler>();
@@ -40,7 +39,6 @@ public static class MediatorServiceCollectionExtensions
     services.AddTransient<IRequestHandler<FixApiPermissionsRequest, IResult>, FixApiPermissionsHandler>();
     services.AddTransient<IRequestHandler<OpenIddictScopesRequest, IResult>, OpenIddictScopesHandler>();
     services.AddTransient<IRequestHandler<SyncScopesRequest, IResult>, SyncScopesHandler>();
-    services.AddTransient<IRequestHandler<UserInfoTestRequest, IResult>, UserInfoTestHandler>();
     services.AddTransient<IRequestHandler<CurrentClaimsRequest, IResult>, CurrentClaimsHandler>();
     services.AddTransient<IRequestHandler<IdentityResourcesRequest, IResult>, IdentityResourcesHandler>();
     services.AddTransient<IRequestHandler<UserClaimsByUserIdRequest, IResult>, UserClaimsByUserIdHandler>();

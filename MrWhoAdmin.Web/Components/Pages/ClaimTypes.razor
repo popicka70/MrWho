@@ -1,0 +1,93 @@
+@page "/claim-types"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@inject IClaimTypesApiService ClaimTypesApi
+@inject NotificationService NotificationService
+@inject DialogService DialogService
+@inject ILogger<ClaimTypes> Logger
+@using MrWho.Shared.Models
+
+<RadzenStack Gap="1rem">
+    <RadzenText TextStyle="TextStyle.H5" class="rz-font-weight-600">Claim Types</RadzenText>
+
+    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+        <RadzenButton Text="New Claim Type" Icon="add" ButtonStyle="ButtonStyle.Primary" Click="@(async () => await ShowCreate())" />
+        <RadzenButton Text="Refresh" Icon="refresh" ButtonStyle="ButtonStyle.Light" Click="@(async () => await LoadAsync())" IsBusy="@isLoading" />
+    </RadzenStack>
+
+    <RadzenDataGrid TItem="ClaimTypeInfo" Data="@items" @ref="grid" AllowFiltering="true" AllowPaging="true" AllowSorting="true" PageSize="20">
+        <Columns>
+            <RadzenDataGridColumn TItem="ClaimTypeInfo" Property="Type" Title="Type" />
+            <RadzenDataGridColumn TItem="ClaimTypeInfo" Property="DisplayName" Title="Display Name" />
+            <RadzenDataGridColumn TItem="ClaimTypeInfo" Property="Description" Title="Description" />
+            <RadzenDataGridColumn TItem="ClaimTypeInfo" Title="Actions">
+                <Template Context="ct">
+                    <RadzenButton Icon="edit" ButtonStyle="ButtonStyle.Light" Size="ButtonSize.ExtraSmall" Click="@(async () => await Edit(ct))" />
+                    <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.ExtraSmall" Click="@(async () => await Delete(ct))" Style="margin-left:4px" />
+                </Template>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+</RadzenStack>
+
+@code {
+    private List<ClaimTypeInfo> items = new();
+    private bool isLoading;
+    RadzenDataGrid<ClaimTypeInfo>? grid;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            isLoading = true;
+            var result = await ClaimTypesApi.GetAsync();
+            items = result ?? new();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed loading claim types");
+            NotificationService.Notify(new NotificationMessage { Severity = NotificationSeverity.Error, Summary = "Error", Detail = ex.Message });
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task ShowCreate()
+    {
+        var ct = new ClaimTypeInfo();
+        var dialogResult = await DialogService.OpenAsync<EditClaimTypeDialog>("Create Claim Type", new Dictionary<string, object?> { ["Model"] = ct, ["IsNew"] = true }, new DialogOptions { Width = "700px" });
+        if (dialogResult != null)
+        {
+            await LoadAsync();
+        }
+    }
+
+    private async Task Edit(ClaimTypeInfo ct)
+    {
+        var dialogResult = await DialogService.OpenAsync<EditClaimTypeDialog>("Edit Claim Type", new Dictionary<string, object?> { ["Model"] = ct, ["IsNew"] = false }, new DialogOptions { Width = "700px" });
+        if (dialogResult != null)
+        {
+            await LoadAsync();
+        }
+    }
+
+    private async Task Delete(ClaimTypeInfo ct)
+    {
+        if (await DialogService.Confirm($"Delete claim type '{ct.Type}'?" , "Confirm Delete") == true)
+        {
+            if (await ClaimTypesApi.DeleteAsync(ct.Type))
+            {
+                NotificationService.Notify(new NotificationMessage { Severity = NotificationSeverity.Success, Summary = "Deleted", Detail = ct.Type });
+                await LoadAsync();
+            }
+            else
+            {
+                NotificationService.Notify(new NotificationMessage { Severity = NotificationSeverity.Error, Summary = "Delete failed", Detail = ct.Type });
+            }
+        }
+    }
+}

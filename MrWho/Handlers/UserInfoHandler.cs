@@ -1,302 +1,229 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using OpenIddict.Abstractions;
-using OpenIddict.Server.AspNetCore;
 using MrWho.Data;
 using MrWho.Models;
-using System.Security.Claims;
+using OpenIddict.Abstractions;
+using OpenIddict.Server;
+using static OpenIddict.Server.OpenIddictServerEvents;
 
 namespace MrWho.Handlers;
 
-/// <summary>
-/// Interface for handling OpenID Connect UserInfo requests
-/// </summary>
-public interface IUserInfoHandler
+public sealed class CustomUserInfoHandler : IOpenIddictServerHandler<HandleUserInfoRequestContext>
 {
-    /// <summary>
-    /// Handles UserInfo requests to return user profile information
-    /// </summary>
-    /// <param name="context">The HTTP context containing the request</param>
-    /// <returns>The user info result</returns>
-    Task<IResult> HandleUserInfoRequestAsync(HttpContext context);
-}
+    public static OpenIddictServerHandlerDescriptor Descriptor =>
+        OpenIddictServerHandlerDescriptor.CreateBuilder<HandleUserInfoRequestContext>()
+            .UseScopedHandler<CustomUserInfoHandler>()
+            .SetOrder(OpenIddictServerHandlers.UserInfo.HandleUserInfoRequest.Descriptor.Order - 200)
+            .SetType(OpenIddictServerHandlerType.Custom)
+            .Build();
 
-/// <summary>
-/// Implementation of UserInfo handler for OpenID Connect UserInfo endpoint
-/// </summary>
-public class UserInfoHandler : IUserInfoHandler
-{
     private readonly UserManager<IdentityUser> _userManager;
-    private readonly ApplicationDbContext _context;
-    private readonly ILogger<UserInfoHandler> _logger;
+    private readonly ApplicationDbContext _db;
+    private readonly ILogger<CustomUserInfoHandler> _logger;
 
-    public UserInfoHandler(
-        UserManager<IdentityUser> userManager,
-        ApplicationDbContext context,
-        ILogger<UserInfoHandler> logger)
+    public CustomUserInfoHandler(UserManager<IdentityUser> userManager, ApplicationDbContext db, ILogger<CustomUserInfoHandler> logger)
     {
         _userManager = userManager;
-        _context = context;
+        _db = db;
         _logger = logger;
     }
 
-    /// <inheritdoc />
-    public async Task<IResult> HandleUserInfoRequestAsync(HttpContext context)
+    public async ValueTask HandleAsync(HandleUserInfoRequestContext context)
     {
-        // When called with a Bearer token, the user claims are in OpenIddict format
-        // We need to extract the Subject claim to find the user
-        var subjectClaim = context.User.FindFirst(OpenIddictConstants.Claims.Subject);
+        if (context.IsRequestHandled || context.IsRejected)
+            return;
 
-        if (subjectClaim == null)
+        // OpenIddict exposes a Principal property on the specific context type even if not visible through events alias.
+        var principal = context.AccessTokenPrincipal;
+        if (principal is null)
         {
-            _logger.LogWarning("UserInfo request without subject claim");
-            return Results.Challenge(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
+            context.Reject(OpenIddictConstants.Errors.InvalidToken, "Missing principal");
+            return;
         }
 
-        // Find the user by their ID (which is stored in the Subject claim)
-        var user = await _userManager.FindByIdAsync(subjectClaim.Value);
+        // Extract subject (sub)
+        var subject = principal.FindFirst(OpenIddictConstants.Claims.Subject)?.Value;
+        if (string.IsNullOrWhiteSpace(subject))
+        {
+            _logger.LogWarning("UserInfo: subject claim missing");
+            context.Reject(OpenIddictConstants.Errors.InvalidToken, "Subject claim missing");
+            return;
+        }
 
+        // Ensure openid scope requested (spec requirement)
+        var scopes = principal.GetScopes();
+        if (!scopes.Contains(OpenIddictConstants.Scopes.OpenId, StringComparer.OrdinalIgnoreCase))
+        {
+            _logger.LogWarning("UserInfo: openid scope not present for subject {Sub}", subject);
+            context.Reject(OpenIddictConstants.Errors.InsufficientScope, "openid scope required");
+            return;
+        }
+
+        // Load user
+        var user = await _userManager.FindByIdAsync(subject);
         if (user == null)
         {
-            _logger.LogWarning("UserInfo request for non-existent user: {SubjectId}", subjectClaim.Value);
-            return Results.Challenge(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
+            _logger.LogWarning("UserInfo: user not found for subject {Sub}", subject);
+            context.Reject(OpenIddictConstants.Errors.InvalidToken, "Unknown subject");
+            return;
         }
 
-        // Get the scopes from the access token
-        var scopes = context.User.GetScopes();
-        _logger.LogDebug("UserInfo request for user {UserId} with scopes: {Scopes}",
-            user.Id, string.Join(", ", scopes));
+        // Optional: enforce client-level permission to access userinfo endpoint if we can resolve client id
+        var clientId = context.Request?.ClientId;
+        if (!string.IsNullOrWhiteSpace(clientId))
+        {
+            var client = await _db.Clients.AsNoTracking().FirstOrDefaultAsync(c => c.ClientId == clientId);
+            if (client?.AllowAccessToUserInfoEndpoint == false)
+            {
+                _logger.LogWarning("UserInfo: client {ClientId} not allowed to access userinfo endpoint", clientId);
+                context.Reject(OpenIddictConstants.Errors.UnauthorizedClient, "Client not allowed to access userinfo");
+                return;
+            }
+        }
 
-        // Load identity resources for the requested scopes
+        _logger.LogDebug("UserInfo: building response for user {UserId} client {ClientId} scopes {Scopes}", user.Id, clientId, string.Join(" ", scopes));
+
+        // Identity resources mapping
         var identityResources = await GetIdentityResourcesForScopesAsync(scopes);
-        _logger.LogDebug("Found {IdentityResourceCount} identity resources for scopes: {Scopes}",
-            identityResources.Count, string.Join(", ", scopes));
+        var payload = await BuildUserInfoAsync(user, identityResources, scopes);
+        await AddMissingStandardScopeClaimsAsync(payload, user, scopes, identityResources.Count > 0);
 
-        // Build the user info response based on identity resources AND scopes (fallback)
-        var userInfo = await BuildUserInfoAsync(user, identityResources, scopes);
+        _logger.LogDebug("UserInfo: returning {ClaimCount} claims for user {UserId}", payload.Count, user.Id);
 
-        _logger.LogDebug("UserInfo response for user {UserId} contains {ClaimCount} claims",
-            user.Id, userInfo.Count);
-
-        return Results.Ok(userInfo);
+        foreach (var kvp in payload)
+        {
+            switch (kvp.Value)
+            {
+                case string s:
+                    context.Claims[kvp.Key] = s; break;
+                case bool b:
+                    context.Claims[kvp.Key] = b; break;
+                case string[] sa:
+                    context.Claims[kvp.Key] = string.Join(" ", sa); break;
+                case IEnumerable<string> enumerable:
+                    var arr = enumerable.ToArray();
+                    context.Claims[kvp.Key] = string.Join(" ", arr); break;
+                default:
+                    context.Claims[kvp.Key] = kvp.Value?.ToString();
+                    break;
+            }
+        }
     }
 
+    // === Logic ported from legacy UserInfoHandler ===
     private async Task<List<IdentityResource>> GetIdentityResourcesForScopesAsync(IEnumerable<string> scopes)
     {
-        return await _context.IdentityResources
-            .Include(ir => ir.UserClaims)
-            .Include(ir => ir.Properties)
-            .Where(ir => ir.IsEnabled && scopes.Contains(ir.Name))
+        var set = scopes.Select(s => s.Trim()).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (set.Count == 0) return new();
+        return await _db.IdentityResources
+            .Include(r => r.UserClaims)
+            .Where(r => r.IsEnabled && set.Contains(r.Name))
             .ToListAsync();
     }
 
-    private async Task<Dictionary<string, object>> BuildUserInfoAsync(
-        IdentityUser user,
-        List<IdentityResource> identityResources,
-        IEnumerable<string> scopes)
+    private async Task<Dictionary<string, object>> BuildUserInfoAsync(IdentityUser user, List<IdentityResource> idResources, IEnumerable<string> scopes)
     {
-        var userInfo = new Dictionary<string, object>();
-
-        // Always include the subject claim
-        userInfo["sub"] = user.Id;
-
-        // Process each identity resource if any exist
-        foreach (var identityResource in identityResources)
+        var dict = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase)
         {
-            _logger.LogDebug("Processing identity resource '{ResourceName}' with {ClaimCount} claims",
-                identityResource.Name, identityResource.UserClaims.Count);
-
-            foreach (var userClaim in identityResource.UserClaims)
+            ["sub"] = user.Id
+        };
+        if (idResources.Count == 0) return dict;
+        var claims = await _userManager.GetClaimsAsync(user);
+        var lookup = claims.GroupBy(c => c.Type, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.First().Value, StringComparer.OrdinalIgnoreCase);
+        foreach (var res in idResources)
+        {
+            foreach (var uc in res.UserClaims)
             {
-                var claimValue = await GetClaimValueAsync(user, userClaim.ClaimType);
-                if (claimValue != null)
+                if (dict.ContainsKey(uc.ClaimType)) continue;
+                if (lookup.TryGetValue(uc.ClaimType, out var val) && !string.IsNullOrWhiteSpace(val))
                 {
-                    // Use the exact claim type as the key
-                    userInfo[userClaim.ClaimType] = claimValue;
-                    _logger.LogDebug("Added claim '{ClaimType}' with value for user {UserId}",
-                        userClaim.ClaimType, user.Id);
-                }
-                else
-                {
-                    _logger.LogDebug("Claim '{ClaimType}' has no value for user {UserId}",
-                        userClaim.ClaimType, user.Id);
+                    dict[uc.ClaimType] = val;
                 }
             }
         }
-
-        // FALLBACK: If no identity resources are found, include standard claims based on scopes
-        if (identityResources.Count == 0)
-        {
-            _logger.LogInformation("No identity resources found, using scope-based claim mapping for user {UserId}", user.Id);
-            
-            foreach (var scope in scopes)
-            {
-                await AddClaimsForScope(userInfo, user, scope);
-            }
-        }
-
-        return userInfo;
+        return dict;
     }
 
-    /// <summary>
-    /// Add claims for a specific scope when no identity resources are configured
-    /// </summary>
-    private async Task AddClaimsForScope(Dictionary<string, object> userInfo, IdentityUser user, string scope)
+    private async Task AddMissingStandardScopeClaimsAsync(Dictionary<string, object> userInfo, IdentityUser user, IEnumerable<string> scopes, bool onlyIfMissing)
     {
-        switch (scope.ToLower())
+        foreach (var scope in scopes)
+        {
+            await AddClaimsForScope(userInfo, user, scope, onlyIfMissing);
+        }
+    }
+
+    private async Task AddClaimsForScope(Dictionary<string, object> userInfo, IdentityUser user, string scope, bool onlyIfMissing)
+    {
+        async Task Add(string type)
+        {
+            if (onlyIfMissing && userInfo.ContainsKey(type)) return;
+            await AddClaimIfPresent(userInfo, user, type);
+        }
+        switch (scope.ToLowerInvariant())
         {
             case "profile":
-                await AddClaimIfNotNull(userInfo, user, "name");
-                await AddClaimIfNotNull(userInfo, user, "given_name");
-                await AddClaimIfNotNull(userInfo, user, "family_name");
-                await AddClaimIfNotNull(userInfo, user, "preferred_username");
-                await AddClaimIfNotNull(userInfo, user, "picture");
-                await AddClaimIfNotNull(userInfo, user, "website");
-                await AddClaimIfNotNull(userInfo, user, "gender");
-                await AddClaimIfNotNull(userInfo, user, "birthdate");
-                await AddClaimIfNotNull(userInfo, user, "zoneinfo");
-                await AddClaimIfNotNull(userInfo, user, "locale");
-                await AddClaimIfNotNull(userInfo, user, "updated_at");
-                _logger.LogDebug("Added profile scope claims for user {UserId}", user.Id);
+                await Add("name"); await Add("given_name"); await Add("family_name"); await Add("preferred_username"); await Add("picture"); await Add("website"); await Add("gender"); await Add("birthdate"); await Add("zoneinfo"); await Add("locale"); await Add("updated_at");
                 break;
-
-            case "email":
-                await AddClaimIfNotNull(userInfo, user, "email");
-                await AddClaimIfNotNull(userInfo, user, "email_verified");
-                _logger.LogDebug("Added email scope claims for user {UserId}", user.Id);
-                break;
-
-            case "phone":
-                await AddClaimIfNotNull(userInfo, user, "phone_number");
-                await AddClaimIfNotNull(userInfo, user, "phone_number_verified");
-                _logger.LogDebug("Added phone scope claims for user {UserId}", user.Id);
-                break;
-
+            case "email": await Add("email"); await Add("email_verified"); break;
+            case "phone": await Add("phone_number"); await Add("phone_number_verified"); break;
             case "roles":
-                await AddClaimIfNotNull(userInfo, user, "role");
-                _logger.LogDebug("Added roles scope claims for user {UserId}", user.Id);
+                if (!userInfo.ContainsKey("role"))
+                {
+                    var roles = await GetRolesAsync(user);
+                    if (roles.Length > 0) userInfo["role"] = roles;
+                }
                 break;
-
-            case "address":
-                await AddClaimIfNotNull(userInfo, user, "address");
-                _logger.LogDebug("Added address scope claims for user {UserId}", user.Id);
-                break;
-
-            default:
-                _logger.LogDebug("Unknown scope '{Scope}' - no default claims added", scope);
-                break;
+            case "address": await Add("address"); break;
         }
     }
 
-    /// <summary>
-    /// Helper method to add a claim only if it has a value
-    /// </summary>
-    private async Task AddClaimIfNotNull(Dictionary<string, object> userInfo, IdentityUser user, string claimType)
+    private async Task AddClaimIfPresent(Dictionary<string, object> userInfo, IdentityUser user, string type)
     {
-        if (!userInfo.ContainsKey(claimType)) // Don't overwrite existing claims
-        {
-            var claimValue = await GetClaimValueAsync(user, claimType);
-            if (claimValue != null)
-            {
-                userInfo[claimType] = claimValue;
-                _logger.LogDebug("Added claim '{ClaimType}' with value for user {UserId}", claimType, user.Id);
-            }
-        }
+        if (userInfo.ContainsKey(type)) return;
+        var val = await GetClaimValueAsync(user, type);
+        if (val == null) return;
+        userInfo[type] = val is bool b ? b : val;
     }
 
-    private async Task<object?> GetClaimValueAsync(IdentityUser user, string claimType)
+    private async Task<object?> GetClaimValueAsync(IdentityUser user, string type) => type switch
     {
-        return claimType switch
-        {
-            // Standard OpenID Connect claims
-            "sub" => user.Id,
-            "email" => user.Email,
-            "email_verified" => user.EmailConfirmed,
-            "preferred_username" => user.UserName,
-            "phone_number" => user.PhoneNumber,
-            "phone_number_verified" => user.PhoneNumberConfirmed,
+        "sub" => user.Id,
+        "email" => user.Email,
+        "email_verified" => user.EmailConfirmed,
+        "preferred_username" => $"{user.UserName}",
+        "phone_number" => user.PhoneNumber,
+        "phone_number_verified" => user.PhoneNumberConfirmed,
+        "name" => await GetUserClaimValueAsync(user, "name") ?? GetDisplayName(user),
+        "role" => await GetRolesAsync(user),
+        _ => await GetUserClaimValueAsync(user, type)
+    };
 
-            // For name claim, check user claims first, then fallback to smart username conversion
-            "name" => await GetUserClaimValueAsync(user, "name") ?? GetUserDisplayName(user),
-
-            // Handle roles specially - return as array
-            "role" => await GetUserRolesAsync(user),
-
-            // For other claims, check user claims table
-            _ => await GetUserClaimValueAsync(user, claimType)
-        };
-    }
-
-    /// <summary>
-    /// Get a friendly display name for the user by converting their username/email to a readable format
-    /// </summary>
-    private string GetUserDisplayName(IdentityUser user)
-    {
-        if (string.IsNullOrEmpty(user.UserName))
-            return "Unknown User";
-
-        // If username is an email, extract the local part and convert to friendly name
-        if (user.UserName.Contains('@'))
-        {
-            var localPart = user.UserName.Split('@')[0];
-            return ConvertToFriendlyName(localPart);
-        }
-
-        // Otherwise just convert the username to friendly name
-        return ConvertToFriendlyName(user.UserName);
-    }
-
-    /// <summary>
-    /// Convert a username or email local part to a friendly display name
-    /// Examples:
-    /// - "demo1" -> "Demo1"
-    /// - "john.doe" -> "John Doe"
-    /// - "jane_smith" -> "Jane Smith"
-    /// - "mrwho_demo1" -> "Mrwho Demo1"
-    /// </summary>
-    private string ConvertToFriendlyName(string input)
-    {
-        if (string.IsNullOrEmpty(input))
-            return "Unknown User";
-
-        // Replace common separators with spaces
-        var friendlyName = input.Replace('.', ' ')
-                               .Replace('_', ' ')
-                               .Replace('-', ' ');
-
-        // Split into words and capitalize each word
-        var words = friendlyName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        var capitalizedWords = words.Select(word => 
-            word.Length > 0 ? char.ToUpper(word[0]) + word.Substring(1).ToLower() : word);
-
-        return string.Join(" ", capitalizedWords);
-    }
-
-    private async Task<string?> GetUserClaimValueAsync(IdentityUser user, string claimType)
+    private async Task<string?> GetUserClaimValueAsync(IdentityUser user, string type)
     {
         try
         {
             var claims = await _userManager.GetClaimsAsync(user);
-            return claims.FirstOrDefault(c => c.Type == claimType)?.Value;
+            return claims.FirstOrDefault(c => c.Type.Equals(type, StringComparison.OrdinalIgnoreCase))?.Value;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving claim '{ClaimType}' for user {UserId}", claimType, user.Id);
+            _logger.LogError(ex, "Error reading claim {Type} for user {UserId}", type, user.Id);
             return null;
         }
     }
 
-    private async Task<string[]> GetUserRolesAsync(IdentityUser user)
+    private async Task<string[]> GetRolesAsync(IdentityUser user)
     {
-        try
-        {
-            var roles = await _userManager.GetRolesAsync(user);
-            return roles.ToArray();
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error retrieving roles for user {UserId}", user.Id);
-            return Array.Empty<string>();
-        }
+        try { return (await _userManager.GetRolesAsync(user)).ToArray(); }
+        catch (Exception ex) { _logger.LogError(ex, "Error retrieving roles for user {UserId}", user.Id); return Array.Empty<string>(); }
+    }
+
+    private string GetDisplayName(IdentityUser user)
+    {
+        if (string.IsNullOrWhiteSpace(user.UserName)) return "Unknown User";
+        var input = user.UserName.Contains('@') ? user.UserName.Split('@')[0] : user.UserName;
+        var friendly = input.Replace('.', ' ').Replace('_', ' ').Replace('-', ' ');
+        return string.Join(" ", friendly.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(w => char.ToUpper(w[0]) + w[1..].ToLower()));
     }
 }

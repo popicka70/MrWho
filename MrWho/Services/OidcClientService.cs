@@ -27,6 +27,41 @@ public class OidcClientService : IOidcClientService
         _logger = logger;
     }
 
+    private async Task BackfillEndpointAccessFlagsAsync()
+    {
+        try
+        {
+            var clients = await _context.Clients.Where(c =>
+                c.AllowAccessToUserInfoEndpoint == null ||
+                c.AllowAccessToRevocationEndpoint == null ||
+                c.AllowAccessToIntrospectionEndpoint == null).ToListAsync();
+            if (clients.Count == 0) return;
+            int updated = 0;
+            foreach (var c in clients)
+            {
+                var isMachine = c.ClientType == ClientType.Machine || (c.AllowClientCredentialsFlow && !c.AllowAuthorizationCodeFlow && !c.AllowPasswordFlow);
+                if (c.AllowAccessToUserInfoEndpoint == null)
+                    c.AllowAccessToUserInfoEndpoint = !isMachine; // interactive clients get userinfo
+                if (c.AllowAccessToRevocationEndpoint == null)
+                    c.AllowAccessToRevocationEndpoint = true; // generally safe
+                if (c.AllowAccessToIntrospectionEndpoint == null)
+                    c.AllowAccessToIntrospectionEndpoint = isMachine; // machines often need introspection
+                c.UpdatedAt = DateTime.UtcNow;
+                c.UpdatedBy ??= "Backfill";
+                updated++;
+            }
+            if (updated > 0)
+            {
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Backfilled endpoint access flags for {Count} clients", updated);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error backfilling endpoint access flags");
+        }
+    }
+
     /// <summary>
     /// Initialize essential data that must always be present (admin realm, admin client, admin user)
     /// </summary>
@@ -101,7 +136,11 @@ public class OidcClientService : IOidcClientService
                 AllowRefreshTokenFlow = true,
                 RequirePkce = true,
                 RequireClientSecret = true,
-                CreatedBy = "System"
+                CreatedBy = "System",
+                // Endpoint access defaults (interactive web app)
+                AllowAccessToUserInfoEndpoint = true,
+                AllowAccessToRevocationEndpoint = true,
+                AllowAccessToIntrospectionEndpoint = false
             };
 
             _context.Clients.Add(adminClient);
@@ -371,7 +410,11 @@ public class OidcClientService : IOidcClientService
                 AllowRefreshTokenFlow = true,
                 RequirePkce = true,
                 RequireClientSecret = true,
-                CreatedBy = "System"
+                CreatedBy = "System",
+                // Endpoint access defaults
+                AllowAccessToUserInfoEndpoint = true,
+                AllowAccessToRevocationEndpoint = true,
+                AllowAccessToIntrospectionEndpoint = false
             };
 
             _context.Clients.Add(demo1Client);
@@ -553,7 +596,11 @@ public class OidcClientService : IOidcClientService
                 AllowRefreshTokenFlow = false,
                 RequirePkce = false,
                 RequireClientSecret = true,
-                CreatedBy = "System"
+                CreatedBy = "System",
+                // Endpoint access defaults for M2M (no userinfo, no revocation unless needed)
+                AllowAccessToUserInfoEndpoint = false,
+                AllowAccessToRevocationEndpoint = true,
+                AllowAccessToIntrospectionEndpoint = true
             };
             _context.Clients.Add(m2mClient);
             await _context.SaveChangesAsync();
@@ -733,7 +780,11 @@ public class OidcClientService : IOidcClientService
                 AllowRefreshTokenFlow = true,
                 RequirePkce = false,
                 RequireClientSecret = true,
-                CreatedBy = "System"
+                CreatedBy = "System",
+                // Endpoint defaults for test client
+                AllowAccessToUserInfoEndpoint = true,
+                AllowAccessToRevocationEndpoint = true,
+                AllowAccessToIntrospectionEndpoint = true
             };
 
             _context.Clients.Add(defaultClient);
@@ -894,6 +945,7 @@ public class OidcClientService : IOidcClientService
             // Always add token endpoint
             descriptor.Permissions.Add(OpenIddictConstants.Permissions.Endpoints.Token);
 
+            var hasOpenIdScope = false;
             // Add scope permissions based on client scopes
             foreach (var scope in client.Scopes)
             {
@@ -901,6 +953,7 @@ public class OidcClientService : IOidcClientService
                 {
                     case "openid":
                         descriptor.Permissions.Add("scp:openid");
+                        hasOpenIdScope = true;
                         break;
                     case "email":
                         descriptor.Permissions.Add(OpenIddictConstants.Permissions.Scopes.Email);
@@ -916,20 +969,32 @@ public class OidcClientService : IOidcClientService
                         break;
                     case "api.read":
                     case "api.write":
-                        // For custom API scopes, use the scp: prefix (OpenIddict format for custom scopes)
                         descriptor.Permissions.Add($"scp:{scope.Scope}");
                         break;
                     default:
-                        // Other custom scopes
                         descriptor.Permissions.Add($"scp:{scope.Scope}");
                         break;
                 }
             }
 
             // IMPORTANT: Also add the endpoint access if we have openid scope 
-            if (client.Scopes.Any(s => s.Scope == "openid"))
+            if (hasOpenIdScope)
             {
                 descriptor.Permissions.Add(OpenIddictConstants.Permissions.Endpoints.EndSession);
+            }
+
+            // NEW: Conditionally expose userinfo endpoint if allowed and openid scope present
+            if (client.AllowAccessToUserInfoEndpoint == true)
+            {
+                if (hasOpenIdScope)
+                {
+                    // Constant not available in current OpenIddict version, use raw permission string
+                    descriptor.Permissions.Add("endpoints:userinfo");
+                }
+                else
+                {
+                    _logger.LogWarning("Client '{ClientId}' requested UserInfo endpoint access but does not have 'openid' scope. Skipping permission.", client.ClientId);
+                }
             }
 
             // Add additional permissions from client permissions (skip the ones handled above)

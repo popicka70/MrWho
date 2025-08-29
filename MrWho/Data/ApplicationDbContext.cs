@@ -73,6 +73,9 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
     public DbSet<ClientRole> ClientRoles { get; set; } = null!;
     public DbSet<UserClientRole> UserClientRoles { get; set; } = null!;
 
+    // NEW: Claim types registry
+    public DbSet<ClaimType> ClaimTypes { get; set; } = null!;
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
@@ -428,6 +431,14 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
                   .HasForeignKey(a => a.ClientId)
                   .OnDelete(DeleteBehavior.Cascade);
             entity.HasIndex(a => new { a.ClientId, a.Audience }).IsUnique();
+        });
+
+        // ClaimType registry configuration
+        builder.Entity<ClaimType>(entity =>
+        {
+            entity.HasKey(ct => ct.Id);
+            entity.HasIndex(ct => ct.Type).IsUnique();
+            entity.Property(ct => ct.Type).IsRequired();
         });
 
         // Provider-specific tuning: MySQL row size limits -> move large strings to longtext

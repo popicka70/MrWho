@@ -683,42 +683,6 @@ public sealed class SyncScopesHandler : IRequestHandler<SyncScopesRequest, IResu
     }
 }
 
-// /debug/userinfo-test (GET, authorized)
-public sealed record UserInfoTestRequest(HttpContext HttpContext) : IRequest<IResult>;
-public sealed class UserInfoTestHandler : IRequestHandler<UserInfoTestRequest, IResult>
-{
-    private readonly MrWho.Handlers.IUserInfoHandler _userInfoHandler;
-    private readonly ILogger<UserInfoTestHandler> _logger;
-
-    public UserInfoTestHandler(MrWho.Handlers.IUserInfoHandler userInfoHandler, ILogger<UserInfoTestHandler> logger)
-    {
-        _userInfoHandler = userInfoHandler;
-        _logger = logger;
-    }
-
-    public async Task<IResult> Handle(UserInfoTestRequest request, CancellationToken cancellationToken)
-    {
-        var context = request.HttpContext;
-        _logger.LogInformation("Testing UserInfo handler directly");
-        if (!context.User.Identity?.IsAuthenticated == true)
-        {
-            return Results.Unauthorized();
-        }
-
-        try
-        {
-            var result = await _userInfoHandler.HandleUserInfoRequestAsync(context);
-            _logger.LogInformation("UserInfo handler returned result type: {ResultType}", result.GetType().Name);
-            return result;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error testing UserInfo handler");
-            return Results.Problem($"Error testing UserInfo handler: {ex.Message}");
-        }
-    }
-}
-
 // /debug/current-claims (GET, authorized)
 public sealed record CurrentClaimsRequest(HttpContext HttpContext) : IRequest<IResult>;
 public sealed class CurrentClaimsHandler : IRequestHandler<CurrentClaimsRequest, IResult>
