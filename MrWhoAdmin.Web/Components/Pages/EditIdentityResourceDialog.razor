@@ -7,8 +7,12 @@
 
 <RadzenStack Gap="1rem">
     <RadzenFormField Text="Scope Name" Variant="Variant.Outlined">
-        <RadzenTextBox Value="@IdentityResource.Name" Disabled="true" Style="width: 100%;" />
-        <RadzenText TextStyle="TextStyle.Caption" class="rz-text-disabled-color">OIDC scope identifier (immutable).</RadzenText>
+        <RadzenDropDown @bind-Value="selectedScopeName" Data="@scopeNames"
+                         Placeholder="Select scope..." Style="width: 100%;"
+                         AllowClear="false" AllowFiltering="true"
+                         FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                         Change="@(async (args) => await OnScopeChanged(args))" />
+        <RadzenText TextStyle="TextStyle.Caption" class="rz-text-disabled-color">Select an existing identity scope to edit (name is immutable).</RadzenText>
     </RadzenFormField>
 
     <RadzenFormField Text="Display Name" Variant="Variant.Outlined">
@@ -225,6 +229,11 @@
     private string newPropertyValue = string.Empty;
     private bool isUpdating = false;
 
+    // Scope selection
+    private List<IdentityResourceDto> identityResources = new();
+    private List<string> scopeNames = new();
+    private string? selectedScopeName;
+
     // Claim type selection
     private ClaimTypeInfo? selectedClaimType;
     private string customClaimType = string.Empty;
@@ -241,7 +250,14 @@
     private bool showInDiscoveryDocument;
     private bool emphasize;
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
+    {
+        InitializeFromIdentityResource();
+        await LoadScopesAsync();
+        await LoadClaimTypesAsync();
+    }
+
+    private void InitializeFromIdentityResource()
     {
         request = new UpdateIdentityResourceRequest
         {
@@ -249,7 +265,6 @@
             Description = IdentityResource.Description
         };
 
-        // Convert IdentityResourceClaimDto list to string list for editing
         userClaims = IdentityResource.UserClaims?.Select(c => c.ClaimType).ToList() ?? new List<string>();
         properties = new Dictionary<string, string>(IdentityResource.Properties ?? new Dictionary<string, string>());
 
@@ -258,8 +273,49 @@
         showInDiscoveryDocument = IdentityResource.ShowInDiscoveryDocument;
         emphasize = IdentityResource.Emphasize;
 
-        // Load available claim types from database
-        _ = LoadClaimTypesAsync();
+        selectedScopeName = IdentityResource.Name;
+    }
+
+    private async Task LoadScopesAsync()
+    {
+        try
+        {
+            var result = await IdentityResourcesApi.GetIdentityResourcesAsync(page: 1, pageSize: 1000);
+            identityResources = result.Items?.ToList() ?? new List<IdentityResourceDto>();
+            scopeNames = identityResources.Select(r => r.Name).OrderBy(n => n).ToList();
+            if (selectedScopeName == null && scopeNames.Count > 0)
+            {
+                selectedScopeName = scopeNames.First();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger?.LogError(ex, "Error loading identity resource scopes");
+            NotificationService?.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Error,
+                Summary = "Error",
+                Detail = $"Failed to load scopes: {ex.Message}",
+                Duration = 5000
+            });
+        }
+    }
+
+    private async Task OnScopeChanged(object value)
+    {
+        var newName = value as string;
+        if (string.IsNullOrWhiteSpace(newName) || newName == IdentityResource?.Name)
+        {
+            return;
+        }
+
+        var res = identityResources.FirstOrDefault(r => r.Name == newName);
+        if (res != null)
+        {
+            IdentityResource = res; // update backing parameter for internal state
+            InitializeFromIdentityResource();
+            await InvokeAsync(StateHasChanged);
+        }
     }
 
     private async Task LoadClaimTypesAsync()
@@ -276,14 +332,12 @@
             }
             else
             {
-                // Fallback to standard claims if API call fails
                 availableClaimTypes = CommonClaimTypes.StandardClaims.ToList();
             }
         }
         catch (Exception ex)
         {
             Logger?.LogError(ex, "Error loading claim types");
-            // Fallback to standard claims if error occurs
             availableClaimTypes = CommonClaimTypes.StandardClaims.ToList();
         }
         finally
@@ -357,7 +411,6 @@
     {
         try
         {
-            // Validate required services
             if (IdentityResourcesApi == null)
             {
                 Logger?.LogError("IdentityResourcesApi service is null");
@@ -387,7 +440,6 @@
             isUpdating = true;
             StateHasChanged();
 
-            // Update the request with current values
             request.IsEnabled = isEnabled;
             request.IsRequired = isRequired;
             request.ShowInDiscoveryDocument = showInDiscoveryDocument;
