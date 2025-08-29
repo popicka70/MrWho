@@ -1,4 +1,6 @@
 @page "/claim-types"
+@attribute [Authorize]
+@rendermode InteractiveServer
 @inject IClaimTypesApiService ClaimTypesApi
 @inject NotificationService NotificationService
 @inject DialogService DialogService
@@ -57,14 +59,20 @@
     private async Task ShowCreate()
     {
         var ct = new ClaimTypeInfo();
-        await DialogService.OpenAsync<EditClaimTypeDialog>("Create Claim Type", new Dictionary<string, object?> { ["Model"] = ct, ["IsNew"] = true }, new DialogOptions { Width = "700px" });
-        await LoadAsync();
+        var dialogResult = await DialogService.OpenAsync<EditClaimTypeDialog>("Create Claim Type", new Dictionary<string, object?> { ["Model"] = ct, ["IsNew"] = true }, new DialogOptions { Width = "700px" });
+        if (dialogResult != null)
+        {
+            await LoadAsync();
+        }
     }
 
     private async Task Edit(ClaimTypeInfo ct)
     {
-        await DialogService.OpenAsync<EditClaimTypeDialog>("Edit Claim Type", new Dictionary<string, object?> { ["Model"] = ct, ["IsNew"] = false }, new DialogOptions { Width = "700px" });
-        await LoadAsync();
+        var dialogResult = await DialogService.OpenAsync<EditClaimTypeDialog>("Edit Claim Type", new Dictionary<string, object?> { ["Model"] = ct, ["IsNew"] = false }, new DialogOptions { Width = "700px" });
+        if (dialogResult != null)
+        {
+            await LoadAsync();
+        }
     }
 
     private async Task Delete(ClaimTypeInfo ct)
