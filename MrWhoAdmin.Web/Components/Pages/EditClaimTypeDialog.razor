@@ -1,0 +1,69 @@
+@inherits ComponentBase
+@inject IClaimTypesApiService ClaimTypesApi
+@inject NotificationService NotificationService
+@inject DialogService DialogService
+@inject ILogger<EditClaimTypeDialog> Logger
+@using MrWho.Shared.Models
+
+<RadzenStack Gap="1rem" Style="width:100%">
+    <RadzenFormField Text="Type" Variant="Variant.Outlined">
+        <RadzenTextBox @bind-Value="Model.Type" Disabled="@(!IsNew)" Style="width:100%" />
+    </RadzenFormField>
+    <RadzenFormField Text="Display Name" Variant="Variant.Outlined">
+        <RadzenTextBox @bind-Value="Model.DisplayName" Style="width:100%" />
+    </RadzenFormField>
+    <RadzenFormField Text="Description" Variant="Variant.Outlined">
+        <RadzenTextArea @bind-Value="Model.Description" Rows="3" Style="width:100%" />
+    </RadzenFormField>
+    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+        <RadzenButton Text="Save" Icon="save" ButtonStyle="ButtonStyle.Primary" Click="@(async () => await Save())" IsBusy="@isSaving" />
+        <RadzenButton Text="Cancel" Icon="cancel" ButtonStyle="ButtonStyle.Secondary" Click="@(async () => await Cancel())" />
+    </RadzenStack>
+</RadzenStack>
+
+@code {
+    [Parameter] public ClaimTypeInfo Model { get; set; } = new();
+    [Parameter] public bool IsNew { get; set; }
+    private bool isSaving;
+
+    private async Task Save()
+    {
+        try
+        {
+            isSaving = true;
+            ClaimTypeInfo? result;
+            if (IsNew)
+            {
+                result = await ClaimTypesApi.CreateAsync(Model);
+            }
+            else
+            {
+                result = await ClaimTypesApi.UpdateAsync(Model);
+            }
+            if (result != null)
+            {
+                NotificationService.Notify(new NotificationMessage { Severity = NotificationSeverity.Success, Summary = "Saved", Detail = result.Type });
+                DialogService.Close(true);
+            }
+            else
+            {
+                NotificationService.Notify(new NotificationMessage { Severity = NotificationSeverity.Error, Summary = "Save failed", Detail = Model.Type });
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Save claim type failed");
+            NotificationService.Notify(new NotificationMessage { Severity = NotificationSeverity.Error, Summary = "Error", Detail = ex.Message });
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task Cancel()
+    {
+        DialogService.Close(false);
+        await Task.CompletedTask;
+    }
+}

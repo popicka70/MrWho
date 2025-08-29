@@ -18,13 +18,12 @@ public static class DatabaseInitializationExtensions
         {
             var db = services.GetRequiredService<ApplicationDbContext>();
 
-            // Use EF Core migrations in normal environments
+            // Apply EF Core migrations (dev/prod). Tests may override elsewhere.
             await db.Database.MigrateAsync();
 
-            // Seed essential data (realms, clients, users)
-            var seed = services.GetRequiredService<IOidcClientService>();
-            await seed.InitializeEssentialDataAsync();
-            await seed.InitializeDefaultRealmAndClientsAsync();
+            // Consolidated seeding: single service performs ALL essential seeding idempotently
+            var seeder = services.GetRequiredService<ISeedingService>();
+            await seeder.SeedAsync();
 
             // AFTER seeding, register all dynamic client/realm cookie schemes (idempotent)
             try
@@ -36,10 +35,10 @@ public static class DatabaseInitializationExtensions
             catch (Exception regEx)
             {
                 logger.LogError(regEx, "Failed to register dynamic client cookie schemes after seeding");
-                throw; // rethrow so startup fails clearly if schemes missing
+                throw; // Fail fast so missing schemes are obvious
             }
 
-            logger.LogInformation("Database initialized successfully");
+            logger.LogInformation("Database initialized & seeded successfully");
         }
         catch (Exception ex)
         {

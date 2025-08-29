@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using MrWhoAdmin.Web.Services;
 using MrWhoAdmin.Web.Extensions;
 using Radzen;
+using System.Security.Claims; // Added for claim manipulation
+using System.Text.Json; // For JsonElement processing
 
 namespace MrWhoAdmin.Web.Extensions;
 
@@ -149,6 +151,14 @@ public static class ServiceCollectionExtensions
             client.BaseAddress = new Uri(mrWhoApiBaseUrl);
             client.DefaultRequestHeaders.Add("Accept", "application/json");
             client.Timeout = defaultTimeout; // Set explicit timeout
+        })
+        .AddHttpMessageHandler<AuthenticationDelegatingHandler>();
+
+        services.AddHttpClient<IClaimTypesApiService, ClaimTypesApiService>(client =>
+        {
+            client.BaseAddress = new Uri(mrWhoApiBaseUrl);
+            client.DefaultRequestHeaders.Add("Accept", "application/json");
+            client.Timeout = defaultTimeout;
         })
         .AddHttpMessageHandler<AuthenticationDelegatingHandler>();
 
@@ -347,7 +357,7 @@ public static class ServiceCollectionExtensions
         
         options.ResponseType = "code";
         options.SaveTokens = true; // CRITICAL: This saves tokens for API calls
-        options.GetClaimsFromUserInfoEndpoint = false; // TEMPORARILY DISABLE: Skip UserInfo endpoint due to 403 issue
+        options.GetClaimsFromUserInfoEndpoint = true;
         
         // Production-friendly: allow configuring HTTPS metadata requirement via config (default true when using HTTPS Authority)
         var defaultRequireHttps = options.Authority.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
@@ -502,7 +512,6 @@ public static class ServiceCollectionExtensions
                 logger.LogInformation("? ADMIN: Token validated successfully for user: {UserName}. Claims count: {ClaimsCount}", 
                     context.Principal?.Identity?.Name ?? "Unknown", context.Principal?.Claims?.Count() ?? 0);
                 
-                // Log the claims we have at this context
                 if (context.Principal?.Claims != null)
                 {
                     foreach (var claim in context.Principal.Claims)
@@ -517,15 +526,94 @@ public static class ServiceCollectionExtensions
             OnUserInformationReceived = context =>
             {
                 var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+                var root = context.User.RootElement;
                 logger.LogInformation("?? ADMIN: UserInfo received from endpoint. User document contains {PropertyCount} properties", 
-                    context.User.RootElement.EnumerateObject().Count());
+                    root.EnumerateObject().Count());
                 
-                // Log what we received from UserInfo endpoint
-                foreach (var property in context.User.RootElement.EnumerateObject())
+                foreach (var property in root.EnumerateObject())
                 {
                     logger.LogDebug("ADMIN UserInfo property: {PropertyName} = {PropertyValue}", property.Name, property.Value.ToString());
                 }
-                
+
+                // OPTION 2 IMPLEMENTATION: dynamically project unmapped custom claims (e.g. myclaim) into the principal
+                if (context.Principal?.Identity is ClaimsIdentity identity)
+                {
+                    try
+                    {
+                        var known = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                        {
+                            "sub","name","given_name","family_name","email","email_verified","preferred_username","phone_number","phone_number_verified","role","roles"
+                        };
+
+                        foreach (var prop in root.EnumerateObject())
+                        {
+                            if (known.Contains(prop.Name))
+                            {
+                                continue;
+                            }
+                            if (prop.Value.ValueKind == JsonValueKind.Null || prop.Value.ValueKind == JsonValueKind.Undefined)
+                            {
+                                continue;
+                            }
+
+                            bool AlreadyHas(string type, string value) => identity.HasClaim(c => c.Type == type && c.Value == value);
+                            void AddStringClaim(string type, string value)
+                            {
+                                if (string.IsNullOrWhiteSpace(value)) return;
+                                if (AlreadyHas(type, value)) return;
+                                identity.AddClaim(new Claim(type, value));
+                                logger.LogDebug("ADMIN UserInfo dynamic claim added: {Type} = {Value}", type, value);
+                            }
+
+                            switch (prop.Value.ValueKind)
+                            {
+                                case JsonValueKind.String:
+                                    AddStringClaim(prop.Name, prop.Value.GetString()!);
+                                    break;
+                                case JsonValueKind.True:
+                                case JsonValueKind.False:
+                                    AddStringClaim(prop.Name, prop.Value.GetBoolean().ToString());
+                                    break;
+                                case JsonValueKind.Array:
+                                    foreach (var elem in prop.Value.EnumerateArray())
+                                    {
+                                        if (elem.ValueKind == JsonValueKind.String)
+                                            AddStringClaim(prop.Name, elem.GetString()!);
+                                        else if (elem.ValueKind == JsonValueKind.True || elem.ValueKind == JsonValueKind.False)
+                                            AddStringClaim(prop.Name, elem.GetBoolean().ToString());
+                                    }
+                                    break;
+                                case JsonValueKind.Number:
+                                    if (prop.Value.TryGetInt64(out var l)) AddStringClaim(prop.Name, l.ToString());
+                                    else if (prop.Value.TryGetDouble(out var d)) AddStringClaim(prop.Name, d.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                                    break;
+                                case JsonValueKind.Object:
+                                    try
+                                    {
+                                        var json = prop.Value.GetRawText();
+                                        AddStringClaim(prop.Name, json);
+                                    }
+                                    catch { }
+                                    break;
+                            }
+                        }
+
+                        logger.LogInformation("ADMIN UserInfo dynamic claim mapping complete. Total claims now: {Count}", identity.Claims.Count());
+                    }
+                    catch (Exception ex)
+                    {
+                        logger.LogWarning(ex, "ADMIN: Exception while dynamically mapping UserInfo claims");
+                    }
+                }
+
+                if (context.Principal?.Claims != null)
+                {
+                    foreach (var claim in context.Principal.Claims)
+                    {
+                        logger.LogDebug("ADMIN UserInfo final claim: {ClaimType} = {ClaimValue}", claim.Type, claim.Value);
+                    }
+                }
+
                 return Task.CompletedTask;
             },
             
@@ -544,20 +632,14 @@ public static class ServiceCollectionExtensions
                 logger.LogError("? ADMIN: Authentication failed: {Error} - {ErrorDescription}", 
                     context.Exception?.Message, context.Exception?.ToString());
                 
-                // Check if this is a UserInfo endpoint failure (403 Forbidden)
                 if (context.Exception is HttpRequestException httpEx && 
                     httpEx.Message.Contains("403") && 
                     httpEx.Message.Contains("Forbidden"))
                 {
                     logger.LogWarning("?? ADMIN: UserInfo endpoint returned 403 Forbidden - this might be a temporary server issue");
-                    
-                    // Don't treat UserInfo 403 as a complete authentication failure
-                    // The user can still be authenticated based on the ID token
-                    // Just log the issue and let the authentication continue without UserInfo claims
                     return Task.CompletedTask;
                 }
                 
-                // For other authentication failures, redirect to error page
                 var errorMessage = Uri.EscapeDataString(context.Exception?.Message ?? "Unknown error");
                 context.Response.Redirect($"/auth/error?error={errorMessage}");
                 context.HandleResponse();
@@ -570,19 +652,14 @@ public static class ServiceCollectionExtensions
                 var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
                 logger.LogError("?? ADMIN: Remote authentication failure: {Error}", context.Failure?.Message);
                 
-                // Check if this is a UserInfo endpoint failure (403 Forbidden)
                 if (context.Failure is HttpRequestException httpEx && 
                     httpEx.Message.Contains("403") && 
                     httpEx.Message.Contains("Forbidden"))
                 {
                     logger.LogWarning("?? ADMIN: UserInfo endpoint returned 403 Forbidden during remote authentication");
-                    
-                    // Don't treat UserInfo 403 as a complete authentication failure
-                    // Skip the UserInfo call and continue with ID token claims
                     return Task.CompletedTask;
                 }
                 
-                // For other remote failures, redirect to error page
                 var errorMessage = Uri.EscapeDataString(context.Failure?.Message ?? "Remote authentication failed");
                 context.Response.Redirect($"/auth/error?error={errorMessage}");
                 context.HandleResponse();
