@@ -347,7 +347,7 @@ public static class ServiceCollectionExtensions
         
         options.ResponseType = "code";
         options.SaveTokens = true; // CRITICAL: This saves tokens for API calls
-        options.GetClaimsFromUserInfoEndpoint = false; // TEMPORARILY DISABLE: Skip UserInfo endpoint due to 403 issue
+        options.GetClaimsFromUserInfoEndpoint = true;
         
         // Production-friendly: allow configuring HTTPS metadata requirement via config (default true when using HTTPS Authority)
         var defaultRequireHttps = options.Authority.StartsWith("https://", StringComparison.OrdinalIgnoreCase);

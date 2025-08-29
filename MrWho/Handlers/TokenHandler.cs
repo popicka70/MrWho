@@ -8,7 +8,8 @@ using MrWho.Services;
 using MrWho.Data; // add db
 using Microsoft.EntityFrameworkCore; // include for Include
 using MrWho.Shared; // for AudienceMode
-using static OpenIddict.Abstractions.OpenIddictConstants; // for Destinations & claims
+using static OpenIddict.Abstractions.OpenIddictConstants;
+using MrWho.Models; // for Destinations & claims
 
 namespace MrWho.Handlers;
 
@@ -77,6 +78,54 @@ public class TokenHandler : ITokenHandler
         throw new InvalidOperationException($"The specified grant type '{request.GrantType}' is not supported.");
     }
 
+    // --- helper to build a fresh user identity consistently across flows ---
+    private async Task<ClaimsIdentity> BuildUserIdentityAsync(IdentityUser user, string clientId, IEnumerable<string> scopes)
+    {
+        // Load client to respect AlwaysIncludeUserClaimsInIdToken flag
+        var client = await _db.Clients.FirstOrDefaultAsync(c => c.ClientId == clientId);
+        var includeInId = client?.AlwaysIncludeUserClaimsInIdToken == true; // default false if null
+
+        string[] destinations = includeInId
+            ? new[] { Destinations.AccessToken, Destinations.IdentityToken }
+            : new[] { Destinations.AccessToken }; // userinfo-only exposure for privacy
+
+
+        var identity = new ClaimsIdentity(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+
+        // Core user claims
+        var subClaim = new Claim(OpenIddictConstants.Claims.Subject, user.Id);
+        subClaim.SetDestinations(Destinations.AccessToken, Destinations.IdentityToken);
+        identity.AddClaim(subClaim);
+
+        if (!string.IsNullOrWhiteSpace(user.Email))
+        {
+            var emailClaim = new Claim(OpenIddictConstants.Claims.Email, user.Email);
+            emailClaim.SetDestinations(destinations);
+            identity.AddClaim(emailClaim);
+        }
+
+        // Display/name claims
+        var display = await GetUserNameClaimAsync(user);
+        var nameClaim = new Claim(OpenIddictConstants.Claims.Name, display);
+        nameClaim.SetDestinations(destinations);
+        identity.AddClaim(nameClaim);
+
+        if (!string.IsNullOrWhiteSpace(user.UserName))
+        {
+            var preferredUsernameClaim = new Claim(OpenIddictConstants.Claims.PreferredUsername, user.UserName);
+            preferredUsernameClaim.SetDestinations(destinations);
+            identity.AddClaim(preferredUsernameClaim);
+        }
+
+        // Profile (given/family/picture ...) if profile scope
+        await AddProfileClaimsAsync(identity, user, scopes, client);
+        // Identity resource claims (AccessToken only unless AlwaysIncludeUserClaimsInIdToken)
+        await AddIdentityResourceClaimsAsync(identity, user, scopes, client);
+        // Roles (global + client)
+        await AddRolesAsync(identity, user, clientId, scopes);
+        return identity;
+    }
+
     private RoleInclusion ResolveRoleInclusion(IEnumerable<string> scopes)
     {
         var set = scopes.ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -133,7 +182,7 @@ public class TokenHandler : ITokenHandler
     }
 
     // NEW: Add claims defined by enabled IdentityResources matching requested scopes
-    private async Task AddIdentityResourceClaimsAsync(ClaimsIdentity identity, IdentityUser user, IEnumerable<string> scopes)
+    private async Task AddIdentityResourceClaimsAsync(ClaimsIdentity identity, IdentityUser user, IEnumerable<string> scopes, Client? client)
     {
         try
         {
@@ -144,6 +193,9 @@ public class TokenHandler : ITokenHandler
                 .Where(r => r.IsEnabled && scopeSet.Contains(r.Name))
                 .ToListAsync();
             if (idResources.Count == 0) return;
+
+            // Load client to respect AlwaysIncludeUserClaimsInIdToken flag
+            var includeInId = client?.AlwaysIncludeUserClaimsInIdToken == true; // default false if null
 
             var userClaims = await _userManager.GetClaimsAsync(user);
             var userClaimLookup = userClaims.GroupBy(c => c.Type)
@@ -156,13 +208,19 @@ public class TokenHandler : ITokenHandler
                 if (!userClaimLookup.TryGetValue(claimType, out var value) || string.IsNullOrWhiteSpace(value)) continue;
 
                 var claim = new Claim(claimType, value);
-                // For identity resource claims we default to id + access tokens so APIs can consume if needed
-                claim.SetDestinations(Destinations.IdentityToken, Destinations.AccessToken);
+                if (includeInId)
+                {
+                    claim.SetDestinations(Destinations.AccessToken, Destinations.IdentityToken);
+                }
+                else
+                {
+                    claim.SetDestinations(Destinations.AccessToken); // userinfo-only exposure for privacy
+                }
                 identity.AddClaim(claim);
                 existingTypes.Add(claimType);
             }
 
-            _logger.LogDebug("Added {Count} identity resource claims for user {UserId}", idResources.Sum(r => r.UserClaims.Count), user.Id);
+            _logger.LogDebug("Added {Count} identity resource claims for user {UserId} (IncludeInId={Include})", idResources.Sum(r => r.UserClaims.Count), user.Id, includeInId);
         }
         catch (Exception ex)
         {
@@ -174,99 +232,64 @@ public class TokenHandler : ITokenHandler
     {
         var user = await _userManager.FindByNameAsync(request.Username!);
 
-        if (user != null && await _userManager.CheckPasswordAsync(user, request.Password!))
+        if (user == null || !await _userManager.CheckPasswordAsync(user, request.Password!))
         {
-            var clientId = request.ClientId!;
-            
-            // CRITICAL: Validate user can access this client based on realm restrictions
-            var realmValidation = await _realmValidationService.ValidateUserRealmAccessAsync(user, clientId);
-            if (!realmValidation.IsValid)
+            var propertiesInvalid = new AuthenticationProperties(new Dictionary<string, string?>
             {
-                _logger.LogWarning("User {UserName} denied access to client {ClientId} via password grant: {Reason}", 
-                    user.UserName, clientId, realmValidation.Reason);
-                
-                var forbidProperties = new AuthenticationProperties(new Dictionary<string, string?>
-                {
-                    [OpenIddictServerAspNetCoreConstants.Properties.Error] = "access_denied",
-                    [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = realmValidation.Reason ?? "User does not have access to this client"
-                });
-
-                return Results.Forbid(forbidProperties, new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
-            }
-
-            _logger.LogInformation("User {UserName} validated for password grant access to client {ClientId} in realm {Realm}", 
-                user.UserName, clientId, realmValidation.ClientRealm);
-
-            // Get client-specific authentication scheme if available
-            var cookieScheme = _cookieService.GetCookieSchemeForClient(clientId);
-            var scopes = request.GetScopes();
-
-            var identity = new ClaimsIdentity(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
-            
-            var subClaim = new Claim(OpenIddictConstants.Claims.Subject, user.Id);
-            subClaim.SetDestinations(OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken);
-            identity.AddClaim(subClaim);
-
-            var emailClaim = new Claim(OpenIddictConstants.Claims.Email, user.Email!);
-            emailClaim.SetDestinations(OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken);
-            identity.AddClaim(emailClaim);
-            
-            // Get the user's name claim, fallback to friendly name from username
-            var userName = await GetUserNameClaimAsync(user);
-            var nameClaim = new Claim(OpenIddictConstants.Claims.Name, userName);
-            nameClaim.SetDestinations(OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken);
-            identity.AddClaim(nameClaim);
-
-            var preferredUsernameClaim = new Claim(OpenIddictConstants.Claims.PreferredUsername, user.UserName!);
-            preferredUsernameClaim.SetDestinations(OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken);
-            identity.AddClaim(preferredUsernameClaim);
-
-            // Add other profile claims if available
-            await AddProfileClaimsAsync(identity, user, scopes);
-
-            // NEW: Add claims from requested identity resources
-            await AddIdentityResourceClaimsAsync(identity, user, scopes);
-
-            // Add roles (global + client-scoped based on requested scopes)
-            await AddRolesAsync(identity, user, clientId, scopes);
-
-            var principal = new ClaimsPrincipal(identity);
-            principal.SetScopes(request.GetScopes());
-            var audienceResult = await ApplyAudiencesAsync(principal, request.ClientId!, request.GetScopes(), context);
-            if (audienceResult.Error)
-            {
-                var forbidProps = new AuthenticationProperties(new Dictionary<string, string?>
-                {
-                    [OpenIddictServerAspNetCoreConstants.Properties.Error] = Errors.InvalidScope,
-                    [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = audienceResult.Description ?? "Required audience scope not requested"
-                });
-                return Results.Forbid(forbidProps, new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
-            }
-
-            // Sign in with client-specific cookie scheme for session management
-            try
-            {
-                await context.SignInAsync(cookieScheme, principal);
-                _logger.LogDebug("Signed in user {Username} with client-specific scheme {Scheme}", 
-                    user.UserName, cookieScheme);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to sign in with client-specific scheme {Scheme}", cookieScheme);
-                // DO NOT fallback to default scheme - this would cause cross-client contamination
-                // Just log the error and continue - the OIDC token will still be issued
-            }
-
-            return Results.SignIn(principal, authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+                [OpenIddictServerAspNetCoreConstants.Properties.Error] = Errors.InvalidGrant,
+                [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = "The username/password couple is invalid."
+            });
+            return Results.Forbid(propertiesInvalid, new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
         }
 
-        var properties = new AuthenticationProperties(new Dictionary<string, string?>
+        var clientId = request.ClientId!;
+        
+        // CRITICAL: Validate user can access this client based on realm restrictions
+        var realmValidation = await _realmValidationService.ValidateUserRealmAccessAsync(user, clientId);
+        if (!realmValidation.IsValid)
         {
-            [OpenIddictServerAspNetCoreConstants.Properties.Error] = OpenIddictConstants.Errors.InvalidGrant,
-            [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = "The username/password couple is invalid."
-        });
+            _logger.LogWarning("User {UserName} denied access to client {ClientId} via password grant: {Reason}", 
+                user.UserName, clientId, realmValidation.Reason);
+            
+            var forbidProperties = new AuthenticationProperties(new Dictionary<string, string?>
+            {
+                [OpenIddictServerAspNetCoreConstants.Properties.Error] = Errors.AccessDenied,
+                [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = realmValidation.Reason ?? "User does not have access to this client"
+            });
 
-        return Results.Forbid(properties, new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
+            return Results.Forbid(forbidProperties, new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
+        }
+
+        _logger.LogInformation("User {UserName} validated for password grant access to client {ClientId} in realm {Realm}", 
+            user.UserName, clientId, realmValidation.ClientRealm);
+
+        var scopes = request.GetScopes();
+        var identity = await BuildUserIdentityAsync(user, clientId, scopes);
+        var principal = new ClaimsPrincipal(identity);
+        principal.SetScopes(scopes);
+        var audienceResult = await ApplyAudiencesAsync(principal, clientId, scopes, context);
+        if (audienceResult.Error)
+        {
+            var forbidProps = new AuthenticationProperties(new Dictionary<string, string?>
+            {
+                [OpenIddictServerAspNetCoreConstants.Properties.Error] = Errors.InvalidScope,
+                [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = audienceResult.Description ?? "Required audience scope not requested"
+            });
+            return Results.Forbid(forbidProps, new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
+        }
+
+        // Try persisting session
+        var cookieScheme = _cookieService.GetCookieSchemeForClient(clientId);
+        try
+        {
+            await context.SignInAsync(cookieScheme, principal);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Cookie sign-in failed for scheme {Scheme}", cookieScheme);
+        }
+
+        return Results.SignIn(principal, authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
     }
 
     private async Task<IResult> HandleClientCredentialsGrantAsync(OpenIddictRequest request)
@@ -293,104 +316,40 @@ public class TokenHandler : ITokenHandler
 
     private async Task<IResult> HandleAuthorizationCodeGrantAsync(HttpContext context, OpenIddictRequest request)
     {
-        // Try to authenticate with client-specific scheme first
-        ClaimsPrincipal? principal = null;
         var clientId = request.ClientId!;
+        ClaimsPrincipal? authPrincipal = null;
         var cookieScheme = _cookieService.GetCookieSchemeForClient(clientId);
+        try { var cookieResult = await context.AuthenticateAsync(cookieScheme); if (cookieResult.Succeeded && cookieResult.Principal?.Identity?.IsAuthenticated == true) authPrincipal = cookieResult.Principal; }
+        catch (Exception ex){ _logger.LogDebug(ex, "Cookie auth failed for scheme {Scheme}", cookieScheme); }
+        if (authPrincipal == null)
+        {
+            var fallback = await context.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+            authPrincipal = fallback.Principal;
+        }
+        if (authPrincipal == null) return Results.Forbid(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
 
-        try
-        {
-            var clientAuthResult = await context.AuthenticateAsync(cookieScheme);
-            if (clientAuthResult.Succeeded && clientAuthResult.Principal?.Identity?.IsAuthenticated == true)
-            {
-                principal = clientAuthResult.Principal;
-                _logger.LogDebug("Authenticated authorization code with client-specific scheme {Scheme}", cookieScheme);
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogDebug(ex, "Failed to authenticate with client-specific scheme {Scheme}", cookieScheme);
-        }
+        var sub = authPrincipal.FindFirst(OpenIddictConstants.Claims.Subject)?.Value;
+        if (string.IsNullOrWhiteSpace(sub)) return Results.Forbid(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
+        var user = await _userManager.FindByIdAsync(sub);
+        if (user == null) return Results.Forbid(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
 
-        // Fallback to OpenIddict authentication
-        if (principal == null)
+        var scopes = request.GetScopes();
+        // Build fresh identity (ensures updated roles/claims)
+        var identity = await BuildUserIdentityAsync(user, clientId, scopes);
+        // Preserve extra claims (e.g., amr) from original principal if not already present
+        var existingTypes = identity.Claims.Select(c => c.Type).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var c in authPrincipal.Claims)
         {
-            var authenticateResult = await context.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
-            principal = authenticateResult.Principal;
-            _logger.LogDebug("Using OpenIddict authentication for authorization code");
-        }
-        
-        if (principal == null)
-        {
-            _logger.LogWarning("Authorization code authentication failed: no principal found");
-            return Results.Forbid(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
-        }
-
-        // Create a new identity for the access token with the claims from the authorization code
-        var identity = new ClaimsIdentity(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
-        
-        // Copy the claims from the principal stored in the authorization code, preserving destinations
-        var subjectClaim = principal.FindFirst(OpenIddictConstants.Claims.Subject);
-        var nameClaim = principal.FindFirst(OpenIddictConstants.Claims.Name);
-        var emailClaim = principal.FindFirst(OpenIddictConstants.Claims.Email);
-        var preferredUsernameClaim = principal.FindFirst(OpenIddictConstants.Claims.PreferredUsername);
-        var givenNameClaim = principal.FindFirst(OpenIddictConstants.Claims.GivenName);
-        var familyNameClaim = principal.FindFirst(OpenIddictConstants.Claims.FamilyName);
-        
-        if (subjectClaim != null)
-        {
-            var newSubClaim = new Claim(OpenIddictConstants.Claims.Subject, subjectClaim.Value);
-            newSubClaim.SetDestinations(OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken);
-            identity.AddClaim(newSubClaim);
-        }
-        if (nameClaim != null)
-        {
-            var newNameClaim = new Claim(OpenIddictConstants.Claims.Name, nameClaim.Value);
-            newNameClaim.SetDestinations(OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken);
-            identity.AddClaim(newNameClaim);
-        }
-        if (emailClaim != null)
-        {
-            var newEmailClaim = new Claim(OpenIddictConstants.Claims.Email, emailClaim.Value);
-            newEmailClaim.SetDestinations(OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken);
-            identity.AddClaim(newEmailClaim);
-        }
-        if (preferredUsernameClaim != null)
-        {
-            var newPreferredUsernameClaim = new Claim(OpenIddictConstants.Claims.PreferredUsername, preferredUsernameClaim.Value);
-            newPreferredUsernameClaim.SetDestinations(OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken);
-            identity.AddClaim(newPreferredUsernameClaim);
-        }
-        if (givenNameClaim != null)
-        {
-            var newGivenNameClaim = new Claim(OpenIddictConstants.Claims.GivenName, givenNameClaim.Value);
-            newGivenNameClaim.SetDestinations(OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken);
-            identity.AddClaim(newGivenNameClaim);
-        }
-        if (familyNameClaim != null)
-        {
-            var newFamilyNameClaim = new Claim(OpenIddictConstants.Claims.FamilyName, familyNameClaim.Value);
-            newFamilyNameClaim.SetDestinations(OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken);
-            identity.AddClaim(newFamilyNameClaim);
+            if (existingTypes.Contains(c.Type)) continue; // skip duplicates
+            if (c.Type is OpenIddictConstants.Claims.Subject or OpenIddictConstants.Claims.Email or OpenIddictConstants.Claims.Name or OpenIddictConstants.Claims.PreferredUsername) continue; // already set with destinations
+            var clone = new Claim(c.Type, c.Value, c.ValueType, c.Issuer, c.OriginalIssuer);
+            clone.SetDestinations(Destinations.AccessToken); // default to access token
+            identity.AddClaim(clone);
         }
 
-        // Re-hydrate roles fresh (global + client) to ensure up-to-date assignments
-        var userId = subjectClaim?.Value;
-        if (!string.IsNullOrEmpty(userId))
-        {
-            var user = await _userManager.FindByIdAsync(userId);
-            if (user != null)
-            {
-                var scopes = request.GetScopes();
-                // NEW: identity resource claims
-                await AddIdentityResourceClaimsAsync(identity, user, scopes);
-                await AddRolesAsync(identity, user, clientId, scopes);
-            }
-        }
-        
-        var newPrincipal = new ClaimsPrincipal(identity);
-        newPrincipal.SetScopes(request.GetScopes());
-        var audienceResult = await ApplyAudiencesAsync(newPrincipal, request.ClientId!, request.GetScopes(), context);
+        var principal = new ClaimsPrincipal(identity);
+        principal.SetScopes(scopes);
+        var audienceResult = await ApplyAudiencesAsync(principal, clientId, scopes, context);
         if (audienceResult.Error)
         {
             var forbidProps = new AuthenticationProperties(new Dictionary<string, string?>
@@ -400,78 +359,24 @@ public class TokenHandler : ITokenHandler
             });
             return Results.Forbid(forbidProps, new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
         }
-        return Results.SignIn(newPrincipal, authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+        return Results.SignIn(principal, authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
     }
 
     private async Task<IResult> HandleRefreshTokenGrantAsync(HttpContext context, OpenIddictRequest request)
     {
-        // Authenticate the refresh token and extract the principal
         var authenticateResult = await context.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
         var principal = authenticateResult.Principal;
-        
-        if (principal == null)
-        {
-            _logger.LogWarning("Refresh token authentication failed: no principal found");
-            return Results.Forbid(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
-        }
-
-        // Extract the user ID from the refresh token principal
-        var subjectClaim = principal.FindFirst(OpenIddictConstants.Claims.Subject);
-        if (subjectClaim == null)
-        {
-            _logger.LogWarning("Refresh token authentication failed: no subject claim found");
-            return Results.Forbid(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
-        }
-
-        // Get the user from the database to ensure they still exist and are valid
-        var user = await _userManager.FindByIdAsync(subjectClaim.Value);
-        if (user == null)
-        {
-            _logger.LogWarning("Refresh token authentication failed: user not found for subject {Subject}", subjectClaim.Value);
-            return Results.Forbid(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
-        }
-
-        // Check if the user is still enabled (you can add additional checks here if needed)
-        if (!user.EmailConfirmed && _userManager.Options.SignIn.RequireConfirmedEmail)
-        {
-            _logger.LogWarning("Refresh token authentication failed: user {UserName} email not confirmed", user.UserName);
-            return Results.Forbid(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
-        }
-
-        // Create a new identity with fresh user information
-        var identity = new ClaimsIdentity(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+        if (principal == null) return Results.Forbid(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
+        var sub = principal.FindFirst(OpenIddictConstants.Claims.Subject)?.Value;
+        if (string.IsNullOrWhiteSpace(sub)) return Results.Forbid(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
+        var user = await _userManager.FindByIdAsync(sub);
+        if (user == null) return Results.Forbid(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
+        if (!user.EmailConfirmed && _userManager.Options.SignIn.RequireConfirmedEmail) return Results.Forbid(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
         var scopes = request.GetScopes();
-        
-        var subClaim = new Claim(OpenIddictConstants.Claims.Subject, user.Id);
-        subClaim.SetDestinations(OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken);
-        identity.AddClaim(subClaim);
-
-        var emailClaim = new Claim(OpenIddictConstants.Claims.Email, user.Email!);
-        emailClaim.SetDestinations(OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken);
-        identity.AddClaim(emailClaim);
-        
-        // Get the user's name claim, fallback to friendly name from username
-        var userName = await GetUserNameClaimAsync(user);
-        var nameClaim = new Claim(OpenIddictConstants.Claims.Name, userName);
-        nameClaim.SetDestinations(OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken);
-        identity.AddClaim(nameClaim);
-
-        var preferredUsernameClaim = new Claim(OpenIddictConstants.Claims.PreferredUsername, user.UserName!);
-        preferredUsernameClaim.SetDestinations(OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken);
-        identity.AddClaim(preferredUsernameClaim);
-
-        // Add other profile claims if available
-        await AddProfileClaimsAsync(identity, user, scopes);
-
-        // NEW: Add claims from requested identity resources
-        await AddIdentityResourceClaimsAsync(identity, user, scopes);
-
-        // Add roles
-        await AddRolesAsync(identity, user, request.ClientId!, scopes);
-
+        var identity = await BuildUserIdentityAsync(user, request.ClientId!, scopes);
         var newPrincipal = new ClaimsPrincipal(identity);
-        newPrincipal.SetScopes(request.GetScopes());
-        var audienceResult = await ApplyAudiencesAsync(newPrincipal, request.ClientId!, request.GetScopes(), context);
+        newPrincipal.SetScopes(scopes);
+        var audienceResult = await ApplyAudiencesAsync(newPrincipal, request.ClientId!, scopes, context);
         if (audienceResult.Error)
         {
             var forbidProps = new AuthenticationProperties(new Dictionary<string, string?>
@@ -481,22 +386,9 @@ public class TokenHandler : ITokenHandler
             });
             return Results.Forbid(forbidProps, new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
         }
-
-        // Update client-specific session if available
-        var clientId = request.ClientId!;
-        var cookieScheme = _cookieService.GetCookieSchemeForClient(clientId);
-        try
-        {
-            await context.SignInAsync(cookieScheme, newPrincipal);
-            _logger.LogDebug("Updated client-specific session for user {UserName} with scheme {Scheme}", 
-                user.UserName, cookieScheme);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogDebug(ex, "Failed to update client-specific session with scheme {Scheme}", cookieScheme);
-        }
-
-        _logger.LogDebug("Refresh token grant successful for user: {UserName}", user.UserName);
+        // Update session cookie if possible
+        var cookieScheme = _cookieService.GetCookieSchemeForClient(request.ClientId!);
+        try { await context.SignInAsync(cookieScheme, newPrincipal); } catch { }
         return Results.SignIn(newPrincipal, authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
     }
 
@@ -527,10 +419,17 @@ public class TokenHandler : ITokenHandler
     /// <summary>
     /// Add additional profile claims with proper destinations if available
     /// </summary>
-    private async Task AddProfileClaimsAsync(ClaimsIdentity identity, IdentityUser user, IEnumerable<string> scopes)
+    private async Task AddProfileClaimsAsync(ClaimsIdentity identity, IdentityUser user, IEnumerable<string> scopes, Client? client)
     {
         try
         {
+            // Load client to respect AlwaysIncludeUserClaimsInIdToken flag
+            var includeInId = client?.AlwaysIncludeUserClaimsInIdToken == true; // default false if null
+
+            var destinations = includeInId
+                ? new[] { Destinations.AccessToken, Destinations.IdentityToken }
+                : new[] { Destinations.AccessToken }; // userinfo-only exposure for privacy
+
             var claims = await _userManager.GetClaimsAsync(user);
             
             // Only include profile claims if profile scope is requested
@@ -541,7 +440,7 @@ public class TokenHandler : ITokenHandler
                 if (!string.IsNullOrEmpty(givenName))
                 {
                     var givenNameClaim = new Claim(OpenIddictConstants.Claims.GivenName, givenName);
-                    givenNameClaim.SetDestinations(OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken);
+                    givenNameClaim.SetDestinations(destinations);
                     identity.AddClaim(givenNameClaim);
                 }
 
@@ -550,7 +449,7 @@ public class TokenHandler : ITokenHandler
                 if (!string.IsNullOrEmpty(familyName))
                 {
                     var familyNameClaim = new Claim(OpenIddictConstants.Claims.FamilyName, familyName);
-                    familyNameClaim.SetDestinations(OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken);
+                    familyNameClaim.SetDestinations(destinations);
                     identity.AddClaim(familyNameClaim);
                 }
 
@@ -559,7 +458,7 @@ public class TokenHandler : ITokenHandler
                 if (!string.IsNullOrEmpty(picture))
                 {
                     var pictureClaim = new Claim(OpenIddictConstants.Claims.Picture, picture);
-                    pictureClaim.SetDestinations(OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken);
+                    pictureClaim.SetDestinations(destinations);
                     identity.AddClaim(pictureClaim);
                 }
             }
