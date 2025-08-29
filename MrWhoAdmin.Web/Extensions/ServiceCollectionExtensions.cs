@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using MrWhoAdmin.Web.Services;
 using MrWhoAdmin.Web.Extensions;
 using Radzen;
+using System.Security.Claims; // Added for claim manipulation
 
 namespace MrWhoAdmin.Web.Extensions;
 
@@ -525,7 +526,7 @@ public static class ServiceCollectionExtensions
                 {
                     logger.LogDebug("ADMIN UserInfo property: {PropertyName} = {PropertyValue}", property.Name, property.Value.ToString());
                 }
-                
+
                 return Task.CompletedTask;
             },
             
@@ -544,20 +545,14 @@ public static class ServiceCollectionExtensions
                 logger.LogError("? ADMIN: Authentication failed: {Error} - {ErrorDescription}", 
                     context.Exception?.Message, context.Exception?.ToString());
                 
-                // Check if this is a UserInfo endpoint failure (403 Forbidden)
                 if (context.Exception is HttpRequestException httpEx && 
                     httpEx.Message.Contains("403") && 
                     httpEx.Message.Contains("Forbidden"))
                 {
                     logger.LogWarning("?? ADMIN: UserInfo endpoint returned 403 Forbidden - this might be a temporary server issue");
-                    
-                    // Don't treat UserInfo 403 as a complete authentication failure
-                    // The user can still be authenticated based on the ID token
-                    // Just log the issue and let the authentication continue without UserInfo claims
                     return Task.CompletedTask;
                 }
                 
-                // For other authentication failures, redirect to error page
                 var errorMessage = Uri.EscapeDataString(context.Exception?.Message ?? "Unknown error");
                 context.Response.Redirect($"/auth/error?error={errorMessage}");
                 context.HandleResponse();
@@ -570,19 +565,14 @@ public static class ServiceCollectionExtensions
                 var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
                 logger.LogError("?? ADMIN: Remote authentication failure: {Error}", context.Failure?.Message);
                 
-                // Check if this is a UserInfo endpoint failure (403 Forbidden)
                 if (context.Failure is HttpRequestException httpEx && 
                     httpEx.Message.Contains("403") && 
                     httpEx.Message.Contains("Forbidden"))
                 {
                     logger.LogWarning("?? ADMIN: UserInfo endpoint returned 403 Forbidden during remote authentication");
-                    
-                    // Don't treat UserInfo 403 as a complete authentication failure
-                    // Skip the UserInfo call and continue with ID token claims
                     return Task.CompletedTask;
                 }
                 
-                // For other remote failures, redirect to error page
                 var errorMessage = Uri.EscapeDataString(context.Failure?.Message ?? "Remote authentication failed");
                 context.Response.Redirect($"/auth/error?error={errorMessage}");
                 context.HandleResponse();
