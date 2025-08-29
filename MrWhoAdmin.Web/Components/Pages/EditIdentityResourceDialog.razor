@@ -6,9 +6,9 @@
 @using MrWho.Shared.Models
 
 <RadzenStack Gap="1rem">
-    <RadzenFormField Text="Name" Variant="Variant.Outlined">
+    <RadzenFormField Text="Scope Name" Variant="Variant.Outlined">
         <RadzenTextBox Value="@IdentityResource.Name" Disabled="true" Style="width: 100%;" />
-        <RadzenText TextStyle="TextStyle.Caption" class="rz-text-disabled-color">Name cannot be changed</RadzenText>
+        <RadzenText TextStyle="TextStyle.Caption" class="rz-text-disabled-color">OIDC scope identifier (immutable).</RadzenText>
     </RadzenFormField>
 
     <RadzenFormField Text="Display Name" Variant="Variant.Outlined">

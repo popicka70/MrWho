@@ -6,9 +6,10 @@
 @using MrWho.Shared.Models
 
 <RadzenStack Gap="1rem">
-    <RadzenFormField Text="Name" Variant="Variant.Outlined">
+    <RadzenFormField Text="Scope Name" Variant="Variant.Outlined">
         <RadzenTextBox @bind-Value="@request.Name" MaxLength="200" Style="width: 100%;" />
-        <RadzenRequiredValidator Component="Name" Text="Name is required" />
+        <RadzenRequiredValidator Component="Name" Text="Scope name is required" />
+        <RadzenText TextStyle="TextStyle.Caption" class="rz-text-secondary-color">Unique OIDC scope identifier clients will request (e.g. employee_profile). Cannot be changed after creation.</RadzenText>
     </RadzenFormField>
 
     <RadzenFormField Text="Display Name" Variant="Variant.Outlined">
@@ -392,7 +393,7 @@
                 {
                     Severity = NotificationSeverity.Warning,
                     Summary = "Validation Error",
-                    Detail = "Identity resource name is required",
+                    Detail = "Scope name is required",
                     Duration = 5000
                 });
                 return;
