@@ -368,33 +368,44 @@ public class UsersController : ControllerBase
     {
         try
         {
-            // Get distinct claim types from AspNetUserClaims table directly
+            // Prefer canonical registry if any claim types defined
+            var registered = await _context.ClaimTypes
+                .Where(ct => ct.IsEnabled && !ct.IsObsolete)
+                .OrderBy(ct => ct.SortOrder ?? 0)
+                .ThenBy(ct => ct.DisplayName)
+                .Select(ct => new ClaimTypeInfo
+                {
+                    Type = ct.Type,
+                    DisplayName = string.IsNullOrWhiteSpace(ct.DisplayName) ? ct.Type.Replace("_", " ").ToTitleCase() : ct.DisplayName,
+                    Description = ct.Description ?? (ct.IsStandard ? "Standard claim type" : "Custom claim type")
+                })
+                .ToListAsync();
+
+            if (registered.Any())
+            {
+                return Ok(registered);
+            }
+
+            // Fallback legacy behavior
             var distinctClaimTypes = await _context.UserClaims
                 .Select(c => c.ClaimType)
                 .Where(ct => ct != null)
                 .Distinct()
                 .ToListAsync();
 
-            // Combine standard claims with custom claims from database
             var allClaimTypes = new List<ClaimTypeInfo>();
-            
-            // Add all standard claims
             allClaimTypes.AddRange(CommonClaimTypes.StandardClaims);
-            
-            // Add custom claims that aren't already in the standard list
             foreach (var claimType in distinctClaimTypes)
             {
                 if (!string.IsNullOrEmpty(claimType) && !allClaimTypes.Any(c => c.Type == claimType))
                 {
                     allClaimTypes.Add(new ClaimTypeInfo(
-                        claimType, 
-                        claimType.Replace("_", " ").ToTitleCase(), 
+                        claimType,
+                        claimType.Replace("_", " ").ToTitleCase(),
                         "Custom claim type from database"
                     ));
                 }
             }
-
-            // Sort by display name for better UX
             return Ok(allClaimTypes.OrderBy(c => c.DisplayName).ToList());
         }
         catch (Exception ex)

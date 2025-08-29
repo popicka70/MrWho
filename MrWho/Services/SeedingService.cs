@@ -19,6 +19,7 @@ public class SeedingService : ISeedingService
     private readonly IApiResourceSeederService _apiResourceSeederService;
     private readonly IIdentityResourceSeederService _identityResourceSeederService;
     private readonly ILogger<SeedingService> _logger;
+    private readonly IClaimTypeSeederService? _claimTypeSeederService;
 
     public SeedingService(
         ApplicationDbContext context,
@@ -29,7 +30,8 @@ public class SeedingService : ISeedingService
         IScopeSeederService scopeSeederService,
         IApiResourceSeederService apiResourceSeederService,
         IIdentityResourceSeederService identityResourceSeederService,
-        ILogger<SeedingService> logger)
+        ILogger<SeedingService> logger,
+        IClaimTypeSeederService? claimTypeSeederService = null)
     {
         _context = context;
         _applicationManager = applicationManager;
@@ -40,6 +42,7 @@ public class SeedingService : ISeedingService
         _apiResourceSeederService = apiResourceSeederService;
         _identityResourceSeederService = identityResourceSeederService;
         _logger = logger;
+        _claimTypeSeederService = claimTypeSeederService;
     }
 
     public async Task SeedAsync()
@@ -64,6 +67,12 @@ public class SeedingService : ISeedingService
         
         // Seed standard Identity resources
         await _identityResourceSeederService.SeedStandardIdentityResourcesAsync();
+
+        // Seed claim types (after identity resources so we can also import distinct existing ones)
+        if (_claimTypeSeederService != null)
+        {
+            await _claimTypeSeederService.SeedClaimTypesAsync();
+        }
         
         // Seed predefined external identity providers (disabled by default)
         await SeedPredefinedIdentityProvidersAsync();

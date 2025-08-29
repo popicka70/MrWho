@@ -154,6 +154,14 @@ public static class ServiceCollectionExtensions
         })
         .AddHttpMessageHandler<AuthenticationDelegatingHandler>();
 
+        services.AddHttpClient<IClaimTypesApiService, ClaimTypesApiService>(client =>
+        {
+            client.BaseAddress = new Uri(mrWhoApiBaseUrl);
+            client.DefaultRequestHeaders.Add("Accept", "application/json");
+            client.Timeout = defaultTimeout;
+        })
+        .AddHttpMessageHandler<AuthenticationDelegatingHandler>();
+
         // Add Sessions API service
         services.AddHttpClient<ISessionsApiService, SessionsApiService>(client =>
         {

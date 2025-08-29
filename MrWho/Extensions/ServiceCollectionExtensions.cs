@@ -35,6 +35,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IScopeSeederService, ScopeSeederService>();
         services.AddScoped<IApiResourceSeederService, ApiResourceSeederService>();
         services.AddScoped<IIdentityResourceSeederService, IdentityResourceSeederService>();
+        services.AddScoped<IClaimTypeSeederService, ClaimTypeSeederService>();
 
         // Register client services
         services.AddScoped<IOidcClientService, OidcClientService>();
