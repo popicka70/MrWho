@@ -20,6 +20,8 @@ public class ApiResourceDto
     public List<string> Scopes { get; set; } = new();
     public List<string> UserClaims { get; set; } = new();
     public List<ApiSecretDto> Secrets { get; set; } = new();
+    /// <summary>Claim destinations (e.g. access_token, identity_token)</summary>
+    public List<string> ClaimDestinations { get; set; } = new();
 }
 
 /// <summary>
@@ -47,6 +49,7 @@ public class CreateApiResourceRequest
     public List<string> Scopes { get; set; } = new();
     public List<string> UserClaims { get; set; } = new();
     public List<CreateApiSecretRequest> Secrets { get; set; } = new();
+    public List<string> ClaimDestinations { get; set; } = new();
 }
 
 /// <summary>
@@ -60,6 +63,7 @@ public class UpdateApiResourceRequest
     public List<string>? Scopes { get; set; }
     public List<string>? UserClaims { get; set; }
     public List<CreateApiSecretRequest>? Secrets { get; set; }
+    public List<string>? ClaimDestinations { get; set; }
 }
 
 /// <summary>
