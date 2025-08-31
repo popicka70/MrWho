@@ -16,6 +16,12 @@ public class ApiResource
     public string? CreatedBy { get; set; }
     public string? UpdatedBy { get; set; }
 
+    /// <summary>
+    /// JSON array (e.g. ["access_token","identity_token"]) of OpenIddict destinations to apply to claims from this API resource.
+    /// If null or empty, defaults to ["access_token"].
+    /// </summary>
+    public string? ClaimDestinationsJson { get; set; }
+
     // Navigation properties
     public virtual ICollection<ApiResourceScope> Scopes { get; set; } = new List<ApiResourceScope>();
     public virtual ICollection<ApiResourceClaim> UserClaims { get; set; } = new List<ApiResourceClaim>();

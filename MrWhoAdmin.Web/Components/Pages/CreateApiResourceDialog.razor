@@ -22,11 +22,9 @@
                         </RadzenFormField>
                     </RadzenColumn>
                 </RadzenRow>
-                
                 <RadzenFormField Text="Description" Variant="Variant.Outlined">
                     <RadzenTextArea @bind-Value="@model.Description" Name="Description" class="w-100" Rows="3" />
                 </RadzenFormField>
-                
                 <RadzenRow>
                     <RadzenColumn Size="12" SizeMD="6">
                         <RadzenFormField Text="Enabled" Variant="Variant.Outlined">
@@ -40,6 +38,30 @@
             </RadzenStack>
         </RadzenStack>
 
+        <!-- Claim Destinations -->
+        <RadzenStack Gap="0.75rem">
+            <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Claim Destinations</RadzenText>
+            <RadzenStack Gap="0.5rem">
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Select where claims for this API resource should appear.</RadzenText>
+                <RadzenFormField Text="Access Token" Variant="Variant.Outlined">
+                    <Start>
+                        <RadzenCheckBox @bind-Value="accessTokenSelected" />
+                    </Start>
+                    <ChildContent>
+                        <RadzenLabel Text="Include claims in access tokens" />
+                    </ChildContent>
+                </RadzenFormField>
+                <RadzenFormField Text="ID Token" Variant="Variant.Outlined">
+                    <Start>
+                        <RadzenCheckBox @bind-Value="idTokenSelected" />
+                    </Start>
+                    <ChildContent>
+                        <RadzenLabel Text="Include claims in ID tokens" />
+                    </ChildContent>
+                </RadzenFormField>
+            </RadzenStack>
+        </RadzenStack>
+
         <!-- Scopes -->
         <RadzenStack Gap="0.75rem">
             <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Scopes</RadzenText>
@@ -47,7 +69,6 @@
                 <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
                     Define the scopes that this API resource supports. These scopes can be requested by clients to access this API.
                 </RadzenText>
-                
                 <RadzenRow>
                     <RadzenColumn Size="10">
                         <RadzenTextBox @bind-Value="@newScope" Placeholder="Enter scope name (e.g., api.read, api.write)" class="w-100" />
@@ -56,7 +77,6 @@
                         <RadzenButton Click="@AddScope" Icon="add" ButtonStyle="ButtonStyle.Primary" class="w-100" />
                     </RadzenColumn>
                 </RadzenRow>
-                
                 @if (model.Scopes.Any())
                 {
                     <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" Wrap="FlexWrap.Wrap">
@@ -65,8 +85,7 @@
                             <RadzenBadge BadgeStyle="BadgeStyle.Info" class="rz-p-2">
                                 <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
                                     <RadzenText>@scope</RadzenText>
-                                    <RadzenButton Click="@(() => RemoveScope(scope))" Icon="close" Size="ButtonSize.ExtraSmall" 
-                                                 ButtonStyle="ButtonStyle.Danger" Variant="Variant.Text" />
+                                    <RadzenButton Click="@(() => RemoveScope(scope))" Icon="close" Size="ButtonSize.ExtraSmall" ButtonStyle="ButtonStyle.Danger" Variant="Variant.Text" />
                                 </RadzenStack>
                             </RadzenBadge>
                         }
@@ -86,7 +105,7 @@
             <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">User Claims</RadzenText>
             <RadzenStack Gap="1rem">
                 <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                    Define which user claims should be included in access tokens for this API resource.
+                    Define which user claims should be included for this API resource.
                 </RadzenText>
                 
                 <RadzenRow>
@@ -116,7 +135,7 @@
                 else
                 {
                     <RadzenAlert AlertStyle="AlertStyle.Info" Size="AlertSize.Small">
-                        No user claims defined. Add claims that should be included in access tokens.
+                        No user claims defined.
                     </RadzenAlert>
                 }
             </RadzenStack>
@@ -127,7 +146,7 @@
             <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">API Secrets (Optional)</RadzenText>
             <RadzenStack Gap="1rem">
                 <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                    API secrets are used for token introspection and other server-to-server scenarios. They are optional for most APIs.
+                    API secrets are used for token introspection and other server-to-server scenarios.
                 </RadzenText>
                 
                 @if (newSecret != null)
@@ -205,21 +224,35 @@
 </RadzenTemplateForm>
 
 @code {
-    private CreateApiResourceRequest model = new() { IsEnabled = true };
+    private CreateApiResourceRequest model = new() { IsEnabled = true, ClaimDestinations = new List<string>{"access_token"} };
+    private bool accessTokenSelected { get => HasDestination("access_token"); set => ToggleDestination("access_token", value); }
+    private bool idTokenSelected { get => HasDestination("identity_token"); set => ToggleDestination("identity_token", value); }
     private bool isSubmitting = false;
     private string newScope = "";
     private string newClaim = "";
     private CreateApiSecretRequest? newSecret = null;
 
+    private bool HasDestination(string dest) => model.ClaimDestinations.Contains(dest, StringComparer.OrdinalIgnoreCase);
+    private void ToggleDestination(string dest, bool selected)
+    {
+        if (selected)
+        {
+            if (!HasDestination(dest)) model.ClaimDestinations.Add(dest);
+        }
+        else
+        {
+            model.ClaimDestinations.RemoveAll(d => string.Equals(d, dest, StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
     private async Task OnSubmit(CreateApiResourceRequest formModel)
     {
         if (isSubmitting) return;
-
+        if (!formModel.ClaimDestinations.Any()) formModel.ClaimDestinations.Add("access_token");
         isSubmitting = true;
         try
         {
             var result = await ApiResourcesApi.CreateApiResourceAsync(formModel);
-            
             if (result != null)
             {
                 DialogService.Close(result);
@@ -249,10 +282,7 @@
         }
     }
 
-    private void RemoveScope(string scope)
-    {
-        model.Scopes.Remove(scope);
-    }
+    private void RemoveScope(string scope) => model.Scopes.Remove(scope);
 
     private void AddClaim()
     {
@@ -263,18 +293,9 @@
         }
     }
 
-    private void RemoveClaim(string claim)
-    {
-        model.UserClaims.Remove(claim);
-    }
+    private void RemoveClaim(string claim) => model.UserClaims.Remove(claim);
 
-    private void StartAddSecret()
-    {
-        newSecret = new CreateApiSecretRequest
-        {
-            Type = "SharedSecret"
-        };
-    }
+    private void StartAddSecret() => newSecret = new CreateApiSecretRequest { Type = "SharedSecret" };
 
     private void AddSecret()
     {
@@ -285,10 +306,7 @@
         }
     }
 
-    private void CancelAddSecret()
-    {
-        newSecret = null;
-    }
+    private void CancelAddSecret() => newSecret = null;
 
     private void RemoveSecret(int index)
     {
