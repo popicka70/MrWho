@@ -121,6 +121,8 @@ public class TokenHandler : ITokenHandler
         await AddProfileClaimsAsync(identity, user, scopes, client);
         // Identity resource claims (AccessToken only unless AlwaysIncludeUserClaimsInIdToken)
         await AddIdentityResourceClaimsAsync(identity, user, scopes, client);
+        // NEW: API resource claims (AccessToken only)
+        await AddApiResourceClaimsAsync(identity, user, scopes);
         // Roles (global + client)
         await AddRolesAsync(identity, user, clientId, scopes);
         return identity;
@@ -225,6 +227,79 @@ public class TokenHandler : ITokenHandler
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed adding identity resource claims for user {UserId}", user.Id);
+        }
+    }
+
+    // NEW: Add claims for API resources associated via requested scopes.
+    // These go to access token only (APIs consume them); ID token inclusion would normally be unnecessary.
+    private async Task AddApiResourceClaimsAsync(ClaimsIdentity identity, IdentityUser user, IEnumerable<string> scopes)
+    {
+        try
+        {
+            var requested = scopes.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if (requested.Count == 0) return;
+
+            var apiResources = await _db.ApiResources
+                .Include(r => r.UserClaims)
+                .Include(r => r.Scopes)
+                .Where(r => r.IsEnabled && r.Scopes.Any(s => requested.Contains(s.Scope)))
+                .ToListAsync();
+            if (apiResources.Count == 0) return;
+
+            var userClaims = await _userManager.GetClaimsAsync(user);
+            var userClaimLookup = userClaims.GroupBy(c => c.Type)
+                .ToDictionary(g => g.Key, g => g.First().Value, StringComparer.OrdinalIgnoreCase);
+            var existingTypes = identity.Claims.Select(c => c.Type).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            string[] DefaultDestinations() => new[] { Destinations.AccessToken };
+            static string[] ParseDestinations(string? json, ILogger logger, string apiName)
+            {
+                if (string.IsNullOrWhiteSpace(json)) return new[] { Destinations.AccessToken };
+                try
+                {
+                    var arr = System.Text.Json.JsonSerializer.Deserialize<string[]>(json);
+                    if (arr == null || arr.Length == 0) return new[] { Destinations.AccessToken };
+                    // Filter only supported known values
+                    var supported = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                    {
+                        Destinations.AccessToken,
+                        Destinations.IdentityToken
+                    };
+                    var cleaned = arr.Where(s => !string.IsNullOrWhiteSpace(s) && supported.Contains(s)).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+                    return cleaned.Length == 0 ? new[] { Destinations.AccessToken } : cleaned;
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "Failed to parse ClaimDestinationsJson for API resource {ApiResource}", apiName);
+                    return new[] { Destinations.AccessToken };
+                }
+            }
+
+            var added = 0;
+            foreach (var api in apiResources)
+            {
+                var destinations = ParseDestinations(api.ClaimDestinationsJson, _logger, api.Name);
+                foreach (var claimType in api.UserClaims.Select(c => c.ClaimType).Distinct(StringComparer.OrdinalIgnoreCase))
+                {
+                    if (existingTypes.Contains(claimType)) continue; // do not duplicate
+                    if (!userClaimLookup.TryGetValue(claimType, out var value) || string.IsNullOrWhiteSpace(value)) continue;
+
+                    var claim = new Claim(claimType, value);
+                    claim.SetDestinations(destinations);
+                    identity.AddClaim(claim);
+                    existingTypes.Add(claimType);
+                    added++;
+                }
+            }
+
+            if (added > 0)
+            {
+                _logger.LogDebug("Added {Count} API resource claims for user {UserId}", added, user.Id);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed adding API resource claims for user {UserId}", user.Id);
         }
     }
 

@@ -216,7 +216,7 @@
         }
 
         var result = await DialogService.OpenAsync<EditApiResourceDialog>("Edit API Resource", 
-            new Dictionary<string, object> { { "ApiResource", apiResource } }, 
+            new Dictionary<string, object> { { "ApiResourceId", apiResource.Id } }, 
             new DialogOptions() { Width = "800px", Height = "700px", Resizable = true });
 
         if (result != null && result is ApiResourceDto)

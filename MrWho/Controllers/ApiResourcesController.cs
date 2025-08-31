@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using MrWho.Data;
 using MrWho.Models;
 using MrWho.Shared.Models;
+using System.Text.Json; // added for JSON
 
 namespace MrWho.Controllers;
 
@@ -20,6 +21,26 @@ public class ApiResourcesController : ControllerBase
     {
         _context = context;
         _logger = logger;
+    }
+
+    private static List<string> ParseDestinations(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return new List<string>();
+        try
+        {
+            var arr = JsonSerializer.Deserialize<List<string>>(json) ?? new List<string>();
+            var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase){"access_token","identity_token"};
+            return arr.Where(a=>!string.IsNullOrWhiteSpace(a) && allowed.Contains(a)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        }
+        catch { return new List<string>(); }
+    }
+
+    private static string? SerializeDestinations(IEnumerable<string>? list)
+    {
+        if (list == null) return null;
+        var filtered = list.Where(l=>!string.IsNullOrWhiteSpace(l)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        if (filtered.Count==0) return null;
+        return JsonSerializer.Serialize(filtered);
     }
 
     /// <summary>
@@ -73,7 +94,8 @@ public class ApiResourcesController : ControllerBase
                         Expiration = s.Expiration,
                         Type = s.Type,
                         CreatedAt = s.CreatedAt
-                    }).ToList()
+                    }).ToList(),
+                    ClaimDestinations = ParseDestinations(ar.ClaimDestinationsJson)
                 })
                 .ToListAsync();
 
@@ -134,7 +156,8 @@ public class ApiResourcesController : ControllerBase
                     Expiration = s.Expiration,
                     Type = s.Type,
                     CreatedAt = s.CreatedAt
-                }).ToList()
+                }).ToList(),
+                ClaimDestinations = ParseDestinations(apiResource.ClaimDestinationsJson)
             };
 
             return Ok(dto);
@@ -172,7 +195,8 @@ public class ApiResourcesController : ControllerBase
                 Description = request.Description,
                 IsEnabled = request.IsEnabled,
                 IsStandard = false,
-                CreatedBy = userName
+                CreatedBy = userName,
+                ClaimDestinationsJson = SerializeDestinations(request.ClaimDestinations)
             };
 
             _context.ApiResources.Add(apiResource);
@@ -242,7 +266,8 @@ public class ApiResourcesController : ControllerBase
                     Expiration = s.Expiration,
                     Type = s.Type,
                     CreatedAt = s.CreatedAt
-                }).ToList()
+                }).ToList(),
+                ClaimDestinations = ParseDestinations(createdApiResource.ClaimDestinationsJson)
             };
 
             _logger.LogInformation("Created API resource '{ApiResourceName}' by user '{UserName}'", request.Name, userName);
@@ -288,6 +313,8 @@ public class ApiResourcesController : ControllerBase
                 apiResource.Description = request.Description;
             if (request.IsEnabled.HasValue)
                 apiResource.IsEnabled = request.IsEnabled.Value;
+            if (request.ClaimDestinations != null)
+                apiResource.ClaimDestinationsJson = SerializeDestinations(request.ClaimDestinations);
 
             apiResource.UpdatedAt = DateTime.UtcNow;
             apiResource.UpdatedBy = userName;
@@ -368,7 +395,8 @@ public class ApiResourcesController : ControllerBase
                     Expiration = s.Expiration,
                     Type = s.Type,
                     CreatedAt = s.CreatedAt
-                }).ToList()
+                }).ToList(),
+                ClaimDestinations = ParseDestinations(updatedApiResource.ClaimDestinationsJson)
             };
 
             _logger.LogInformation("Updated API resource '{ApiResourceName}' by user '{UserName}'", apiResource.Name, userName);
@@ -463,7 +491,8 @@ public class ApiResourcesController : ControllerBase
                     Expiration = s.Expiration,
                     Type = s.Type,
                     CreatedAt = s.CreatedAt
-                }).ToList()
+                }).ToList(),
+                ClaimDestinations = ParseDestinations(apiResource.ClaimDestinationsJson)
             };
 
             var status = apiResource.IsEnabled ? "enabled" : "disabled";
