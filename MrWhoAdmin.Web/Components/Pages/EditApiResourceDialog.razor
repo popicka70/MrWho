@@ -6,15 +6,36 @@
 @inject ILogger<EditApiResourceDialog> Logger
 @using MrWho.Shared.Models
 
+@if (isLoading)
+{
+    <RadzenStack Gap="1rem" class="rz-p-4" AlignItems="AlignItems.Center">
+        <RadzenProgressBarCircular Mode="ProgressBarMode.Indeterminate" ProgressBarStyle="ProgressBarStyle.Light" ShowValue="false" />
+        <RadzenText>Loading API resource...</RadzenText>
+    </RadzenStack>
+}
+else if (loadError != null)
+{
+    <RadzenAlert AlertStyle="AlertStyle.Danger">
+        <RadzenText>@loadError</RadzenText>
+    </RadzenAlert>
+}
+else if (apiResource == null)
+{
+    <RadzenAlert AlertStyle="AlertStyle.Warning">
+        <RadzenText>API resource not found.</RadzenText>
+    </RadzenAlert>
+}
+else
+{
 <RadzenTemplateForm TItem="UpdateApiResourceRequest" Data="@model" Submit="@OnSubmit">
     <RadzenStack Gap="1rem">
         <!-- API Resource Info -->
         <RadzenCard class="rz-p-3" Style="background-color: var(--rz-base-50);">
             <RadzenStack Gap="0.5rem">
-                <RadzenText TextStyle="TextStyle.H6" class="rz-color-primary">@ApiResource.Name</RadzenText>
+                <RadzenText TextStyle="TextStyle.H6" class="rz-color-primary">@apiResource.Name</RadzenText>
                 <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                    Created: @ApiResource.CreatedAt.ToString("MMM dd, yyyy HH:mm")
-                    @if (!string.IsNullOrEmpty(ApiResource.CreatedBy)) { <text>by @ApiResource.CreatedBy</text> }
+                    Created: @apiResource.CreatedAt.ToString("MMM dd, yyyy HH:mm")
+                    @if (!string.IsNullOrEmpty(apiResource.CreatedBy)) { <text>by @apiResource.CreatedBy</text> }
                 </RadzenText>
             </RadzenStack>
         </RadzenCard>
@@ -205,11 +226,17 @@
         </RadzenStack>
     </div>
 </RadzenTemplateForm>
+}
 
 @code {
-    [Parameter] public ApiResourceDto ApiResource { get; set; } = default!;
+    [Parameter] public string ApiResourceId { get; set; } = string.Empty; // passed in now
+
+    private ApiResourceDto? apiResource;
     private UpdateApiResourceRequest model = new();
     private bool isSubmitting = false;
+    private bool isLoading = true;
+    private string? loadError;
+
     private string? selectedScopeName; // dropdown selection
     private string? selectedClaimType; // claim type selection
     private CreateApiSecretRequest? newSecret = null;
@@ -240,58 +267,84 @@
 
     protected override async Task OnInitializedAsync()
     {
-        // initialize model from DTO
-        model = new UpdateApiResourceRequest
+        if (string.IsNullOrWhiteSpace(ApiResourceId))
         {
-            DisplayName = ApiResource.DisplayName,
-            Description = ApiResource.Description,
-            IsEnabled = ApiResource.IsEnabled,
-            Scopes = new List<string>(ApiResource.Scopes),
-            UserClaims = new List<string>(ApiResource.UserClaims),
-            Secrets = new List<CreateApiSecretRequest>(),
-            ClaimDestinations = new List<string>(ApiResource.ClaimDestinations ?? new())
-        };
-        claimDestinations = model.ClaimDestinations ?? new();
-        if (!claimDestinations.Any()) claimDestinations.Add("access_token");
-        model.ClaimDestinations = new List<string>(claimDestinations);
+            loadError = "No API resource id provided.";
+            isLoading = false;
+            return;
+        }
 
-        // load scopes (up to 500)
         try
         {
-            var scopePage = await ScopesApi.GetScopesAsync(page:1, pageSize:500);
-            if (scopePage?.Items != null)
+            apiResource = await ApiResourcesApi.GetApiResourceAsync(ApiResourceId);
+            if (apiResource == null)
             {
-                availableScopes = scopePage.Items;
+                loadError = "API resource not found.";
+                return;
+            }
+
+            model = new UpdateApiResourceRequest
+            {
+                DisplayName = apiResource.DisplayName,
+                Description = apiResource.Description,
+                IsEnabled = apiResource.IsEnabled,
+                Scopes = new List<string>(apiResource.Scopes),
+                UserClaims = new List<string>(apiResource.UserClaims),
+                Secrets = new List<CreateApiSecretRequest>(),
+                ClaimDestinations = new List<string>(apiResource.ClaimDestinations ?? new())
+            };
+            claimDestinations = model.ClaimDestinations ?? new();
+            if (!claimDestinations.Any()) claimDestinations.Add("access_token");
+            model.ClaimDestinations = new List<string>(claimDestinations);
+
+            // load scopes (up to 500)
+            try
+            {
+                var scopePage = await ScopesApi.GetScopesAsync(page:1, pageSize:500);
+                if (scopePage?.Items != null)
+                {
+                    availableScopes = scopePage.Items;
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Failed loading scopes for dropdown");
+                NotificationService.Notify(NotificationSeverity.Warning, "Scopes", "Failed to load scope list");
+            }
+
+            // load claim types
+            try
+            {
+                var claims = await ClaimTypesApi.GetAsync();
+                if (claims != null) availableClaimTypes = claims.Where(c=>!string.IsNullOrWhiteSpace(c.Type)).ToList();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Failed loading claim types");
+                NotificationService.Notify(NotificationSeverity.Warning, "Claims", "Failed to load claim types");
             }
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Failed loading scopes for dropdown");
-            NotificationService.Notify(NotificationSeverity.Warning, "Scopes", "Failed to load scope list");
+            Logger.LogError(ex, "Error loading API resource {ApiResourceId}", ApiResourceId);
+            loadError = "Error loading API resource.";
         }
-
-        // load claim types
-        try
+        finally
         {
-            var claims = await ClaimTypesApi.GetAsync();
-            if (claims != null) availableClaimTypes = claims.Where(c=>!string.IsNullOrWhiteSpace(c.Type)).ToList();
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Failed loading claim types");
-            NotificationService.Notify(NotificationSeverity.Warning, "Claims", "Failed to load claim types");
+            isLoading = false;
         }
     }
 
     private async Task OnSubmit(UpdateApiResourceRequest formModel)
     {
+        if (apiResource == null) return;
         if (isSubmitting) return;
         isSubmitting = true;
         try
         {
             if (formModel.ClaimDestinations == null || !formModel.ClaimDestinations.Any())
                 formModel.ClaimDestinations = new List<string>{"access_token"};
-            var result = await ApiResourcesApi.UpdateApiResourceAsync(ApiResource.Id, formModel);
+            var result = await ApiResourcesApi.UpdateApiResourceAsync(apiResource.Id, formModel);
             if (result != null) DialogService.Close(result);
             else NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to update API resource");
         }
