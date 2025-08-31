@@ -1,7 +1,10 @@
 @inject IApiResourcesApiService ApiResourcesApi
+@inject IScopesApiService ScopesApi // new service for available scopes
+@inject IClaimTypesApiService ClaimTypesApi // new service for claim types
 @inject DialogService DialogService
 @inject NotificationService NotificationService
 @inject ILogger<EditApiResourceDialog> Logger
+@using MrWho.Shared.Models
 
 <RadzenTemplateForm TItem="UpdateApiResourceRequest" Data="@model" Submit="@OnSubmit">
     <RadzenStack Gap="1rem">
@@ -28,10 +31,12 @@
                     </RadzenColumn>
                     <RadzenColumn Size="12" SizeMD="6">
                         <RadzenFormField Text="Enabled" Variant="Variant.Outlined">
-                            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" Style="margin-top: 0.5rem;">
+                            <Start>
                                 <RadzenCheckBox @bind-Value="@enabledValue" Name="IsEnabled" />
+                            </Start>
+                            <ChildContent>
                                 <RadzenLabel Text="Enabled" Component="IsEnabled" class="rz-ms-2" />
-                            </RadzenStack>
+                            </ChildContent>
                         </RadzenFormField>
                     </RadzenColumn>
                 </RadzenRow>
@@ -65,13 +70,15 @@
         <RadzenStack Gap="0.75rem">
             <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Scopes</RadzenText>
             <RadzenStack Gap="1rem">
-                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Define the scopes that this API resource supports.</RadzenText>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Select scopes to associate. Only enabled scopes not already added are shown.</RadzenText>
                 <RadzenRow>
                     <RadzenColumn Size="10">
-                        <RadzenTextBox @bind-Value="@newScope" Placeholder="Enter scope name (e.g., api.read, api.write)" class="w-100" />
+                        <RadzenFormField Text="Add Scope" Variant="Variant.Outlined">
+                            <RadzenDropDown Data="@filteredAvailableScopes" TextProperty="Name" ValueProperty="Name" @bind-Value="selectedScopeName" AllowClear="true" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive" Filter="true" Placeholder="Select scope..." Style="width:100%" />
+                        </RadzenFormField>
                     </RadzenColumn>
                     <RadzenColumn Size="2">
-                        <RadzenButton Click="@AddScope" Icon="add" ButtonStyle="ButtonStyle.Primary" class="w-100" />
+                        <RadzenButton Click="@AddScopeFromSelection" Icon="add" ButtonStyle="ButtonStyle.Primary" class="w-100" Disabled="@string.IsNullOrWhiteSpace(selectedScopeName)" />
                     </RadzenColumn>
                 </RadzenRow>
                 @if (model.Scopes != null && model.Scopes.Any())
@@ -82,7 +89,7 @@
                             <RadzenBadge BadgeStyle="BadgeStyle.Info" class="rz-p-2">
                                 <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
                                     <RadzenText>@scope</RadzenText>
-                                    <RadzenButton Click="@(() => RemoveScope(scope))" Icon="close" Size="ButtonSize.ExtraSmall" ButtonStyle="ButtonStyle.Danger" Variant="Variant.Text" />
+                                    <RadzenButton Click="@(async () => RemoveScope(scope))" Icon="close" Size="ButtonSize.ExtraSmall" ButtonStyle="ButtonStyle.Danger" Variant="Variant.Text" />
                                 </RadzenStack>
                             </RadzenBadge>
                         }
@@ -99,13 +106,15 @@
         <RadzenStack Gap="0.75rem">
             <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">User Claims</RadzenText>
             <RadzenStack Gap="1rem">
-                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Define which user claims should be included.</RadzenText>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Select claim types from registry. Only enabled claim types not already added are shown.</RadzenText>
                 <RadzenRow>
                     <RadzenColumn Size="10">
-                        <RadzenTextBox @bind-Value="@newClaim" Placeholder="Enter claim type (e.g., sub, email, name)" class="w-100" />
+                        <RadzenFormField Text="Add Claim Type" Variant="Variant.Outlined">
+                            <RadzenDropDown Data="@filteredAvailableClaimTypes" TextProperty="Type" ValueProperty="Type" @bind-Value="selectedClaimType" AllowClear="true" Filter="true" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive" Placeholder="Select claim type..." Style="width:100%" />
+                        </RadzenFormField>
                     </RadzenColumn>
                     <RadzenColumn Size="2">
-                        <RadzenButton Click="@AddClaim" Icon="add" ButtonStyle="ButtonStyle.Primary" class="w-100" />
+                        <RadzenButton Click="@AddClaimFromSelection" Icon="add" ButtonStyle="ButtonStyle.Primary" class="w-100" Disabled="@string.IsNullOrWhiteSpace(selectedClaimType)" />
                     </RadzenColumn>
                 </RadzenRow>
                 @if (model.UserClaims != null && model.UserClaims.Any())
@@ -201,10 +210,15 @@
     [Parameter] public ApiResourceDto ApiResource { get; set; } = default!;
     private UpdateApiResourceRequest model = new();
     private bool isSubmitting = false;
-    private string newScope = "";
-    private string newClaim = "";
+    private string? selectedScopeName; // dropdown selection
+    private string? selectedClaimType; // claim type selection
     private CreateApiSecretRequest? newSecret = null;
     private List<string> claimDestinations = new();
+    private List<ScopeDto> availableScopes = new();
+    private List<ClaimTypeInfo> availableClaimTypes = new();
+
+    private IEnumerable<ScopeDto> filteredAvailableScopes => availableScopes.Where(s => s.IsEnabled && (model.Scopes == null || !model.Scopes.Contains(s.Name)) ).OrderBy(s=>s.Name);
+    private IEnumerable<ClaimTypeInfo> filteredAvailableClaimTypes => availableClaimTypes.Where(c => model.UserClaims == null || !model.UserClaims.Contains(c.Type)).OrderBy(c => c.Type);
 
     private bool enabledValue { get => model.IsEnabled ?? false; set => model.IsEnabled = value; }
     private bool accessTokenSelected { get => HasDestination("access_token"); set => ToggleDestination("access_token", value); }
@@ -224,8 +238,9 @@
         model.ClaimDestinations = new List<string>(claimDestinations);
     }
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
+        // initialize model from DTO
         model = new UpdateApiResourceRequest
         {
             DisplayName = ApiResource.DisplayName,
@@ -239,6 +254,33 @@
         claimDestinations = model.ClaimDestinations ?? new();
         if (!claimDestinations.Any()) claimDestinations.Add("access_token");
         model.ClaimDestinations = new List<string>(claimDestinations);
+
+        // load scopes (up to 500)
+        try
+        {
+            var scopePage = await ScopesApi.GetScopesAsync(page:1, pageSize:500);
+            if (scopePage?.Items != null)
+            {
+                availableScopes = scopePage.Items;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed loading scopes for dropdown");
+            NotificationService.Notify(NotificationSeverity.Warning, "Scopes", "Failed to load scope list");
+        }
+
+        // load claim types
+        try
+        {
+            var claims = await ClaimTypesApi.GetAsync();
+            if (claims != null) availableClaimTypes = claims.Where(c=>!string.IsNullOrWhiteSpace(c.Type)).ToList();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed loading claim types");
+            NotificationService.Notify(NotificationSeverity.Warning, "Claims", "Failed to load claim types");
+        }
     }
 
     private async Task OnSubmit(UpdateApiResourceRequest formModel)
@@ -261,17 +303,34 @@
         finally { isSubmitting = false; }
     }
 
-    private void AddScope()
+    private void AddScopeFromSelection()
     {
-        if (!string.IsNullOrWhiteSpace(newScope) && model.Scopes != null && !model.Scopes.Contains(newScope))
-        { model.Scopes.Add(newScope.Trim()); newScope = ""; }
+        if (!string.IsNullOrWhiteSpace(selectedScopeName))
+        {
+            if (model.Scopes == null) model.Scopes = new List<string>();
+            if (!model.Scopes.Contains(selectedScopeName))
+            {
+                model.Scopes.Add(selectedScopeName);
+            }
+            selectedScopeName = null;
+        }
     }
+
     private void RemoveScope(string scope) => model.Scopes?.Remove(scope);
-    private void AddClaim()
+
+    private void AddClaimFromSelection()
     {
-        if (!string.IsNullOrWhiteSpace(newClaim) && model.UserClaims != null && !model.UserClaims.Contains(newClaim))
-        { model.UserClaims.Add(newClaim.Trim()); newClaim = ""; }
+        if (!string.IsNullOrWhiteSpace(selectedClaimType))
+        {
+            if (model.UserClaims == null) model.UserClaims = new List<string>();
+            if (!model.UserClaims.Contains(selectedClaimType))
+            {
+                model.UserClaims.Add(selectedClaimType);
+            }
+            selectedClaimType = null;
+        }
     }
+
     private void RemoveClaim(string claim) => model.UserClaims?.Remove(claim);
     private void StartAddSecret() => newSecret = new CreateApiSecretRequest { Type = "SharedSecret" };
     private void AddSecret() { if (newSecret != null && !string.IsNullOrWhiteSpace(newSecret.Value) && model.Secrets != null){ model.Secrets.Add(newSecret); newSecret = null; } }
