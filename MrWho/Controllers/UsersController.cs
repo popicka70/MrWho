@@ -652,18 +652,43 @@ public class UsersController : ControllerBase
             return BadRequest($"Invalid state '{request.State}'. Allowed: {string.Join(", ", Enum.GetNames(typeof(UserState)))}");
         }
 
+        // Ensure user exists (avoid creating profile for non-existent user id)
+        var user = await _userManager.FindByIdAsync(id);
+        if (user == null)
+        {
+            return NotFound($"User with ID '{id}' not found.");
+        }
+
         var profile = await _context.UserProfiles.FirstOrDefaultAsync(p => p.UserId == id);
         if (profile == null)
         {
-            return NotFound("User profile not found");
+            profile = new UserProfile
+            {
+                UserId = id,
+                DisplayName = BuildDisplayName(user.UserName ?? user.Email ?? id),
+                State = newState,
+                CreatedAt = DateTime.UtcNow
+            };
+            _context.UserProfiles.Add(profile);
         }
-
-        profile.State = newState;
-        profile.UpdatedAt = DateTime.UtcNow;
+        else
+        {
+            profile.State = newState;
+            profile.UpdatedAt = DateTime.UtcNow;
+        }
         await _context.SaveChangesAsync();
 
-        _logger.LogInformation("Changed profile state for user {UserId} to {State} by {Admin}", id, newState, User.Identity?.Name);
+        _logger.LogInformation("Changed/created profile state for user {UserId} to {State} by {Admin}", id, newState, User.Identity?.Name);
         return Ok(new UserProfileStateDto { State = profile.State.ToString() });
+    }
+
+    private static string BuildDisplayName(string source)
+    {
+        if (string.IsNullOrWhiteSpace(source)) return "New User";
+        if (source.Contains('@')) source = source.Split('@')[0];
+        var friendly = source.Replace('.', ' ').Replace('_', ' ').Replace('-', ' ');
+        var words = friendly.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return string.Join(' ', words.Select(w => char.ToUpper(w[0]) + w[1..].ToLower()));
     }
 }
 
