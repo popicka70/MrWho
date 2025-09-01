@@ -695,119 +695,95 @@ public class UsersController : ControllerBase
     [HttpGet("{id}/edit-context")]
     public async Task<ActionResult<UserEditContextDto>> GetUserEditContext(string id)
     {
-        // Fetch identity data first (UserManager not thread-safe for concurrent operations on same instance)
         var user = await _userManager.FindByIdAsync(id);
         if (user == null) return NotFound($"User with ID '{id}' not found.");
 
-        var userRoleNames = await _userManager.GetRolesAsync(user); // sequential
-        var userClaims = await _userManager.GetClaimsAsync(user);   // sequential
+        var userRoleNames = await _userManager.GetRolesAsync(user);
+        var userClaims = await _userManager.GetClaimsAsync(user);
 
-        // Start parallel DB (read-only) queries with isolated contexts (AsNoTracking all)
-        var profileTask = Task.Run(async () =>
+        // Local helper to create an async scope and execute a query (ensures separate DbContext & good tracing)
+        async Task<T> InScope<T>(Func<ApplicationDbContext, Task<T>> work)
         {
             await using var scope = _scopeFactory.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            return await db.UserProfiles.AsNoTracking().FirstOrDefaultAsync(p => p.UserId == id);
-        });
+            return await work(db);
+        }
 
-        var assignedClientsTask = Task.Run(async () =>
-        {
-            await using var scope = _scopeFactory.CreateAsyncScope();
-            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            return await db.ClientUsers.AsNoTracking()
-                .Where(cu => cu.UserId == id)
-                .Join(db.Clients.AsNoTracking(), cu => cu.ClientId, c => c.Id, (cu, c) => new { cu, c })
-                .OrderBy(x => x.c.Name)
-                .Select(x => new UserClientDto
-                {
-                    ClientId = x.c.Id,
-                    ClientPublicId = x.c.ClientId,
-                    ClientName = x.c.Name,
-                    CreatedAt = x.cu.CreatedAt
-                }).ToListAsync();
-        });
+        var profileTask = InScope(db => db.UserProfiles.AsNoTracking().FirstOrDefaultAsync(p => p.UserId == id));
 
-        var allClientsTask = Task.Run(async () =>
-        {
-            await using var scope = _scopeFactory.CreateAsyncScope();
-            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            return await db.Clients.AsNoTracking()
-                .OrderBy(c => c.Name)
-                .Select(c => new ClientDto
-                {
-                    Id = c.Id,
-                    ClientId = c.ClientId,
-                    Name = c.Name,
-                    Description = c.Description,
-                    IsEnabled = c.IsEnabled,
-                    ClientType = c.ClientType,
-                    AllowAuthorizationCodeFlow = c.AllowAuthorizationCodeFlow,
-                    AllowClientCredentialsFlow = c.AllowClientCredentialsFlow,
-                    AllowPasswordFlow = c.AllowPasswordFlow,
-                    AllowRefreshTokenFlow = c.AllowRefreshTokenFlow,
-                    RequirePkce = c.RequirePkce,
-                    RequireClientSecret = c.RequireClientSecret,
-                    RealmId = c.RealmId,
-                    RealmName = c.Realm.Name,
-                    CreatedAt = c.CreatedAt,
-                    UpdatedAt = c.UpdatedAt
-                }).ToListAsync();
-        });
+        var assignedClientsTask = InScope(db => db.ClientUsers.AsNoTracking()
+            .Where(cu => cu.UserId == id)
+            .Join(db.Clients.AsNoTracking(), cu => cu.ClientId, c => c.Id, (cu, c) => new { cu, c })
+            .OrderBy(x => x.c.Name)
+            .Select(x => new UserClientDto
+            {
+                ClientId = x.c.Id,
+                ClientPublicId = x.c.ClientId,
+                ClientName = x.c.Name,
+                CreatedAt = x.cu.CreatedAt
+            }).ToListAsync());
 
-        var globalRolesTask = Task.Run(async () =>
-        {
-            await using var scope = _scopeFactory.CreateAsyncScope();
-            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            return await db.Roles.AsNoTracking()
-                .OrderBy(r => r.Name)
-                .Select(r => new RoleDto
-                {
-                    Id = r.Id,
-                    Name = r.Name!,
-                    Description = null,
-                    IsEnabled = true,
-                    CreatedAt = DateTime.UtcNow,
-                    UpdatedAt = DateTime.UtcNow
-                }).ToListAsync();
-        });
+        var allClientsTask = InScope(db => db.Clients.AsNoTracking()
+            .OrderBy(c => c.Name)
+            .Select(c => new ClientDto
+            {
+                Id = c.Id,
+                ClientId = c.ClientId,
+                Name = c.Name,
+                Description = c.Description,
+                IsEnabled = c.IsEnabled,
+                ClientType = c.ClientType,
+                AllowAuthorizationCodeFlow = c.AllowAuthorizationCodeFlow,
+                AllowClientCredentialsFlow = c.AllowClientCredentialsFlow,
+                AllowPasswordFlow = c.AllowPasswordFlow,
+                AllowRefreshTokenFlow = c.AllowRefreshTokenFlow,
+                RequirePkce = c.RequirePkce,
+                RequireClientSecret = c.RequireClientSecret,
+                RealmId = c.RealmId,
+                RealmName = c.Realm.Name,
+                CreatedAt = c.CreatedAt,
+                UpdatedAt = c.UpdatedAt
+            }).ToListAsync());
 
-        var clientRolesTask = Task.Run(async () =>
-        {
-            await using var scope = _scopeFactory.CreateAsyncScope();
-            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            return await db.ClientRoles.AsNoTracking()
-                .Include(cr => cr.UserClientRoles)
-                .OrderBy(cr => cr.ClientId).ThenBy(cr => cr.Name)
-                .Select(cr => new ClientRoleDto
-                {
-                    Id = cr.Id,
-                    Name = cr.Name,
-                    ClientId = cr.ClientId,
-                    UserCount = cr.UserClientRoles.Count
-                }).ToListAsync();
-        });
+        var globalRolesTask = InScope(db => db.Roles.AsNoTracking()
+            .OrderBy(r => r.Name)
+            .Select(r => new RoleDto
+            {
+                Id = r.Id,
+                Name = r.Name!,
+                Description = null,
+                IsEnabled = true,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            }).ToListAsync());
 
-        var userClientRoleAssignmentsTask = Task.Run(async () =>
-        {
-            await using var scope = _scopeFactory.CreateAsyncScope();
-            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-            return await db.UserClientRoles.AsNoTracking()
-                .Where(ucr => ucr.UserId == id)
-                .Join(db.ClientRoles.AsNoTracking(), ucr => ucr.ClientRoleId, cr => cr.Id, (ucr, cr) => new { cr.ClientId, RoleName = cr.Name })
-                .ToListAsync();
-        });
+        var clientRolesTask = InScope(db => db.ClientRoles.AsNoTracking()
+            .Include(cr => cr.UserClientRoles)
+            .OrderBy(cr => cr.ClientId).ThenBy(cr => cr.Name)
+            .Select(cr => new ClientRoleDto
+            {
+                Id = cr.Id,
+                Name = cr.Name,
+                ClientId = cr.ClientId,
+                UserCount = cr.UserClientRoles.Count
+            }).ToListAsync());
+
+        var userClientRoleAssignmentsTask = InScope(db => db.UserClientRoles.AsNoTracking()
+            .Where(ucr => ucr.UserId == id)
+            .Join(db.ClientRoles.AsNoTracking(), ucr => ucr.ClientRoleId, cr => cr.Id, (ucr, cr) => new { cr.ClientId, RoleName = cr.Name })
+            .ToListAsync());
 
         await Task.WhenAll(profileTask, assignedClientsTask, allClientsTask, globalRolesTask, clientRolesTask, userClientRoleAssignmentsTask);
 
-        var roleDtos = globalRolesTask.Result;
+        var roleDtos = await globalRolesTask;
         var userRoleDtos = roleDtos.Where(r => userRoleNames.Contains(r.Name, StringComparer.OrdinalIgnoreCase)).ToList();
         var availableRoleDtos = roleDtos.Where(r => !userRoleNames.Contains(r.Name, StringComparer.OrdinalIgnoreCase)).ToList();
 
-        var assignedClients = assignedClientsTask.Result;
-        var allClients = allClientsTask.Result;
+        var assignedClients = await assignedClientsTask;
+        var allClients = await allClientsTask;
         var availableClients = allClients.Where(c => !assignedClients.Any(ac => ac.ClientId == c.Id)).ToList();
 
-        var userClientRolesByClient = userClientRoleAssignmentsTask.Result
+        var userClientRolesByClient = (await userClientRoleAssignmentsTask)
             .GroupBy(x => x.ClientId)
             .ToDictionary(g => g.Key, g => g.Select(x => x.RoleName).Distinct().OrderBy(n => n).ToList());
 
@@ -834,9 +810,9 @@ public class UsersController : ControllerBase
             AvailableRoles = availableRoleDtos,
             AssignedClients = assignedClients,
             AvailableClients = availableClients,
-            ProfileState = profileTask.Result == null ? null : new UserProfileStateDto { State = profileTask.Result!.State.ToString() },
+            ProfileState = await profileTask == null ? null : new UserProfileStateDto { State = (await profileTask)!.State.ToString() },
             AllClients = allClients,
-            AllClientRoles = clientRolesTask.Result,
+            AllClientRoles = await clientRolesTask,
             UserClientRolesByClient = userClientRolesByClient
         });
     }

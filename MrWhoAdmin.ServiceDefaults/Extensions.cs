@@ -9,6 +9,7 @@ using OpenTelemetry.Exporter;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
+using OpenTelemetry.Resources; // added
 using Serilog;
 using Serilog.Events;
 using Serilog.Sinks.GoogleCloudLogging; // Added for GoogleCloudLogging sink
@@ -26,7 +27,7 @@ public static class Extensions
     public static TBuilder AddServiceDefaults<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
         builder.ConfigureSerilog();
-        //builder.ConfigureOpenTelemetry();
+        builder.ConfigureOpenTelemetry(); // enable OTEL (was commented out)
 
         builder.AddDefaultHealthChecks();
 
@@ -41,46 +42,66 @@ public static class Extensions
             http.AddServiceDiscovery();
         });
 
-        // Uncomment the following to restrict the allowed schemes for service discovery.
-        // builder.Services.Configure<ServiceDiscoveryOptions>(options =>
-        // {
-        //     options.AllowedSchemes = ["https"];
-        // });
-
         return builder;
     }
 
     public static TBuilder ConfigureOpenTelemetry<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
+        // Configure log export (structured) + Activity context
         builder.Logging.AddOpenTelemetry(logging =>
         {
             logging.IncludeFormattedMessage = true;
             logging.IncludeScopes = true;
         });
 
+        // Shared resource describing this service
+        var resourceBuilder = ResourceBuilder.CreateEmpty().AddService(serviceName: builder.Environment.ApplicationName, serviceVersion: typeof(Extensions).Assembly.GetName().Version?.ToString() ?? "1.0.0");
+
+        // Configuration-driven EF instrumentation detail level (Default | Commands | All)
+        var efVerbosity = builder.Configuration["Telemetry:EntityFramework:Level"] ?? "Default";
+
         builder.Services.AddOpenTelemetry()
+            .ConfigureResource(rb => rb.AddService(builder.Environment.ApplicationName)) // simple name
             .WithMetrics(metrics =>
             {
-                metrics.AddAspNetCoreInstrumentation()
-                    .AddHttpClientInstrumentation()
-                    .AddRuntimeInstrumentation();
+                metrics
+                    .AddRuntimeInstrumentation()
+                    .AddAspNetCoreInstrumentation()
+                    .AddHttpClientInstrumentation();
             })
             .WithTracing(tracing =>
             {
-                tracing.AddSource(builder.Environment.ApplicationName)
-                    .AddAspNetCoreInstrumentation(tracing =>
-                        // Exclude health check requests from tracing
-                        tracing.Filter = context =>
-                            !context.Request.Path.StartsWithSegments(HealthEndpointPath)
-                            && !context.Request.Path.StartsWithSegments(AlivenessEndpointPath)
-                    )
-                    // Uncomment the following line to enable gRPC instrumentation (requires the OpenTelemetry.Instrumentation.GrpcNetClient package)
-                    //.AddGrpcClientInstrumentation()
-                    .AddHttpClientInstrumentation()
-                    .AddOtlpExporter(options =>
+                tracing
+                    .SetResourceBuilder(resourceBuilder)
+                    .AddSource(builder.Environment.ApplicationName)
+                    .AddAspNetCoreInstrumentation(options =>
                     {
-                    });
+                        // Exclude health probes
+                        options.Filter = context =>
+                            !context.Request.Path.StartsWithSegments(HealthEndpointPath) &&
+                            !context.Request.Path.StartsWithSegments(AlivenessEndpointPath);
+                    })
+                    .AddHttpClientInstrumentation();
 
+                // EF Core instrumentation (package added). Verbosity via config.
+                tracing.AddEntityFrameworkCoreInstrumentation(options =>
+                {
+                    // Always helpful to see which context
+                    options.SetDbStatementForText = efVerbosity.Equals("All", StringComparison.OrdinalIgnoreCase) || efVerbosity.Equals("Commands", StringComparison.OrdinalIgnoreCase);
+                    options.SetDbStatementForStoredProcedure = efVerbosity.Equals("All", StringComparison.OrdinalIgnoreCase) || efVerbosity.Equals("Commands", StringComparison.OrdinalIgnoreCase);
+                    // Conditional enabling of sensitive data (ONLY for dev) controlled separately
+                });
+
+                // Optional: Sampling (100%) if configured
+                var sampling = builder.Configuration["Telemetry:Tracing:Sampler"];
+                if (string.Equals(sampling, "AlwaysOn", StringComparison.OrdinalIgnoreCase))
+                {
+                    tracing.SetSampler(new AlwaysOnSampler());
+                }
+                else if (string.Equals(sampling, "AlwaysOff", StringComparison.OrdinalIgnoreCase))
+                {
+                    tracing.SetSampler(new AlwaysOffSampler());
+                }
             });
 
         builder.AddOpenTelemetryExporters();
@@ -90,20 +111,13 @@ public static class Extensions
 
     private static TBuilder AddOpenTelemetryExporters<TBuilder>(this TBuilder builder) where TBuilder : IHostApplicationBuilder
     {
-        var useOtlpExporter = !string.IsNullOrWhiteSpace(builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]);
-
-        if (useOtlpExporter)
+        var endpoint = builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]; // e.g. http://localhost:4317
+        if (!string.IsNullOrWhiteSpace(endpoint))
         {
-            //builder.Services.AddOpenTelemetry().UseOtlpExporter();
-            builder.Services.AddOpenTelemetry().WithLogging();
+            // Attach OTLP exporter for traces & metrics (and logs already via Logging provider)
+            builder.Services.AddOpenTelemetry()
+                .UseOtlpExporter();
         }
-
-        // Uncomment the following lines to enable the Azure Monitor exporter (requires the Azure.Monitor.OpenTelemetry.AspNetCore package)
-        //if (!string.IsNullOrEmpty(builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"]))
-        //{
-        //    builder.Services.AddOpenTelemetry()
-        //       .UseAzureMonitor();
-        //}
 
         return builder;
     }
@@ -135,8 +149,6 @@ public static class Extensions
             .MinimumLevel.Override("Microsoft.AspNetCore.Diagnostics.ExceptionHandlerMiddleware", LogEventLevel.Error)
             .MinimumLevel.Override("Microsoft.Hosting.Lifetime", LogEventLevel.Information)
             .WriteTo.Console();
-
-        // EF Core category overrides now configured via Serilog configuration (appsettings.*.json)
 
         string loggingMessage = "Serilog logging configured to write to Console";
 
@@ -170,14 +182,9 @@ public static class Extensions
 
     public static WebApplication MapDefaultEndpoints(this WebApplication app)
     {
-        // Adding health checks endpoints to applications in non-development environments has security implications.
-        // See https://aka.ms/dotnet/aspire/healthchecks for details before enabling these endpoints in non-development environments.
         if (app.Environment.IsDevelopment())
         {
-            // All health checks must pass for app to be considered ready to accept traffic after starting
             app.MapHealthChecks(HealthEndpointPath);
-
-            // Only health checks tagged with the "live" tag must pass for app to be considered alive
             app.MapHealthChecks(AlivenessEndpointPath, new HealthCheckOptions
             {
                 Predicate = r => r.Tags.Contains("live")
