@@ -1,17 +1,21 @@
 using Microsoft.AspNetCore.Identity;
 using MrWho.Models;
 using MrWho.Shared.Models;
+using MrWho.Data; // added
+using Microsoft.EntityFrameworkCore; // added for EF operations
 
 namespace MrWho.Handlers.Users;
 
 public class CreateUserHandler : ICreateUserHandler
 {
     private readonly UserManager<IdentityUser> _userManager;
+    private readonly ApplicationDbContext _db; // added
     private readonly ILogger<CreateUserHandler> _logger;
 
-    public CreateUserHandler(UserManager<IdentityUser> userManager, ILogger<CreateUserHandler> logger)
+    public CreateUserHandler(UserManager<IdentityUser> userManager, ApplicationDbContext db, ILogger<CreateUserHandler> logger) // updated ctor
     {
         _userManager = userManager;
+        _db = db;
         _logger = logger;
     }
 
@@ -33,6 +37,29 @@ public class CreateUserHandler : ICreateUserHandler
 
             if (result.Succeeded)
             {
+                // Create associated UserProfile immediately (option 1 implementation)
+                try
+                {
+                    var existingProfile = await _db.UserProfiles.FirstOrDefaultAsync(p => p.UserId == user.Id);
+                    if (existingProfile == null)
+                    {
+                        var isAdmin = string.Equals(user.Email, "admin@mrwho.local", StringComparison.OrdinalIgnoreCase) || string.Equals(user.UserName, "admin@mrwho.local", StringComparison.OrdinalIgnoreCase);
+                        _db.UserProfiles.Add(new UserProfile
+                        {
+                            UserId = user.Id,
+                            DisplayName = BuildDisplayName(user.UserName ?? user.Email ?? user.Id),
+                            State = isAdmin ? UserState.Active : UserState.New,
+                            CreatedAt = DateTime.UtcNow
+                        });
+                        await _db.SaveChangesAsync();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // Non-fatal; log but still return success for user creation
+                    _logger.LogError(ex, "Failed creating UserProfile for user {UserId}", user.Id);
+                }
+
                 _logger.LogInformation("Successfully created user {UserName} with ID {UserId}", user.UserName, user.Id);
                 
                 var userDto = new UserDto
@@ -61,5 +88,14 @@ public class CreateUserHandler : ICreateUserHandler
             _logger.LogError(ex, "Error creating user {UserName}", request.UserName);
             return (false, null, new[] { "An unexpected error occurred while creating the user." });
         }
+    }
+
+    private static string BuildDisplayName(string source)
+    {
+        if (string.IsNullOrWhiteSpace(source)) return "New User";
+        if (source.Contains('@')) source = source.Split('@')[0];
+        var friendly = source.Replace('.', ' ').Replace('_', ' ').Replace('-', ' ');
+        var words = friendly.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return string.Join(' ', words.Select(w => char.ToUpper(w[0]) + w[1..].ToLower()));
     }
 }
