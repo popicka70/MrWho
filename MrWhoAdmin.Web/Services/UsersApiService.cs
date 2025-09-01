@@ -399,4 +399,20 @@ public class UsersApiService : IUsersApiService
             return false;
         }
     }
+
+    public async Task<UserEditContextDto?> GetUserEditContextAsync(string userId)
+    {
+        try
+        {
+            var resp = await _httpClient.GetAsync($"api/users/{Uri.EscapeDataString(userId)}/edit-context");
+            resp.EnsureSuccessStatusCode();
+            var json = await resp.Content.ReadAsStringAsync();
+            return JsonSerializer.Deserialize<UserEditContextDto>(json, _jsonOptions);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting user edit context {UserId}", userId);
+            return null;
+        }
+    }
 }

@@ -35,4 +35,5 @@ public interface IUsersApiService
     // Profile state
     Task<UserProfileStateDto?> GetProfileStateAsync(string userId);
     Task<bool> SetProfileStateAsync(string userId, SetUserProfileStateRequest request);
+    Task<UserEditContextDto?> GetUserEditContextAsync(string userId);
 }

@@ -24,7 +24,8 @@ public class UsersController : ControllerBase
     private readonly IDeleteUserHandler _deleteUserHandler;
     private readonly UserManager<IdentityUser> _userManager;
     private readonly RoleManager<IdentityRole> _roleManager;
-    private readonly ApplicationDbContext _context;
+    private readonly ApplicationDbContext _context; // kept for non-parallel single operations
+    private readonly IServiceScopeFactory _scopeFactory; // use scope factory instead of DbContextFactory
     private readonly ILogger<UsersController> _logger;
 
     public UsersController(
@@ -36,6 +37,7 @@ public class UsersController : ControllerBase
         UserManager<IdentityUser> userManager,
         RoleManager<IdentityRole> roleManager,
         ApplicationDbContext context,
+        IServiceScopeFactory scopeFactory,
         ILogger<UsersController> logger)
     {
         _getUsersHandler = getUsersHandler;
@@ -46,6 +48,7 @@ public class UsersController : ControllerBase
         _userManager = userManager;
         _roleManager = roleManager;
         _context = context;
+        _scopeFactory = scopeFactory;
         _logger = logger;
     }
 
@@ -552,6 +555,9 @@ public class UsersController : ControllerBase
             query = query.Where(r => r.Name!.Contains(search));
         }
 
+        // Ensure deterministic ordering for paging when using Skip/Take
+        query = query.OrderBy(r => r.Name);
+
         var totalCount = await query.CountAsync();
         var roles = await query
             .Skip((page - 1) * pageSize)
@@ -680,6 +686,159 @@ public class UsersController : ControllerBase
 
         _logger.LogInformation("Changed/created profile state for user {UserId} to {State} by {Admin}", id, newState, User.Identity?.Name);
         return Ok(new UserProfileStateDto { State = profile.State.ToString() });
+    }
+
+    /// <summary>
+    /// Get aggregated context data for editing a user (single roundtrip)
+    /// Parallel version: each query uses its own DbContext instance via factory.
+    /// </summary>
+    [HttpGet("{id}/edit-context")]
+    public async Task<ActionResult<UserEditContextDto>> GetUserEditContext(string id)
+    {
+        // Fetch identity data first (UserManager not thread-safe for concurrent operations on same instance)
+        var user = await _userManager.FindByIdAsync(id);
+        if (user == null) return NotFound($"User with ID '{id}' not found.");
+
+        var userRoleNames = await _userManager.GetRolesAsync(user); // sequential
+        var userClaims = await _userManager.GetClaimsAsync(user);   // sequential
+
+        // Start parallel DB (read-only) queries with isolated contexts (AsNoTracking all)
+        var profileTask = Task.Run(async () =>
+        {
+            await using var scope = _scopeFactory.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            return await db.UserProfiles.AsNoTracking().FirstOrDefaultAsync(p => p.UserId == id);
+        });
+
+        var assignedClientsTask = Task.Run(async () =>
+        {
+            await using var scope = _scopeFactory.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            return await db.ClientUsers.AsNoTracking()
+                .Where(cu => cu.UserId == id)
+                .Join(db.Clients.AsNoTracking(), cu => cu.ClientId, c => c.Id, (cu, c) => new { cu, c })
+                .OrderBy(x => x.c.Name)
+                .Select(x => new UserClientDto
+                {
+                    ClientId = x.c.Id,
+                    ClientPublicId = x.c.ClientId,
+                    ClientName = x.c.Name,
+                    CreatedAt = x.cu.CreatedAt
+                }).ToListAsync();
+        });
+
+        var allClientsTask = Task.Run(async () =>
+        {
+            await using var scope = _scopeFactory.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            return await db.Clients.AsNoTracking()
+                .OrderBy(c => c.Name)
+                .Select(c => new ClientDto
+                {
+                    Id = c.Id,
+                    ClientId = c.ClientId,
+                    Name = c.Name,
+                    Description = c.Description,
+                    IsEnabled = c.IsEnabled,
+                    ClientType = c.ClientType,
+                    AllowAuthorizationCodeFlow = c.AllowAuthorizationCodeFlow,
+                    AllowClientCredentialsFlow = c.AllowClientCredentialsFlow,
+                    AllowPasswordFlow = c.AllowPasswordFlow,
+                    AllowRefreshTokenFlow = c.AllowRefreshTokenFlow,
+                    RequirePkce = c.RequirePkce,
+                    RequireClientSecret = c.RequireClientSecret,
+                    RealmId = c.RealmId,
+                    RealmName = c.Realm.Name,
+                    CreatedAt = c.CreatedAt,
+                    UpdatedAt = c.UpdatedAt
+                }).ToListAsync();
+        });
+
+        var globalRolesTask = Task.Run(async () =>
+        {
+            await using var scope = _scopeFactory.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            return await db.Roles.AsNoTracking()
+                .OrderBy(r => r.Name)
+                .Select(r => new RoleDto
+                {
+                    Id = r.Id,
+                    Name = r.Name!,
+                    Description = null,
+                    IsEnabled = true,
+                    CreatedAt = DateTime.UtcNow,
+                    UpdatedAt = DateTime.UtcNow
+                }).ToListAsync();
+        });
+
+        var clientRolesTask = Task.Run(async () =>
+        {
+            await using var scope = _scopeFactory.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            return await db.ClientRoles.AsNoTracking()
+                .Include(cr => cr.UserClientRoles)
+                .OrderBy(cr => cr.ClientId).ThenBy(cr => cr.Name)
+                .Select(cr => new ClientRoleDto
+                {
+                    Id = cr.Id,
+                    Name = cr.Name,
+                    ClientId = cr.ClientId,
+                    UserCount = cr.UserClientRoles.Count
+                }).ToListAsync();
+        });
+
+        var userClientRoleAssignmentsTask = Task.Run(async () =>
+        {
+            await using var scope = _scopeFactory.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            return await db.UserClientRoles.AsNoTracking()
+                .Where(ucr => ucr.UserId == id)
+                .Join(db.ClientRoles.AsNoTracking(), ucr => ucr.ClientRoleId, cr => cr.Id, (ucr, cr) => new { cr.ClientId, RoleName = cr.Name })
+                .ToListAsync();
+        });
+
+        await Task.WhenAll(profileTask, assignedClientsTask, allClientsTask, globalRolesTask, clientRolesTask, userClientRoleAssignmentsTask);
+
+        var roleDtos = globalRolesTask.Result;
+        var userRoleDtos = roleDtos.Where(r => userRoleNames.Contains(r.Name, StringComparer.OrdinalIgnoreCase)).ToList();
+        var availableRoleDtos = roleDtos.Where(r => !userRoleNames.Contains(r.Name, StringComparer.OrdinalIgnoreCase)).ToList();
+
+        var assignedClients = assignedClientsTask.Result;
+        var allClients = allClientsTask.Result;
+        var availableClients = allClients.Where(c => !assignedClients.Any(ac => ac.ClientId == c.Id)).ToList();
+
+        var userClientRolesByClient = userClientRoleAssignmentsTask.Result
+            .GroupBy(x => x.ClientId)
+            .ToDictionary(g => g.Key, g => g.Select(x => x.RoleName).Distinct().OrderBy(n => n).ToList());
+
+        var userWithClaims = new UserWithClaimsDto
+        {
+            Id = user.Id,
+            UserName = user.UserName ?? string.Empty,
+            Email = user.Email ?? string.Empty,
+            EmailConfirmed = user.EmailConfirmed,
+            PhoneNumber = user.PhoneNumber,
+            PhoneNumberConfirmed = user.PhoneNumberConfirmed,
+            TwoFactorEnabled = user.TwoFactorEnabled,
+            LockoutEnabled = user.LockoutEnabled,
+            LockoutEnd = user.LockoutEnd,
+            AccessFailedCount = user.AccessFailedCount,
+            Claims = userClaims.Select(c => new UserClaimDto { ClaimType = c.Type, ClaimValue = c.Value, Issuer = c.Issuer }).ToList(),
+            Roles = userRoleNames.ToList()
+        };
+
+        return Ok(new UserEditContextDto
+        {
+            User = userWithClaims,
+            UserRoles = userRoleDtos,
+            AvailableRoles = availableRoleDtos,
+            AssignedClients = assignedClients,
+            AvailableClients = availableClients,
+            ProfileState = profileTask.Result == null ? null : new UserProfileStateDto { State = profileTask.Result!.State.ToString() },
+            AllClients = allClients,
+            AllClientRoles = clientRolesTask.Result,
+            UserClientRolesByClient = userClientRolesByClient
+        });
     }
 
     private static string BuildDisplayName(string source)

@@ -74,62 +74,34 @@ else
     private string? selectedRoleName;
     private bool isAssigning;
 
-    protected override async Task OnInitializedAsync()
+    protected override Task OnInitializedAsync()
     {
-        if (editUser.IsEdit)
-        {
-            await LoadClients();
-            await LoadAllRoles();
-            await LoadAllUserClientRoles();
-        }
+        // Consume pre-fetched aggregated data from parent to avoid extra HTTP calls
+        clients = editUser.aggregatedAllClients;
+        allRoles = editUser.aggregatedAllClientRoles;
+        userClientRoles = editUser.aggregatedUserClientRolesByClient
+            .SelectMany(kvp => kvp.Value.Select(r => new UserClientRoleView { ClientId = kvp.Key, RoleName = r }))
+            .OrderBy(x => x.ClientId).ThenBy(x => x.RoleName).ToList();
+
+        // Default selection
+        selectedClientId = clients.FirstOrDefault()?.ClientId;
+        LoadClientRolesSync();
+        return Task.CompletedTask;
     }
 
-    private async Task LoadClients()
+    private void LoadClientRolesSync()
     {
-        try
-        {
-            var result = await ClientsApi.GetClientsAsync(page:1,pageSize:200);
-            clients = result?.Items ?? new();
-        }
-        catch (Exception ex) { Logger.LogError(ex, "LoadClients failed"); }
-    }
-
-    private async Task LoadAllRoles()
-    {
-        try { allRoles = await ClientRolesApi.GetRolesAsync() ?? new(); }
-        catch (Exception ex) { Logger.LogError(ex, "LoadAllRoles failed"); }
+        if (string.IsNullOrWhiteSpace(selectedClientId)) { availableRoles = new(); return; }
+        var assignedNames = userClientRoles.Where(r => r.ClientId == selectedClientId).Select(r => r.RoleName).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var rolesForClient = allRoles.Where(r => r.ClientId == selectedClientId).ToList();
+        availableRoles = rolesForClient.Where(r => !assignedNames.Contains(r.Name)).OrderBy(r => r.Name).ToList();
+        selectedRoleName = null;
     }
 
     private async Task LoadClientRoles()
     {
-        if (string.IsNullOrWhiteSpace(selectedClientId)) { availableRoles = new(); return; }
-        try
-        {
-            var rolesForClient = allRoles.Where(r => r.ClientId == selectedClientId).ToList();
-            var assignedNames = userClientRoles.Where(r => r.ClientId == selectedClientId).Select(r => r.RoleName).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            availableRoles = rolesForClient.Where(r => !assignedNames.Contains(r.Name)).OrderBy(r=>r.Name).ToList();
-            selectedRoleName = null;
-        }
-        catch (Exception ex) { Logger.LogError(ex, "LoadClientRoles failed"); }
-    }
-
-    private async Task LoadAllUserClientRoles()
-    {
-        userClientRoles.Clear();
-        if (editUser.currentUser == null) return;
-        foreach (var c in clients)
-        {
-            try
-            {
-                var roles = await ClientRolesApi.GetUserClientRolesAsync(c.ClientId, editUser.currentUser.Id) ?? new();
-                foreach (var r in roles)
-                {
-                    userClientRoles.Add(new UserClientRoleView{ ClientId = c.ClientId, RoleName = r });
-                }
-            }
-            catch (Exception ex) { Logger.LogError(ex, "LoadUserClientRoles failed for {Client}", c.ClientId); }
-        }
-        await LoadClientRoles();
+        LoadClientRolesSync();
+        await Task.CompletedTask;
     }
 
     private bool CanAssign() => !string.IsNullOrWhiteSpace(selectedClientId) && !string.IsNullOrWhiteSpace(selectedRoleName) && editUser.currentUser != null;
@@ -140,12 +112,19 @@ else
         isAssigning = true;
         try
         {
-            var ok = await ClientRolesApi.AssignRoleAsync(new AssignClientRoleRequest{ UserId = editUser.currentUser!.Id, ClientId = selectedClientId!, RoleName = selectedRoleName! });
+            var ok = await ClientRolesApi.AssignRoleAsync(new AssignClientRoleRequest { UserId = editUser.currentUser!.Id, ClientId = selectedClientId!, RoleName = selectedRoleName! });
             if (ok)
             {
-                userClientRoles.Add(new UserClientRoleView{ ClientId = selectedClientId!, RoleName = selectedRoleName! });
+                userClientRoles.Add(new UserClientRoleView { ClientId = selectedClientId!, RoleName = selectedRoleName! });
+                // Update parent cache to stay consistent
+                if (!editUser.aggregatedUserClientRolesByClient.TryGetValue(selectedClientId!, out var list))
+                {
+                    list = new List<string>();
+                    editUser.aggregatedUserClientRolesByClient[selectedClientId!] = list;
+                }
+                if (!list.Contains(selectedRoleName!, StringComparer.OrdinalIgnoreCase)) list.Add(selectedRoleName!);
                 NotificationService.Notify(NotificationSeverity.Success, "Assigned", $"Role '{selectedRoleName}' assigned to client '{selectedClientId}'");
-                await LoadClientRoles();
+                LoadClientRolesSync();
             }
             else NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to assign role");
         }
@@ -155,16 +134,21 @@ else
 
     private async Task RemoveRole(UserClientRoleView view)
     {
-        var ok = await DialogService.Confirm($"Remove role '{view.RoleName}' from client '{view.ClientId}'?", "Remove Client Role", new ConfirmOptions{ OkButtonText="Remove", CancelButtonText="Cancel" });
+        var ok = await DialogService.Confirm($"Remove role '{view.RoleName}' from client '{view.ClientId}'?", "Remove Client Role", new ConfirmOptions { OkButtonText = "Remove", CancelButtonText = "Cancel" });
         if (ok != true) return;
         try
         {
-            var success = await ClientRolesApi.RemoveRoleAsync(new RemoveClientRoleRequest{ UserId = editUser.currentUser!.Id, ClientId = view.ClientId, RoleName = view.RoleName });
+            var success = await ClientRolesApi.RemoveRoleAsync(new RemoveClientRoleRequest { UserId = editUser.currentUser!.Id, ClientId = view.ClientId, RoleName = view.RoleName });
             if (success)
             {
                 userClientRoles.Remove(view);
+                if (editUser.aggregatedUserClientRolesByClient.TryGetValue(view.ClientId, out var list))
+                {
+                    list.RemoveAll(r => string.Equals(r, view.RoleName, StringComparison.OrdinalIgnoreCase));
+                    if (list.Count == 0) editUser.aggregatedUserClientRolesByClient.Remove(view.ClientId);
+                }
                 NotificationService.Notify(NotificationSeverity.Success, "Removed", "Client role removed");
-                await LoadClientRoles();
+                LoadClientRolesSync();
             }
             else NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to remove role");
         }

@@ -57,16 +57,16 @@ public partial class EditUser
     // Profile state
     internal UserProfileStateDto? profileState;
 
+    // Aggregated data to share with child tabs
+    internal List<ClientDto> aggregatedAllClients = new();
+    internal List<ClientRoleDto> aggregatedAllClientRoles = new();
+    internal Dictionary<string, List<string>> aggregatedUserClientRolesByClient = new();
+
     protected override async Task OnInitializedAsync()
     {
         if (IsEdit)
         {
-            await LoadUser();
-            await LoadUserRoles();
-            await LoadAvailableRoles();
-            await LoadUserClients();
-            await LoadAvailableClients();
-            await LoadProfileState();
+            await LoadEditContext();
         }
         else
         {
@@ -74,6 +74,48 @@ public partial class EditUser
             userModel.PhoneNumberConfirmed = false;
             userModel.TwoFactorEnabled = false;
         }
+    }
+
+    private async Task LoadEditContext()
+    {
+        isLoading = true;
+        try
+        {
+            var ctx = await UsersApiService.GetUserEditContextAsync(Id!);
+            if (ctx?.User == null)
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "User not found");
+                Navigation.NavigateTo("/users");
+                return;
+            }
+            currentUser = ctx.User;
+            userModel = new UserEditModel
+            {
+                UserName = currentUser.UserName,
+                Email = currentUser.Email,
+                PhoneNumber = currentUser.PhoneNumber,
+                EmailConfirmed = currentUser.EmailConfirmed,
+                PhoneNumberConfirmed = currentUser.PhoneNumberConfirmed,
+                TwoFactorEnabled = currentUser.TwoFactorEnabled
+            };
+            userClaims = currentUser.Claims;
+            userRoles = ctx.UserRoles;
+            availableRoles = ctx.AvailableRoles;
+            assignedClients = ctx.AssignedClients;
+            availableClients = ctx.AvailableClients;
+            profileState = ctx.ProfileState;
+
+            // Pass-through for nested tabs (avoid extra HTTP calls)
+            aggregatedAllClients = ctx.AllClients;
+            aggregatedAllClientRoles = ctx.AllClientRoles;
+            aggregatedUserClientRolesByClient = ctx.UserClientRolesByClient;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading edit context for user {UserId}", Id);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to load user context");
+        }
+        finally { isLoading = false; }
     }
 
     private async Task LoadProfileState()
@@ -164,6 +206,46 @@ public partial class EditUser
             availableClients = all.Where(c => !assignedClients.Any(ac => ac.ClientId == c.Id)).ToList();
         }
         catch (Exception ex) { Logger.LogError(ex, "Error loading available clients for user {UserId}", Id); }
+    }
+
+    internal async Task<bool> SetClientAssignment(string clientDbId, bool assign)
+    {
+        if (currentUser == null) return false;
+        try
+        {
+            if (assign)
+            {
+                var res = await ClientUsersApi.AssignUserAsync(clientDbId, new AssignClientUserRequest { UserId = currentUser.Id, ClientId = clientDbId });
+                if (res != null)
+                {
+                    NotificationService.Notify(NotificationSeverity.Success, "Assigned", $"Assigned to '{res.ClientName}'");
+                    await LoadUserClients();
+                    await LoadAvailableClients();
+                    return true;
+                }
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to assign client");
+                return false;
+            }
+            else
+            {
+                var ok = await ClientUsersApi.RemoveUserAsync(clientDbId, currentUser.Id);
+                if (ok)
+                {
+                    NotificationService.Notify(NotificationSeverity.Success, "Removed", "Client unassigned");
+                    await LoadUserClients();
+                    await LoadAvailableClients();
+                    return true;
+                }
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to remove client");
+                return false;
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error changing client assignment for {UserId} client {ClientId}", Id, clientDbId);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", ex.Message);
+            return false;
+        }
     }
 
     internal async Task OnSaveUser()
