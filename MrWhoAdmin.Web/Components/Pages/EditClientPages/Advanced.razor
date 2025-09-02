@@ -1,6 +1,15 @@
 @using MrWho.Shared
 @using MrWho.Shared.Models
 
+@if (editClient.IsLoading)
+{
+    <RadzenCard class="rz-my-4">
+        <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+        <RadzenText class="rz-mt-3">Loading client data...</RadzenText>
+    </RadzenCard>
+}
+else
+{
 <RadzenStack Gap="0.75rem" class="rz-mb-4">
     <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Protocol Configuration</RadzenText>
     <RadzenStack Gap="1rem">
@@ -46,6 +55,7 @@
         </RadzenFormField>
     </RadzenStack>
 </RadzenStack>
+}
 
 @code {
     [Parameter] public EditClient editClient { get; set; } = null!;

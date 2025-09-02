@@ -1,4 +1,11 @@
-@if (!editClient.IsEdit)
+@if (editClient.IsLoading)
+{
+    <RadzenCard class="rz-my-4">
+        <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+        <RadzenText class="rz-mt-3">Loading client data...</RadzenText>
+    </RadzenCard>
+}
+else if (!editClient.IsEdit)
 {
     <RadzenAlert AlertStyle="AlertStyle.Info" ShowIcon="true">
         <RadzenText TextStyle="TextStyle.Body1">Save the client first to manage identity provider links.</RadzenText>
