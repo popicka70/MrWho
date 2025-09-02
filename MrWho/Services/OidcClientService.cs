@@ -4,7 +4,6 @@ using MrWho.Data;
 using MrWho.Models;
 using MrWho.Shared;
 using OpenIddict.Abstractions;
-using static System.Net.WebRequestMethods;
 
 namespace MrWho.Services;
 
@@ -14,6 +13,11 @@ public class OidcClientService : IOidcClientService
     private readonly IOpenIddictApplicationManager _applicationManager;
     private readonly UserManager<IdentityUser> _userManager;
     private readonly ILogger<OidcClientService> _logger;
+
+    // Fallback literal permissions for endpoints not exposed as constants in current OpenIddict version
+    private const string UserInfoEndpointPermission = "endpoints:userinfo";
+    private const string RevocationEndpointPermission = "endpoints:revocation";
+    private const string IntrospectionEndpointPermission = "endpoints:introspection";
 
     public OidcClientService(
         ApplicationDbContext context,
@@ -62,6 +66,26 @@ public class OidcClientService : IOidcClientService
         }
     }
 
+    // Centralized scope->permission mapping (Step 1 standardization) - unify ALL scopes to scp: prefix
+    private static (bool hasOpenId, List<string> permissions) BuildScopePermissions(IEnumerable<string> scopes)
+    {
+        var perms = new List<string>();
+        var hasOpenId = false;
+        foreach (var scope in scopes.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            if (string.Equals(scope, StandardScopes.OpenId, StringComparison.OrdinalIgnoreCase))
+            {
+                perms.Add("scp:openid");
+                hasOpenId = true;
+            }
+            else
+            {
+                perms.Add($"scp:{scope}");
+            }
+        }
+        return (hasOpenId, perms);
+    }
+
     /// <summary>
     /// Initialize essential data that must always be present (admin realm, admin client, admin user)
     /// </summary>
@@ -81,7 +105,6 @@ public class OidcClientService : IOidcClientService
                 RefreshTokenLifetime = TimeSpan.FromDays(30),
                 AuthorizationCodeLifetime = TimeSpan.FromMinutes(10),
                 CreatedBy = "System",
-                // Theme: Corporate look for administration
                 DefaultThemeName = "corporate"
             };
             _context.Realms.Add(adminRealm);
@@ -103,7 +126,6 @@ public class OidcClientService : IOidcClientService
                 RefreshTokenLifetime = TimeSpan.FromDays(7),
                 AuthorizationCodeLifetime = TimeSpan.FromMinutes(10),
                 CreatedBy = "System",
-                // Theme: Ocean look for demos
                 DefaultThemeName = "ocean"
             };
             _context.Realms.Add(demoRealm);
@@ -191,7 +213,7 @@ public class OidcClientService : IOidcClientService
             }
 
             // Add scopes (INCLUDING API SCOPES AND MRWHO.USE)
-            var scopes = new[] { "openid", "email", "profile", "roles", "offline_access", "api.read", "api.write", "mrwho.use" };
+            var scopes = new[] { StandardScopes.OpenId, StandardScopes.Email, StandardScopes.Profile, StandardScopes.Roles, StandardScopes.OfflineAccess, StandardScopes.ApiRead, StandardScopes.ApiWrite, StandardScopes.MrWhoUse };
             foreach (var scope in scopes)
             {
                 _context.ClientScopes.Add(new ClientScope
@@ -201,187 +223,38 @@ public class OidcClientService : IOidcClientService
                 });
             }
 
-            // Add permissions (INCLUDING API PERMISSIONS AND MRWHO.USE)
-            var permissions = new[]
+            // Standardized: only custom scopes stored in permissions beyond endpoint/grant constants; openid etc. handled via scopes => permissions during sync
+            var basePermissions = new[]
             {
                 OpenIddictConstants.Permissions.Endpoints.Authorization,
                 OpenIddictConstants.Permissions.Endpoints.Token,
                 OpenIddictConstants.Permissions.Endpoints.EndSession,
                 OpenIddictConstants.Permissions.GrantTypes.AuthorizationCode,
                 OpenIddictConstants.Permissions.GrantTypes.RefreshToken,
-                "oidc:scope:openid",
-                OpenIddictConstants.Permissions.Scopes.Email,
-                OpenIddictConstants.Permissions.Scopes.Profile,
-                OpenIddictConstants.Permissions.Scopes.Roles,
-                OpenIddictConstants.Permissions.ResponseTypes.Code,
-                "oidc:scope:api.read",   // Use oidc:scope: prefix for API read permission
-                "oidc:scope:api.write",  // Use oidc:scope: prefix for API write permission
-                "scp:mrwho.use"          // Use scp: prefix for custom mrwho.use permission
+                OpenIddictConstants.Permissions.ResponseTypes.Code
             };
-
-            foreach (var permission in permissions)
-            {
-                _context.ClientPermissions.Add(new ClientPermission
-                {
-                    ClientId = adminClient.Id,
-                    Permission = permission
-                });
-            }
+            foreach (var p in basePermissions)
+                _context.ClientPermissions.Add(new ClientPermission { ClientId = adminClient.Id, Permission = p });
+            // Custom scope mrwho.use explicit permission (scp: format)
+            _context.ClientPermissions.Add(new ClientPermission { ClientId = adminClient.Id, Permission = "scp:mrwho.use" });
 
             await _context.SaveChangesAsync();
-            _logger.LogInformation("Created admin client 'mrwho_admin_web' with API access and redirect URIs for 7257, 8081 and onrender");
+            _logger.LogInformation("Created admin client 'mrwho_admin_web' with standardized permissions");
         }
         else
         {
-            // Ensure required redirect/post-logout URIs exist (add 8081 entries for docker-hosted admin and onrender hosted)
-            var requiredRedirects = new[]
+            // Cleanup legacy permission formats for admin client
+            var legacy = adminClient.Permissions.Where(p => p.Permission.StartsWith("oidc:scope:") || (p.Permission.StartsWith("api.") && !p.Permission.StartsWith("scp:")) || p.Permission == "scp:openid").ToList();
+            if (legacy.Any())
             {
-                "https://localhost:7257/signin-oidc",
-                "https://localhost:7257/callback",
-                "http://localhost:8081/signin-oidc",
-                "http://localhost:8081/callback",
-                "https://mrwho.onrender.com/signin-oidc",
-                "https://mrwho.onrender.com/callback",
-                "https://mrwhoadmin.onrender.com/signin-oidc",
-                "https://mrwhoadmin.onrender.com/callback"
-            };
-            var requiredPostLogout = new[]
-            {
-                "https://localhost:7257/",
-                "https://localhost:7257/signout-callback-oidc",
-                "http://localhost:8081/",
-                "http://localhost:8081/signout-callback-oidc",
-                "https://mrwho.onrender.com/",
-                "https://mrwho.onrender.com/signout-callback-oidc",
-                "https://mrwhoadmin.onrender.com/",
-                "https://mrwhoadmin.onrender.com/signout-callback-oidc"
-            };
-
-            var missingRedirects = requiredRedirects
-                .Where(u => !adminClient.RedirectUris.Any(r => r.Uri == u))
-                .ToList();
-            var missingPostLogout = requiredPostLogout
-                .Where(u => !adminClient.PostLogoutUris.Any(r => r.Uri == u))
-                .ToList();
-
-            if (missingRedirects.Count > 0)
-            {
-                _logger.LogInformation("Adding missing admin client redirect URIs: {Uris}", string.Join(", ", missingRedirects));
-                foreach (var uri in missingRedirects)
-                {
-                    _context.ClientRedirectUris.Add(new ClientRedirectUri
-                    {
-                        ClientId = adminClient.Id,
-                        Uri = uri
-                    });
-                }
-            }
-            if (missingPostLogout.Count > 0)
-            {
-                _logger.LogInformation("Adding missing admin client post-logout URIs: {Uris}", string.Join(", ", missingPostLogout));
-                foreach (var uri in missingPostLogout)
-                {
-                    _context.ClientPostLogoutUris.Add(new ClientPostLogoutUri
-                    {
-                        ClientId = adminClient.Id,
-                        Uri = uri
-                    });
-                }
-            }
-
-            // Check if existing admin client has API scopes and add them if missing
-            var existingApiScopes = adminClient.Scopes.Where(s => s.Scope.StartsWith("api.")).ToList();
-            var existingCorrectApiPermissions = adminClient.Permissions.Where(p => p.Permission.StartsWith("oidc:scope:api.")).ToList();
-            var hasOfflineAccess = adminClient.Scopes.Any(s => s.Scope == "offline_access");
-            var hasMrWhoUse = adminClient.Scopes.Any(s => s.Scope == "mrwho.use");
-
-            // Fix existing incorrect permissions - remove old format and add correct format
-            var oldApiPermissions = adminClient.Permissions.Where(p => p.Permission.StartsWith("api.") && !p.Permission.StartsWith("oidc:scope:")).ToList();
-            if (oldApiPermissions.Any())
-            {
-                _logger.LogInformation("Removing old API permissions with incorrect format");
-                foreach (var oldPermission in oldApiPermissions)
-                {
-                    _context.ClientPermissions.Remove(oldPermission);
-                }
-            }
-
-            if (existingApiScopes.Count == 0)
-            {
-                _logger.LogInformation("Adding API scopes to existing admin client");
-                
-                // Add API scopes
-                var apiScopes = new[] { "api.read", "api.write" };
-                foreach (var scope in apiScopes)
-                {
-                    _context.ClientScopes.Add(new ClientScope
-                    {
-                        ClientId = adminClient.Id,
-                        Scope = scope
-                    });
-                }
-            }
-
-            if (!hasOfflineAccess)
-            {
-                _logger.LogInformation("Adding offline_access scope to existing admin client for refresh token support");
-                _context.ClientScopes.Add(new ClientScope
-                {
-                    ClientId = adminClient.Id,
-                    Scope = "offline_access"
-                });
-            }
-
-            if (!hasMrWhoUse)
-            {
-                _logger.LogInformation("Adding mrwho.use scope to existing admin client");
-                _context.ClientScopes.Add(new ClientScope
-                {
-                    ClientId = adminClient.Id,
-                    Scope = "mrwho.use"
-                });
-            }
-
-            if (existingCorrectApiPermissions.Count == 0)
-            {
-                _logger.LogInformation("Adding API permissions with correct format to existing admin client");
-                
-                // Add API permissions with correct oidc:scope: prefix
-                var apiPermissions = new[] { "oidc:scope:api.read", "oidc:scope:api.write" };
-                foreach (var permission in apiPermissions)
-                {
-                    _context.ClientPermissions.Add(new ClientPermission
-                    {
-                        ClientId = adminClient.Id,
-                        Permission = permission
-                    });
-                }
-            }
-
-            // Add mrwho.use permission if missing
-            var hasMrWhoUsePermission = adminClient.Permissions.Any(p => p.Permission == "scp:mrwho.use");
-            if (!hasMrWhoUsePermission)
-            {
-                _logger.LogInformation("Adding mrwho.use permission to existing admin client");
-                _context.ClientPermissions.Add(new ClientPermission
-                {
-                    ClientId = adminClient.Id,
-                    Permission = "scp:mrwho.use"
-                });
-            }
-
-            if (missingRedirects.Count > 0 || missingPostLogout.Count > 0 || existingApiScopes.Count == 0 || existingCorrectApiPermissions.Count == 0 || !hasOfflineAccess || !hasMrWhoUse || !hasMrWhoUsePermission || oldApiPermissions.Any())
-            {
+                _context.ClientPermissions.RemoveRange(legacy);
                 await _context.SaveChangesAsync();
-                _logger.LogInformation("Updated admin client with missing URIs/scopes/permissions");
-                
-                // Reload the client with new settings
-                adminClient = await _context.Clients
-                    .Include(c => c.RedirectUris)
-                    .Include(c => c.PostLogoutUris)
-                    .Include(c => c.Scopes)
-                    .Include(c => c.Permissions)
-                    .FirstOrDefaultAsync(c => c.ClientId == "mrwho_admin_web");
+                _logger.LogInformation("Removed {Count} legacy permissions from admin client", legacy.Count);
+            }
+            if (!adminClient.Permissions.Any(p => p.Permission == "scp:mrwho.use"))
+            {
+                _context.ClientPermissions.Add(new ClientPermission { ClientId = adminClient.Id, Permission = "scp:mrwho.use" });
+                await _context.SaveChangesAsync();
             }
         }
 
@@ -453,7 +326,7 @@ public class OidcClientService : IOidcClientService
             }
 
             // Add scopes for demo1 (include API scopes)
-            var scopes = new[] { "openid", "email", "profile", "roles", "offline_access", "api.read", "api.write" };
+            var scopes = new[] { StandardScopes.OpenId, StandardScopes.Email, StandardScopes.Profile, StandardScopes.Roles, StandardScopes.OfflineAccess, StandardScopes.ApiRead, StandardScopes.ApiWrite };
             foreach (var scope in scopes)
             {
                 _context.ClientScopes.Add(new ClientScope
@@ -506,7 +379,7 @@ public class OidcClientService : IOidcClientService
                 "https://localhost:7037/",
                 "https://localhost:7037/signout-callback-oidc"
             };
-            var requiredScopes = new[] { "openid", "email", "profile", "roles", "offline_access", "api.read", "api.write" };
+            var requiredScopes = new[] { StandardScopes.OpenId, StandardScopes.Email, StandardScopes.Profile, StandardScopes.Roles, StandardScopes.OfflineAccess, StandardScopes.ApiRead, StandardScopes.ApiWrite };
             var requiredPermissions = new[]
             {
                 OpenIddictConstants.Permissions.Endpoints.Authorization,
@@ -605,16 +478,14 @@ public class OidcClientService : IOidcClientService
             _context.Clients.Add(m2mClient);
             await _context.SaveChangesAsync();
 
-            foreach (var scopeName in new[] { "api.read", "api.write" })
+            foreach (var scopeName in new[] { StandardScopes.ApiRead, StandardScopes.ApiWrite })
             {
                 _context.ClientScopes.Add(new ClientScope { ClientId = m2mClient.Id, Scope = scopeName });
             }
             foreach (var permission in new[]
             {
                 OpenIddictConstants.Permissions.Endpoints.Token,
-                OpenIddictConstants.Permissions.GrantTypes.ClientCredentials,
-                "scp:api.read",
-                "scp:api.write"
+                OpenIddictConstants.Permissions.GrantTypes.ClientCredentials
             })
             {
                 _context.ClientPermissions.Add(new ClientPermission { ClientId = m2mClient.Id, Permission = permission });
@@ -624,30 +495,8 @@ public class OidcClientService : IOidcClientService
         }
         else
         {
-            var added = false;
-            foreach (var scopeName in new[] { "api.read", "api.write" }.Where(s => !m2mClient.Scopes.Any(cs => cs.Scope == s)))
-            {
-                _context.ClientScopes.Add(new ClientScope { ClientId = m2mClient.Id, Scope = scopeName });
-                added = true;
-            }
-            var requiredPermissionsM2M = new[]
-            {
-                OpenIddictConstants.Permissions.Endpoints.Token,
-                OpenIddictConstants.Permissions.GrantTypes.ClientCredentials,
-                "scp:api.read",
-                "scp:api.write"
-            };
-            var existingPermSetM2M = m2mClient.Permissions.Select(p => p.Permission).ToHashSet();
-            foreach (var perm in requiredPermissionsM2M.Where(p => !existingPermSetM2M.Contains(p)))
-            {
-                _context.ClientPermissions.Add(new ClientPermission { ClientId = m2mClient.Id, Permission = perm });
-                added = true;
-            }
-            if (added)
-            {
-                await _context.SaveChangesAsync();
-                _logger.LogInformation("Updated machine-to-machine client 'mrwho_demo_api_client' with missing scopes/permissions.");
-            }
+            var legacy = m2mClient.Permissions.Where(p => p.Permission.StartsWith("oidc:scope:") || (p.Permission.StartsWith("api.") && !p.Permission.StartsWith("scp:")) || p.Permission == "scp:openid").ToList();
+            if (legacy.Any()) { _context.ClientPermissions.RemoveRange(legacy); await _context.SaveChangesAsync(); }
         }
 
         // 3. Create admin user if it doesn't exist
@@ -733,7 +582,6 @@ public class OidcClientService : IOidcClientService
         await SyncClientWithOpenIddictAsync(adminClient!);
         await SyncClientWithOpenIddictAsync(demo1Client!);
         await SyncClientWithOpenIddictAsync(m2mClient!);
-        await FixExistingApiPermissionsAsync(adminClient!);
     }
 
     public async Task InitializeDefaultRealmAndClientsAsync()
@@ -791,16 +639,14 @@ public class OidcClientService : IOidcClientService
             await _context.SaveChangesAsync();
 
             // Add redirect URIs
-            var redirectUris = new[]
+            foreach (var uri in new[]
             {
                 "https://localhost:7001/callback",
                 "http://localhost:5001/callback",
                 "https://localhost:7002/",
                 "https://localhost:7002/callback",
                 "https://localhost:7002/signin-oidc"
-            };
-
-            foreach (var uri in redirectUris)
+            })
             {
                 _context.ClientRedirectUris.Add(new ClientRedirectUri
                 {
@@ -810,15 +656,13 @@ public class OidcClientService : IOidcClientService
             }
 
             // Add post-logout URIs
-            var postLogoutUris = new[]
+            foreach (var uri in new[]
             {
                 "https://localhost:7001/",
                 "http://localhost:5001/",
                 "https://localhost:7002/",
                 "https://localhost:7002/signout-callback-oidc"
-            };
-
-            foreach (var uri in postLogoutUris)
+            })
             {
                 _context.ClientPostLogoutUris.Add(new ClientPostLogoutUri
                 {
@@ -828,8 +672,7 @@ public class OidcClientService : IOidcClientService
             }
 
             // Add scopes
-            var scopes = new[] { "openid", "email", "profile", "roles" };
-            foreach (var scope in scopes)
+            foreach (var scope in new[] { StandardScopes.OpenId, StandardScopes.Email, StandardScopes.Profile, StandardScopes.Roles })
             {
                 _context.ClientScopes.Add(new ClientScope
                 {
@@ -839,7 +682,7 @@ public class OidcClientService : IOidcClientService
             }
 
             // Add permissions
-            var permissions = new[]
+            foreach (var permission in new[]
             {
                 OpenIddictConstants.Permissions.Endpoints.Authorization,
                 OpenIddictConstants.Permissions.Endpoints.Token,
@@ -853,9 +696,7 @@ public class OidcClientService : IOidcClientService
                 OpenIddictConstants.Permissions.Scopes.Profile,
                 OpenIddictConstants.Permissions.Scopes.Roles,
                 OpenIddictConstants.Permissions.ResponseTypes.Code
-            };
-
-            foreach (var permission in permissions)
+            })
             {
                 _context.ClientPermissions.Add(new ClientPermission
                 {
@@ -892,195 +733,73 @@ public class OidcClientService : IOidcClientService
     {
         try
         {
-            // Guard: confidential/machine clients requiring a secret must have one.
-            if ((client.ClientType == ClientType.Confidential || client.ClientType == ClientType.Machine)
-                && client.RequireClientSecret
-                && string.IsNullOrWhiteSpace(client.ClientSecret))
+            if ((client.ClientType == ClientType.Confidential || client.ClientType == ClientType.Machine) && client.RequireClientSecret && string.IsNullOrWhiteSpace(client.ClientSecret))
             {
-                _logger.LogWarning("Skipping OpenIddict sync for client '{ClientId}': confidential/machine client requires a secret but none is set.", client.ClientId);
-                return; // Don't fail startup; just skip this invalid record.
+                _logger.LogWarning("Skipping OpenIddict sync for client '{ClientId}': missing secret.", client.ClientId);
+                return;
             }
 
-            // Remove existing OpenIddict application if it exists
             var existingClient = await _applicationManager.FindByClientIdAsync(client.ClientId);
             if (existingClient != null)
-            {
                 await _applicationManager.DeleteAsync(existingClient);
-            }
 
-            // Create new OpenIddict application descriptor
             var descriptor = new OpenIddictApplicationDescriptor
             {
                 ClientId = client.ClientId,
                 ClientSecret = client.ClientSecret,
                 DisplayName = client.Name,
-                ClientType = client.ClientType == ClientType.Public 
-                    ? OpenIddictConstants.ClientTypes.Public 
-                    : OpenIddictConstants.ClientTypes.Confidential
+                ClientType = client.ClientType == ClientType.Public ? OpenIddictConstants.ClientTypes.Public : OpenIddictConstants.ClientTypes.Confidential
             };
 
-            // Add permissions based on client configuration
             if (client.AllowAuthorizationCodeFlow)
             {
                 descriptor.Permissions.Add(OpenIddictConstants.Permissions.GrantTypes.AuthorizationCode);
                 descriptor.Permissions.Add(OpenIddictConstants.Permissions.Endpoints.Authorization);
                 descriptor.Permissions.Add(OpenIddictConstants.Permissions.ResponseTypes.Code);
             }
-
             if (client.AllowClientCredentialsFlow)
-            {
                 descriptor.Permissions.Add(OpenIddictConstants.Permissions.GrantTypes.ClientCredentials);
-            }
-
             if (client.AllowPasswordFlow)
-            {
                 descriptor.Permissions.Add(OpenIddictConstants.Permissions.GrantTypes.Password);
-            }
-
             if (client.AllowRefreshTokenFlow)
-            {
                 descriptor.Permissions.Add(OpenIddictConstants.Permissions.GrantTypes.RefreshToken);
-            }
-
-            // Always add token endpoint
             descriptor.Permissions.Add(OpenIddictConstants.Permissions.Endpoints.Token);
 
-            var hasOpenIdScope = false;
-            // Add scope permissions based on client scopes
-            foreach (var scope in client.Scopes)
-            {
-                switch (scope.Scope.ToLower())
-                {
-                    case "openid":
-                        descriptor.Permissions.Add("scp:openid");
-                        hasOpenIdScope = true;
-                        break;
-                    case "email":
-                        descriptor.Permissions.Add(OpenIddictConstants.Permissions.Scopes.Email);
-                        break;
-                    case "profile":
-                        descriptor.Permissions.Add(OpenIddictConstants.Permissions.Scopes.Profile);
-                        break;
-                    case "roles":
-                        descriptor.Permissions.Add(OpenIddictConstants.Permissions.Scopes.Roles);
-                        break;
-                    case "offline_access":
-                        descriptor.Permissions.Add($"scp:{scope.Scope}");
-                        break;
-                    case "api.read":
-                    case "api.write":
-                        descriptor.Permissions.Add($"scp:{scope.Scope}");
-                        break;
-                    default:
-                        descriptor.Permissions.Add($"scp:{scope.Scope}");
-                        break;
-                }
-            }
+            var (hasOpenId, scopePerms) = BuildScopePermissions(client.Scopes.Select(s => s.Scope));
+            foreach (var p in scopePerms) descriptor.Permissions.Add(p);
 
-            // IMPORTANT: Also add the endpoint access if we have openid scope 
-            if (hasOpenIdScope)
-            {
+            if (hasOpenId)
                 descriptor.Permissions.Add(OpenIddictConstants.Permissions.Endpoints.EndSession);
-            }
 
-            // NEW: Conditionally expose userinfo endpoint if allowed and openid scope present
-            if (client.AllowAccessToUserInfoEndpoint == true)
+            if (client.AllowAccessToUserInfoEndpoint == true && hasOpenId)
+                descriptor.Permissions.Add(UserInfoEndpointPermission);
+            if (client.AllowAccessToRevocationEndpoint == true)
+                descriptor.Permissions.Add(RevocationEndpointPermission);
+            if (client.AllowAccessToIntrospectionEndpoint == true)
+                descriptor.Permissions.Add(IntrospectionEndpointPermission);
+
+            // Additional stored permissions (exclude scope-derived and standard endpoint ones already added)
+            foreach (var permission in client.Permissions.Select(p => p.Permission))
             {
-                if (hasOpenIdScope)
-                {
-                    // Constant not available in current OpenIddict version, use raw permission string
-                    descriptor.Permissions.Add("endpoints:userinfo");
-                }
-                else
-                {
-                    _logger.LogWarning("Client '{ClientId}' requested UserInfo endpoint access but does not have 'openid' scope. Skipping permission.", client.ClientId);
-                }
+                if (permission.StartsWith("scp:") || permission.StartsWith("oidc:scope:"))
+                    continue; // derived or legacy (already cleaned up)
+                if (descriptor.Permissions.Contains(permission))
+                    continue;
+                descriptor.Permissions.Add(permission);
             }
 
-            // Add additional permissions from client permissions (skip the ones handled above)
-            foreach (var permission in client.Permissions)
-            {
-                if (!permission.Permission.StartsWith("oidc:scope:") && 
-                    !permission.Permission.StartsWith("api.") &&
-                    !permission.Permission.StartsWith("scp:") &&
-                    !descriptor.Permissions.Contains(permission.Permission))
-                {
-                    descriptor.Permissions.Add(permission.Permission);
-                }
-            }
+            foreach (var redirect in client.RedirectUris)
+                descriptor.RedirectUris.Add(new Uri(redirect.Uri));
+            foreach (var postLogout in client.PostLogoutUris)
+                descriptor.PostLogoutRedirectUris.Add(new Uri(postLogout.Uri));
 
-            // Add redirect URIs
-            foreach (var redirectUri in client.RedirectUris)
-            {
-                descriptor.RedirectUris.Add(new Uri(redirectUri.Uri));
-            }
-
-            // Add post-logout redirect URIs
-            foreach (var postLogoutUri in client.PostLogoutUris)
-            {
-                descriptor.PostLogoutRedirectUris.Add(new Uri(postLogoutUri.Uri));
-            }
-
-            // Create the OpenIddict application
             await _applicationManager.CreateAsync(descriptor);
-
-            _logger.LogInformation("Successfully synced client '{ClientId}' with OpenIddict. Permissions: {Permissions}", 
-                client.ClientId, string.Join(", ", descriptor.Permissions));
+            _logger.LogInformation("Synced client '{ClientId}' with permissions: {Permissions}", client.ClientId, string.Join(", ", descriptor.Permissions));
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to sync client '{ClientId}' with OpenIddict", client.ClientId);
+            _logger.LogError(ex, "Failed to sync client '{ClientId}'", client.ClientId);
             throw;
-        }
-    }
-
-    private async Task FixExistingApiPermissionsAsync(Client client)
-    {
-        // Ensure any existing API permissions are corrected to the new format
-        var apiScopes = new[] { "api.read", "api.write" };
-        var correctApiPermissions = apiScopes.Select(scope => $"scp:{scope}").ToList();
-
-        // Remove old API permissions with incorrect format
-        var oldApiPermissions = client.Permissions
-            .Where(p => (p.Permission.StartsWith("api.") && !p.Permission.StartsWith("scp:")) ||
-                       p.Permission.StartsWith("oidc:scope:api.") ||
-                       p.Permission.Contains("Prefixes.Scope"))
-            .ToList();
-
-        // Remove old API permissions
-        if (oldApiPermissions.Any())
-        {
-            _logger.LogInformation("Removing old API permissions with incorrect format for client '{ClientId}': {Permissions}", 
-                client.ClientId, string.Join(", ", oldApiPermissions.Select(p => p.Permission)));
-            foreach (var oldPermission in oldApiPermissions)
-            {
-                _context.ClientPermissions.Remove(oldPermission);
-            }
-        }
-
-        // Add missing correct API permissions
-        var missingApiPermissions = correctApiPermissions
-            .Where(p => !client.Permissions.Any(cp => cp.Permission == p))
-            .ToList();
-
-        if (missingApiPermissions.Any())
-        {
-            _logger.LogInformation("Adding missing correct API permissions for client '{ClientId}': {Permissions}", 
-                client.ClientId, string.Join(", ", missingApiPermissions));
-            foreach (var permission in missingApiPermissions)
-            {
-                _context.ClientPermissions.Add(new ClientPermission
-                {
-                    ClientId = client.Id,
-                    Permission = permission
-                });
-            }
-        }
-
-        if (oldApiPermissions.Any() || missingApiPermissions.Any())
-        {
-            await _context.SaveChangesAsync();
-            _logger.LogInformation("Successfully fixed API permissions for client '{ClientId}'", client.ClientId);
         }
     }
 }

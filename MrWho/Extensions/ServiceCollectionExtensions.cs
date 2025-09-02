@@ -294,13 +294,15 @@ public static class ServiceCollectionExtensions
                 // Custom UserInfo handler descriptor (uses IUserInfoHandler)
                 options.AddEventHandler(CustomUserInfoHandler.Descriptor);
 
-                // Enable the authorization and token endpoints
+                // Enable endpoints (added revocation + introspection for step 2)
                 options.SetAuthorizationEndpointUris("/connect/authorize")
                        .SetTokenEndpointUris("/connect/token")
                        .SetEndSessionEndpointUris("/connect/logout")
                        .SetConfigurationEndpointUris("/.well-known/openid-configuration")
                        .SetUserInfoEndpointUris("/connect/userinfo")
-                       // Device authorization flow endpoints not configured: extension methods not present in current packages
+                       .SetRevocationEndpointUris("/connect/revocation")
+                       .SetIntrospectionEndpointUris("/connect/introspect")
+                       // Flows
                        .AllowAuthorizationCodeFlow()
                        .AllowClientCredentialsFlow()
                        .AllowRefreshTokenFlow(); // device auth flow deferred until package alignment
@@ -324,9 +326,9 @@ public static class ServiceCollectionExtensions
                                       OpenIddictConstants.Scopes.Email,
                                       OpenIddictConstants.Scopes.Profile,
                                       OpenIddictConstants.Scopes.Roles,
-                                      OpenIddictConstants.Scopes.OfflineAccess, // CRITICAL: Required for refresh tokens
-                                      StandardScopes.ApiRead,   // Use constant
-                                      StandardScopes.ApiWrite,  // Use constant
+                                      OpenIddictConstants.Scopes.OfflineAccess,
+                                      StandardScopes.ApiRead,
+                                      StandardScopes.ApiWrite,
                                       StandardScopes.MrWhoUse,
                                       "roles.global",
                                       "roles.client",
@@ -485,20 +487,6 @@ public static class ServiceCollectionExtensions
     {
         // Configure authorization - all policies handled by DynamicAuthorizationPolicyProvider
         services.AddAuthorization();
-
-        // The DynamicAuthorizationPolicyProvider (registered in AddMrWhoServices) handles:
-        // ? UserInfoPolicy - Static security policy for OpenIddict validation
-        // ? AdminOnly - Static policy for admin client authentication  
-        // ? DemoAccess - Static policy for demo client authentication
-        // ? ApiAccess - Static policy for API client + OpenIddict validation
-        // ? Default Policy - Dynamic policy loading ALL client schemes from database
-        // ? Client_{clientId} - Dynamic policies for any client (e.g., "Client_my_custom_client")
-        //
-        // Benefits:
-        // ?? Single source of truth for all authorization configuration
-        // ?? Database-driven default policy with automatic client inclusion
-        // ?? No code changes needed when adding new clients to database
-        // ?? Centralized policy logic with proper fallback handling
 
         return services;
     }
