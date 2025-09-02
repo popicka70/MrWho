@@ -12,6 +12,7 @@ namespace MrWhoAdmin.Web.Components.Pages
         internal List<ScopeSelection> scopeItems = new();
         internal string? scopeSearch;
         private bool isLoading = false; // stays private (only used in main page)
+        internal bool IsLoading => isLoading; // expose read-only to tab components
         private int selectedTabIndex = 0; // stays private (only used in main page)
 
         // Dropdown data

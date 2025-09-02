@@ -1,4 +1,13 @@
 @using MrWho.Shared
+@if (editClient.IsLoading)
+{
+    <RadzenCard class="rz-my-4">
+        <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+        <RadzenText class="rz-mt-3">Loading client data...</RadzenText>
+    </RadzenCard>
+}
+else
+{
 <RadzenStack Gap="0.75rem">
     <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Allowed OAuth/OIDC Flows</RadzenText>
     <RadzenFormField Text="Authorization Code Flow" Variant="Variant.Outlined">
@@ -67,6 +76,7 @@
         </Helper>
     </RadzenFormField>
 </RadzenStack>
+}
 
 @code {
     [Parameter] public EditClient editClient { get; set; } = null!;
