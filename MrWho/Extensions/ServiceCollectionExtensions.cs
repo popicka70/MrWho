@@ -1,25 +1,24 @@
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Cookies; // ensure CookieAuthenticationOptions is available
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.RateLimiting; // rate limiting
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics; // added for RelationalEventId
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Options;
 using MrWho.Data;
 using MrWho.Handlers;
-using MrWho.Handlers.Users; // added for user handler interfaces/implementations
-using MrWho.Options; // for CookieSeparationMode
+using MrWho.Handlers.Users;
+using MrWho.Options;
 using MrWho.Services;
 using MrWho.Shared;
-using MrWho.Shared.Authentication; // for CookieSchemeNaming
+using MrWho.Shared.Authentication;
 using OpenIddict.Abstractions;
-using OpenIddict.Client; // added for client options
-using OpenIddict.Client.AspNetCore; // added for aspnetcore integration
-using OpenIddict.Client.SystemNetHttp; // added for http integration
-using System.Threading.RateLimiting; // rate limiting options
-using Microsoft.AspNetCore.Hosting; // added for IWebHostEnvironment
-// removed OpenIddict.Server usings for device flow (not enabled)
+using OpenIddict.Client;
+using OpenIddict.Client.AspNetCore;
+using OpenIddict.Client.SystemNetHttp;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.Hosting;
 
 namespace MrWho.Extensions;
 
@@ -277,7 +276,6 @@ public static class ServiceCollectionExtensions
 
     public static IServiceCollection AddMrWhoOpenIddict(this IServiceCollection services, IConfiguration configuration, IWebHostEnvironment environment)
     {
-        // Configure OpenIddict
         services.AddOpenIddict()
             .AddCore(options =>
             {
@@ -302,9 +300,10 @@ public static class ServiceCollectionExtensions
                        .SetEndSessionEndpointUris("/connect/logout")
                        .SetConfigurationEndpointUris("/.well-known/openid-configuration")
                        .SetUserInfoEndpointUris("/connect/userinfo")
+                       // Device authorization flow endpoints not configured: extension methods not present in current packages
                        .AllowAuthorizationCodeFlow()
                        .AllowClientCredentialsFlow()
-                       .AllowRefreshTokenFlow(); // device code flow removed due to missing extensions
+                       .AllowRefreshTokenFlow(); // device auth flow deferred until package alignment
 
                 // Enforce PKCE for auth code flow (Option 1)
                 options.RequireProofKeyForCodeExchange();
@@ -344,7 +343,7 @@ public static class ServiceCollectionExtensions
                 options.UseAspNetCore()
                        .EnableAuthorizationEndpointPassthrough()
                        .EnableTokenEndpointPassthrough()
-                       .EnableEndSessionEndpointPassthrough();
+                       .EnableEndSessionEndpointPassthrough(); // leave device/verification with default UI for now
             })
             .AddValidation(options =>
             {
@@ -408,6 +407,8 @@ public static class ServiceCollectionExtensions
         int tokenPerHour = section.GetValue<int?>("TokenPerHour") ?? 60;
         int authorizePerHour = section.GetValue<int?>("AuthorizePerHour") ?? 120;
         int userInfoPerHour = section.GetValue<int?>("UserInfoPerHour") ?? 240;
+        int devicePerHour = section.GetValue<int?>("DevicePerHour") ?? 60; // new
+        int verifyPerHour = section.GetValue<int?>("VerifyPerHour") ?? 120; // new
 
         services.AddRateLimiter(options =>
         {
@@ -450,6 +451,22 @@ public static class ServiceCollectionExtensions
             options.AddPolicy("rl.userinfo", ctx => RateLimitPartition.GetFixedWindowLimiter(GetRemoteIp(ctx), _ => new FixedWindowRateLimiterOptions
             {
                 PermitLimit = Math.Max(1, userInfoPerHour),
+                Window = TimeSpan.FromHours(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+            options.AddPolicy("rl.device", ctx => RateLimitPartition.GetFixedWindowLimiter(GetRemoteIp(ctx), _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = Math.Max(1, devicePerHour),
+                Window = TimeSpan.FromHours(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+            options.AddPolicy("rl.verify", ctx => RateLimitPartition.GetFixedWindowLimiter(GetRemoteIp(ctx), _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = Math.Max(1, verifyPerHour),
                 Window = TimeSpan.FromHours(1),
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
                 QueueLimit = 0,
