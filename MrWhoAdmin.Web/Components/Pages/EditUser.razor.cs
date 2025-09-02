@@ -18,6 +18,7 @@ public partial class EditUser
     [Inject] protected IUserClientsApiService UserClientsApi { get; set; } = default!;
     [Inject] protected IClientsApiService ClientsApi { get; set; } = default!;
     [Inject] protected IClientUsersApiService ClientUsersApi { get; set; } = default!;
+    [Inject] protected PersistentComponentState AppState { get; set; } = default!; // cache between prerender + interactive
 
     internal bool IsEdit => !string.IsNullOrEmpty(Id);
     internal int selectedTabIndex = 0;
@@ -62,11 +63,34 @@ public partial class EditUser
     internal List<ClientRoleDto> aggregatedAllClientRoles = new();
     internal Dictionary<string, List<string>> aggregatedUserClientRolesByClient = new();
 
+    // Caching support (option B)
+    private const string StateKeyPrefix = "EditUserContext_";
+    private UserEditContextDto? _lastContext; // hold original context for persistence
+    private PersistingComponentStateSubscription? _persistingSubscription;
+
     protected override async Task OnInitializedAsync()
     {
         if (IsEdit)
         {
-            await LoadEditContext();
+            var cacheKey = StateKeyPrefix + Id;
+            // Try to hydrate from prerender state (interactive pass)
+            if (AppState.TryTakeFromJson<UserEditContextDto>(cacheKey, out var cached) && cached?.User != null)
+            {
+                ApplyContext(cached);
+            }
+            else
+            {
+                await LoadEditContext();
+                // Register persistence for prerender disposal only once
+                _persistingSubscription = AppState.RegisterOnPersisting(() =>
+                {
+                    if (_lastContext != null)
+                    {
+                        AppState.PersistAsJson(cacheKey, _lastContext);
+                    }
+                    return Task.CompletedTask;
+                });
+            }
         }
         else
         {
@@ -74,6 +98,29 @@ public partial class EditUser
             userModel.PhoneNumberConfirmed = false;
             userModel.TwoFactorEnabled = false;
         }
+    }
+
+    private void ApplyContext(UserEditContextDto ctx)
+    {
+        currentUser = ctx.User;
+        userModel = new UserEditModel
+        {
+            UserName = currentUser.UserName,
+            Email = currentUser.Email,
+            PhoneNumber = currentUser.PhoneNumber,
+            EmailConfirmed = currentUser.EmailConfirmed,
+            PhoneNumberConfirmed = currentUser.PhoneNumberConfirmed,
+            TwoFactorEnabled = currentUser.TwoFactorEnabled
+        };
+        userClaims = currentUser.Claims;
+        userRoles = ctx.UserRoles;
+        availableRoles = ctx.AvailableRoles;
+        assignedClients = ctx.AssignedClients;
+        availableClients = ctx.AvailableClients;
+        profileState = ctx.ProfileState;
+        aggregatedAllClients = ctx.AllClients;
+        aggregatedAllClientRoles = ctx.AllClientRoles;
+        aggregatedUserClientRolesByClient = ctx.UserClientRolesByClient;
     }
 
     private async Task LoadEditContext()
@@ -88,27 +135,8 @@ public partial class EditUser
                 Navigation.NavigateTo("/users");
                 return;
             }
-            currentUser = ctx.User;
-            userModel = new UserEditModel
-            {
-                UserName = currentUser.UserName,
-                Email = currentUser.Email,
-                PhoneNumber = currentUser.PhoneNumber,
-                EmailConfirmed = currentUser.EmailConfirmed,
-                PhoneNumberConfirmed = currentUser.PhoneNumberConfirmed,
-                TwoFactorEnabled = currentUser.TwoFactorEnabled
-            };
-            userClaims = currentUser.Claims;
-            userRoles = ctx.UserRoles;
-            availableRoles = ctx.AvailableRoles;
-            assignedClients = ctx.AssignedClients;
-            availableClients = ctx.AvailableClients;
-            profileState = ctx.ProfileState;
-
-            // Pass-through for nested tabs (avoid extra HTTP calls)
-            aggregatedAllClients = ctx.AllClients;
-            aggregatedAllClientRoles = ctx.AllClientRoles;
-            aggregatedUserClientRolesByClient = ctx.UserClientRolesByClient;
+            _lastContext = ctx; // keep for persistence
+            ApplyContext(ctx);
         }
         catch (Exception ex)
         {
