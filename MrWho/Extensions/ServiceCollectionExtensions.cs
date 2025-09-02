@@ -18,6 +18,7 @@ using OpenIddict.Client; // added for client options
 using OpenIddict.Client.AspNetCore; // added for aspnetcore integration
 using OpenIddict.Client.SystemNetHttp; // added for http integration
 using System.Threading.RateLimiting; // rate limiting options
+using Microsoft.AspNetCore.Hosting; // added for IWebHostEnvironment
 
 namespace MrWho.Extensions;
 
@@ -173,8 +174,8 @@ public static class ServiceCollectionExtensions
             options.LogoutPath = "/connect/logout";
             options.AccessDeniedPath = "/connect/access-denied";
             options.SlidingExpiration = true;
-            options.Cookie.SameSite = SameSiteMode.None; // Required for external IdP (cross-site) login/logout
-            options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+            options.Cookie.SameSite = SameSiteMode.None; // cross-site OIDC flows
+            options.Cookie.SecurePolicy = CookieSecurePolicy.Always; // Enforce HTTPS (Option 3)
             options.Cookie.Name = CookieSchemeNaming.DefaultCookieName; // Ensure cookie name is explicitly set
             options.Cookie.HttpOnly = true; // Security best practice
             options.ExpireTimeSpan = TimeSpan.FromHours(8); // Consistent with client cookies
@@ -225,7 +226,7 @@ public static class ServiceCollectionExtensions
             {
                 options.Cookie.Name = actualCookieName;
                 options.Cookie.HttpOnly = true;
-                options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+                options.Cookie.SecurePolicy = CookieSecurePolicy.Always; // Enforce HTTPS (Option 3)
                 options.Cookie.SameSite = SameSiteMode.None; // Required for cross-site OIDC redirects
                 options.ExpireTimeSpan = TimeSpan.FromHours(24);
                 options.SlidingExpiration = true;
@@ -249,9 +250,6 @@ public static class ServiceCollectionExtensions
             ? parsed
             : CookieSeparationMode.ByClient;
 
-        // IMPORTANT: In None mode we want ONLY the default Identity scheme/cookie. Do NOT register a client-specific scheme
-        // that reuses the same cookie name (.AspNetCore.Identity.Application) or we get two schemes sharing one cookie
-        // which can break Authenticate/Challenge flows and prevent the login page from rendering.
         if (mode == CookieSeparationMode.None)
         {
             return services; // default Identity cookie already configured in AddMrWhoIdentityWithClientCookies
@@ -273,11 +271,10 @@ public static class ServiceCollectionExtensions
             options.ExpireTimeSpan = TimeSpan.FromHours(8); // Work day session
         });
 
-        // Note: Remaining clients are registered dynamically by DynamicClientCookieService from the database.
         return services;
     }
 
-    public static IServiceCollection AddMrWhoOpenIddict(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddMrWhoOpenIddict(this IServiceCollection services, IConfiguration configuration, IWebHostEnvironment environment)
     {
         // Configure OpenIddict
         services.AddOpenIddict()
@@ -305,18 +302,24 @@ public static class ServiceCollectionExtensions
                        .SetConfigurationEndpointUris("/.well-known/openid-configuration")
                        .SetUserInfoEndpointUris("/connect/userinfo")
 
-                       // Enable grant types
+                       // Enable grant types (removed password flow - Option 1)
                        .AllowAuthorizationCodeFlow()
                        .AllowClientCredentialsFlow()
-                       .AllowPasswordFlow()
                        .AllowRefreshTokenFlow();
+
+                // Enforce PKCE for auth code flow (Option 1)
+                options.RequireProofKeyForCodeExchange();
 
                 // Configure token lifetimes for better refresh token experience
                 options.SetAccessTokenLifetime(TimeSpan.FromMinutes(60))    // 1 hour access tokens
                        .SetRefreshTokenLifetime(TimeSpan.FromDays(14));     // 14 days refresh tokens
 
-                // Configure refresh token behavior
-                options.DisableRollingRefreshTokens(); // Disable refresh token rotation for development
+                // Refresh token rotation (Option 2): enable in non-development
+                if (environment.IsDevelopment())
+                {
+                    options.DisableRollingRefreshTokens();
+                }
+                // In non-development, rolling refresh tokens remain enabled by default; no explicit call needed
 
                 // Register scopes (including API scopes)
                 options.RegisterScopes(StandardScopes.OpenId,
@@ -343,7 +346,6 @@ public static class ServiceCollectionExtensions
                        .EnableAuthorizationEndpointPassthrough()
                        .EnableTokenEndpointPassthrough() // ADDED: allow custom minimal API handler for /connect/token
                        .EnableEndSessionEndpointPassthrough();
-                       //.EnableUserInfoEndpointPassthrough();
             })
             .AddValidation(options =>
             {

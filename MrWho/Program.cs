@@ -38,7 +38,8 @@ builder.Services.AddMrWhoAntiforgery();
 builder.Services.AddMrWhoIdentityWithClientCookies();
 builder.Services.AddMrWhoServices(); // includes registrar & hosted service
 builder.Services.AddMrWhoClientCookies(builder.Configuration); // config-driven naming
-builder.Services.AddMrWhoOpenIddict(builder.Configuration);
+// Updated to pass environment (Options 1 & 2 changes inside)
+builder.Services.AddMrWhoOpenIddict(builder.Configuration, builder.Environment);
 
 // Ensure Challenge() uses the Identity application cookie (redirects to login page)
 builder.Services.AddAuthentication(options =>
@@ -70,10 +71,17 @@ builder.Services.PostConfigureAll<CookieAuthenticationOptions>(options =>
     {
         options.Cookie.Domain = configuredCookieDomain;
     }
-    if (configuredRequireHttps)
+    // Always enforce Secure in production (Option 3). If explicitly requested insecure (dev), SameAsRequest is acceptable elsewhere.
+    if (builder.Environment.IsDevelopment())
+    {
+        if (configuredRequireHttps)
+        {
+            options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+        }
+    }
+    else
     {
         options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-        options.Cookie.SameSite = SameSiteMode.Lax;
     }
 });
 
@@ -108,10 +116,9 @@ builder.Services.AddSession(options =>
     {
         options.Cookie.Domain = configuredCookieDomain;
     }
-    if (configuredRequireHttps)
+    if (!builder.Environment.IsDevelopment())
     {
         options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
-        options.Cookie.SameSite = SameSiteMode.Lax;
     }
 });
 
