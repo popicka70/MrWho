@@ -15,9 +15,10 @@
 </head>
 
 <body>
-    <RadzenComponents />
+    <!-- Force non-prerendered interactive server mode globally -->
+    <RadzenComponents @rendermode="InteractiveServer" />
     <CascadingAuthenticationState>
-        <Routes />
+        <Routes @rendermode="InteractiveServer" />
     </CascadingAuthenticationState>
     <script src="@Assets["_framework/blazor.web.js"]"></script>
     <script src="_content/Radzen.Blazor/Radzen.Blazor.js"></script>

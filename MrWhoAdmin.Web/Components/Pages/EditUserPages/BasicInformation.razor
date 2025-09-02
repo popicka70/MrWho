@@ -1,6 +1,15 @@
 @using MrWho.Shared.Models
 
-<div style="padding: 1rem;">
+@if (editUser.isLoading)
+{
+    <RadzenCard class="rz-my-4">
+        <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+        <RadzenText class="rz-mt-3">Loading user data...</RadzenText>
+    </RadzenCard>
+}
+else
+{
+<div style="padding: 1 rem;">
     <RadzenStack Gap="2rem">
         <RadzenStack Gap="0.75rem" class="rz-mb-2">
             <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">User Information</RadzenText>
@@ -108,6 +117,7 @@
         </RadzenStack>
     </RadzenStack>
 </div>
+}
 
 @code {
     [Parameter] public EditUser editUser { get; set; } = null!;

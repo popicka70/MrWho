@@ -136,6 +136,8 @@ public static class ServiceCollectionExtensions
             options.UseOpenIddict();
         });
 
+        // Removed AddDbContextFactory due to lifetime conflict; use IServiceScopeFactory for parallel read contexts.
+
         return services;
     }
 

@@ -3,6 +3,13 @@
 {
     <RadzenAlert AlertStyle="AlertStyle.Info"><RadzenText>Save user first to manage claims.</RadzenText></RadzenAlert>
 }
+else if (editUser.isLoading)
+{
+    <RadzenCard class="rz-my-4">
+        <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+        <RadzenText class="rz-mt-3">Loading claims...</RadzenText>
+    </RadzenCard>
+}
 else
 {
     <div style="padding: 1rem;">

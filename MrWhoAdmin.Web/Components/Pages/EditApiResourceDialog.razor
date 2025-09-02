@@ -290,7 +290,14 @@ else
                 IsEnabled = apiResource.IsEnabled,
                 Scopes = new List<string>(apiResource.Scopes),
                 UserClaims = new List<string>(apiResource.UserClaims),
-                Secrets = new List<CreateApiSecretRequest>(),
+                // Map existing secrets so they display in the UI (value left blank for security)
+                Secrets = apiResource.Secrets?.Select(s => new CreateApiSecretRequest
+                {
+                    Description = s.Description,
+                    Expiration = s.Expiration,
+                    Type = s.Type,
+                    Value = string.Empty // do not expose existing secret value
+                }).ToList() ?? new List<CreateApiSecretRequest>(),
                 ClaimDestinations = new List<string>(apiResource.ClaimDestinations ?? new())
             };
             claimDestinations = model.ClaimDestinations ?? new();
