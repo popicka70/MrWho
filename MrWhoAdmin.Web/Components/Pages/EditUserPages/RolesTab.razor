@@ -14,53 +14,40 @@ else if (editUser.isLoading)
 else
 {
     <div style="padding: 1rem;">
-        <RadzenStack Gap="2rem">
-            <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
-                <RadzenText TextStyle="TextStyle.H6" Text="User Roles" />
-                <RadzenBadge BadgeStyle="BadgeStyle.Success" Text="@($"{editUser.userRoles.Count} roles")" />
-            </RadzenStack>
-            <RadzenCard Style="background-color: var(--rz-base-50);">
-                <RadzenStack Gap="1rem">
-                    <RadzenText TextStyle="TextStyle.Subtitle1" Text="Assign Role" />
-                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                        Roles provide groups of permissions and appear in the 'role' claim when the roles scope is requested.
-                    </RadzenText>
-                    <RadzenRow>
-                        <RadzenColumn Size="12" SizeMD="8">
-                            <RadzenFormField Text="Available Roles" Variant="Variant.Outlined">
-                                <RadzenDropDown @bind-Value="editUser.selectedRoleId" Data="@editUser.availableRoles" TextProperty="Name" ValueProperty="Id" Placeholder="Select a role to assign" Style="width: 100%;" />
-                            </RadzenFormField>
-                        </RadzenColumn>
-                        <RadzenColumn Size="12" SizeMD="4">
-                            <RadzenFormField Text="Action" Variant="Variant.Outlined">
-                                <RadzenButton Click="@(async () => await editUser.AssignRole())" Icon="add" ButtonStyle="ButtonStyle.Success" Text="Assign Role" Disabled="@(string.IsNullOrWhiteSpace(editUser.selectedRoleId))" IsBusy="@editUser.isAssigningRole" Style="width: 100%;" />
-                            </RadzenFormField>
-                        </RadzenColumn>
-                    </RadzenRow>
-                </RadzenStack>
-            </RadzenCard>
+        <RadzenStack Gap="1.5rem">
+            <RadzenText TextStyle="TextStyle.H6" Text="Role Assignments" />
             <RadzenStack Gap="0.75rem">
-                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Assigned Roles</RadzenText>
-                @if (editUser.userRoles.Any())
+                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Roles</RadzenText>
+                <RadzenDataGrid Data="@rows" TItem="RoleAssignmentRow" AllowPaging="true" PageSize="15" AllowSorting="true" AllowFiltering="true">
+                    <Columns>
+                        <RadzenDataGridColumn TItem="RoleAssignmentRow" Title="Assigned" Width="110px">
+                            <Template Context="row">
+                                <RadzenCheckBox Value="@row.IsAssigned" Change="@(async (bool? value) => await OnAssignmentChanged(row, value == true))" />
+                            </Template>
+                        </RadzenDataGridColumn>
+                        <RadzenDataGridColumn TItem="RoleAssignmentRow" Property="Name" Title="Name" />
+                        <RadzenDataGridColumn TItem="RoleAssignmentRow" Property="Description" Title="Description">
+                            <Template Context="row">
+                                @if (!string.IsNullOrWhiteSpace(row.Description))
+                                {
+                                    <RadzenText>@row.Description</RadzenText>
+                                }
+                                else
+                                {
+                                    <RadzenText class="rz-color-secondary">—</RadzenText>
+                                }
+                            </Template>
+                        </RadzenDataGridColumn>
+                        <RadzenDataGridColumn TItem="RoleAssignmentRow" Property="IsEnabled" Title="Enabled" Width="110px">
+                            <Template Context="row">
+                                <RadzenBadge BadgeStyle="@(row.IsEnabled ? BadgeStyle.Success : BadgeStyle.Danger)" Text="@(row.IsEnabled ? "Yes" : "No")" />
+                            </Template>
+                        </RadzenDataGridColumn>
+                    </Columns>
+                </RadzenDataGrid>
+                @if (!rows.Any())
                 {
-                    <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" Wrap="FlexWrap.Wrap">
-                        @foreach (var role in editUser.userRoles)
-                        {
-                            <RadzenBadge BadgeStyle="BadgeStyle.Success" class="rz-p-3">
-                                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
-                                    <RadzenIcon Icon="group" />
-                                    <RadzenText Text="@role.Name" />
-                                    <RadzenButton Click="@(async () => await editUser.RemoveRole(role.Id))" Icon="close" Size="ButtonSize.ExtraSmall" ButtonStyle="ButtonStyle.Danger" Variant="Variant.Text" />
-                                </RadzenStack>
-                            </RadzenBadge>
-                        }
-                    </RadzenStack>
-                }
-                else
-                {
-                    <RadzenAlert AlertStyle="AlertStyle.Info">
-                        <RadzenText>No roles assigned to this user. Assign roles above to grant permissions.</RadzenText>
-                    </RadzenAlert>
+                    <RadzenAlert AlertStyle="AlertStyle.Info"><RadzenText>No roles found.</RadzenText></RadzenAlert>
                 }
             </RadzenStack>
         </RadzenStack>
@@ -69,4 +56,69 @@ else
 
 @code {
     [Parameter] public EditUser editUser { get; set; } = null!;
+
+    private List<RoleAssignmentRow> rows = new();
+
+    protected override void OnParametersSet()
+    {
+        BuildRows();
+    }
+
+    private void BuildRows()
+    {
+        // Assigned roles
+        var assigned = editUser.userRoles.Select(r => new RoleAssignmentRow
+        {
+            RoleId = r.Id,
+            Name = r.Name,
+            Description = r.Description,
+            IsEnabled = r.IsEnabled,
+            IsAssigned = true
+        });
+        // Available roles (not assigned)
+        var available = editUser.availableRoles.Select(r => new RoleAssignmentRow
+        {
+            RoleId = r.Id,
+            Name = r.Name,
+            Description = r.Description,
+            IsEnabled = r.IsEnabled,
+            IsAssigned = false
+        });
+        rows = assigned.Concat(available)
+            .OrderBy(r => r.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private async Task OnAssignmentChanged(RoleAssignmentRow row, bool assign)
+    {
+        var original = row.IsAssigned;
+        row.IsAssigned = assign; // optimistic
+        bool success;
+        if (assign)
+        {
+            editUser.selectedRoleId = row.RoleId; // use existing assign logic
+            await editUser.AssignRole();
+            success = editUser.userRoles.Any(r => r.Id == row.RoleId);
+        }
+        else
+        {
+            await editUser.RemoveRole(row.RoleId);
+            success = !editUser.userRoles.Any(r => r.Id == row.RoleId);
+        }
+        if (!success)
+        {
+            row.IsAssigned = original; // revert
+        }
+        BuildRows();
+        StateHasChanged();
+    }
+
+    private class RoleAssignmentRow
+    {
+        public string RoleId { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public bool IsEnabled { get; set; }
+        public bool IsAssigned { get; set; }
+    }
 }
