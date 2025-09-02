@@ -18,7 +18,6 @@ public partial class EditUser
     [Inject] protected IUserClientsApiService UserClientsApi { get; set; } = default!;
     [Inject] protected IClientsApiService ClientsApi { get; set; } = default!;
     [Inject] protected IClientUsersApiService ClientUsersApi { get; set; } = default!;
-    [Inject] protected PersistentComponentState AppState { get; set; } = default!; // cache between prerender + interactive
 
     internal bool IsEdit => !string.IsNullOrEmpty(Id);
     internal int selectedTabIndex = 0;
@@ -63,34 +62,11 @@ public partial class EditUser
     internal List<ClientRoleDto> aggregatedAllClientRoles = new();
     internal Dictionary<string, List<string>> aggregatedUserClientRolesByClient = new();
 
-    // Caching support (option B)
-    private const string StateKeyPrefix = "EditUserContext_";
-    private UserEditContextDto? _lastContext; // hold original context for persistence
-    private PersistingComponentStateSubscription? _persistingSubscription;
-
     protected override async Task OnInitializedAsync()
     {
         if (IsEdit)
         {
-            var cacheKey = StateKeyPrefix + Id;
-            // Try to hydrate from prerender state (interactive pass)
-            if (AppState.TryTakeFromJson<UserEditContextDto>(cacheKey, out var cached) && cached?.User != null)
-            {
-                ApplyContext(cached);
-            }
-            else
-            {
-                await LoadEditContext();
-                // Register persistence for prerender disposal only once
-                _persistingSubscription = AppState.RegisterOnPersisting(() =>
-                {
-                    if (_lastContext != null)
-                    {
-                        AppState.PersistAsJson(cacheKey, _lastContext);
-                    }
-                    return Task.CompletedTask;
-                });
-            }
+            await LoadEditContext();
         }
         else
         {
@@ -102,7 +78,7 @@ public partial class EditUser
 
     private void ApplyContext(UserEditContextDto ctx)
     {
-        currentUser = ctx.User;
+        currentUser = ctx.User!;
         userModel = new UserEditModel
         {
             UserName = currentUser.UserName,
@@ -135,7 +111,6 @@ public partial class EditUser
                 Navigation.NavigateTo("/users");
                 return;
             }
-            _lastContext = ctx; // keep for persistence
             ApplyContext(ctx);
         }
         catch (Exception ex)
@@ -143,7 +118,10 @@ public partial class EditUser
             Logger.LogError(ex, "Error loading edit context for user {UserId}", Id);
             NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to load user context");
         }
-        finally { isLoading = false; }
+        finally 
+        { 
+            isLoading = false; 
+        }
     }
 
     private async Task LoadProfileState()
@@ -170,53 +148,6 @@ public partial class EditUser
             Logger.LogError(ex, "Error setting profile state for {UserId}", Id);
             NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to update profile state");
         }
-    }
-
-    private async Task LoadUser()
-    {
-        isLoading = true;
-        try
-        {
-            currentUser = await UsersApiService.GetUserWithClaimsAsync(Id!);
-            if (currentUser == null)
-            {
-                NotificationService.Notify(NotificationSeverity.Error, "Error", "User not found");
-                Navigation.NavigateTo("/users");
-                return;
-            }
-            userModel = new UserEditModel
-            {
-                UserName = currentUser.UserName,
-                Email = currentUser.Email,
-                PhoneNumber = currentUser.PhoneNumber,
-                EmailConfirmed = currentUser.EmailConfirmed,
-                PhoneNumberConfirmed = currentUser.PhoneNumberConfirmed,
-                TwoFactorEnabled = currentUser.TwoFactorEnabled
-            };
-            userClaims = currentUser.Claims;
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Error loading user {UserId}", Id);
-            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to load user");
-        }
-        finally { isLoading = false; }
-    }
-
-    private async Task LoadUserRoles()
-    {
-        try { userRoles = await UsersApiService.GetUserRolesAsync(Id!) ?? new(); }
-        catch (Exception ex) { Logger.LogError(ex, "Error loading user roles {UserId}", Id); }
-    }
-
-    private async Task LoadAvailableRoles()
-    {
-        try
-        {
-            var result = await UsersApiService.GetRolesAsync(page:1,pageSize:100);
-            availableRoles = result?.Items.Where(r => !userRoles.Any(ur => ur.Id == r.Id)).ToList() ?? new();
-        }
-        catch (Exception ex) { Logger.LogError(ex, "Error loading available roles"); }
     }
 
     private async Task LoadUserClients()
@@ -424,7 +355,7 @@ public partial class EditUser
             else NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to assign client");
         }
         catch (Exception ex) { Logger.LogError(ex, "Error assigning client {UserId}", Id); NotificationService.Notify(NotificationSeverity.Error, "Error", ex.Message); }
-        finally { isAssigningClient = false; }
+            finally { isAssigningClient = false; }
     }
 
     internal async Task RemoveClient(UserClientDto c)

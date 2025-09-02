@@ -30,7 +30,8 @@ else
     <RadzenCard class="rz-my-4">
         <!-- Single form wrapping all tabs so actions are always visible -->
         <RadzenTemplateForm Data="@userModel" TItem="EditUser.UserEditModel" Submit="@OnSaveUser">
-            <RadzenTabs @bind-SelectedIndex="selectedTabIndex" RenderMode="TabRenderMode.Client" TabPosition="TabPosition.Left">
+            <!-- Change RenderMode to Server so only active tab content renders (lazy) -->
+            <RadzenTabs @bind-SelectedIndex="selectedTabIndex" RenderMode="TabRenderMode.Server" TabPosition="TabPosition.Left">
                 <Tabs>
                     <!-- Basic Information Tab -->
                     <RadzenTabsItem Text="Basic Information" Icon="person">
