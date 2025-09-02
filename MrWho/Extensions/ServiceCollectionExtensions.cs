@@ -19,6 +19,7 @@ using OpenIddict.Client.AspNetCore; // added for aspnetcore integration
 using OpenIddict.Client.SystemNetHttp; // added for http integration
 using System.Threading.RateLimiting; // rate limiting options
 using Microsoft.AspNetCore.Hosting; // added for IWebHostEnvironment
+// removed OpenIddict.Server usings for device flow (not enabled)
 
 namespace MrWho.Extensions;
 
@@ -301,11 +302,9 @@ public static class ServiceCollectionExtensions
                        .SetEndSessionEndpointUris("/connect/logout")
                        .SetConfigurationEndpointUris("/.well-known/openid-configuration")
                        .SetUserInfoEndpointUris("/connect/userinfo")
-
-                       // Enable grant types (removed password flow - Option 1)
                        .AllowAuthorizationCodeFlow()
                        .AllowClientCredentialsFlow()
-                       .AllowRefreshTokenFlow();
+                       .AllowRefreshTokenFlow(); // device code flow removed due to missing extensions
 
                 // Enforce PKCE for auth code flow (Option 1)
                 options.RequireProofKeyForCodeExchange();
@@ -344,7 +343,7 @@ public static class ServiceCollectionExtensions
                 // Register the ASP.NET Core host and enable passthrough for the authorization endpoint
                 options.UseAspNetCore()
                        .EnableAuthorizationEndpointPassthrough()
-                       .EnableTokenEndpointPassthrough() // ADDED: allow custom minimal API handler for /connect/token
+                       .EnableTokenEndpointPassthrough()
                        .EnableEndSessionEndpointPassthrough();
             })
             .AddValidation(options =>
