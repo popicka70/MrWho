@@ -19,53 +19,37 @@ else if (editUser.isLoading)
 else
 {
     <div style="padding:1rem;">
-        <RadzenStack Gap="2rem">
-            <RadzenText TextStyle="TextStyle.H6" Text="Client Scoped Roles" />
+        <RadzenStack Gap="1.5rem">
+            <RadzenText TextStyle="TextStyle.H6" Text="Client Scoped Role Assignments" />
+            <RadzenFormField Text="Client" Variant="Variant.Outlined">
+                <RadzenDropDown Data="@clients" @bind-Value="selectedClientId" TextProperty="ClientId" ValueProperty="ClientId" AllowFiltering="true" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive" Placeholder="Select client" Style="width:300px;" Change="@(async (_) => await OnClientChanged())" />
+            </RadzenFormField>
 
-            <RadzenCard Style="background-color: var(--rz-base-50);">
-                <RadzenStack Gap="1rem">
-                    <RadzenText TextStyle="TextStyle.Subtitle1" Text="Assign Client Role" />
-                    <RadzenRow>
-                        <RadzenColumn Size="12" SizeMD="4">
-                            <RadzenFormField Text="Client" Variant="Variant.Outlined">
-                                <RadzenDropDown Data="@clients" @bind-Value="selectedClientId" TextProperty="ClientId" ValueProperty="ClientId" AllowFiltering="true" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive" Placeholder="Select client" Style="width:100%;" Change="@(async (_) => await LoadClientRoles())" />
-                            </RadzenFormField>
-                        </RadzenColumn>
-                        <RadzenColumn Size="12" SizeMD="4">
-                            <RadzenFormField Text="Role" Variant="Variant.Outlined">
-                                <RadzenDropDown Data="@availableRoles" @bind-Value="selectedRoleName" TextProperty="Name" ValueProperty="Name" AllowFiltering="true" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive" Placeholder="Select role" Style="width:100%;" />
-                            </RadzenFormField>
-                        </RadzenColumn>
-                        <RadzenColumn Size="12" SizeMD="4">
-                            <RadzenFormField Text="Action" Variant="Variant.Outlined">
-                                <RadzenButton Text="Assign" Icon="add" ButtonStyle="ButtonStyle.Primary" Disabled="@(!CanAssign())" Click="@(async () => await AssignRole())" IsBusy="@isAssigning" Style="width:100%;" />
-                            </RadzenFormField>
-                        </RadzenColumn>
-                    </RadzenRow>
-                </RadzenStack>
-            </RadzenCard>
-
-            <RadzenStack Gap="0.75rem">
-                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Assigned Client Roles</RadzenText>
-                @if (userClientRoles.Any())
-                {
-                    <RadzenDataGrid Data="@userClientRoles" TItem="UserClientRoleView" AllowSorting="true" AllowPaging="true" PageSize="10">
+            @if (string.IsNullOrWhiteSpace(selectedClientId))
+            {
+                <RadzenAlert AlertStyle="AlertStyle.Info"><RadzenText>Select a client to view and assign roles.</RadzenText></RadzenAlert>
+            }
+            else
+            {
+                <RadzenStack Gap="0.75rem">
+                    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Roles for @selectedClientId</RadzenText>
+                    <RadzenDataGrid Data="@rows" TItem="ClientRoleAssignmentRow" AllowPaging="true" PageSize="15" AllowSorting="true" AllowFiltering="true">
                         <Columns>
-                            <RadzenDataGridColumn TItem="UserClientRoleView" Property="ClientId" Title="Client" />
-                            <RadzenDataGridColumn TItem="UserClientRoleView" Property="RoleName" Title="Role" />
-                            <RadzenDataGridColumn TItem="UserClientRoleView" Title="Actions" Width="90px">
-                                <Template Context="r">
-                                    <RadzenButton Icon="delete" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Danger" Variant="Variant.Text" Click="@(async () => await RemoveRole(r))" />
+                            <RadzenDataGridColumn TItem="ClientRoleAssignmentRow" Title="Assigned" Width="110px">
+                                <Template Context="row">
+                                    <RadzenCheckBox Value="@row.IsAssigned" Change="@(async (bool? value) => await OnAssignmentChanged(row, value == true))" />
                                 </Template>
                             </RadzenDataGridColumn>
+                            <RadzenDataGridColumn TItem="ClientRoleAssignmentRow" Property="Name" Title="Role" />
+                            <RadzenDataGridColumn TItem="ClientRoleAssignmentRow" Property="UserCount" Title="Users" Width="110px" />
                         </Columns>
                     </RadzenDataGrid>
-                }
-                else
-                {
-                    <RadzenAlert AlertStyle="AlertStyle.Info"><RadzenText>This user has no client-scoped roles.</RadzenText></RadzenAlert>
-                }
-            </RadzenStack>
+                    @if (!rows.Any())
+                    {
+                        <RadzenAlert AlertStyle="AlertStyle.Info"><RadzenText>No roles defined for this client.</RadzenText></RadzenAlert>
+                    }
+                </RadzenStack>
+            }
         </RadzenStack>
     </div>
 }
@@ -75,91 +59,93 @@ else
 
     private List<ClientDto> clients = new();
     private List<ClientRoleDto> allRoles = new();
-    private List<ClientRoleDto> availableRoles = new();
     private List<UserClientRoleView> userClientRoles = new();
     private string? selectedClientId;
-    private string? selectedRoleName;
-    private bool isAssigning;
+
+    private List<ClientRoleAssignmentRow> rows = new();
 
     protected override Task OnInitializedAsync()
     {
-        // Consume pre-fetched aggregated data from parent to avoid extra HTTP calls
         clients = editUser.aggregatedAllClients;
         allRoles = editUser.aggregatedAllClientRoles;
         userClientRoles = editUser.aggregatedUserClientRolesByClient
             .SelectMany(kvp => kvp.Value.Select(r => new UserClientRoleView { ClientId = kvp.Key, RoleName = r }))
             .OrderBy(x => x.ClientId).ThenBy(x => x.RoleName).ToList();
-
-        // Default selection
         selectedClientId = clients.FirstOrDefault()?.ClientId;
-        LoadClientRolesSync();
+        BuildRows();
         return Task.CompletedTask;
     }
 
-    private void LoadClientRolesSync()
+    private Task OnClientChanged()
     {
-        if (string.IsNullOrWhiteSpace(selectedClientId)) { availableRoles = new(); return; }
-        var assignedNames = userClientRoles.Where(r => r.ClientId == selectedClientId).Select(r => r.RoleName).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        BuildRows();
+        return Task.CompletedTask;
+    }
+
+    private void BuildRows()
+    {
+        if (string.IsNullOrWhiteSpace(selectedClientId)) { rows = new(); return; }
         var rolesForClient = allRoles.Where(r => r.ClientId == selectedClientId).ToList();
-        availableRoles = rolesForClient.Where(r => !assignedNames.Contains(r.Name)).OrderBy(r => r.Name).ToList();
-        selectedRoleName = null;
-    }
-
-    private async Task LoadClientRoles()
-    {
-        LoadClientRolesSync();
-        await Task.CompletedTask;
-    }
-
-    private bool CanAssign() => !string.IsNullOrWhiteSpace(selectedClientId) && !string.IsNullOrWhiteSpace(selectedRoleName) && editUser.currentUser != null;
-
-    private async Task AssignRole()
-    {
-        if (!CanAssign()) return;
-        isAssigning = true;
-        try
+        var assignedNames = userClientRoles.Where(r => r.ClientId == selectedClientId).Select(r => r.RoleName).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        rows = rolesForClient.Select(r => new ClientRoleAssignmentRow
         {
-            var ok = await ClientRolesApi.AssignRoleAsync(new AssignClientRoleRequest { UserId = editUser.currentUser!.Id, ClientId = selectedClientId!, RoleName = selectedRoleName! });
-            if (ok)
-            {
-                userClientRoles.Add(new UserClientRoleView { ClientId = selectedClientId!, RoleName = selectedRoleName! });
-                // Update parent cache to stay consistent
-                if (!editUser.aggregatedUserClientRolesByClient.TryGetValue(selectedClientId!, out var list))
-                {
-                    list = new List<string>();
-                    editUser.aggregatedUserClientRolesByClient[selectedClientId!] = list;
-                }
-                if (!list.Contains(selectedRoleName!, StringComparer.OrdinalIgnoreCase)) list.Add(selectedRoleName!);
-                NotificationService.Notify(NotificationSeverity.Success, "Assigned", $"Role '{selectedRoleName}' assigned to client '{selectedClientId}'");
-                LoadClientRolesSync();
-            }
-            else NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to assign role");
-        }
-        catch (Exception ex) { Logger.LogError(ex, "AssignRole failed"); NotificationService.Notify(NotificationSeverity.Error, "Error", ex.Message); }
-        finally { isAssigning = false; }
+            ClientId = r.ClientId,
+            Name = r.Name,
+            UserCount = r.UserCount,
+            IsAssigned = assignedNames.Contains(r.Name)
+        }).OrderBy(r => r.Name, StringComparer.OrdinalIgnoreCase).ToList();
     }
 
-    private async Task RemoveRole(UserClientRoleView view)
+    private async Task OnAssignmentChanged(ClientRoleAssignmentRow row, bool assign)
     {
-        var ok = await DialogService.Confirm($"Remove role '{view.RoleName}' from client '{view.ClientId}'?", "Remove Client Role", new ConfirmOptions { OkButtonText = "Remove", CancelButtonText = "Cancel" });
-        if (ok != true) return;
-        try
+        if (editUser.currentUser == null) return;
+        var original = row.IsAssigned;
+        row.IsAssigned = assign; // optimistic
+        bool success;
+        if (assign)
         {
-            var success = await ClientRolesApi.RemoveRoleAsync(new RemoveClientRoleRequest { UserId = editUser.currentUser!.Id, ClientId = view.ClientId, RoleName = view.RoleName });
+            success = await ClientRolesApi.AssignRoleAsync(new AssignClientRoleRequest { UserId = editUser.currentUser.Id, ClientId = row.ClientId, RoleName = row.Name });
             if (success)
             {
-                userClientRoles.Remove(view);
-                if (editUser.aggregatedUserClientRolesByClient.TryGetValue(view.ClientId, out var list))
+                userClientRoles.Add(new UserClientRoleView { ClientId = row.ClientId, RoleName = row.Name });
+                if (!editUser.aggregatedUserClientRolesByClient.TryGetValue(row.ClientId, out var list))
                 {
-                    list.RemoveAll(r => string.Equals(r, view.RoleName, StringComparison.OrdinalIgnoreCase));
-                    if (list.Count == 0) editUser.aggregatedUserClientRolesByClient.Remove(view.ClientId);
+                    list = new List<string>();
+                    editUser.aggregatedUserClientRolesByClient[row.ClientId] = list;
                 }
-                NotificationService.Notify(NotificationSeverity.Success, "Removed", "Client role removed");
-                LoadClientRolesSync();
+                if (!list.Contains(row.Name, StringComparer.OrdinalIgnoreCase)) list.Add(row.Name);
+                NotificationService.Notify(NotificationSeverity.Success, "Assigned", $"Role '{row.Name}' assigned");
             }
-            else NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to remove role");
         }
-        catch (Exception ex) { Logger.LogError(ex, "RemoveRole failed"); NotificationService.Notify(NotificationSeverity.Error, "Error", ex.Message); }
+        else
+        {
+            success = await ClientRolesApi.RemoveRoleAsync(new RemoveClientRoleRequest { UserId = editUser.currentUser.Id, ClientId = row.ClientId, RoleName = row.Name });
+            if (success)
+            {
+                userClientRoles.RemoveAll(r => r.ClientId == row.ClientId && string.Equals(r.RoleName, row.Name, StringComparison.OrdinalIgnoreCase));
+                if (editUser.aggregatedUserClientRolesByClient.TryGetValue(row.ClientId, out var list))
+                {
+                    list.RemoveAll(n => string.Equals(n, row.Name, StringComparison.OrdinalIgnoreCase));
+                    if (list.Count == 0) editUser.aggregatedUserClientRolesByClient.Remove(row.ClientId);
+                }
+                NotificationService.Notify(NotificationSeverity.Success, "Removed", "Role removed");
+            }
+        }
+        if (!success)
+        {
+            row.IsAssigned = original; // revert
+            NotificationService.Notify(NotificationSeverity.Error, "Error", assign ? "Failed to assign role" : "Failed to remove role");
+        }
+        BuildRows();
+        StateHasChanged();
+    }
+
+    private class ClientRoleAssignmentRow
+    {
+        public string ClientId { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public int UserCount { get; set; }
+        public bool IsAssigned { get; set; }
     }
 
     private class UserClientRoleView
