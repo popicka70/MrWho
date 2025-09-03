@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Aspire.Hosting;
+using OpenIddict.Abstractions; // added
 
 namespace MrWhoAdmin.Tests;
 
@@ -52,6 +53,43 @@ public static class SharedTestInfrastructure
             _app.ResourceNotifications.WaitForResourceHealthyAsync("postgres", cancellationToken).WaitAsync(StartupTimeout, cancellationToken).Wait();
             _app.ResourceNotifications.WaitForResourceHealthyAsync("mrwho", cancellationToken).WaitAsync(StartupTimeout, cancellationToken).Wait();
             _app.ResourceNotifications.WaitForResourceHealthyAsync("webfrontend", cancellationToken).WaitAsync(StartupTimeout, cancellationToken).Wait();
+
+            // After services are healthy, poll until the admin OpenIddict application is registered
+            try
+            {
+                Console.WriteLine("? Waiting for OpenIddict admin client registration (mrwho_admin_web)...");
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                var maxWait = TimeSpan.FromSeconds(45);
+                var delay = TimeSpan.FromMilliseconds(500);
+                bool ready = false;
+                while (sw.Elapsed < maxWait)
+                {
+                    using var scope = _app.Services.CreateScope();
+                    var mgr = scope.ServiceProvider.GetService<IOpenIddictApplicationManager>();
+                    if (mgr != null)
+                    {
+                        var appReg = mgr.FindByClientIdAsync("mrwho_admin_web").GetAwaiter().GetResult();
+                        if (appReg != null)
+                        {
+                            ready = true;
+                            break;
+                        }
+                    }
+                    Thread.Sleep(delay);
+                }
+                if (!ready)
+                {
+                    Console.WriteLine("?? Timed out waiting for OpenIddict admin client registration; tests may fail with invalid_client.");
+                }
+                else
+                {
+                    Console.WriteLine("? OpenIddict admin client registration detected.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"?? Exception while waiting for OpenIddict readiness: {ex.Message}");
+            }
 
             _isInitialized = true;
             Console.WriteLine("? Shared PostgreSQL infrastructure started successfully!");
