@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using MrWho.Data;
 using MrWho.Services;
+using Npgsql; // for NpgsqlException
+using System.Net.Sockets;
 
 namespace MrWho.Extensions;
 
@@ -24,8 +26,8 @@ public static class DatabaseInitializationExtensions
 
             if (isTestMode)
             {
-                logger.LogInformation("[DB INIT] Test mode detected -> using EnsureCreated (skipping migrations)");
-                await db.Database.EnsureCreatedAsync();
+                logger.LogInformation("[DB INIT] Test mode detected -> using EnsureCreated with retry (skipping migrations)");
+                await EnsureCreatedWithRetryAsync(db, logger, maxAttempts: 12, baseDelayMs: 500);
             }
             else
             {
@@ -57,5 +59,58 @@ public static class DatabaseInitializationExtensions
             logger.LogError(ex, "Error during database initialization");
             throw;
         }
+    }
+
+    private static async Task EnsureCreatedWithRetryAsync(ApplicationDbContext db, ILogger logger, int maxAttempts, int baseDelayMs)
+    {
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            try
+            {
+                // Explicitly open a raw connection first so we fail fast before EnsureCreated allocates resources
+                var connection = db.Database.GetDbConnection();
+                if (connection.State != System.Data.ConnectionState.Open)
+                {
+                    await connection.OpenAsync();
+                }
+
+                // Lightweight readiness probe
+                if (connection is NpgsqlConnection npgsqlConn)
+                {
+                    using var cmd = npgsqlConn.CreateCommand();
+                    cmd.CommandText = "SELECT 1";
+                    await cmd.ExecuteScalarAsync();
+                }
+
+                // Now ensure schema
+                await db.Database.EnsureCreatedAsync();
+                logger.LogInformation("[DB INIT] EnsureCreated succeeded on attempt {Attempt}/{MaxAttempts}", attempt, maxAttempts);
+                return;
+            }
+            catch (Exception ex) when (IsTransient(ex) && attempt < maxAttempts)
+            {
+                var delay = TimeSpan.FromMilliseconds(baseDelayMs * Math.Min(10, attempt));
+                logger.LogWarning(ex, "[DB INIT] EnsureCreated transient failure attempt {Attempt}/{MaxAttempts}. Retrying in {Delay}...", attempt, maxAttempts, delay);
+                await Task.Delay(delay);
+            }
+        }
+
+        // One final attempt without catching to surface the real exception
+        await db.Database.EnsureCreatedAsync();
+    }
+
+    private static bool IsTransient(Exception ex)
+    {
+        return ex switch
+        {
+            NpgsqlException => true,
+            TimeoutException => true,
+            EndOfStreamException => true,
+            IOException => true,
+            SocketException => true,
+            _ when ex.Message.Contains("Connection refused", StringComparison.OrdinalIgnoreCase) => true,
+            _ when ex.InnerException is not null && IsTransient(ex.InnerException) => true,
+            _ => false
+        };
     }
 }
