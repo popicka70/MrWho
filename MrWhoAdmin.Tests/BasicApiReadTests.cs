@@ -23,9 +23,8 @@ public class BasicApiReadTests
         var form = new Dictionary<string, string>
         {
             ["grant_type"] = "client_credentials",
-            ["client_id"] = "mrwho_tests_m2m",
-            ["client_secret"] = "TestM2MSecret2025!",
-            // mrwho.use required by AdminClientApi policy; api.read for list endpoints
+            ["client_id"] = "mrwho_m2m",
+            ["client_secret"] = "MrWhoM2MSecret2025!",
             ["scope"] = "mrwho.use api.read"
         };
 
@@ -47,7 +46,7 @@ public class BasicApiReadTests
     }
 
     [TestMethod]
-    public async Task Can_Acquire_Token_With_Test_M2M_Client()
+    public async Task Can_Acquire_Token_With_M2M_Client()
     {
         var token = await GetAccessTokenAsync();
         token.Should().NotBeNullOrEmpty();
