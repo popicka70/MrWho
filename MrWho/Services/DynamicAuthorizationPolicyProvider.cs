@@ -117,8 +117,18 @@ public class DynamicAuthorizationPolicyProvider : IAuthorizationPolicyProvider
                                               .Contains(StandardScopes.MrWhoUse));
                         if (!hasMrWhoUse) return false;
                         string adminClientId = MrWhoConstants.AdminClientId;
+                        const string testM2MClientId = "mrwho_tests_m2m";
                         bool isAdminClient = user.HasClaim(c => (c.Type == "azp" || c.Type == "client_id") && c.Value == adminClientId);
-                        return isAdminClient;
+                        if (isAdminClient) return true;
+                        // In test mode allow dedicated test M2M client
+                        var isTesting = string.Equals(Environment.GetEnvironmentVariable("MRWHO_TESTS"), "1", StringComparison.OrdinalIgnoreCase) ||
+                                         string.Equals(Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"), "Testing", StringComparison.OrdinalIgnoreCase);
+                        if (isTesting)
+                        {
+                            bool isTestClient = user.HasClaim(c => (c.Type == "azp" || c.Type == "client_id") && c.Value == testM2MClientId);
+                            if (isTestClient) return true;
+                        }
+                        return false;
                     })
                     .Build();
         }

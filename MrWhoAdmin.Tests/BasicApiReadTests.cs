@@ -5,7 +5,7 @@ using System.Text;
 namespace MrWhoAdmin.Tests;
 
 /// <summary>
-/// Basic read-only API tests using a real access token (password grant) with mrwho.use scope.
+/// Basic read-only API tests using a client_credentials access token (mrwho_tests_m2m) with mrwho.use + api.read scopes.
 /// </summary>
 [TestClass]
 [TestCategory("Integration")] 
@@ -22,13 +22,11 @@ public class BasicApiReadTests
 
         var form = new Dictionary<string, string>
         {
-            ["grant_type"] = "password",
-            ["client_id"] = "mrwho_admin_web",
-            ["client_secret"] = "MrWhoAdmin2024!SecretKey",
-            ["username"] = "admin@mrwho.local",
-            ["password"] = "Adm1n#2025!G7x",
-            // Include mrwho.use + standard/openid + read scope
-            ["scope"] = "openid profile email roles mrwho.use api.read"
+            ["grant_type"] = "client_credentials",
+            ["client_id"] = "mrwho_tests_m2m",
+            ["client_secret"] = "TestM2MSecret2025!",
+            // mrwho.use required by AdminClientApi policy; api.read for list endpoints
+            ["scope"] = "mrwho.use api.read"
         };
 
         using var content = new FormUrlEncodedContent(form);
@@ -49,7 +47,7 @@ public class BasicApiReadTests
     }
 
     [TestMethod]
-    public async Task Can_Acquire_Token_With_mrwho_use_Scope()
+    public async Task Can_Acquire_Token_With_Test_M2M_Client()
     {
         var token = await GetAccessTokenAsync();
         token.Should().NotBeNullOrEmpty();
