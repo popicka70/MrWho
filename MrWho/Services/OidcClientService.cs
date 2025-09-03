@@ -518,6 +518,68 @@ public class OidcClientService : IOidcClientService
         await SyncClientWithOpenIddictAsync(adminClient!);
         await SyncClientWithOpenIddictAsync(demo1Client!);
         await SyncClientWithOpenIddictAsync(m2mClient!);
+
+        // Standard machine-to-machine client for internal MrWho administrative API usage
+        var serviceM2M = await _context.Clients
+            .Include(c => c.Scopes)
+            .Include(c => c.Permissions)
+            .FirstOrDefaultAsync(c => c.ClientId == "mrwho_m2m");
+        if (serviceM2M == null)
+        {
+            serviceM2M = new Client
+            {
+                ClientId = "mrwho_m2m",
+                ClientSecret = "MrWhoM2MSecret2025!",
+                Name = "MrWho Service M2M Client",
+                Description = "Standard machine client (client_credentials) for calling protected MrWho API endpoints requiring mrwho.use",
+                RealmId = adminRealm.Id,
+                IsEnabled = true,
+                ClientType = ClientType.Machine,
+                AllowAuthorizationCodeFlow = false,
+                AllowClientCredentialsFlow = true,
+                AllowPasswordFlow = false,
+                AllowRefreshTokenFlow = false,
+                RequirePkce = false,
+                RequireClientSecret = true,
+                CreatedBy = "System",
+                AllowAccessToUserInfoEndpoint = false,
+                AllowAccessToRevocationEndpoint = true,
+                AllowAccessToIntrospectionEndpoint = true
+            };
+            _context.Clients.Add(serviceM2M);
+            await _context.SaveChangesAsync();
+
+            _context.ClientScopes.Add(new ClientScope { ClientId = serviceM2M.Id, Scope = StandardScopes.MrWhoUse });
+            _context.ClientPermissions.Add(new ClientPermission { ClientId = serviceM2M.Id, Permission = OpenIddictConstants.Permissions.Endpoints.Token });
+            _context.ClientPermissions.Add(new ClientPermission { ClientId = serviceM2M.Id, Permission = OpenIddictConstants.Permissions.GrantTypes.ClientCredentials });
+            _context.ClientPermissions.Add(new ClientPermission { ClientId = serviceM2M.Id, Permission = "scp:mrwho.use" });
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Created standard service M2M client 'mrwho_m2m' (scope mrwho.use)");
+        }
+        else
+        {
+            if (!serviceM2M.Scopes.Any(s => s.Scope == StandardScopes.MrWhoUse))
+                _context.ClientScopes.Add(new ClientScope { ClientId = serviceM2M.Id, Scope = StandardScopes.MrWhoUse });
+            if (!serviceM2M.Permissions.Any(p => p.Permission == "scp:mrwho.use"))
+                _context.ClientPermissions.Add(new ClientPermission { ClientId = serviceM2M.Id, Permission = "scp:mrwho.use" });
+            if (!serviceM2M.Permissions.Any(p => p.Permission == OpenIddictConstants.Permissions.GrantTypes.ClientCredentials))
+                _context.ClientPermissions.Add(new ClientPermission { ClientId = serviceM2M.Id, Permission = OpenIddictConstants.Permissions.GrantTypes.ClientCredentials });
+            if (!serviceM2M.Permissions.Any(p => p.Permission == OpenIddictConstants.Permissions.Endpoints.Token))
+                _context.ClientPermissions.Add(new ClientPermission { ClientId = serviceM2M.Id, Permission = OpenIddictConstants.Permissions.Endpoints.Token });
+            await _context.SaveChangesAsync();
+        }
+
+        // NEW: ensure mrwho_m2m is registered with OpenIddict (previous omission caused invalid_client)
+        try
+        {
+            await SyncClientWithOpenIddictAsync(serviceM2M!);
+            _logger.LogInformation("Synchronized service M2M client 'mrwho_m2m' with OpenIddict");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to sync service M2M client 'mrwho_m2m'");
+            throw; // fail fast so invalid_client is surfaced early
+        }
     }
 
     public async Task InitializeDefaultRealmAndClientsAsync()

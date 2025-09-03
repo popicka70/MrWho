@@ -8,27 +8,6 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 
 namespace MrWho.Services;
 
-/// <summary>
-/// SINGLE SOURCE OF TRUTH for all authorization policies in the application
-/// 
-/// This provider dynamically loads client-specific authentication schemes from database at runtime
-/// and centralizes ALL authorization policy configuration in one place. It solves the chicken-and-egg 
-/// problem of needing database access during service registration.
-/// 
-/// Handles:
-/// - Static Security Policies: UserInfoPolicy (OpenIddict validation only)
-/// - Static Client Policies: AdminOnly, DemoAccess, ApiAccess  
-/// - Dynamic Default Policy: Loads ALL client schemes from database automatically
-/// - Dynamic Client Policies: Client_{clientId} format for any database client
-/// - Fallback: Uses DefaultAuthorizationPolicyProvider for unknown policies
-/// 
-/// Benefits:
-/// ? Single location for all authorization configuration
-/// ? Database-driven policies that update automatically when clients are added
-/// ? No code changes needed for new clients
-/// ? Proper fallback handling when database is unavailable
-/// ? Thread-safe policy creation with caching
-/// </summary>
 public class DynamicAuthorizationPolicyProvider : IAuthorizationPolicyProvider
 {
     private readonly DefaultAuthorizationPolicyProvider _fallbackPolicyProvider;
@@ -112,15 +91,25 @@ public class DynamicAuthorizationPolicyProvider : IAuthorizationPolicyProvider
                     {
                         var user = ctx.User;
                         if (user?.Identity?.IsAuthenticated != true) return false;
+
+                        // Must include mrwho.use scope
                         bool hasMrWhoUse = user.FindAll("scope")
                             .Any(c => c.Value.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                                               .Contains(StandardScopes.MrWhoUse));
                         if (!hasMrWhoUse) return false;
+
                         string adminClientId = MrWhoConstants.AdminClientId;
+                        string serviceM2MClientId = MrWhoConstants.ServiceM2MClientId; // newly allowed automation client
                         const string testM2MClientId = "mrwho_tests_m2m";
+
                         bool isAdminClient = user.HasClaim(c => (c.Type == "azp" || c.Type == "client_id") && c.Value == adminClientId);
                         if (isAdminClient) return true;
-                        // In test mode allow dedicated test M2M client
+
+                        // Allow standard service M2M client (automation/integration) in production as long as it has mrwho.use scope
+                        bool isServiceM2M = user.HasClaim(c => (c.Type == "azp" || c.Type == "client_id") && c.Value == serviceM2MClientId);
+                        if (isServiceM2M) return true;
+
+                        // Test-only allowance
                         var isTesting = string.Equals(Environment.GetEnvironmentVariable("MRWHO_TESTS"), "1", StringComparison.OrdinalIgnoreCase) ||
                                          string.Equals(Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"), "Testing", StringComparison.OrdinalIgnoreCase);
                         if (isTesting)
