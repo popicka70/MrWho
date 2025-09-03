@@ -86,11 +86,66 @@ public class OidcClientService : IOidcClientService
         return (hasOpenId, perms);
     }
 
+    // Build application descriptor (Create/Update) without always deleting existing app (Step 3)
+    private OpenIddictApplicationDescriptor BuildDescriptor(Client client)
+    {
+        var descriptor = new OpenIddictApplicationDescriptor
+        {
+            ClientId = client.ClientId,
+            ClientSecret = client.ClientSecret,
+            DisplayName = client.Name,
+            ClientType = client.ClientType == ClientType.Public ? OpenIddictConstants.ClientTypes.Public : OpenIddictConstants.ClientTypes.Confidential
+        };
+
+        if (client.AllowAuthorizationCodeFlow)
+        {
+            descriptor.Permissions.Add(OpenIddictConstants.Permissions.GrantTypes.AuthorizationCode);
+            descriptor.Permissions.Add(OpenIddictConstants.Permissions.Endpoints.Authorization);
+            descriptor.Permissions.Add(OpenIddictConstants.Permissions.ResponseTypes.Code);
+        }
+        if (client.AllowClientCredentialsFlow)
+            descriptor.Permissions.Add(OpenIddictConstants.Permissions.GrantTypes.ClientCredentials);
+        if (client.AllowPasswordFlow)
+            descriptor.Permissions.Add(OpenIddictConstants.Permissions.GrantTypes.Password);
+        if (client.AllowRefreshTokenFlow)
+            descriptor.Permissions.Add(OpenIddictConstants.Permissions.GrantTypes.RefreshToken);
+        descriptor.Permissions.Add(OpenIddictConstants.Permissions.Endpoints.Token);
+
+        var (hasOpenId, scopePerms) = BuildScopePermissions(client.Scopes.Select(s => s.Scope));
+        foreach (var p in scopePerms) descriptor.Permissions.Add(p);
+        if (hasOpenId)
+            descriptor.Permissions.Add(OpenIddictConstants.Permissions.Endpoints.EndSession);
+        if (client.AllowAccessToUserInfoEndpoint == true && hasOpenId)
+            descriptor.Permissions.Add(UserInfoEndpointPermission);
+        if (client.AllowAccessToRevocationEndpoint == true)
+            descriptor.Permissions.Add(RevocationEndpointPermission);
+        if (client.AllowAccessToIntrospectionEndpoint == true)
+            descriptor.Permissions.Add(IntrospectionEndpointPermission);
+
+        foreach (var permission in client.Permissions.Select(p => p.Permission))
+        {
+            if (permission.StartsWith("scp:") || permission.StartsWith("oidc:scope:"))
+                continue; // skip derived/legacy
+            if (!descriptor.Permissions.Contains(permission))
+                descriptor.Permissions.Add(permission);
+        }
+
+        foreach (var redirect in client.RedirectUris)
+            descriptor.RedirectUris.Add(new Uri(redirect.Uri));
+        foreach (var postLogout in client.PostLogoutUris)
+            descriptor.PostLogoutRedirectUris.Add(new Uri(postLogout.Uri));
+
+        return descriptor;
+    }
+
     /// <summary>
     /// Initialize essential data that must always be present (admin realm, admin client, admin user)
     /// </summary>
     public async Task InitializeEssentialDataAsync()
     {
+        // Ensure flag backfill first
+        await BackfillEndpointAccessFlagsAsync();
+
         // 1. Create admin realm if it doesn't exist
         var adminRealm = await _context.Realms.FirstOrDefaultAsync(r => r.Name == "admin");
         if (adminRealm == null)
@@ -112,7 +167,6 @@ public class OidcClientService : IOidcClientService
             _logger.LogInformation("Created admin realm");
         }
 
-        // 1.5. Create demo realm if it doesn't exist
         var demoRealm = await _context.Realms.FirstOrDefaultAsync(r => r.Name == "demo");
         if (demoRealm == null)
         {
@@ -133,7 +187,7 @@ public class OidcClientService : IOidcClientService
             _logger.LogInformation("Created demo realm");
         }
 
-        // 2. Create admin client for MrWhoAdmin.Web if it doesn't exist
+        // Admin client
         var adminClient = await _context.Clients
             .Include(c => c.RedirectUris)
             .Include(c => c.PostLogoutUris)
@@ -159,7 +213,6 @@ public class OidcClientService : IOidcClientService
                 RequirePkce = true,
                 RequireClientSecret = true,
                 CreatedBy = "System",
-                // Endpoint access defaults (interactive web app)
                 AllowAccessToUserInfoEndpoint = true,
                 AllowAccessToRevocationEndpoint = true,
                 AllowAccessToIntrospectionEndpoint = false
@@ -168,7 +221,6 @@ public class OidcClientService : IOidcClientService
             _context.Clients.Add(adminClient);
             await _context.SaveChangesAsync();
 
-            // Add redirect URIs for MrWhoAdmin.Web (local https 7257, docker host http 8081, and hosted onrender)
             var redirectUris = new[]
             {
                 "https://localhost:7257/signin-oidc",
@@ -180,17 +232,9 @@ public class OidcClientService : IOidcClientService
                 "https://mrwhoadmin.onrender.com/signin-oidc",
                 "https://mrwhoadmin.onrender.com/callback"
             };
-
             foreach (var uri in redirectUris)
-            {
-                _context.ClientRedirectUris.Add(new ClientRedirectUri
-                {
-                    ClientId = adminClient.Id,
-                    Uri = uri
-                });
-            }
+                _context.ClientRedirectUris.Add(new ClientRedirectUri { ClientId = adminClient.Id, Uri = uri });
 
-            // Add post-logout URIs (local https 7257, docker host http 8081, and hosted onrender)
             var postLogoutUris = new[]
             {
                 "https://localhost:7257/",
@@ -202,28 +246,13 @@ public class OidcClientService : IOidcClientService
                 "https://mrwhoadmin.onrender.com/",
                 "https://mrwhoadmin.onrender.com/signout-callback-oidc"
             };
-
             foreach (var uri in postLogoutUris)
-            {
-                _context.ClientPostLogoutUris.Add(new ClientPostLogoutUri
-                {
-                    ClientId = adminClient.Id,
-                    Uri = uri
-                });
-            }
+                _context.ClientPostLogoutUris.Add(new ClientPostLogoutUri { ClientId = adminClient.Id, Uri = uri });
 
-            // Add scopes (INCLUDING API SCOPES AND MRWHO.USE)
             var scopes = new[] { StandardScopes.OpenId, StandardScopes.Email, StandardScopes.Profile, StandardScopes.Roles, StandardScopes.OfflineAccess, StandardScopes.ApiRead, StandardScopes.ApiWrite, StandardScopes.MrWhoUse };
             foreach (var scope in scopes)
-            {
-                _context.ClientScopes.Add(new ClientScope
-                {
-                    ClientId = adminClient.Id,
-                    Scope = scope
-                });
-            }
+                _context.ClientScopes.Add(new ClientScope { ClientId = adminClient.Id, Scope = scope });
 
-            // Standardized: only custom scopes stored in permissions beyond endpoint/grant constants; openid etc. handled via scopes => permissions during sync
             var basePermissions = new[]
             {
                 OpenIddictConstants.Permissions.Endpoints.Authorization,
@@ -235,7 +264,6 @@ public class OidcClientService : IOidcClientService
             };
             foreach (var p in basePermissions)
                 _context.ClientPermissions.Add(new ClientPermission { ClientId = adminClient.Id, Permission = p });
-            // Custom scope mrwho.use explicit permission (scp: format)
             _context.ClientPermissions.Add(new ClientPermission { ClientId = adminClient.Id, Permission = "scp:mrwho.use" });
 
             await _context.SaveChangesAsync();
@@ -243,7 +271,6 @@ public class OidcClientService : IOidcClientService
         }
         else
         {
-            // Cleanup legacy permission formats for admin client
             var legacy = adminClient.Permissions.Where(p => p.Permission.StartsWith("oidc:scope:") || (p.Permission.StartsWith("api.") && !p.Permission.StartsWith("scp:")) || p.Permission == "scp:openid").ToList();
             if (legacy.Any())
             {
@@ -258,7 +285,7 @@ public class OidcClientService : IOidcClientService
             }
         }
 
-        // 2.5. Create demo1 client for MrWhoDemo1 if it doesn't exist
+        // demo1 client
         var demo1Client = await _context.Clients
             .Include(c => c.RedirectUris)
             .Include(c => c.PostLogoutUris)
@@ -274,7 +301,7 @@ public class OidcClientService : IOidcClientService
                 ClientSecret = "Demo1Secret2024!",
                 Name = "MrWho Demo Application 1",
                 Description = "Demo application showcasing MrWho OIDC integration",
-                RealmId = (await _context.Realms.FirstAsync(r => r.Name == "demo")).Id,
+                RealmId = demoRealm.Id,
                 IsEnabled = true,
                 ClientType = ClientType.Confidential,
                 AllowAuthorizationCodeFlow = true,
@@ -284,180 +311,40 @@ public class OidcClientService : IOidcClientService
                 RequirePkce = true,
                 RequireClientSecret = true,
                 CreatedBy = "System",
-                // Endpoint access defaults
                 AllowAccessToUserInfoEndpoint = true,
                 AllowAccessToRevocationEndpoint = true,
                 AllowAccessToIntrospectionEndpoint = false
             };
-
             _context.Clients.Add(demo1Client);
             await _context.SaveChangesAsync();
 
-            // Add redirect URIs for MrWhoDemo1 (port 7037)
-            var redirectUris = new[]
-            {
-                "https://localhost:7037/signin-oidc",
-                "https://localhost:7037/callback"
-            };
-
-            foreach (var uri in redirectUris)
-            {
-                _context.ClientRedirectUris.Add(new ClientRedirectUri
-                {
-                    ClientId = demo1Client.Id,
-                    Uri = uri
-                });
-            }
-
-            // Add post-logout URIs
-            var postLogoutUris = new[]
-            {
-                "https://localhost:7037/",
-                "https://localhost:7037/signout-callback-oidc"
-            };
-
-            foreach (var uri in postLogoutUris)
-            {
-                _context.ClientPostLogoutUris.Add(new ClientPostLogoutUri
-                {
-                    ClientId = demo1Client.Id,
-                    Uri = uri
-                });
-            }
-
-            // Add scopes for demo1 (include API scopes)
-            var scopes = new[] { StandardScopes.OpenId, StandardScopes.Email, StandardScopes.Profile, StandardScopes.Roles, StandardScopes.OfflineAccess, StandardScopes.ApiRead, StandardScopes.ApiWrite };
-            foreach (var scope in scopes)
-            {
-                _context.ClientScopes.Add(new ClientScope
-                {
-                    ClientId = demo1Client.Id,
-                    Scope = scope
-                });
-            }
-
-            // Add permissions for demo1 (include API scope permissions)
-            var permissions = new[]
-            {
-                OpenIddictConstants.Permissions.Endpoints.Authorization,
-                OpenIddictConstants.Permissions.Endpoints.Token,
-                OpenIddictConstants.Permissions.Endpoints.EndSession,
-                OpenIddictConstants.Permissions.GrantTypes.AuthorizationCode,
-                OpenIddictConstants.Permissions.GrantTypes.RefreshToken,
-                OpenIddictConstants.Permissions.ResponseTypes.Code,
-                "scp:openid",
-                OpenIddictConstants.Permissions.Scopes.Email,
-                OpenIddictConstants.Permissions.Scopes.Profile,
-                OpenIddictConstants.Permissions.Scopes.Roles,
-                "scp:offline_access",
-                "scp:api.read",
-                "scp:api.write"
-            };
-
-            foreach (var permission in permissions)
-            {
-                _context.ClientPermissions.Add(new ClientPermission
-                {
-                    ClientId = demo1Client.Id,
-                    Permission = permission
-                });
-            }
-
+            foreach (var uri in new[] { "https://localhost:7037/signin-oidc", "https://localhost:7037/callback" })
+                _context.ClientRedirectUris.Add(new ClientRedirectUri { ClientId = demo1Client.Id, Uri = uri });
+            foreach (var uri in new[] { "https://localhost:7037/", "https://localhost:7037/signout-callback-oidc" })
+                _context.ClientPostLogoutUris.Add(new ClientPostLogoutUri { ClientId = demo1Client.Id, Uri = uri });
+            foreach (var scope in new[] { StandardScopes.OpenId, StandardScopes.Email, StandardScopes.Profile, StandardScopes.Roles, StandardScopes.OfflineAccess, StandardScopes.ApiRead, StandardScopes.ApiWrite })
+                _context.ClientScopes.Add(new ClientScope { ClientId = demo1Client.Id, Scope = scope });
+            foreach (var p in new[] { OpenIddictConstants.Permissions.Endpoints.Authorization, OpenIddictConstants.Permissions.Endpoints.Token, OpenIddictConstants.Permissions.Endpoints.EndSession, OpenIddictConstants.Permissions.GrantTypes.AuthorizationCode, OpenIddictConstants.Permissions.GrantTypes.RefreshToken, OpenIddictConstants.Permissions.ResponseTypes.Code })
+                _context.ClientPermissions.Add(new ClientPermission { ClientId = demo1Client.Id, Permission = p });
             await _context.SaveChangesAsync();
-            _logger.LogInformation("Created demo1 client 'mrwho_demo1' with API scopes");
         }
         else
         {
-            // Ensure required redirects/post-logout URIs, scopes, and permissions exist for existing demo1 client
-            var requiredRedirects = new[]
-            {
-                "https://localhost:7037/signin-oidc",
-                "https://localhost:7037/callback"
-            };
-            var requiredPostLogout = new[]
-            {
-                "https://localhost:7037/",
-                "https://localhost:7037/signout-callback-oidc"
-            };
-            var requiredScopes = new[] { StandardScopes.OpenId, StandardScopes.Email, StandardScopes.Profile, StandardScopes.Roles, StandardScopes.OfflineAccess, StandardScopes.ApiRead, StandardScopes.ApiWrite };
-            var requiredPermissions = new[]
-            {
-                OpenIddictConstants.Permissions.Endpoints.Authorization,
-                OpenIddictConstants.Permissions.Endpoints.Token,
-                OpenIddictConstants.Permissions.Endpoints.EndSession,
-                OpenIddictConstants.Permissions.GrantTypes.AuthorizationCode,
-                OpenIddictConstants.Permissions.GrantTypes.RefreshToken,
-                OpenIddictConstants.Permissions.ResponseTypes.Code,
-                "scp:openid",
-                OpenIddictConstants.Permissions.Scopes.Email,
-                OpenIddictConstants.Permissions.Scopes.Profile,
-                OpenIddictConstants.Permissions.Scopes.Roles,
-                "scp:offline_access",
-                "scp:api.read",
-                "scp:api.write"
-            };
-
-            var added = false;
-
-            var missingRedirects = requiredRedirects.Where(u => !demo1Client.RedirectUris.Any(r => r.Uri == u)).ToList();
-            foreach (var uri in missingRedirects)
-            {
-                _context.ClientRedirectUris.Add(new ClientRedirectUri { ClientId = demo1Client.Id, Uri = uri });
-                added = true;
-            }
-
-            var missingPostLogout = requiredPostLogout.Where(u => !demo1Client.PostLogoutUris.Any(r => r.Uri == u)).ToList();
-            foreach (var uri in missingPostLogout)
-            {
-                _context.ClientPostLogoutUris.Add(new ClientPostLogoutUri { ClientId = demo1Client.Id, Uri = uri });
-                added = true;
-            }
-
-            var missingScopes = requiredScopes.Where(s => !demo1Client.Scopes.Any(cs => cs.Scope == s)).ToList();
-            foreach (var s in missingScopes)
-            {
-                _context.ClientScopes.Add(new ClientScope { ClientId = demo1Client.Id, Scope = s });
-                added = true;
-            }
-
-            var existingPerms = demo1Client.Permissions.Select(p => p.Permission).ToHashSet();
-            foreach (var p in requiredPermissions)
-            {
-                if (!existingPerms.Contains(p))
-                {
-                    _context.ClientPermissions.Add(new ClientPermission { ClientId = demo1Client.Id, Permission = p });
-                    added = true;
-                }
-            }
-
-            if (added)
-            {
-                await _context.SaveChangesAsync();
-                _logger.LogInformation("Updated existing demo1 client with missing URIs/scopes/permissions (API scopes included)");
-
-                // Reload the client
-                demo1Client = await _context.Clients
-                    .Include(c => c.RedirectUris)
-                    .Include(c => c.PostLogoutUris)
-                    .Include(c => c.Scopes)
-                    .Include(c => c.Permissions)
-                    .FirstOrDefaultAsync(c => c.ClientId == "mrwho_demo1");
-            }
+            var legacy = demo1Client.Permissions.Where(p => p.Permission.StartsWith("oidc:scope:") || (p.Permission.StartsWith("api.") && !p.Permission.StartsWith("scp:")) || p.Permission == "scp:openid").ToList();
+            if (legacy.Any()) { _context.ClientPermissions.RemoveRange(legacy); await _context.SaveChangesAsync(); }
         }
 
-        // 2.6. Create machine-to-machine client for service-to-service calls if it doesn't exist
+        // m2m client
         var m2mClient = await _context.Clients
             .Include(c => c.Scopes)
             .Include(c => c.Permissions)
             .FirstOrDefaultAsync(c => c.ClientId == "mrwho_demo_api_client");
-
         if (m2mClient == null)
         {
-            // reuse existing demoRealm variable (guaranteed created above)
             m2mClient = new Client
             {
                 ClientId = "mrwho_demo_api_client",
-                ClientSecret = "DemoApiClientSecret2025!", // demo-only secret
+                ClientSecret = "DemoApiClientSecret2025!",
                 Name = "MrWho Demo API Machine Client",
                 Description = "Machine-to-machine client (client_credentials) for calling MrWhoDemoApi",
                 RealmId = demoRealm.Id,
@@ -470,28 +357,17 @@ public class OidcClientService : IOidcClientService
                 RequirePkce = false,
                 RequireClientSecret = true,
                 CreatedBy = "System",
-                // Endpoint access defaults for M2M (no userinfo, no revocation unless needed)
                 AllowAccessToUserInfoEndpoint = false,
                 AllowAccessToRevocationEndpoint = true,
                 AllowAccessToIntrospectionEndpoint = true
             };
             _context.Clients.Add(m2mClient);
             await _context.SaveChangesAsync();
-
-            foreach (var scopeName in new[] { StandardScopes.ApiRead, StandardScopes.ApiWrite })
-            {
-                _context.ClientScopes.Add(new ClientScope { ClientId = m2mClient.Id, Scope = scopeName });
-            }
-            foreach (var permission in new[]
-            {
-                OpenIddictConstants.Permissions.Endpoints.Token,
-                OpenIddictConstants.Permissions.GrantTypes.ClientCredentials
-            })
-            {
-                _context.ClientPermissions.Add(new ClientPermission { ClientId = m2mClient.Id, Permission = permission });
-            }
+            foreach (var scope in new[] { StandardScopes.ApiRead, StandardScopes.ApiWrite })
+                _context.ClientScopes.Add(new ClientScope { ClientId = m2mClient.Id, Scope = scope });
+            foreach (var p in new[] { OpenIddictConstants.Permissions.Endpoints.Token, OpenIddictConstants.Permissions.GrantTypes.ClientCredentials })
+                _context.ClientPermissions.Add(new ClientPermission { ClientId = m2mClient.Id, Permission = p });
             await _context.SaveChangesAsync();
-            _logger.LogInformation("Created machine-to-machine client 'mrwho_demo_api_client'.");
         }
         else
         {
@@ -499,16 +375,11 @@ public class OidcClientService : IOidcClientService
             if (legacy.Any()) { _context.ClientPermissions.RemoveRange(legacy); await _context.SaveChangesAsync(); }
         }
 
-        // 3. Create admin user if it doesn't exist
+        // Users
         var adminUser = await _userManager.FindByNameAsync("admin@mrwho.local");
         if (adminUser == null)
         {
-            adminUser = new IdentityUser
-            {
-                UserName = "admin@mrwho.local",
-                Email = "admin@mrwho.local",
-                EmailConfirmed = true
-            };
+            adminUser = new IdentityUser { UserName = "admin@mrwho.local", Email = "admin@mrwho.local", EmailConfirmed = true };
             var result = await _userManager.CreateAsync(adminUser, "Adm1n#2025!G7x");
             if (result.Succeeded)
             {
@@ -519,30 +390,18 @@ public class OidcClientService : IOidcClientService
                 await _userManager.AddClaimAsync(adminUser, new System.Security.Claims.Claim("realm", "admin"));
                 _logger.LogInformation("Created admin user 'admin@mrwho.local'");
             }
-            else
-            {
-                _logger.LogError("Failed to create admin user: {Errors}", string.Join(", ", result.Errors.Select(e => e.Description)));
-            }
         }
         else
         {
             var adminClaims = await _userManager.GetClaimsAsync(adminUser);
             if (!adminClaims.Any(c => c.Type == "realm"))
-            {
                 await _userManager.AddClaimAsync(adminUser, new System.Security.Claims.Claim("realm", "admin"));
-            }
         }
 
-        // 3.5 Create demo1 user if it doesn't exist
         var demo1User = await _userManager.FindByNameAsync("demo1@example.com");
         if (demo1User == null)
         {
-            demo1User = new IdentityUser
-            {
-                UserName = "demo1@example.com",
-                Email = "demo1@example.com",
-                EmailConfirmed = true
-            };
+            demo1User = new IdentityUser { UserName = "demo1@example.com", Email = "demo1@example.com", EmailConfirmed = true };
             var result = await _userManager.CreateAsync(demo1User, "Dem0!User#2025");
             if (result.Succeeded)
             {
@@ -553,32 +412,20 @@ public class OidcClientService : IOidcClientService
                 await _userManager.AddClaimAsync(demo1User, new System.Security.Claims.Claim("realm", "demo"));
                 _logger.LogInformation("Created demo1 user 'demo1@example.com'");
             }
-            else
-            {
-                _logger.LogError("Failed to create demo1 user: {Errors}", string.Join(", ", result.Errors.Select(e => e.Description)));
-            }
         }
         else
         {
             var demoClaims = await _userManager.GetClaimsAsync(demo1User);
             if (!demoClaims.Any(c => c.Type == "realm"))
-            {
                 await _userManager.AddClaimAsync(demo1User, new System.Security.Claims.Claim("realm", "demo"));
-            }
         }
 
-        // Assign users to their clients
         if (adminClient != null && adminUser != null && !await _context.ClientUsers.AnyAsync(cu => cu.ClientId == adminClient.Id && cu.UserId == adminUser.Id))
-        {
             _context.ClientUsers.Add(new ClientUser { ClientId = adminClient.Id, UserId = adminUser.Id, CreatedAt = DateTime.UtcNow, CreatedBy = "System" });
-        }
         if (demo1Client != null && demo1User != null && !await _context.ClientUsers.AnyAsync(cu => cu.ClientId == demo1Client.Id && cu.UserId == demo1User.Id))
-        {
             _context.ClientUsers.Add(new ClientUser { ClientId = demo1Client.Id, UserId = demo1User.Id, CreatedAt = DateTime.UtcNow, CreatedBy = "System" });
-        }
         await _context.SaveChangesAsync();
 
-        // Sync clients with OpenIddict
         await SyncClientWithOpenIddictAsync(adminClient!);
         await SyncClientWithOpenIddictAsync(demo1Client!);
         await SyncClientWithOpenIddictAsync(m2mClient!);
@@ -586,28 +433,21 @@ public class OidcClientService : IOidcClientService
 
     public async Task InitializeDefaultRealmAndClientsAsync()
     {
-        // Create default realm if it doesn't exist
+        await BackfillEndpointAccessFlagsAsync();
+
         var defaultRealm = await _context.Realms.FirstOrDefaultAsync(r => r.Name == "default");
         if (defaultRealm == null)
         {
-            defaultRealm = new Realm
-            {
-                Name = "default",
-                DisplayName = "Default Realm",
-                Description = "Default realm for OIDC clients",
-                IsEnabled = true,
-                CreatedBy = "System"
-            };
+            defaultRealm = new Realm { Name = "default", DisplayName = "Default Realm", Description = "Default realm for OIDC clients", IsEnabled = true, CreatedBy = "System" };
             _context.Realms.Add(defaultRealm);
             await _context.SaveChangesAsync();
             _logger.LogInformation("Created default realm");
         }
 
-        // Create default client if it doesn't exist (keeping existing postman_client for backwards compatibility)
         var defaultClient = await _context.Clients
             .Include(c => c.RedirectUris)
             .Include(c => c.PostLogoutUris)
-            .Include(c => c.Scopes)  
+            .Include(c => c.Scopes)
             .Include(c => c.Permissions)
             .FirstOrDefaultAsync(c => c.ClientId == "postman_client");
 
@@ -629,59 +469,21 @@ public class OidcClientService : IOidcClientService
                 RequirePkce = false,
                 RequireClientSecret = true,
                 CreatedBy = "System",
-                // Endpoint defaults for test client
                 AllowAccessToUserInfoEndpoint = true,
                 AllowAccessToRevocationEndpoint = true,
                 AllowAccessToIntrospectionEndpoint = true
             };
-
             _context.Clients.Add(defaultClient);
             await _context.SaveChangesAsync();
 
-            // Add redirect URIs
-            foreach (var uri in new[]
-            {
-                "https://localhost:7001/callback",
-                "http://localhost:5001/callback",
-                "https://localhost:7002/",
-                "https://localhost:7002/callback",
-                "https://localhost:7002/signin-oidc"
-            })
-            {
-                _context.ClientRedirectUris.Add(new ClientRedirectUri
-                {
-                    ClientId = defaultClient.Id,
-                    Uri = uri
-                });
-            }
-
-            // Add post-logout URIs
-            foreach (var uri in new[]
-            {
-                "https://localhost:7001/",
-                "http://localhost:5001/",
-                "https://localhost:7002/",
-                "https://localhost:7002/signout-callback-oidc"
-            })
-            {
-                _context.ClientPostLogoutUris.Add(new ClientPostLogoutUri
-                {
-                    ClientId = defaultClient.Id,
-                    Uri = uri
-                });
-            }
-
-            // Add scopes
+            foreach (var uri in new[] { "https://localhost:7001/callback", "http://localhost:5001/callback", "https://localhost:7002/", "https://localhost:7002/callback", "https://localhost:7002/signin-oidc" })
+                _context.ClientRedirectUris.Add(new ClientRedirectUri { ClientId = defaultClient.Id, Uri = uri });
+            foreach (var uri in new[] { "https://localhost:7001/", "http://localhost:5001/", "https://localhost:7002/", "https://localhost:7002/signout-callback-oidc" })
+                _context.ClientPostLogoutUris.Add(new ClientPostLogoutUri { ClientId = defaultClient.Id, Uri = uri });
             foreach (var scope in new[] { StandardScopes.OpenId, StandardScopes.Email, StandardScopes.Profile, StandardScopes.Roles })
-            {
-                _context.ClientScopes.Add(new ClientScope
-                {
-                    ClientId = defaultClient.Id,
-                    Scope = scope
-                });
-            }
+                _context.ClientScopes.Add(new ClientScope { ClientId = defaultClient.Id, Scope = scope });
 
-            // Add permissions
+            // Only grant/endpoint permissions; no scope-derived stored perms
             foreach (var permission in new[]
             {
                 OpenIddictConstants.Permissions.Endpoints.Authorization,
@@ -691,30 +493,28 @@ public class OidcClientService : IOidcClientService
                 OpenIddictConstants.Permissions.GrantTypes.ClientCredentials,
                 OpenIddictConstants.Permissions.GrantTypes.Password,
                 OpenIddictConstants.Permissions.GrantTypes.RefreshToken,
-                "oidc:scope:openid",
-                OpenIddictConstants.Permissions.Scopes.Email,
-                OpenIddictConstants.Permissions.Scopes.Profile,
-                OpenIddictConstants.Permissions.Scopes.Roles,
                 OpenIddictConstants.Permissions.ResponseTypes.Code
             })
-            {
-                _context.ClientPermissions.Add(new ClientPermission
-                {
-                    ClientId = defaultClient.Id,
-                    Permission = permission
-                });
-            }
+                _context.ClientPermissions.Add(new ClientPermission { ClientId = defaultClient.Id, Permission = permission });
 
             await _context.SaveChangesAsync();
             _logger.LogInformation("Created default client 'postman_client'");
         }
+        else
+        {
+            // Remove legacy stored scope permissions in default client
+            var legacy = defaultClient.Permissions.Where(p => p.Permission.StartsWith("oidc:scope:") || p.Permission == "scp:openid" || p.Permission.StartsWith("scp:email") || p.Permission.StartsWith("scp:profile") || p.Permission.StartsWith("scp:roles") ).ToList();
+            if (legacy.Any())
+            {
+                _context.ClientPermissions.RemoveRange(legacy);
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Cleaned {Count} legacy scope permissions from default client", legacy.Count);
+            }
+        }
 
-        // Sync all enabled clients with OpenIddict
         var enabledClients = await GetEnabledClientsAsync();
         foreach (var client in enabledClients)
-        {
             await SyncClientWithOpenIddictAsync(client);
-        }
     }
 
     public async Task<IEnumerable<Client>> GetEnabledClientsAsync()
@@ -740,61 +540,18 @@ public class OidcClientService : IOidcClientService
             }
 
             var existingClient = await _applicationManager.FindByClientIdAsync(client.ClientId);
-            if (existingClient != null)
-                await _applicationManager.DeleteAsync(existingClient);
+            var descriptor = BuildDescriptor(client);
 
-            var descriptor = new OpenIddictApplicationDescriptor
+            if (existingClient == null)
             {
-                ClientId = client.ClientId,
-                ClientSecret = client.ClientSecret,
-                DisplayName = client.Name,
-                ClientType = client.ClientType == ClientType.Public ? OpenIddictConstants.ClientTypes.Public : OpenIddictConstants.ClientTypes.Confidential
-            };
-
-            if (client.AllowAuthorizationCodeFlow)
-            {
-                descriptor.Permissions.Add(OpenIddictConstants.Permissions.GrantTypes.AuthorizationCode);
-                descriptor.Permissions.Add(OpenIddictConstants.Permissions.Endpoints.Authorization);
-                descriptor.Permissions.Add(OpenIddictConstants.Permissions.ResponseTypes.Code);
+                await _applicationManager.CreateAsync(descriptor);
+                _logger.LogInformation("Created OpenIddict application for '{ClientId}'", client.ClientId);
             }
-            if (client.AllowClientCredentialsFlow)
-                descriptor.Permissions.Add(OpenIddictConstants.Permissions.GrantTypes.ClientCredentials);
-            if (client.AllowPasswordFlow)
-                descriptor.Permissions.Add(OpenIddictConstants.Permissions.GrantTypes.Password);
-            if (client.AllowRefreshTokenFlow)
-                descriptor.Permissions.Add(OpenIddictConstants.Permissions.GrantTypes.RefreshToken);
-            descriptor.Permissions.Add(OpenIddictConstants.Permissions.Endpoints.Token);
-
-            var (hasOpenId, scopePerms) = BuildScopePermissions(client.Scopes.Select(s => s.Scope));
-            foreach (var p in scopePerms) descriptor.Permissions.Add(p);
-
-            if (hasOpenId)
-                descriptor.Permissions.Add(OpenIddictConstants.Permissions.Endpoints.EndSession);
-
-            if (client.AllowAccessToUserInfoEndpoint == true && hasOpenId)
-                descriptor.Permissions.Add(UserInfoEndpointPermission);
-            if (client.AllowAccessToRevocationEndpoint == true)
-                descriptor.Permissions.Add(RevocationEndpointPermission);
-            if (client.AllowAccessToIntrospectionEndpoint == true)
-                descriptor.Permissions.Add(IntrospectionEndpointPermission);
-
-            // Additional stored permissions (exclude scope-derived and standard endpoint ones already added)
-            foreach (var permission in client.Permissions.Select(p => p.Permission))
+            else
             {
-                if (permission.StartsWith("scp:") || permission.StartsWith("oidc:scope:"))
-                    continue; // derived or legacy (already cleaned up)
-                if (descriptor.Permissions.Contains(permission))
-                    continue;
-                descriptor.Permissions.Add(permission);
+                await _applicationManager.UpdateAsync(existingClient, descriptor);
+                _logger.LogInformation("Updated OpenIddict application for '{ClientId}'", client.ClientId);
             }
-
-            foreach (var redirect in client.RedirectUris)
-                descriptor.RedirectUris.Add(new Uri(redirect.Uri));
-            foreach (var postLogout in client.PostLogoutUris)
-                descriptor.PostLogoutRedirectUris.Add(new Uri(postLogout.Uri));
-
-            await _applicationManager.CreateAsync(descriptor);
-            _logger.LogInformation("Synced client '{ClientId}' with permissions: {Permissions}", client.ClientId, string.Join(", ", descriptor.Permissions));
         }
         catch (Exception ex)
         {
