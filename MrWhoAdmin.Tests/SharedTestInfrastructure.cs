@@ -5,7 +5,7 @@ namespace MrWhoAdmin.Tests;
 
 /// <summary>
 /// Shared test infrastructure for all integration tests
-/// This starts MSSQL once and reuses it across all integration tests
+/// This starts PostgreSQL (via Aspire) once and reuses it across all integration tests
 /// </summary>
 [TestClass]
 public static class SharedTestInfrastructure
@@ -27,13 +27,16 @@ public static class SharedTestInfrastructure
         {
             if (_isInitialized) return;
 
-            Console.WriteLine("?? Starting shared MSSQL infrastructure for all integration tests...");
-            
+            Console.WriteLine("?? Starting shared PostgreSQL Aspire infrastructure for all integration tests...");
+
+            // Signal AppHost that we are in test mode so it provisions Postgres
+            Environment.SetEnvironmentVariable("MRWHO_TESTS", "1");
+
             var cancellationToken = new CancellationTokenSource(StartupTimeout).Token;
 
             // Create the Aspire application host
             var appHost = DistributedApplicationTestingBuilder.CreateAsync<Projects.MrWhoAdmin_AppHost>(cancellationToken).Result;
-            
+
             appHost.Services.AddLogging(logging =>
             {
                 logging.SetMinimumLevel(LogLevel.Information);
@@ -44,13 +47,14 @@ public static class SharedTestInfrastructure
             _app = appHost.BuildAsync(cancellationToken).WaitAsync(StartupTimeout, cancellationToken).Result;
             _app.StartAsync(cancellationToken).WaitAsync(StartupTimeout, cancellationToken).Wait();
 
-            // Wait for all resources to be healthy
-            _app.ResourceNotifications.WaitForResourceHealthyAsync("sqlserver", cancellationToken).WaitAsync(StartupTimeout, cancellationToken).Wait();
+            // Wait for resources to be healthy
+            // postgres (server) name derived from AppHost ("postgres") and database reference supplies connection string named mrwhodb
+            _app.ResourceNotifications.WaitForResourceHealthyAsync("postgres", cancellationToken).WaitAsync(StartupTimeout, cancellationToken).Wait();
             _app.ResourceNotifications.WaitForResourceHealthyAsync("mrwho", cancellationToken).WaitAsync(StartupTimeout, cancellationToken).Wait();
             _app.ResourceNotifications.WaitForResourceHealthyAsync("webfrontend", cancellationToken).WaitAsync(StartupTimeout, cancellationToken).Wait();
 
             _isInitialized = true;
-            Console.WriteLine("? Shared MSSQL infrastructure started successfully!");
+            Console.WriteLine("? Shared PostgreSQL infrastructure started successfully!");
         }
         await Task.CompletedTask; // Ensure method is async
     }
@@ -63,7 +67,7 @@ public static class SharedTestInfrastructure
     {
         if (_app != null)
         {
-            Console.WriteLine("?? Cleaning up shared MSSQL infrastructure...");
+            Console.WriteLine("?? Cleaning up shared Aspire infrastructure...");
             await _app.DisposeAsync();
             Console.WriteLine("? Shared infrastructure cleanup completed!");
         }
