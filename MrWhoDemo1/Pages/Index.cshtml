@@ -14,11 +14,15 @@
             <div class="card border-success mb-4">
                 <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
                     <h5 class="mb-0"><i class="bi bi-cpu"></i> Machine-to-Machine API Test (No Login Needed)</h5>
-                    <button id="btnCallM2M" class="btn btn-light btn-sm"><i class="bi bi-play-circle"></i> Run Test</button>
+                    <div class="btn-group">
+                        <button id="btnCallM2M" class="btn btn-light btn-sm"><i class="bi bi-play-circle"></i> Demo API</button>
+                        <!-- NEW button to test mrwho_m2m realms call -->
+                        <button id="btnCallMrWhoRealms" class="btn btn-warning btn-sm"><i class="bi bi-database"></i> MrWho Realms</button>
+                    </div>
                 </div>
                 <div class="card-body">
-                    <p class="small text-muted mb-2">Calls Demo API endpoint <code>m2m-test/obtain-token-and-call</code> which performs a client_credentials token request then fetches WeatherForecast. Useful to prove service-to-service flow works.</p>
-                    <pre id="m2mResult" class="bg-dark text-light p-3 rounded" style="min-height:110px; white-space:pre-wrap;"><em>Click "Run Test" to perform machine-to-machine call...</em></pre>
+                    <p class="small text-muted mb-2">Calls Demo API endpoint <code>m2m-test/obtain-token-and-call</code> (client_credentials) or fetches realms from MrWho API using <code>mrwho_m2m</code> client with <code>mrwho.use</code> scope.</p>
+                    <pre id="m2mResult" class="bg-dark text-light p-3 rounded" style="min-height:110px; white-space:pre-wrap;"><em>Click a button to perform machine-to-machine call...</em></pre>
                 </div>
             </div>
             
@@ -296,43 +300,35 @@
 @section Scripts {
 <script>
     document.addEventListener('DOMContentLoaded', () => {
-        // Machine-to-machine test (works even if not logged in)
-        const btnM2M = document.getElementById('btnCallM2M');
-        if (btnM2M) {
-            btnM2M.addEventListener('click', async () => {
-                const el = document.getElementById('m2mResult');
-                el.textContent = 'Running machine-to-machine test...';
-                try {
-                    const resp = await fetch('/call-m2m');
-                    const data = await resp.json();
-                    let raw = data.raw || ''; 
-                    try { raw = JSON.stringify(JSON.parse(raw), null, 2); } catch {}
-                    el.textContent = `Status: ${data.status} (ok=${data.ok})\n${raw}`;
-                } catch (e) {
-                    el.textContent = 'Error: ' + e;
-                }
-            });
+        const resultEl = document.getElementById('m2mResult');
+        async function runM2M(url, label){
+            resultEl.textContent = 'Calling ' + label + '...';
+            try {
+                const resp = await fetch(url);
+                const data = await resp.json();
+                let body = data.body || data.raw || '';
+                try { body = JSON.stringify(JSON.parse(body), null, 2); } catch {}
+                resultEl.textContent = `Stage: ${data.stage || 'final'}\nStatus: ${data.status || resp.status} (ok=${data.ok})\n` + body;
+            } catch(e){
+                resultEl.textContent = 'Error: ' + e;
+            }
         }
+        document.getElementById('btnCallM2M')?.addEventListener('click', () => runM2M('/call-m2m','Demo API (WeatherForecast)'));
+        document.getElementById('btnCallMrWhoRealms')?.addEventListener('click', () => runM2M('/call-mrwho-realms','MrWho API (Realms)'));
 
-        // Existing user access token call (only present when authenticated section rendered)
         const btn = document.getElementById('btnCallApi');
         if (btn) {
             btn.addEventListener('click', async () => {
-                const resultEl = document.getElementById('apiResult');
-                resultEl && (resultEl.textContent = 'Calling API...');
+                const apiResult = document.getElementById('apiResult');
+                apiResult.textContent = 'Calling API...';
                 try {
                     const resp = await fetch('/call-api');
                     const data = await resp.json();
-                    if (data.body) {
-                        let prettyBody = data.body;
-                        try { prettyBody = JSON.stringify(JSON.parse(data.body), null, 2); } catch {}
-                        resultEl.textContent = `Status: ${data.status} (ok=${data.ok})\n${prettyBody}`;
-                    } else {
-                        resultEl.textContent = JSON.stringify(data, null, 2);
-                    }
-                } catch (e) {
-                    resultEl.textContent = 'Error calling API: ' + e;
-                }
+                    if (data.body){
+                        let pretty = data.body; try { pretty = JSON.stringify(JSON.parse(pretty), null, 2);} catch{}
+                        apiResult.textContent = `Status: ${data.status} (ok=${data.ok})\n${pretty}`;
+                    } else apiResult.textContent = JSON.stringify(data,null,2);
+                } catch(e){ apiResult.textContent = 'Error: ' + e; }
             });
         }
     });

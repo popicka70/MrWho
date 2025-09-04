@@ -25,6 +25,8 @@
     <PackageReference Include="OpenIddict.Client" Version="7.0.0" />
     <PackageReference Include="OpenIddict.Client.AspNetCore" Version="7.0.0" />
     <PackageReference Include="OpenIddict.Client.SystemNetHttp" Version="7.0.0" />
+    <PackageReference Include="OpenIddict.Server" Version="7.0.0" />
+    <PackageReference Include="OpenIddict.Server.AspNetCore" Version="7.0.0" />
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.14.0" />
     <PackageReference Include="QRCoder" Version="1.6.0" />
     <PackageReference Include="Fido2" Version="4.0.0" />

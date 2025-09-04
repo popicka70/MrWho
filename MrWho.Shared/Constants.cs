@@ -8,6 +8,7 @@ public static class MrWhoConstants
     public const string AdminRealmName = "admin";
     public const string DefaultRealmName = "default";
     public const string AdminClientId = "mrwho_admin_web";
+    public const string ServiceM2MClientId = "mrwho_m2m"; // added for standard service machine client
     
     /// <summary>
     /// Default token lifetimes
