@@ -32,6 +32,12 @@ builder.Services.AddHttpClient("DemoApi", client =>
     client.BaseAddress = new Uri("https://localhost:7162/"); // Matches Demo API https profile
 });
 
+// NEW: HttpClient for direct MrWho identity server API (administration API) – uses client credentials (mrwho_m2m)
+builder.Services.AddHttpClient("MrWhoApi", client =>
+{
+    client.BaseAddress = new Uri("https://localhost:7113/");
+});
+
 // Delegating handler to attach access token from current user
 builder.Services.AddTransient<DelegatingHandler, UserAccessTokenHandler>();
 
@@ -235,6 +241,46 @@ app.MapGet("/call-m2m", async (IHttpClientFactory factory) =>
     var response = await client.GetAsync("m2m-test/obtain-token-and-call");
     var body = await response.Content.ReadAsStringAsync();
     return Results.Json(new { status = (int)response.StatusCode, ok = response.IsSuccessStatusCode, raw = body });
+});
+
+// NEW: Client credentials call using mrwho_m2m client to fetch realms from MrWho API (requires mrwho.use)
+// The endpoint itself performs token request then API call for demo clarity.
+app.MapGet("/call-mrwho-realms", async () =>
+{
+    // Perform client_credentials token request manually
+    using var http = new HttpClient();
+    var tokenReq = new HttpRequestMessage(HttpMethod.Post, "https://localhost:7113/connect/token")
+    {
+        Content = new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["grant_type"] = "client_credentials",
+            ["client_id"] = "mrwho_m2m",
+            ["client_secret"] = "MrWhoM2MSecret2025!",
+            ["scope"] = "mrwho.use"
+        })
+    };
+    var tokenResp = await http.SendAsync(tokenReq);
+    var tokenJson = await tokenResp.Content.ReadAsStringAsync();
+    if (!tokenResp.IsSuccessStatusCode)
+    {
+        return Results.Json(new { stage = "token", status = (int)tokenResp.StatusCode, ok = false, body = tokenJson });
+    }
+    string? accessToken = null;
+    try
+    {
+        var doc = System.Text.Json.JsonDocument.Parse(tokenJson);
+        accessToken = doc.RootElement.GetProperty("access_token").GetString();
+    }
+    catch { }
+    if (string.IsNullOrEmpty(accessToken))
+        return Results.Json(new { stage = "token-parse", ok = false, body = tokenJson });
+
+    // Call protected realms endpoint on identity server API
+    var apiClient = new HttpClient { BaseAddress = new Uri("https://localhost:7113/") };
+    apiClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+    var realmsResp = await apiClient.GetAsync("api/realms?page=1&pageSize=20");
+    var realmsBody = await realmsResp.Content.ReadAsStringAsync();
+    return Results.Json(new { stage = "realms", status = (int)realmsResp.StatusCode, ok = realmsResp.IsSuccessStatusCode, body = realmsBody });
 });
 
 // Add health check endpoint

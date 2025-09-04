@@ -11,6 +11,7 @@ public class OidcClientService : IOidcClientService
 {
     private readonly ApplicationDbContext _context;
     private readonly IOpenIddictApplicationManager _applicationManager;
+    private readonly IOpenIddictScopeManager _scopeManager; // added
     private readonly UserManager<IdentityUser> _userManager;
     private readonly ILogger<OidcClientService> _logger;
 
@@ -22,11 +23,13 @@ public class OidcClientService : IOidcClientService
     public OidcClientService(
         ApplicationDbContext context,
         IOpenIddictApplicationManager applicationManager,
+        IOpenIddictScopeManager scopeManager, // added
         UserManager<IdentityUser> userManager,
         ILogger<OidcClientService> logger)
     {
         _context = context;
         _applicationManager = applicationManager;
+        _scopeManager = scopeManager; // added
         _userManager = userManager;
         _logger = logger;
     }
@@ -143,8 +146,34 @@ public class OidcClientService : IOidcClientService
     /// </summary>
     public async Task InitializeEssentialDataAsync()
     {
+        // Detect test environment for enabling relaxed flows (password grant) in tests only
+        var isTesting = string.Equals(Environment.GetEnvironmentVariable("MRWHO_TESTS"), "1", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"), "Testing", StringComparison.OrdinalIgnoreCase);
+
         // Ensure flag backfill first
         await BackfillEndpointAccessFlagsAsync();
+
+        // Ensure mrwho.use scope exists in OpenIddict (create if missing)
+        try
+        {
+            if (await _scopeManager.FindByNameAsync(StandardScopes.MrWhoUse) == null)
+            {
+                var scopeDescriptor = new OpenIddictScopeDescriptor
+                {
+                    Name = StandardScopes.MrWhoUse,
+                    DisplayName = "MrWho Admin Usage",
+                    Description = "Allows calling protected MrWho administration API endpoints"
+                };
+                // Associate resource if standard API exists
+                scopeDescriptor.Resources.Add("mrwho_api");
+                await _scopeManager.CreateAsync(scopeDescriptor);
+                _logger.LogInformation("Created OpenIddict scope '{Scope}'", StandardScopes.MrWhoUse);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed ensuring mrwho.use scope");
+        }
 
         // 1. Create admin realm if it doesn't exist
         var adminRealm = await _context.Realms.FirstOrDefaultAsync(r => r.Name == "admin");
@@ -208,7 +237,7 @@ public class OidcClientService : IOidcClientService
                 ClientType = ClientType.Confidential,
                 AllowAuthorizationCodeFlow = true,
                 AllowClientCredentialsFlow = false,
-                AllowPasswordFlow = false,
+                AllowPasswordFlow = isTesting, // enable password flow ONLY for tests
                 AllowRefreshTokenFlow = true,
                 RequirePkce = true,
                 RequireClientSecret = true,
@@ -253,7 +282,7 @@ public class OidcClientService : IOidcClientService
             foreach (var scope in scopes)
                 _context.ClientScopes.Add(new ClientScope { ClientId = adminClient.Id, Scope = scope });
 
-            var basePermissions = new[]
+            var basePermissions = new List<string>
             {
                 OpenIddictConstants.Permissions.Endpoints.Authorization,
                 OpenIddictConstants.Permissions.Endpoints.Token,
@@ -262,12 +291,17 @@ public class OidcClientService : IOidcClientService
                 OpenIddictConstants.Permissions.GrantTypes.RefreshToken,
                 OpenIddictConstants.Permissions.ResponseTypes.Code
             };
+            if (isTesting)
+            {
+                // allow password grant ONLY for test tokens
+                basePermissions.Add(OpenIddictConstants.Permissions.GrantTypes.Password);
+            }
             foreach (var p in basePermissions)
                 _context.ClientPermissions.Add(new ClientPermission { ClientId = adminClient.Id, Permission = p });
             _context.ClientPermissions.Add(new ClientPermission { ClientId = adminClient.Id, Permission = "scp:mrwho.use" });
 
             await _context.SaveChangesAsync();
-            _logger.LogInformation("Created admin client 'mrwho_admin_web' with standardized permissions");
+            _logger.LogInformation("Created admin client 'mrwho_admin_web' with standardized permissions (PasswordGrant={Password})", isTesting);
         }
         else
         {
@@ -282,6 +316,16 @@ public class OidcClientService : IOidcClientService
             {
                 _context.ClientPermissions.Add(new ClientPermission { ClientId = adminClient.Id, Permission = "scp:mrwho.use" });
                 await _context.SaveChangesAsync();
+            }
+            // Enable password flow dynamically in test environment if not already enabled
+            if (isTesting && !adminClient.AllowPasswordFlow)
+            {
+                adminClient.AllowPasswordFlow = true;
+                adminClient.UpdatedAt = DateTime.UtcNow;
+                adminClient.UpdatedBy = "TestSetup";
+                await _context.SaveChangesAsync();
+                // Explicit permission not required here; SyncClientWithOpenIddictAsync will add it via descriptor
+                _logger.LogInformation("Enabled password grant for admin client in test environment");
             }
         }
 
@@ -375,7 +419,7 @@ public class OidcClientService : IOidcClientService
             if (legacy.Any()) { _context.ClientPermissions.RemoveRange(legacy); await _context.SaveChangesAsync(); }
         }
 
-        // Users
+        // Users (unchanged)
         var adminUser = await _userManager.FindByNameAsync("admin@mrwho.local");
         if (adminUser == null)
         {
@@ -429,6 +473,94 @@ public class OidcClientService : IOidcClientService
         await SyncClientWithOpenIddictAsync(adminClient!);
         await SyncClientWithOpenIddictAsync(demo1Client!);
         await SyncClientWithOpenIddictAsync(m2mClient!);
+
+        // Standard machine-to-machine client for internal MrWho administrative API usage
+        var serviceM2M = await _context.Clients
+            .Include(c => c.Scopes)
+            .Include(c => c.Permissions)
+            .FirstOrDefaultAsync(c => c.ClientId == "mrwho_m2m");
+        if (serviceM2M == null)
+        {
+            serviceM2M = new Client
+            {
+                ClientId = "mrwho_m2m",
+                ClientSecret = "MrWhoM2MSecret2025!",
+                Name = "MrWho Service M2M Client",
+                Description = "Standard machine client (client_credentials) for calling protected MrWho API endpoints requiring mrwho.use",
+                RealmId = adminRealm.Id,
+                IsEnabled = true,
+                ClientType = ClientType.Machine,
+                AllowAuthorizationCodeFlow = false,
+                AllowClientCredentialsFlow = true,
+                AllowPasswordFlow = false,
+                AllowRefreshTokenFlow = false,
+                RequirePkce = false,
+                RequireClientSecret = true,
+                CreatedBy = "System",
+                AllowAccessToUserInfoEndpoint = false,
+                AllowAccessToRevocationEndpoint = true,
+                AllowAccessToIntrospectionEndpoint = true
+            };
+            _context.Clients.Add(serviceM2M);
+            await _context.SaveChangesAsync();
+
+            // Required scopes for tests/integration: mrwho.use + api.read
+            _context.ClientScopes.Add(new ClientScope { ClientId = serviceM2M.Id, Scope = StandardScopes.MrWhoUse });
+            _context.ClientScopes.Add(new ClientScope { ClientId = serviceM2M.Id, Scope = StandardScopes.ApiRead });
+
+            _context.ClientPermissions.Add(new ClientPermission { ClientId = serviceM2M.Id, Permission = OpenIddictConstants.Permissions.Endpoints.Token });
+            _context.ClientPermissions.Add(new ClientPermission { ClientId = serviceM2M.Id, Permission = OpenIddictConstants.Permissions.GrantTypes.ClientCredentials });
+            _context.ClientPermissions.Add(new ClientPermission { ClientId = serviceM2M.Id, Permission = "scp:mrwho.use" });
+            // scp:api.read will be added by descriptor from scopes; no need to store directly, but harmless if present
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Created standard service M2M client 'mrwho_m2m' (scopes mrwho.use, api.read)");
+        }
+        else
+        {
+            bool changed = false;
+            if (!serviceM2M.Scopes.Any(s => s.Scope == StandardScopes.MrWhoUse))
+            {
+                _context.ClientScopes.Add(new ClientScope { ClientId = serviceM2M.Id, Scope = StandardScopes.MrWhoUse });
+                changed = true;
+            }
+            if (!serviceM2M.Scopes.Any(s => s.Scope == StandardScopes.ApiRead))
+            {
+                _context.ClientScopes.Add(new ClientScope { ClientId = serviceM2M.Id, Scope = StandardScopes.ApiRead });
+                changed = true;
+            }
+            if (!serviceM2M.Permissions.Any(p => p.Permission == "scp:mrwho.use"))
+            {
+                _context.ClientPermissions.Add(new ClientPermission { ClientId = serviceM2M.Id, Permission = "scp:mrwho.use" });
+                changed = true;
+            }
+            if (!serviceM2M.Permissions.Any(p => p.Permission == OpenIddictConstants.Permissions.GrantTypes.ClientCredentials))
+            {
+                _context.ClientPermissions.Add(new ClientPermission { ClientId = serviceM2M.Id, Permission = OpenIddictConstants.Permissions.GrantTypes.ClientCredentials });
+                changed = true;
+            }
+            if (!serviceM2M.Permissions.Any(p => p.Permission == OpenIddictConstants.Permissions.Endpoints.Token))
+            {
+                _context.ClientPermissions.Add(new ClientPermission { ClientId = serviceM2M.Id, Permission = OpenIddictConstants.Permissions.Endpoints.Token });
+                changed = true;
+            }
+            if (changed)
+            {
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Updated service M2M client 'mrwho_m2m' to include required scopes/permissions");
+            }
+        }
+
+        // NEW: ensure mrwho_m2m is registered with OpenIddict (previous omission caused invalid_client)
+        try
+        {
+            await SyncClientWithOpenIddictAsync(serviceM2M!);
+            _logger.LogInformation("Synchronized service M2M client 'mrwho_m2m' with OpenIddict");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to sync service M2M client 'mrwho_m2m'");
+            throw; // fail fast so invalid_client is surfaced early
+        }
     }
 
     public async Task InitializeDefaultRealmAndClientsAsync()

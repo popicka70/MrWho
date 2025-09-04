@@ -307,6 +307,14 @@ public static class ServiceCollectionExtensions
                        .AllowClientCredentialsFlow()
                        .AllowRefreshTokenFlow(); // device auth flow deferred until package alignment
 
+                // Conditionally enable password flow ONLY for tests to support integration tests
+                var enablePassword = string.Equals(Environment.GetEnvironmentVariable("MRWHO_TESTS"), "1", StringComparison.OrdinalIgnoreCase) ||
+                                     environment.IsEnvironment("Testing");
+                if (enablePassword)
+                {
+                    options.AllowPasswordFlow();
+                }
+
                 // Enforce PKCE for auth code flow (Option 1)
                 options.RequireProofKeyForCodeExchange();
 

@@ -48,26 +48,19 @@ public class SeedingService : ISeedingService
     public async Task SeedAsync()
     {
         // Schema managed via EF Core migrations on application startup.
-        // No EnsureCreated calls here.
-        
+
         // Seed default realm
         await SeedDefaultRealm();
-        
         // Seed default roles
         await SeedDefaultRoles();
-        
         // Seed default user
         await SeedDefaultUser();
-        
         // Seed standard scopes
         await _scopeSeederService.InitializeStandardScopesAsync();
-        
         // Seed standard API resources
         await _apiResourceSeederService.SeedStandardApiResourcesAsync();
-        
         // Seed standard Identity resources
         await _identityResourceSeederService.SeedStandardIdentityResourcesAsync();
-
         // Seed claim types (after identity resources so we can also import distinct existing ones)
         if (_claimTypeSeederService != null)
         {
@@ -79,6 +72,18 @@ public class SeedingService : ISeedingService
         
         // Seed default OIDC applications
         await SeedDefaultApplications();
+        
+        // NEW: Ensure essential admin/demo data + admin client (needed for tests) -> registers with OpenIddict
+        try
+        {
+            await _oidcClientService.InitializeEssentialDataAsync();
+            _logger.LogInformation("Essential OIDC data initialized (admin/demo realms & clients)");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed initializing essential OIDC data");
+            throw; // fail fast so invalid_client issues are surfaced early
+        }
     }
 
     private async Task SeedPredefinedIdentityProvidersAsync()

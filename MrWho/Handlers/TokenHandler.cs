@@ -370,13 +370,29 @@ public class TokenHandler : ITokenHandler
     private async Task<IResult> HandleClientCredentialsGrantAsync(OpenIddictRequest request)
     {
         var identity = new ClaimsIdentity(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
-        var subClaim = new Claim(Claims.Subject, request.ClientId!);
+        var clientId = request.ClientId!;
+        var subClaim = new Claim(Claims.Subject, clientId);
         subClaim.SetDestinations(Destinations.AccessToken);
         identity.AddClaim(subClaim);
 
+        // Add azp (authorized party) & client_id claims so AdminClientApi policy can validate
+        try
+        {
+            var azp = new Claim(OpenIddictConstants.Claims.AuthorizedParty, clientId);
+            azp.SetDestinations(Destinations.AccessToken);
+            identity.AddClaim(azp);
+            var clientIdClaim = new Claim("client_id", clientId);
+            clientIdClaim.SetDestinations(Destinations.AccessToken);
+            identity.AddClaim(clientIdClaim);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Failed adding azp/client_id claims for client_credentials token");
+        }
+
         var principal = new ClaimsPrincipal(identity);
         principal.SetScopes(request.GetScopes());
-        var audienceResult = await ApplyAudiencesAsync(principal, request.ClientId!, request.GetScopes(), null);
+        var audienceResult = await ApplyAudiencesAsync(principal, clientId, request.GetScopes(), null);
         if (audienceResult.Error)
         {
             var forbidProps = new AuthenticationProperties(new Dictionary<string, string?>
