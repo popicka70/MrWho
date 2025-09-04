@@ -8,27 +8,6 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 
 namespace MrWho.Services;
 
-/// <summary>
-/// SINGLE SOURCE OF TRUTH for all authorization policies in the application
-/// 
-/// This provider dynamically loads client-specific authentication schemes from database at runtime
-/// and centralizes ALL authorization policy configuration in one place. It solves the chicken-and-egg 
-/// problem of needing database access during service registration.
-/// 
-/// Handles:
-/// - Static Security Policies: UserInfoPolicy (OpenIddict validation only)
-/// - Static Client Policies: AdminOnly, DemoAccess, ApiAccess  
-/// - Dynamic Default Policy: Loads ALL client schemes from database automatically
-/// - Dynamic Client Policies: Client_{clientId} format for any database client
-/// - Fallback: Uses DefaultAuthorizationPolicyProvider for unknown policies
-/// 
-/// Benefits:
-/// ? Single location for all authorization configuration
-/// ? Database-driven policies that update automatically when clients are added
-/// ? No code changes needed for new clients
-/// ? Proper fallback handling when database is unavailable
-/// ? Thread-safe policy creation with caching
-/// </summary>
 public class DynamicAuthorizationPolicyProvider : IAuthorizationPolicyProvider
 {
     private readonly DefaultAuthorizationPolicyProvider _fallbackPolicyProvider;
@@ -116,9 +95,25 @@ public class DynamicAuthorizationPolicyProvider : IAuthorizationPolicyProvider
                             .Any(c => c.Value.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                                               .Contains(StandardScopes.MrWhoUse));
                         if (!hasMrWhoUse) return false;
-                        string adminClientId = MrWhoConstants.AdminClientId;
+
+                        string adminClientId = MrWhoConstants.AdminClientId; // mrwho_admin_web
+                        const string serviceClientId = "mrwho_m2m";        // standard service M2M
+                        const string testM2MClientId = "mrwho_tests_m2m";  // legacy test-only client (optional)
+
                         bool isAdminClient = user.HasClaim(c => (c.Type == "azp" || c.Type == "client_id") && c.Value == adminClientId);
-                        return isAdminClient;
+                        if (isAdminClient) return true;
+
+                        bool isServiceClient = user.HasClaim(c => (c.Type == "azp" || c.Type == "client_id") && c.Value == serviceClientId);
+                        if (isServiceClient) return true;
+
+                        var isTesting = string.Equals(Environment.GetEnvironmentVariable("MRWHO_TESTS"), "1", StringComparison.OrdinalIgnoreCase) ||
+                                         string.Equals(Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"), "Testing", StringComparison.OrdinalIgnoreCase);
+                        if (isTesting)
+                        {
+                            bool isLegacyTestClient = user.HasClaim(c => (c.Type == "azp" || c.Type == "client_id") && c.Value == testM2MClientId);
+                            if (isLegacyTestClient) return true;
+                        }
+                        return false;
                     })
                     .Build();
         }

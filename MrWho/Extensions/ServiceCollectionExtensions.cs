@@ -1,23 +1,24 @@
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Cookies; // ensure CookieAuthenticationOptions is available
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.RateLimiting; // rate limiting
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Diagnostics; // added for RelationalEventId
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Options;
 using MrWho.Data;
 using MrWho.Handlers;
-using MrWho.Handlers.Users; // added for user handler interfaces/implementations
-using MrWho.Options; // for CookieSeparationMode
+using MrWho.Handlers.Users;
+using MrWho.Options;
 using MrWho.Services;
 using MrWho.Shared;
-using MrWho.Shared.Authentication; // for CookieSchemeNaming
+using MrWho.Shared.Authentication;
 using OpenIddict.Abstractions;
-using OpenIddict.Client; // added for client options
-using OpenIddict.Client.AspNetCore; // added for aspnetcore integration
-using OpenIddict.Client.SystemNetHttp; // added for http integration
-using System.Threading.RateLimiting; // rate limiting options
+using OpenIddict.Client;
+using OpenIddict.Client.AspNetCore;
+using OpenIddict.Client.SystemNetHttp;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.Hosting;
 
 namespace MrWho.Extensions;
 
@@ -173,8 +174,8 @@ public static class ServiceCollectionExtensions
             options.LogoutPath = "/connect/logout";
             options.AccessDeniedPath = "/connect/access-denied";
             options.SlidingExpiration = true;
-            options.Cookie.SameSite = SameSiteMode.None; // Required for external IdP (cross-site) login/logout
-            options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+            options.Cookie.SameSite = SameSiteMode.None; // cross-site OIDC flows
+            options.Cookie.SecurePolicy = CookieSecurePolicy.Always; // Enforce HTTPS (Option 3)
             options.Cookie.Name = CookieSchemeNaming.DefaultCookieName; // Ensure cookie name is explicitly set
             options.Cookie.HttpOnly = true; // Security best practice
             options.ExpireTimeSpan = TimeSpan.FromHours(8); // Consistent with client cookies
@@ -225,7 +226,7 @@ public static class ServiceCollectionExtensions
             {
                 options.Cookie.Name = actualCookieName;
                 options.Cookie.HttpOnly = true;
-                options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+                options.Cookie.SecurePolicy = CookieSecurePolicy.Always; // Enforce HTTPS (Option 3)
                 options.Cookie.SameSite = SameSiteMode.None; // Required for cross-site OIDC redirects
                 options.ExpireTimeSpan = TimeSpan.FromHours(24);
                 options.SlidingExpiration = true;
@@ -249,9 +250,6 @@ public static class ServiceCollectionExtensions
             ? parsed
             : CookieSeparationMode.ByClient;
 
-        // IMPORTANT: In None mode we want ONLY the default Identity scheme/cookie. Do NOT register a client-specific scheme
-        // that reuses the same cookie name (.AspNetCore.Identity.Application) or we get two schemes sharing one cookie
-        // which can break Authenticate/Challenge flows and prevent the login page from rendering.
         if (mode == CookieSeparationMode.None)
         {
             return services; // default Identity cookie already configured in AddMrWhoIdentityWithClientCookies
@@ -273,13 +271,11 @@ public static class ServiceCollectionExtensions
             options.ExpireTimeSpan = TimeSpan.FromHours(8); // Work day session
         });
 
-        // Note: Remaining clients are registered dynamically by DynamicClientCookieService from the database.
         return services;
     }
 
-    public static IServiceCollection AddMrWhoOpenIddict(this IServiceCollection services, IConfiguration configuration)
+    public static IServiceCollection AddMrWhoOpenIddict(this IServiceCollection services, IConfiguration configuration, IWebHostEnvironment environment)
     {
-        // Configure OpenIddict
         services.AddOpenIddict()
             .AddCore(options =>
             {
@@ -298,34 +294,49 @@ public static class ServiceCollectionExtensions
                 // Custom UserInfo handler descriptor (uses IUserInfoHandler)
                 options.AddEventHandler(CustomUserInfoHandler.Descriptor);
 
-                // Enable the authorization and token endpoints
+                // Enable endpoints (added revocation + introspection for step 2)
                 options.SetAuthorizationEndpointUris("/connect/authorize")
                        .SetTokenEndpointUris("/connect/token")
                        .SetEndSessionEndpointUris("/connect/logout")
                        .SetConfigurationEndpointUris("/.well-known/openid-configuration")
                        .SetUserInfoEndpointUris("/connect/userinfo")
-
-                       // Enable grant types
+                       .SetRevocationEndpointUris("/connect/revocation")
+                       .SetIntrospectionEndpointUris("/connect/introspect")
+                       // Flows
                        .AllowAuthorizationCodeFlow()
                        .AllowClientCredentialsFlow()
-                       .AllowPasswordFlow()
-                       .AllowRefreshTokenFlow();
+                       .AllowRefreshTokenFlow(); // device auth flow deferred until package alignment
+
+                // Conditionally enable password flow ONLY for tests to support integration tests
+                var enablePassword = string.Equals(Environment.GetEnvironmentVariable("MRWHO_TESTS"), "1", StringComparison.OrdinalIgnoreCase) ||
+                                     environment.IsEnvironment("Testing");
+                if (enablePassword)
+                {
+                    options.AllowPasswordFlow();
+                }
+
+                // Enforce PKCE for auth code flow (Option 1)
+                options.RequireProofKeyForCodeExchange();
 
                 // Configure token lifetimes for better refresh token experience
                 options.SetAccessTokenLifetime(TimeSpan.FromMinutes(60))    // 1 hour access tokens
                        .SetRefreshTokenLifetime(TimeSpan.FromDays(14));     // 14 days refresh tokens
 
-                // Configure refresh token behavior
-                options.DisableRollingRefreshTokens(); // Disable refresh token rotation for development
+                // Refresh token rotation (Option 2): enable in non-development
+                if (environment.IsDevelopment())
+                {
+                    options.DisableRollingRefreshTokens();
+                }
+                // In non-development, rolling refresh tokens remain enabled by default; no explicit call needed
 
                 // Register scopes (including API scopes)
                 options.RegisterScopes(StandardScopes.OpenId,
                                       OpenIddictConstants.Scopes.Email,
                                       OpenIddictConstants.Scopes.Profile,
                                       OpenIddictConstants.Scopes.Roles,
-                                      OpenIddictConstants.Scopes.OfflineAccess, // CRITICAL: Required for refresh tokens
-                                      StandardScopes.ApiRead,   // Use constant
-                                      StandardScopes.ApiWrite,  // Use constant
+                                      OpenIddictConstants.Scopes.OfflineAccess,
+                                      StandardScopes.ApiRead,
+                                      StandardScopes.ApiWrite,
                                       StandardScopes.MrWhoUse,
                                       "roles.global",
                                       "roles.client",
@@ -341,9 +352,8 @@ public static class ServiceCollectionExtensions
                 // Register the ASP.NET Core host and enable passthrough for the authorization endpoint
                 options.UseAspNetCore()
                        .EnableAuthorizationEndpointPassthrough()
-                       .EnableTokenEndpointPassthrough() // ADDED: allow custom minimal API handler for /connect/token
-                       .EnableEndSessionEndpointPassthrough();
-                       //.EnableUserInfoEndpointPassthrough();
+                       .EnableTokenEndpointPassthrough()
+                       .EnableEndSessionEndpointPassthrough(); // leave device/verification with default UI for now
             })
             .AddValidation(options =>
             {
@@ -407,6 +417,8 @@ public static class ServiceCollectionExtensions
         int tokenPerHour = section.GetValue<int?>("TokenPerHour") ?? 60;
         int authorizePerHour = section.GetValue<int?>("AuthorizePerHour") ?? 120;
         int userInfoPerHour = section.GetValue<int?>("UserInfoPerHour") ?? 240;
+        int devicePerHour = section.GetValue<int?>("DevicePerHour") ?? 60; // new
+        int verifyPerHour = section.GetValue<int?>("VerifyPerHour") ?? 120; // new
 
         services.AddRateLimiter(options =>
         {
@@ -454,6 +466,22 @@ public static class ServiceCollectionExtensions
                 QueueLimit = 0,
                 AutoReplenishment = true
             }));
+            options.AddPolicy("rl.device", ctx => RateLimitPartition.GetFixedWindowLimiter(GetRemoteIp(ctx), _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = Math.Max(1, devicePerHour),
+                Window = TimeSpan.FromHours(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+            options.AddPolicy("rl.verify", ctx => RateLimitPartition.GetFixedWindowLimiter(GetRemoteIp(ctx), _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = Math.Max(1, verifyPerHour),
+                Window = TimeSpan.FromHours(1),
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
         });
 
         return services;
@@ -467,20 +495,6 @@ public static class ServiceCollectionExtensions
     {
         // Configure authorization - all policies handled by DynamicAuthorizationPolicyProvider
         services.AddAuthorization();
-
-        // The DynamicAuthorizationPolicyProvider (registered in AddMrWhoServices) handles:
-        // ? UserInfoPolicy - Static security policy for OpenIddict validation
-        // ? AdminOnly - Static policy for admin client authentication  
-        // ? DemoAccess - Static policy for demo client authentication
-        // ? ApiAccess - Static policy for API client + OpenIddict validation
-        // ? Default Policy - Dynamic policy loading ALL client schemes from database
-        // ? Client_{clientId} - Dynamic policies for any client (e.g., "Client_my_custom_client")
-        //
-        // Benefits:
-        // ?? Single source of truth for all authorization configuration
-        // ?? Database-driven default policy with automatic client inclusion
-        // ?? No code changes needed when adding new clients to database
-        // ?? Centralized policy logic with proper fallback handling
 
         return services;
     }

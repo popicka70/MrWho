@@ -1,0 +1,190 @@
+@using MrWho.Shared.Models
+@using Radzen
+@using Radzen.Blazor
+@inject IClientRolesApiService ClientRolesApi
+@inject IClientRoleUsersApiService ClientRoleUsersApi
+@inject NotificationService NotificationService
+@inject DialogService DialogService
+@inject ILogger<EditClientClientRolesTab> Logger
+
+@if (!editClient.IsEdit)
+{
+    <RadzenAlert AlertStyle="AlertStyle.Info"><RadzenText>Save client first to manage client-scoped roles.</RadzenText></RadzenAlert>
+}
+else if (editClient.IsLoading)
+{
+    <RadzenCard class="rz-my-4">
+        <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+        <RadzenText class="rz-mt-3">Loading roles...</RadzenText>
+    </RadzenCard>
+}
+else
+{
+    <div style="padding:1rem;">
+        <RadzenStack Gap="1.5rem">
+            <RadzenText TextStyle="TextStyle.H6" Text="Client Roles" />
+
+            <RadzenStack Gap="0.5rem">
+                <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
+                    <RadzenTextBox @bind-Value="newRoleName" Placeholder="role-name" Style="width:300px;" />
+                    <RadzenButton Icon="add" Text="Add" ButtonStyle="ButtonStyle.Primary" Disabled="@string.IsNullOrWhiteSpace(newRoleName)" Click="@(async () => await CreateRole())" IsBusy="@creating" />
+                </RadzenStack>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Create a new role for this client</RadzenText>
+            </RadzenStack>
+
+            <RadzenTabs RenderMode="TabRenderMode.Client" @bind-SelectedIndex="tabIndex">
+                <Tabs>
+                    <RadzenTabsItem Text="Roles" Icon="shield_person">
+                        @if (loadingRoles)
+                        {
+                            <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+                        }
+                        else if (!roles.Any())
+                        {
+                            <RadzenAlert AlertStyle="AlertStyle.Info"><RadzenText>No roles defined.</RadzenText></RadzenAlert>
+                        }
+                        else
+                        {
+                            <RadzenDataGrid Data="@roles" TItem="ClientRoleDto" AllowPaging="true" PageSize="15" AllowSorting="true" AllowFiltering="true">
+                                <Columns>
+                                    <RadzenDataGridColumn TItem="ClientRoleDto" Property="Name" Title="Role" />
+                                    <RadzenDataGridColumn TItem="ClientRoleDto" Property="UserCount" Title="Users" Width="90px" />
+                                    <RadzenDataGridColumn TItem="ClientRoleDto" Title="Actions" Width="160px">
+                                        <Template Context="r">
+                                            <RadzenButton Icon="group" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Variant="Variant.Text" Click="@(async () => await ViewUsers(r))" />
+                                            <RadzenButton Icon="delete" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Danger" Variant="Variant.Text" Disabled="@(r.UserCount>0)" Click="@(async () => await DeleteRole(r))" />
+                                        </Template>
+                                    </RadzenDataGridColumn>
+                                </Columns>
+                            </RadzenDataGrid>
+                        }
+                    </RadzenTabsItem>
+                    <RadzenTabsItem Text="Role Users" Icon="group" Disabled="@(!roleUsers.Any())">
+                        <RadzenStack Gap="0.75rem">
+                            <RadzenText TextStyle="TextStyle.Subtitle1" Text="@($"Users for role: {selectedRole}")" />
+                            @if (loadingRoleUsers)
+                            {
+                                <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+                            }
+                            else if (!roleUsers.Any())
+                            {
+                                <RadzenAlert AlertStyle="AlertStyle.Info"><RadzenText>No users for this role.</RadzenText></RadzenAlert>
+                            }
+                            else
+                            {
+                                <RadzenDataGrid Data="@roleUsers" TItem="ClientRoleUserDto" AllowPaging="true" PageSize="15">
+                                    <Columns>
+                                        <RadzenDataGridColumn TItem="ClientRoleUserDto" Property="UserName" Title="User" />
+                                        <RadzenDataGridColumn TItem="ClientRoleUserDto" Property="Email" Title="Email" />
+                                    </Columns>
+                                </RadzenDataGrid>
+                            }
+                        </RadzenStack>
+                    </RadzenTabsItem>
+                </Tabs>
+            </RadzenTabs>
+        </RadzenStack>
+    </div>
+}
+
+@code {
+    [Parameter] public EditClient editClient { get; set; } = null!;
+
+    private bool loadingRoles;
+    private bool loadingRoleUsers;
+    private bool creating;
+    private List<ClientRoleDto> roles = new();
+    private List<ClientRoleUserDto> roleUsers = new();
+    private string? selectedRole;
+    private string? newRoleName;
+    private int tabIndex = 0;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (editClient.IsEdit)
+        {
+            await LoadRoles();
+        }
+    }
+
+    private async Task LoadRoles()
+    {
+        loadingRoles = true;
+        try
+        {
+            var res = await ClientRolesApi.GetRolesAsync(editClient.model.ClientId!);
+            roles = (res ?? new()).OrderBy(r => r.Name).ToList();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "LoadRoles failed for client {ClientId}", editClient.model.ClientId);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to load roles");
+        }
+        finally { loadingRoles = false; }
+    }
+
+    private async Task CreateRole()
+    {
+        if (string.IsNullOrWhiteSpace(newRoleName)) return;
+        creating = true;
+        try
+        {
+            var created = await ClientRolesApi.CreateRoleAsync(new CreateClientRoleRequest { ClientId = editClient.model.ClientId!, Name = newRoleName!.Trim() });
+            if (created != null)
+            {
+                NotificationService.Notify(NotificationSeverity.Success, "Created", $"Role '{created.Name}' created");
+                newRoleName = string.Empty;
+                await LoadRoles();
+            }
+            else NotificationService.Notify(NotificationSeverity.Error, "Error", "Create failed");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "CreateRole failed");
+            NotificationService.Notify(NotificationSeverity.Error, "Error", ex.Message);
+        }
+        finally { creating = false; }
+    }
+
+    private async Task DeleteRole(ClientRoleDto role)
+    {
+        var ok = await DialogService.Confirm($"Delete role '{role.Name}'?", "Delete Role", new ConfirmOptions { OkButtonText = "Delete", CancelButtonText = "Cancel" });
+        if (ok != true) return;
+        try
+        {
+            var success = await ClientRolesApi.DeleteRoleAsync(new DeleteClientRoleRequest { ClientId = role.ClientId, Name = role.Name });
+            if (success)
+            {
+                NotificationService.Notify(NotificationSeverity.Success, "Deleted", "Role deleted");
+                await LoadRoles();
+            }
+            else NotificationService.Notify(NotificationSeverity.Error, "Error", "Delete failed");
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "DeleteRole failed");
+            NotificationService.Notify(NotificationSeverity.Error, "Error", ex.Message);
+        }
+    }
+
+    private async Task ViewUsers(ClientRoleDto role)
+    {
+        roleUsers.Clear();
+        selectedRole = role.Name;
+        tabIndex = 1;
+        loadingRoleUsers = true;
+        try
+        {
+            roleUsers = await ClientRoleUsersApi.GetUsersForRoleAsync(role.ClientId, role.Name) ?? new();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "ViewUsers failed");
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to load users");
+        }
+        finally { loadingRoleUsers = false; }
+    }
+
+    // marker type for logger generic param
+    public class EditClientClientRolesTab { }
+}
