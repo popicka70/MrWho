@@ -15,10 +15,13 @@ public class OidcClientService : IOidcClientService
     private readonly UserManager<IdentityUser> _userManager;
     private readonly ILogger<OidcClientService> _logger;
 
+    // Removed incorrect custom endpoint permission constants. OpenIddict uses dot notation e.g. "endpoints.introspection".
+    // We'll rely on OpenIddictConstants when available and literal strings for those not exposed (fallback list maintained below).
+
     // Fallback literal permissions for endpoints not exposed as constants in current OpenIddict version
-    private const string UserInfoEndpointPermission = "endpoints:userinfo";
-    private const string RevocationEndpointPermission = "endpoints:revocation";
-    private const string IntrospectionEndpointPermission = "endpoints:introspection";
+    private const string UserInfoEndpointPermission = "endpoints.userinfo"; // correct form
+    private const string RevocationEndpointPermission = "endpoints.revocation"; // correct form
+    private const string IntrospectionEndpointPermission = "endpoints.introspection"; // correct form
 
     public OidcClientService(
         ApplicationDbContext context,
@@ -42,25 +45,40 @@ public class OidcClientService : IOidcClientService
                 c.AllowAccessToUserInfoEndpoint == null ||
                 c.AllowAccessToRevocationEndpoint == null ||
                 c.AllowAccessToIntrospectionEndpoint == null).ToListAsync();
-            if (clients.Count == 0) return;
-            int updated = 0;
-            foreach (var c in clients)
+            if (clients.Count > 0)
             {
-                var isMachine = c.ClientType == ClientType.Machine || (c.AllowClientCredentialsFlow && !c.AllowAuthorizationCodeFlow && !c.AllowPasswordFlow);
-                if (c.AllowAccessToUserInfoEndpoint == null)
-                    c.AllowAccessToUserInfoEndpoint = !isMachine; // interactive clients get userinfo
-                if (c.AllowAccessToRevocationEndpoint == null)
-                    c.AllowAccessToRevocationEndpoint = true; // generally safe
-                if (c.AllowAccessToIntrospectionEndpoint == null)
-                    c.AllowAccessToIntrospectionEndpoint = isMachine; // machines often need introspection
-                c.UpdatedAt = DateTime.UtcNow;
-                c.UpdatedBy ??= "Backfill";
-                updated++;
-            }
-            if (updated > 0)
-            {
+                int updated = 0;
+                foreach (var c in clients)
+                {
+                    var isMachine = c.ClientType == ClientType.Machine || (c.AllowClientCredentialsFlow && !c.AllowAuthorizationCodeFlow && !c.AllowPasswordFlow);
+                    if (c.AllowAccessToUserInfoEndpoint == null)
+                        c.AllowAccessToUserInfoEndpoint = !isMachine;
+                    if (c.AllowAccessToRevocationEndpoint == null)
+                        c.AllowAccessToRevocationEndpoint = true;
+                    if (c.AllowAccessToIntrospectionEndpoint == null)
+                        c.AllowAccessToIntrospectionEndpoint = isMachine;
+                    c.UpdatedAt = DateTime.UtcNow;
+                    c.UpdatedBy ??= "Backfill";
+                    updated++;
+                }
                 await _context.SaveChangesAsync();
                 _logger.LogInformation("Backfilled endpoint access flags for {Count} clients", updated);
+            }
+
+            // Remove legacy incorrect stored permissions (colon or slash forms)
+            var legacyPerms = await _context.ClientPermissions
+                .Where(p => p.Permission == "endpoints:userinfo" ||
+                            p.Permission == "endpoints:revocation" ||
+                            p.Permission == "endpoints:introspection" ||
+                            p.Permission == "endpoints/userinfo" ||
+                            p.Permission == "endpoints/revocation" ||
+                            p.Permission == "endpoints/introspection")
+                .ToListAsync();
+            if (legacyPerms.Count > 0)
+            {
+                _context.ClientPermissions.RemoveRange(legacyPerms);
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Removed {Count} legacy endpoint permission strings (colon/slash forms)", legacyPerms.Count);
             }
         }
         catch (Exception ex)
@@ -69,7 +87,6 @@ public class OidcClientService : IOidcClientService
         }
     }
 
-    // Centralized scope->permission mapping (Step 1 standardization) - unify ALL scopes to scp: prefix
     private static (bool hasOpenId, List<string> permissions) BuildScopePermissions(IEnumerable<string> scopes)
     {
         var perms = new List<string>();
@@ -89,7 +106,6 @@ public class OidcClientService : IOidcClientService
         return (hasOpenId, perms);
     }
 
-    // Build application descriptor (Create/Update) without always deleting existing app (Step 3)
     private OpenIddictApplicationDescriptor BuildDescriptor(Client client)
     {
         var descriptor = new OpenIddictApplicationDescriptor
@@ -118,6 +134,8 @@ public class OidcClientService : IOidcClientService
         foreach (var p in scopePerms) descriptor.Permissions.Add(p);
         if (hasOpenId)
             descriptor.Permissions.Add(OpenIddictConstants.Permissions.Endpoints.EndSession);
+
+        // Add endpoint permissions using correct dot notation literals (if constants not exposed by current package version)
         if (client.AllowAccessToUserInfoEndpoint == true && hasOpenId)
             descriptor.Permissions.Add(UserInfoEndpointPermission);
         if (client.AllowAccessToRevocationEndpoint == true)
@@ -128,7 +146,11 @@ public class OidcClientService : IOidcClientService
         foreach (var permission in client.Permissions.Select(p => p.Permission))
         {
             if (permission.StartsWith("scp:") || permission.StartsWith("oidc:scope:"))
-                continue; // skip derived/legacy
+                continue;
+            // Skip legacy forms
+            if (permission is "endpoints:userinfo" or "endpoints:revocation" or "endpoints:introspection" ||
+                permission is "endpoints/userinfo" or "endpoints/revocation" or "endpoints/introspection")
+                continue;
             if (!descriptor.Permissions.Contains(permission))
                 descriptor.Permissions.Add(permission);
         }
