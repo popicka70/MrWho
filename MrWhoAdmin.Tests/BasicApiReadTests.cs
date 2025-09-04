@@ -5,7 +5,8 @@ using System.Text;
 namespace MrWhoAdmin.Tests;
 
 /// <summary>
-/// Basic read-only API tests using a client_credentials access token (mrwho_tests_m2m) with mrwho.use + api.read scopes.
+/// Basic read-only API tests using a client_credentials access token (mrwho_m2m) with mrwho.use + api.read scopes.
+/// Uses dynamic base address from Aspire test host instead of hard-coded port.
 /// </summary>
 [TestClass]
 [TestCategory("Integration")] 
@@ -18,7 +19,8 @@ public class BasicApiReadTests
 
     private async Task<string?> GetAccessTokenAsync()
     {
-        using var client = SharedTestInfrastructure.CreateHttpClient("mrwho");
+        // Dynamic base address (may be http or https depending on Aspire assignment)
+        using var client = SharedTestInfrastructure.CreateHttpClient("mrwho", disableRedirects: true);
 
         var form = new Dictionary<string, string>
         {
@@ -29,9 +31,10 @@ public class BasicApiReadTests
         };
 
         using var content = new FormUrlEncodedContent(form);
-        var response = await client.PostAsync("/connect/token", content);
-        response.IsSuccessStatusCode.Should().BeTrue("token request should succeed (status {0})", response.StatusCode);
+        var response = await client.PostAsync("connect/token", content); // relative path to dynamic base
         var json = await response.Content.ReadAsStringAsync();
+        response.IsSuccessStatusCode.Should().BeTrue(
+            "token request should succeed (status {0}) payload: {1}", response.StatusCode, json);
         using var doc = JsonDocument.Parse(json);
         return doc.RootElement.TryGetProperty("access_token", out var at) ? at.GetString() : null;
     }
@@ -40,7 +43,8 @@ public class BasicApiReadTests
     {
         var token = await GetAccessTokenAsync();
         token.Should().NotBeNullOrEmpty("access token should be present");
-        var client = SharedTestInfrastructure.CreateHttpClient("mrwho");
+
+        var client = SharedTestInfrastructure.CreateHttpClient("mrwho", disableRedirects: true);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
         return client;
     }
@@ -56,7 +60,7 @@ public class BasicApiReadTests
     public async Task Realms_List_Returns_Data()
     {
         using var client = await CreateAuthorizedClientAsync();
-        var resp = await client.GetAsync("/api/realms?page=1&pageSize=5");
+        var resp = await client.GetAsync("api/realms?page=1&pageSize=5");
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
         var payload = await resp.Content.ReadAsStringAsync();
         payload.Should().Contain("items");
@@ -66,7 +70,7 @@ public class BasicApiReadTests
     public async Task ApiResources_List_Returns_Data()
     {
         using var client = await CreateAuthorizedClientAsync();
-        var resp = await client.GetAsync("/api/apiresources?page=1&pageSize=5");
+        var resp = await client.GetAsync("api/apiresources?page=1&pageSize=5");
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
         var payload = await resp.Content.ReadAsStringAsync();
         payload.Should().Contain("items");
@@ -76,7 +80,7 @@ public class BasicApiReadTests
     public async Task IdentityResources_List_Returns_Data()
     {
         using var client = await CreateAuthorizedClientAsync();
-        var resp = await client.GetAsync("/api/identityresources?page=1&pageSize=5");
+        var resp = await client.GetAsync("api/identityresources?page=1&pageSize=5");
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
         var payload = await resp.Content.ReadAsStringAsync();
         payload.Should().Contain("items");

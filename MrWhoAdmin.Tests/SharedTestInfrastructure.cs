@@ -32,16 +32,36 @@ public static class SharedTestInfrastructure
 
             // Signal AppHost that we are in test mode so it provisions Postgres
             Environment.SetEnvironmentVariable("MRWHO_TESTS", "1");
+            // Disable HTTPS redirection inside the API during tests to avoid http->https redirect losing Authorization header
+            Environment.SetEnvironmentVariable("DISABLE_HTTPS_REDIRECT", "true");
 
             var cancellationToken = new CancellationTokenSource(StartupTimeout).Token;
 
             // Create the Aspire application host
-            var appHost = DistributedApplicationTestingBuilder.CreateAsync<Projects.MrWhoAdmin_AppHost>(cancellationToken).Result;
+            var appHost = DistributedApplicationTestingBuilder.CreateAsync<Projects.MrWhoAdmin_AppHost>(new string[] {}, 
+            (o, s) => {
+                o.AllowUnsecuredTransport = false; // enforce HTTPS
+            }, cancellationToken).Result;
 
             appHost.Services.AddLogging(logging =>
             {
                 logging.SetMinimumLevel(LogLevel.Information);
                 logging.AddFilter("Aspire.", LogLevel.Information);
+            });
+
+            appHost.Services.ConfigureHttpClientDefaults(http =>
+            {
+                http.ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+                {
+                    ClientCertificateOptions = ClientCertificateOption.Manual,
+                    ServerCertificateCustomValidationCallback = (httpRequestMessage, cert, cetChain, policyErrors) =>
+                    {
+                        // Only allow HTTPS connections
+                        return httpRequestMessage.RequestUri?.Scheme == Uri.UriSchemeHttps;
+                    }
+                });
+
+                http.AddHttpMessageHandler(() => new HttpsEnforcementHandler());
             });
 
             // Build and start the application
@@ -124,10 +144,51 @@ public static class SharedTestInfrastructure
     }
 
     /// <summary>
-    /// Create an HTTP client for a specific service
+    /// Create an HTTP client for a specific service. Set disableRedirects=true to preserve Authorization header.
     /// </summary>
-    public static HttpClient CreateHttpClient(string serviceName)
+    public static HttpClient CreateHttpClient(string serviceName, bool disableRedirects = false)
     {
-        return GetSharedApp().CreateHttpClient(serviceName);
+        var client = GetSharedApp().CreateHttpClient(serviceName, "https");
+        if (!disableRedirects)
+            return client;
+
+        // Build a new handler chain with redirects disabled, copying base address
+        var handler = new HttpClientHandler
+        {
+            AllowAutoRedirect = false,
+            // Accept self-signed dev certificates in test environment
+            ServerCertificateCustomValidationCallback = (msg, cert, chain, errors) => true
+        };
+        var newClient = new HttpClient(handler)
+        {
+            BaseAddress = client.BaseAddress
+        };
+        foreach (var header in client.DefaultRequestHeaders)
+        {
+            newClient.DefaultRequestHeaders.TryAddWithoutValidation(header.Key, header.Value);
+        }
+        return newClient;
+    }
+}
+
+public class HttpsEnforcementHandler : DelegatingHandler
+{
+    protected override async Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request,
+        CancellationToken cancellationToken)
+    {
+        if (request.RequestUri?.Scheme != Uri.UriSchemeHttps)
+        {
+            // Rewrite the URL to use HTTPS
+            var httpsUri = new UriBuilder(request.RequestUri!)
+            {
+                Scheme = Uri.UriSchemeHttps,
+                Port = request.RequestUri!.Port == 80 ? 443 : request.RequestUri.Port
+            }.Uri;
+
+            request.RequestUri = httpsUri;
+        }
+
+        return await base.SendAsync(request, cancellationToken);
     }
 }
