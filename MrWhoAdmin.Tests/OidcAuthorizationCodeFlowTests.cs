@@ -126,7 +126,7 @@ public class OidcAuthorizationCodeFlowTests
         doc.RootElement.TryGetProperty("refresh_token", out var rt).Should().BeTrue();
 
         var accessToken = ParseJwt(at.GetString()!);
-        accessToken.Claims.Should().Contain(c => c.Type == "scp" && c.Value.Contains("mrwho.use"));
+        accessToken.Claims.Should().Contain(c => c.Type == "scope" && c.Value.Contains("mrwho.use"));
         var idToken = ParseJwt(id.GetString()!);
         idToken.Claims.Should().Contain(c => c.Type == "sub");
     }

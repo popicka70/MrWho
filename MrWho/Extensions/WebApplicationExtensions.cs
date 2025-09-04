@@ -79,7 +79,10 @@ public static class WebApplicationExtensions
 
         // CRITICAL: Map API controllers for token inspector and other API endpoints
         app.MapControllers();
-        app.MapDebugResyncClients();
+        if (app.Environment.IsDevelopment())
+        {
+            app.MapDebugResyncClients();
+        }
 
         return app;
     }
@@ -128,7 +131,10 @@ public static class WebApplicationExtensions
             pattern: "{controller=Home}/{action=Index}/{id?}");
 
         app.MapControllers();
-        app.MapDebugResyncClients();
+        if (app.Environment.IsDevelopment())
+        {
+            app.MapDebugResyncClients();
+        }
 
         return app;
     }

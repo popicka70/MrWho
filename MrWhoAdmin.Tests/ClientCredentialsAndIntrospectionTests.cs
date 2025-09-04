@@ -53,22 +53,45 @@ public class ClientCredentialsAndIntrospectionTests
     [TestMethod]
     public async Task Introspection_With_Authorized_Client_Returns_Active()
     {
-        // Get a token from admin auth code flow first (reuse existing test helper pattern quickly via password grant if enabled else skip) - fallback to client_credentials token introspection
         using var sourceTokenDoc = await RequestClientCredentialsAsync();
         var token = sourceTokenDoc.RootElement.GetProperty("access_token").GetString();
 
-        using var introspectClient = SharedTestInfrastructure.CreateHttpClient("mrwho", disableRedirects: true);
-        // Use mrwho_m2m which has introspection permission
-        var form = new Dictionary<string,string>
+        using var http = SharedTestInfrastructure.CreateHttpClient("mrwho", disableRedirects: true);
+        var req = new HttpRequestMessage(HttpMethod.Post, "connect/introspect")
         {
-            ["token"] = token!,
-            ["client_id"] = "mrwho_m2m",
-            ["client_secret"] = "MrWhoM2MSecret2025!"
+            Content = new FormUrlEncodedContent(new Dictionary<string,string>
+            {
+                ["token"] = token!
+            })
         };
-        var resp = await introspectClient.PostAsync("connect/introspect", new FormUrlEncodedContent(form));
-        var json = await resp.Content.ReadAsStringAsync();
-        resp.IsSuccessStatusCode.Should().BeTrue("introspection should succeed: {0} {1}", resp.StatusCode, json);
-        json.Should().Contain("\"active\":true");
+        var basic = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("mrwho_m2m:MrWhoM2MSecret2025!"));
+        req.Headers.Authorization = new AuthenticationHeaderValue("Basic", basic);
+        var resp = await http.SendAsync(req);
+        var payload = await resp.Content.ReadAsStringAsync();
+        resp.IsSuccessStatusCode.Should().BeTrue("introspection should succeed: {0} {1}", resp.StatusCode, payload);
+        payload.Should().Contain("\"active\":true");
+
+        using var doc = JsonDocument.Parse(payload);
+        var root = doc.RootElement;
+        root.TryGetProperty("active", out var activeProp).Should().BeTrue();
+        activeProp.GetBoolean().Should().BeTrue();
+        root.TryGetProperty("token_type", out var typeProp).Should().BeTrue("token_type expected");
+        typeProp.GetString().Should().NotBeNullOrWhiteSpace();
+        root.TryGetProperty("client_id", out var clientIdProp).Should().BeTrue();
+        clientIdProp.GetString().Should().Be("mrwho_m2m");
+        if (root.TryGetProperty("scope", out var scopeProp))
+        {
+            var scopeString = scopeProp.GetString();
+            scopeString.Should().NotBeNull();
+            var scopes = scopeString!.Split(new[]{' '}, StringSplitOptions.RemoveEmptyEntries).OrderBy(s => s).ToArray();
+            var expected = new[]{"api.read","mrwho.use"}.OrderBy(s => s).ToArray();
+            scopes.Should().BeEquivalentTo(expected, "introspection response should contain exactly requested scopes");
+            scopes.Should().OnlyHaveUniqueItems();
+        }
+        else
+        {
+            Assert.Fail("Introspection response did not include 'scope' property");
+        }
     }
 
     [TestMethod]
@@ -77,15 +100,75 @@ public class ClientCredentialsAndIntrospectionTests
         using var sourceTokenDoc = await RequestClientCredentialsAsync();
         var token = sourceTokenDoc.RootElement.GetProperty("access_token").GetString();
 
-        using var introspectClient = SharedTestInfrastructure.CreateHttpClient("mrwho", disableRedirects: true);
-        // Use demo1 (does not allow client credentials + introspect); we expect failure
-        var form = new Dictionary<string,string>
+        using var http = SharedTestInfrastructure.CreateHttpClient("mrwho", disableRedirects: true);
+        var req = new HttpRequestMessage(HttpMethod.Post, "connect/introspect")
         {
-            ["token"] = token!,
-            ["client_id"] = "mrwho_demo1",
-            ["client_secret"] = "Demo1Secret2024!" // present but introspection permission missing
+            Content = new FormUrlEncodedContent(new Dictionary<string,string>
+            {
+                ["token"] = token!
+            })
         };
-        var resp = await introspectClient.PostAsync("connect/introspect", new FormUrlEncodedContent(form));
+        var basic = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("mrwho_demo1:Demo1Secret2024!"));
+        req.Headers.Authorization = new AuthenticationHeaderValue("Basic", basic);
+        var resp = await http.SendAsync(req);
         resp.StatusCode.Should().BeOneOf(HttpStatusCode.BadRequest, HttpStatusCode.Unauthorized, HttpStatusCode.Forbidden);
+    }
+
+    [TestMethod]
+    public async Task M2M_Client_Runtime_Introspection_Flag_Exposed()
+    {
+        using var client = SharedTestInfrastructure.CreateHttpClient("mrwho", disableRedirects: true);
+        var resp = await client.GetAsync("debug/client-flags?client_id=mrwho_m2m");
+        resp.IsSuccessStatusCode.Should().BeTrue("debug/client-flags should return 200 for mrwho_m2m");
+        var json = await resp.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(json);
+
+        bool TryBool(string name, out bool value)
+        {
+            value = false;
+            if (!doc.RootElement.TryGetProperty(name, out var prop)) return false;
+            value = prop.GetBoolean();
+            return true;
+        }
+
+        TryBool("allowAccessToIntrospectionEndpoint", out var introspectFlag).Should().BeTrue();
+        introspectFlag.Should().BeTrue("mrwho_m2m should have introspection enabled at runtime");
+
+        TryBool("allowAccessToUserInfoEndpoint", out var userInfoFlag).Should().BeTrue();
+        userInfoFlag.Should().BeFalse("mrwho_m2m should NOT have userinfo access");
+
+        TryBool("allowAccessToRevocationEndpoint", out var revocationFlag).Should().BeTrue();
+        revocationFlag.Should().BeTrue("mrwho_m2m should have revocation access");
+
+        TryBool("allowClientCredentialsFlow", out var cc).Should().BeTrue();
+        cc.Should().BeTrue("mrwho_m2m must allow client credentials");
+
+        TryBool("allowAuthorizationCodeFlow", out var ac).Should().BeTrue();
+        ac.Should().BeFalse("mrwho_m2m should not allow authorization code flow");
+
+        TryBool("allowPasswordFlow", out var pwd).Should().BeTrue();
+        pwd.Should().BeFalse("mrwho_m2m should not allow password flow");
+
+        TryBool("allowRefreshTokenFlow", out var refresh).Should().BeTrue();
+        refresh.Should().BeFalse("mrwho_m2m should not allow refresh tokens");
+    }
+
+    [TestMethod]
+    public async Task OpenIddict_Runtime_Permissions_Contain_Introspection_For_M2M()
+    {
+        using var client = SharedTestInfrastructure.CreateHttpClient("mrwho", disableRedirects: true);
+        var resp = await client.GetAsync("debug/openiddict-application?client_id=mrwho_m2m");
+        resp.IsSuccessStatusCode.Should().BeTrue("runtime OpenIddict application fetch should succeed");
+        var json = await resp.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(json);
+        var root = doc.RootElement;
+        root.TryGetProperty("permissions", out var perms).Should().BeTrue();
+        perms.ValueKind.Should().Be(JsonValueKind.Array);
+        var list = perms.EnumerateArray().Select(e => e.GetString()!).ToList();
+
+        list.Should().Contain("endpoints.introspection", "OpenIddict app must include introspection permission");
+        list.Should().Contain(e => e == "endpoints.token" || e == "ept:token", "token endpoint permission missing (endpoints.token/ept:token)");
+        list.Should().Contain(e => e == "grant_types.client_credentials" || e == "gt:client_credentials", "client_credentials grant permission missing");
+        list.Should().Contain(e => e == "endpoints.revocation" || e == "ept:revocation", "revocation endpoint permission missing");
     }
 }

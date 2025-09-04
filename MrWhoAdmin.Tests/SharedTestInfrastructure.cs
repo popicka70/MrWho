@@ -60,8 +60,6 @@ public static class SharedTestInfrastructure
                         return httpRequestMessage.RequestUri?.Scheme == Uri.UriSchemeHttps;
                     }
                 });
-
-                http.AddHttpMessageHandler(() => new HttpsEnforcementHandler());
             });
 
             // Build and start the application
@@ -149,46 +147,6 @@ public static class SharedTestInfrastructure
     public static HttpClient CreateHttpClient(string serviceName, bool disableRedirects = false)
     {
         var client = GetSharedApp().CreateHttpClient(serviceName, "https");
-        if (!disableRedirects)
-            return client;
-
-        // Build a new handler chain with redirects disabled, copying base address
-        var handler = new HttpClientHandler
-        {
-            AllowAutoRedirect = false,
-            // Accept self-signed dev certificates in test environment
-            ServerCertificateCustomValidationCallback = (msg, cert, chain, errors) => true
-        };
-        var newClient = new HttpClient(handler)
-        {
-            BaseAddress = client.BaseAddress
-        };
-        foreach (var header in client.DefaultRequestHeaders)
-        {
-            newClient.DefaultRequestHeaders.TryAddWithoutValidation(header.Key, header.Value);
-        }
-        return newClient;
-    }
-}
-
-public class HttpsEnforcementHandler : DelegatingHandler
-{
-    protected override async Task<HttpResponseMessage> SendAsync(
-        HttpRequestMessage request,
-        CancellationToken cancellationToken)
-    {
-        if (request.RequestUri?.Scheme != Uri.UriSchemeHttps)
-        {
-            // Rewrite the URL to use HTTPS
-            var httpsUri = new UriBuilder(request.RequestUri!)
-            {
-                Scheme = Uri.UriSchemeHttps,
-                Port = request.RequestUri!.Port == 80 ? 443 : request.RequestUri.Port
-            }.Uri;
-
-            request.RequestUri = httpsUri;
-        }
-
-        return await base.SendAsync(request, cancellationToken);
+        return client;
     }
 }
