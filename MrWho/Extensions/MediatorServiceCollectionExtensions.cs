@@ -46,6 +46,7 @@ public static class MediatorServiceCollectionExtensions
     services.AddTransient<IRequestHandler<FindUserBySubjectRequest, IResult>, FindUserBySubjectHandler>();
     services.AddTransient<IRequestHandler<CheckSpecificSubjectRequest, IResult>, CheckSpecificSubjectHandler>();
     services.AddTransient<IRequestHandler<Demo1TroubleshootRequest, IResult>, Demo1TroubleshootHandler>();
+    services.AddTransient<IRequestHandler<ResyncClientsRequest, IResult>, ResyncClientsHandler>();
 
         return services;
     }

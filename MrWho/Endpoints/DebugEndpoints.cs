@@ -1045,3 +1045,59 @@ public sealed class Demo1TroubleshootHandler : IRequestHandler<Demo1Troubleshoot
         return Results.Json(new { result = new { TestTimestamp = DateTime.UtcNow, Steps = steps }, summary });
     }
 }
+
+// NEW: /debug/resync-clients (POST dev-only) forces updating OpenIddict application descriptors (e.g. to pick up endpoint permission name fixes)
+public sealed record ResyncClientsRequest() : IRequest<IResult>;
+public sealed class ResyncClientsHandler : IRequestHandler<ResyncClientsRequest, IResult>
+{
+    private readonly IOidcClientService _oidcClientService;
+    private readonly ILogger<ResyncClientsHandler> _logger;
+    private readonly IHostEnvironment _env;
+
+    public ResyncClientsHandler(IOidcClientService oidcClientService, ILogger<ResyncClientsHandler> logger, IHostEnvironment env)
+    {
+        _oidcClientService = oidcClientService;
+        _logger = logger;
+        _env = env;
+    }
+
+    public async Task<IResult> Handle(ResyncClientsRequest request, CancellationToken cancellationToken)
+    {
+        if (!_env.IsDevelopment())
+        {
+            return Results.BadRequest("Client resync endpoint is only available in Development");
+        }
+
+        var clients = await _oidcClientService.GetEnabledClientsAsync();
+        var updated = new List<string>();
+        foreach (var client in clients)
+        {
+            try
+            {
+                await _oidcClientService.SyncClientWithOpenIddictAsync(client);
+                updated.Add(client.ClientId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to resync client {ClientId}", client.ClientId);
+            }
+        }
+        return Results.Ok(new { message = "Clients synchronized with OpenIddict", count = updated.Count, clients = updated, timestamp = DateTime.UtcNow });
+    }
+}
+
+public static class DebugEndpointMappings
+{
+    public static IEndpointRouteBuilder MapDebugResyncClients(this IEndpointRouteBuilder endpoints)
+    {
+        endpoints.MapPost("/debug/resync-clients", async (IMediator mediator, CancellationToken ct) =>
+        {
+            return await mediator.Send(new ResyncClientsRequest(), ct);
+        })
+        .WithDisplayName("Debug: Resync OpenIddict Clients")
+        .WithGroupName("debug")
+        .Produces(StatusCodes.Status200OK)
+        .Produces(StatusCodes.Status400BadRequest);
+        return endpoints;
+    }
+}
