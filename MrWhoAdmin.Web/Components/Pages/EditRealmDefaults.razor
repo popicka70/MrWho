@@ -14,7 +14,7 @@
 
     <RadzenText TextStyle="TextStyle.H3" TagName="TagName.H1" class="rz-pt-4">
         <RadzenIcon Icon="settings" class="rz-me-1" />
-        Realm Default Configuration
+        Realm Default Configuration @if(!string.IsNullOrWhiteSpace(realmDisplayName)){<text>- @realmDisplayName</text>}
     </RadzenText>
     
     <RadzenAlert AlertStyle="AlertStyle.Info" ShowIcon="true" class="rz-mb-4">

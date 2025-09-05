@@ -18,6 +18,7 @@ public partial class EditRealmDefaults
     internal UpdateRealmDefaultsRequest model = new();
     internal bool isLoading;
     internal int selectedTabIndex;
+    internal string? realmDisplayName; // new: holds realm name for UI
 
     internal List<DropdownItem<string>> sameSitePolicies = new();
     internal List<DropdownItem<string>> availableMfaMethods = new();
@@ -64,7 +65,19 @@ public partial class EditRealmDefaults
         try
         {
             var realm = await RealmsApiService.GetRealmAsync(Id!);
-            if (realm != null) model = MapRealmToDefaultsRequest(realm);
+            if (realm != null)
+            {
+                model = MapRealmToDefaultsRequest(realm);
+                // Build display string: Prefer DisplayName; include technical name if different
+                if (!string.IsNullOrWhiteSpace(realm.DisplayName) && !string.Equals(realm.DisplayName, realm.Name, StringComparison.OrdinalIgnoreCase))
+                {
+                    realmDisplayName = $"{realm.DisplayName} ({realm.Name})";
+                }
+                else
+                {
+                    realmDisplayName = realm.Name;
+                }
+            }
         }
         catch (Exception ex)
         {
@@ -180,7 +193,7 @@ public partial class EditRealmDefaults
         NotificationService.Notify(NotificationSeverity.Info, "Reset", "Configuration reset to system defaults");
     }
 
-    internal void BackToRealm() => Navigation.NavigateTo($"/realms/edit/{Id}");
+    internal void BackToRealm() => Navigation.NavigateTo("/realms");
     internal void PickTheme(string? name) => model.DefaultThemeName = name;
 
     internal record DropdownItem<T>(string Text, T Value);
