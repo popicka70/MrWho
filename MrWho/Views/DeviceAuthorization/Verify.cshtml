@@ -1,0 +1,74 @@
+@model DeviceVerificationViewModel
+@{
+    ViewData["Title"] = "Device Verification";
+    var message = TempData["DeviceVerifyMessage"] as string;
+}
+<div class="container py-4">
+    <h2 class="mb-3"><i class="bi bi-phone"></i> Device Authorization</h2>
+    @if(!string.IsNullOrEmpty(message)){
+        <div class="alert alert-info">@message</div>
+    }
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" action="/connect/verify" class="row g-3">
+                <div class="col-auto">
+                    <input name="user_code" value="@Model.InputUserCode" placeholder="Enter user code" class="form-control" />
+                </div>
+                <div class="col-auto">
+                    <button class="btn btn-primary" type="submit">Lookup</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    @if (Model.InputUserCode != null)
+    {
+        if (!Model.Found)
+        {
+            <div class="alert alert-danger">No pending device authorization found for that code.</div>
+        }
+        else if (Model.IsExpired)
+        {
+            <div class="alert alert-warning">This device authorization request has expired.</div>
+        }
+        else if (Model.Status == "approved" || Model.Status == "denied" || Model.Status == "consumed")
+        {
+            <div class="alert alert-secondary">Request already @Model.Status.</div>
+        }
+        else
+        {
+            <div class="card">
+                <div class="card-header">Pending Request</div>
+                <div class="card-body">
+                    <dl class="row">
+                        <dt class="col-sm-3">Client</dt><dd class="col-sm-9">@(!string.IsNullOrEmpty(Model.ClientName) ? Model.ClientName : Model.ClientId)</dd>
+                        <dt class="col-sm-3">Scopes</dt><dd class="col-sm-9">
+                            @if (Model.ScopeDetails?.Any() == true)
+                            {
+                                <ul class="list-unstyled mb-0">
+                                    @foreach (var s in Model.ScopeDetails)
+                                    {
+                                        <li><strong>@s.Name</strong>@(string.IsNullOrEmpty(s.DisplayName)?"":" - "+s.DisplayName) <small class="text-muted">@s.Description</small></li>
+                                    }
+                                </ul>
+                            }
+                            else { <span>(none)</span>; }
+                        </dd>
+                        <dt class="col-sm-3">Expires</dt><dd class="col-sm-9">@Model.ExpiresAt?.ToString("u")</dd>
+                        <dt class="col-sm-3">Status</dt><dd class="col-sm-9 text-capitalize">@Model.Status</dd>
+                    </dl>
+                    <form method="post" action="/connect/verify" class="d-flex gap-2">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="user_code" value="@Model.InputUserCode" />
+                        <button class="btn btn-success" name="action" value="approve" type="submit"><i class="bi bi-check-circle"></i> Approve</button>
+                        <button class="btn btn-danger" name="action" value="deny" type="submit"><i class="bi bi-x-circle"></i> Deny</button>
+                    </form>
+                </div>
+            </div>
+        }
+    }
+
+    <div class="mt-4 text-muted small">
+        <p>Enter the user code displayed on your device to approve or deny access. Approval issues an authorization for the requesting device to obtain tokens.</p>
+    </div>
+</div>

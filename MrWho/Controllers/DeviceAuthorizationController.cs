@@ -7,9 +7,8 @@ using Microsoft.AspNetCore.Authorization;
 
 namespace MrWho.Controllers;
 
-[ApiController]
 [Route("connect")] // align with OIDC base path
-public class DeviceAuthorizationController : ControllerBase
+public class DeviceAuthorizationController : Controller
 {
     private readonly ApplicationDbContext _db;
     private readonly ILogger<DeviceAuthorizationController> _logger;
@@ -25,9 +24,22 @@ public class DeviceAuthorizationController : ControllerBase
     public async Task<IActionResult> CreateDeviceAuthorization([FromForm] string client_id, [FromForm] string? scope = null)
     {
         if (string.IsNullOrWhiteSpace(client_id)) return BadRequest(new { error = "invalid_request", error_description = "client_id required" });
-        var client = await _db.Clients.FirstOrDefaultAsync(c => c.ClientId == client_id && c.IsEnabled);
+        var client = await _db.Clients.Include(c => c.Scopes).FirstOrDefaultAsync(c => c.ClientId == client_id && c.IsEnabled);
         if (client == null) return BadRequest(new { error = "invalid_client" });
         if (!client.AllowDeviceCodeFlow) return BadRequest(new { error = "unauthorized_client" });
+
+        // Validate scopes against client assigned scopes
+        var requestedScopes = (scope ?? string.Empty)
+            .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        var allowedScopes = client.Scopes.Select(s => s.Scope).ToHashSet(StringComparer.Ordinal);
+        var invalid = requestedScopes.Where(s => !allowedScopes.Contains(s)).ToList();
+        if (invalid.Any())
+        {
+            return BadRequest(new { error = "invalid_scope", error_description = $"Invalid scopes: {string.Join(',', invalid)}" });
+        }
+        var normalizedScope = requestedScopes.Any() ? string.Join(' ', requestedScopes) : null;
 
         // Lifetime & polling interval
         var lifetimeMinutes = client.DeviceCodeLifetimeMinutes ?? 10;
@@ -42,8 +54,8 @@ public class DeviceAuthorizationController : ControllerBase
         {
             ClientId = client_id,
             DeviceCode = deviceCode,
-            UserCode = userCode,
-            Scope = scope,
+            UserCode = userCode.ToUpperInvariant(),
+            Scope = normalizedScope,
             ExpiresAt = DateTime.UtcNow.AddMinutes(lifetimeMinutes),
             PollingIntervalSeconds = pollInterval
         };
@@ -52,6 +64,9 @@ public class DeviceAuthorizationController : ControllerBase
 
         var verificationUri = Url.ActionLink(nameof(VerifyDeviceUserCode), values: new { user_code = userCode });
         var verificationUriComplete = verificationUri; // user_code already embedded via query param
+
+        Response.Headers.CacheControl = "no-store";
+        Response.Headers.Pragma = "no-cache";
 
         return Ok(new {
             device_code = deviceCode,
@@ -68,21 +83,52 @@ public class DeviceAuthorizationController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> VerifyDeviceUserCode([FromQuery] string? user_code)
     {
-        if (string.IsNullOrWhiteSpace(user_code)) return Content("Missing user_code");
-        var rec = await _db.DeviceAuthorizations.FirstOrDefaultAsync(d => d.UserCode == NormalizeUserCode(user_code));
-        if (rec == null || rec.ExpiresAt <= DateTime.UtcNow)
-        {
-            return Content("Code invalid or expired");
-        }
+        // If not authenticated, defer until after login (but keep code)
         if (User.Identity?.IsAuthenticated != true)
         {
-            // redirect to login preserving return path
-            var returnUrl = Url.ActionLink(nameof(VerifyDeviceUserCode), values: new { user_code });
-            return Redirect($"/connect/login?returnUrl={Uri.EscapeDataString(returnUrl!)}");
+            var ret = Url.ActionLink(nameof(VerifyDeviceUserCode), values: new { user_code });
+            return Redirect($"/connect/login?returnUrl={Uri.EscapeDataString(ret!)}");
         }
 
-        // Show simple approval page
-        return Content($"Device authorization request for client '{rec.ClientId}' with scopes: {rec.Scope ?? "(none)"}. POST approval to /connect/verify with form fields user_code + action=approve or deny.");
+        DeviceAuthorization? rec = null;
+        if (!string.IsNullOrWhiteSpace(user_code))
+        {
+            var norm = NormalizeUserCode(user_code);
+            rec = await _db.DeviceAuthorizations.FirstOrDefaultAsync(d => d.UserCode == norm);
+        }
+
+        string? clientName = null;
+        List<DeviceScopeInfo> scopeInfos = new();
+        if (rec != null)
+        {
+            var client = await _db.Clients.Include(c => c.Scopes).FirstOrDefaultAsync(c => c.ClientId == rec.ClientId);
+            clientName = client?.Name;
+            if (!string.IsNullOrEmpty(rec.Scope))
+            {
+                var scopeNames = rec.Scope.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                var dbScopes = await _db.Scopes.Where(s => scopeNames.Contains(s.Name)).ToListAsync();
+                foreach (var s in scopeNames)
+                {
+                    var db = dbScopes.FirstOrDefault(x => x.Name == s);
+                    scopeInfos.Add(new DeviceScopeInfo { Name = s, DisplayName = db?.DisplayName, Description = db?.Description });
+                }
+            }
+        }
+
+        var vm = new DeviceVerificationViewModel
+        {
+            InputUserCode = user_code,
+            Found = rec != null,
+            ClientId = rec?.ClientId,
+            ClientName = clientName,
+            Scope = rec?.Scope,
+            ScopeDetails = scopeInfos,
+            Status = rec?.Status,
+            ExpiresAt = rec?.ExpiresAt,
+            IsExpired = rec != null && rec.ExpiresAt <= DateTime.UtcNow
+        };
+
+        return View("Verify", vm);
     }
 
     // POST /connect/verify (approve/deny)
@@ -90,25 +136,37 @@ public class DeviceAuthorizationController : ControllerBase
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> PostVerify([FromForm] string user_code, [FromForm] string action)
     {
-        var rec = await _db.DeviceAuthorizations.FirstOrDefaultAsync(d => d.UserCode == NormalizeUserCode(user_code));
-        if (rec == null) return Content("Invalid code");
-        if (rec.ExpiresAt <= DateTime.UtcNow)
-        {
-            rec.Status = DeviceAuthorizationStatus.Expired;
-            await _db.SaveChangesAsync();
-            return Content("Code expired");
-        }
-        if (rec.Status is DeviceAuthorizationStatus.Approved or DeviceAuthorizationStatus.Denied or DeviceAuthorizationStatus.Consumed)
-        {
-            return Content($"Already {rec.Status}");
-        }
         if (User.Identity?.IsAuthenticated != true)
         {
             var ret = Url.ActionLink(nameof(VerifyDeviceUserCode), values: new { user_code });
             return Redirect($"/connect/login?returnUrl={Uri.EscapeDataString(ret!)}");
         }
+
+        var rec = await _db.DeviceAuthorizations.FirstOrDefaultAsync(d => d.UserCode == NormalizeUserCode(user_code));
+        if (rec == null)
+        {
+            TempData["DeviceVerifyMessage"] = "Code not found";
+            return RedirectToAction(nameof(VerifyDeviceUserCode), new { user_code });
+        }
+        if (rec.ExpiresAt <= DateTime.UtcNow)
+        {
+            rec.Status = DeviceAuthorizationStatus.Expired;
+            await _db.SaveChangesAsync();
+            TempData["DeviceVerifyMessage"] = "Code expired";
+            return RedirectToAction(nameof(VerifyDeviceUserCode), new { user_code });
+        }
+        if (rec.Status is DeviceAuthorizationStatus.Approved or DeviceAuthorizationStatus.Denied or DeviceAuthorizationStatus.Consumed)
+        {
+            TempData["DeviceVerifyMessage"] = $"Request already {rec.Status}";
+            return RedirectToAction(nameof(VerifyDeviceUserCode), new { user_code });
+        }
+
         var sub = User.FindFirst(OpenIddict.Abstractions.OpenIddictConstants.Claims.Subject)?.Value ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-        if (string.IsNullOrWhiteSpace(sub)) return Content("User id missing in principal");
+        if (string.IsNullOrWhiteSpace(sub))
+        {
+            TempData["DeviceVerifyMessage"] = "User id missing in principal";
+            return RedirectToAction(nameof(VerifyDeviceUserCode), new { user_code });
+        }
 
         if (string.Equals(action, "approve", StringComparison.OrdinalIgnoreCase))
         {
@@ -117,14 +175,16 @@ public class DeviceAuthorizationController : ControllerBase
             rec.ApprovedAt = DateTime.UtcNow;
             rec.VerificationIp = HttpContext.Connection.RemoteIpAddress?.ToString();
             rec.VerificationUserAgent = Request.Headers.UserAgent.ToString();
+            TempData["DeviceVerifyMessage"] = "Device authorization approved";
         }
         else
         {
             rec.Status = DeviceAuthorizationStatus.Denied;
             rec.DeniedAt = DateTime.UtcNow;
+            TempData["DeviceVerifyMessage"] = "Device authorization denied";
         }
         await _db.SaveChangesAsync();
-        return Content($"Device authorization {rec.Status}.");
+        return RedirectToAction(nameof(VerifyDeviceUserCode), new { user_code });
     }
 
     private static string GenerateOpaque(int bytes)
@@ -145,4 +205,24 @@ public class DeviceAuthorizationController : ControllerBase
     }
 
     private static string NormalizeUserCode(string code) => code.Trim().ToUpperInvariant();
+}
+
+public class DeviceVerificationViewModel
+{
+    public string? InputUserCode { get; set; }
+    public bool Found { get; set; }
+    public string? ClientId { get; set; }
+    public string? ClientName { get; set; }
+    public string? Scope { get; set; }
+    public List<DeviceScopeInfo> ScopeDetails { get; set; } = new();
+    public string? Status { get; set; }
+    public DateTime? ExpiresAt { get; set; }
+    public bool IsExpired { get; set; }
+}
+
+public class DeviceScopeInfo
+{
+    public string Name { get; set; } = string.Empty;
+    public string? DisplayName { get; set; }
+    public string? Description { get; set; }
 }
