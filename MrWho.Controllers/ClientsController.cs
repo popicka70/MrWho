@@ -36,7 +36,11 @@ public class ClientsController : ControllerBase
                 PrimaryAudience = c.PrimaryAudience,
                 IncludeAudInIdToken = c.IncludeAudInIdToken,
                 RequireExplicitAudienceScope = c.RequireExplicitAudienceScope,
-                RoleInclusionOverride = c.RoleInclusionOverride
+                RoleInclusionOverride = c.RoleInclusionOverride,
+                AllowPasswordFlow = c.AllowPasswordFlow,
+                AllowRefreshTokenFlow = c.AllowRefreshTokenFlow,
+                AllowDeviceCodeFlow = c.AllowDeviceCodeFlow,
+                RequirePkce = c.RequirePkce
                 // ...existing mapped properties after audiences...
             })
             .ToListAsync();
@@ -59,7 +63,11 @@ public class ClientsController : ControllerBase
             PrimaryAudience = client.PrimaryAudience,
             IncludeAudInIdToken = client.IncludeAudInIdToken,
             RequireExplicitAudienceScope = client.RequireExplicitAudienceScope,
-            RoleInclusionOverride = client.RoleInclusionOverride
+            RoleInclusionOverride = client.RoleInclusionOverride,
+            AllowPasswordFlow = client.AllowPasswordFlow,
+            AllowRefreshTokenFlow = client.AllowRefreshTokenFlow,
+            AllowDeviceCodeFlow = client.AllowDeviceCodeFlow,
+            RequirePkce = client.RequirePkce
             // ...existing mappings...
         };
         return dto;
@@ -76,7 +84,11 @@ public class ClientsController : ControllerBase
             PrimaryAudience = request.PrimaryAudience,
             IncludeAudInIdToken = request.IncludeAudInIdToken,
             RequireExplicitAudienceScope = request.RequireExplicitAudienceScope,
-            RoleInclusionOverride = request.RoleInclusionOverride
+            RoleInclusionOverride = request.RoleInclusionOverride,
+            AllowPasswordFlow = request.AllowPasswordFlow,
+            AllowRefreshTokenFlow = request.AllowRefreshTokenFlow,
+            AllowDeviceCodeFlow = request.AllowDeviceCodeFlow,
+            RequirePkce = request.RequirePkce
         };
         // Audiences
         if (request.Audiences?.Any() == true)
@@ -97,7 +109,11 @@ public class ClientsController : ControllerBase
             PrimaryAudience = client.PrimaryAudience,
             IncludeAudInIdToken = client.IncludeAudInIdToken,
             RequireExplicitAudienceScope = client.RequireExplicitAudienceScope,
-            RoleInclusionOverride = client.RoleInclusionOverride
+            RoleInclusionOverride = client.RoleInclusionOverride,
+            AllowPasswordFlow = client.AllowPasswordFlow,
+            AllowRefreshTokenFlow = client.AllowRefreshTokenFlow,
+            AllowDeviceCodeFlow = client.AllowDeviceCodeFlow,
+            RequirePkce = client.RequirePkce
             // ...existing mappings...
         };
         return CreatedAtAction(nameof(GetClient), new { id = client.Id }, dto);
@@ -117,6 +133,10 @@ public class ClientsController : ControllerBase
         if (request.IncludeAudInIdToken.HasValue) client.IncludeAudInIdToken = request.IncludeAudInIdToken;
         if (request.RequireExplicitAudienceScope.HasValue) client.RequireExplicitAudienceScope = request.RequireExplicitAudienceScope;
         if (request.RoleInclusionOverride != null) client.RoleInclusionOverride = request.RoleInclusionOverride;
+        if (request.AllowPasswordFlow.HasValue) client.AllowPasswordFlow = request.AllowPasswordFlow.Value;
+        if (request.AllowRefreshTokenFlow.HasValue) client.AllowRefreshTokenFlow = request.AllowRefreshTokenFlow.Value;
+        if (request.AllowDeviceCodeFlow.HasValue) client.AllowDeviceCodeFlow = request.AllowDeviceCodeFlow.Value;
+        if (request.RequirePkce.HasValue) client.RequirePkce = request.RequirePkce.Value;
         // Sync audiences list
         if (request.Audiences != null)
         {
@@ -138,7 +158,11 @@ public class ClientsController : ControllerBase
             PrimaryAudience = client.PrimaryAudience,
             IncludeAudInIdToken = client.IncludeAudInIdToken,
             RequireExplicitAudienceScope = client.RequireExplicitAudienceScope,
-            RoleInclusionOverride = client.RoleInclusionOverride
+            RoleInclusionOverride = client.RoleInclusionOverride,
+            AllowPasswordFlow = client.AllowPasswordFlow,
+            AllowRefreshTokenFlow = client.AllowRefreshTokenFlow,
+            AllowDeviceCodeFlow = client.AllowDeviceCodeFlow,
+            RequirePkce = client.RequirePkce
             // ...existing mappings...
         };
         return dto;
@@ -158,6 +182,10 @@ public class ClientsController : ControllerBase
             IncludeAudInIdToken = client.IncludeAudInIdToken,
             RequireExplicitAudienceScope = client.RequireExplicitAudienceScope,
             RoleInclusionOverride = client.RoleInclusionOverride,
+            AllowPasswordFlow = client.AllowPasswordFlow,
+            AllowRefreshTokenFlow = client.AllowRefreshTokenFlow,
+            AllowDeviceCodeFlow = client.AllowDeviceCodeFlow,
+            RequirePkce = client.RequirePkce,
             // ...existing mappings...
         };
         return export;
@@ -173,6 +201,10 @@ public class ClientsController : ControllerBase
         client.IncludeAudInIdToken = dto.IncludeAudInIdToken;
         client.RequireExplicitAudienceScope = dto.RequireExplicitAudienceScope;
         client.RoleInclusionOverride = dto.RoleInclusionOverride;
+        client.AllowPasswordFlow = dto.AllowPasswordFlow;
+        client.AllowRefreshTokenFlow = dto.AllowRefreshTokenFlow;
+        client.AllowDeviceCodeFlow = dto.AllowDeviceCodeFlow;
+        client.RequirePkce = dto.RequirePkce;
         // Sync audiences from export
         if (dto.Audiences != null)
         {
