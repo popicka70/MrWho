@@ -1,6 +1,8 @@
 using Microsoft.Extensions.Logging;
 using Aspire.Hosting;
-using OpenIddict.Abstractions; // added
+using OpenIddict.Abstractions; // added (may be unused now but keep if needed elsewhere)
+using System.Diagnostics;
+using System.Text.Json;
 
 namespace MrWhoAdmin.Tests;
 
@@ -13,8 +15,6 @@ public static class SharedTestInfrastructure
 {
     private static DistributedApplication? _app;
     private static readonly TimeSpan StartupTimeout = TimeSpan.FromSeconds(180); // Generous timeout for initial startup
-    private static readonly object _lock = new object();
-    private static bool _isInitialized = false;
 
     /// <summary>
     /// Initialize shared infrastructure once for the entire test assembly
@@ -22,26 +22,27 @@ public static class SharedTestInfrastructure
     [AssemblyInitialize]
     public static async Task AssemblyInitialize(TestContext context)
     {
-        if (_isInitialized) return;
+        Console.WriteLine("Starting shared PostgreSQL Aspire infrastructure for all integration tests (async)...");
 
-        lock (_lock)
+        // Signal AppHost that we are in test mode so it provisions Postgres
+        Environment.SetEnvironmentVariable("MRWHO_TESTS", "1");
+        // Disable HTTPS redirection inside the API during tests to avoid http->https redirect losing Authorization header
+        Environment.SetEnvironmentVariable("DISABLE_HTTPS_REDIRECT", "true");
+
+        using var cts = new CancellationTokenSource(StartupTimeout);
+        var ct = cts.Token;
+
+        try
         {
-            if (_isInitialized) return;
-
-            Console.WriteLine("?? Starting shared PostgreSQL Aspire infrastructure for all integration tests...");
-
-            // Signal AppHost that we are in test mode so it provisions Postgres
-            Environment.SetEnvironmentVariable("MRWHO_TESTS", "1");
-            // Disable HTTPS redirection inside the API during tests to avoid http->https redirect losing Authorization header
-            Environment.SetEnvironmentVariable("DISABLE_HTTPS_REDIRECT", "true");
-
-            var cancellationToken = new CancellationTokenSource(StartupTimeout).Token;
-
             // Create the Aspire application host
-            var appHost = DistributedApplicationTestingBuilder.CreateAsync<Projects.MrWhoAdmin_AppHost>(new string[] {}, 
-            (o, s) => {
-                o.AllowUnsecuredTransport = false; // enforce HTTPS
-            }, cancellationToken).Result;
+            var appHost = await DistributedApplicationTestingBuilder.CreateAsync<Projects.MrWhoAdmin_AppHost>(
+                Array.Empty<string>(),
+                (o, s) =>
+                {
+                    // Keep original behavior: enforce HTTPS inside test environment
+                    o.AllowUnsecuredTransport = false;
+                },
+                ct);
 
             appHost.Services.AddLogging(logging =>
             {
@@ -60,61 +61,84 @@ public static class SharedTestInfrastructure
                         return httpRequestMessage.RequestUri?.Scheme == Uri.UriSchemeHttps;
                     }
                 });
-
-                http.AddHttpMessageHandler(() => new HttpsEnforcementHandler());
             });
 
             // Build and start the application
-            _app = appHost.BuildAsync(cancellationToken).WaitAsync(StartupTimeout, cancellationToken).Result;
-            _app.StartAsync(cancellationToken).WaitAsync(StartupTimeout, cancellationToken).Wait();
+            _app = await appHost.BuildAsync(ct);
+            await _app.StartAsync(ct);
 
             // Wait for resources to be healthy
-            // postgres (server) name derived from AppHost ("postgres") and database reference supplies connection string named mrwhodb
-            _app.ResourceNotifications.WaitForResourceHealthyAsync("postgres", cancellationToken).WaitAsync(StartupTimeout, cancellationToken).Wait();
-            _app.ResourceNotifications.WaitForResourceHealthyAsync("mrwho", cancellationToken).WaitAsync(StartupTimeout, cancellationToken).Wait();
-            _app.ResourceNotifications.WaitForResourceHealthyAsync("webfrontend", cancellationToken).WaitAsync(StartupTimeout, cancellationToken).Wait();
+            await _app.ResourceNotifications.WaitForResourceHealthyAsync("postgres", ct);
+            await _app.ResourceNotifications.WaitForResourceHealthyAsync("mrwho", ct);
+            await _app.ResourceNotifications.WaitForResourceHealthyAsync("webfrontend", ct);
 
-            // After services are healthy, poll until the admin OpenIddict application is registered
-            try
+            // Poll the running API instead of trying to resolve its internal DI services from the host.
+            // The host ServiceProvider does NOT expose the app's container, so GetService<IOpenIddictApplicationManager>() was always null.
+            await WaitForOpenIddictClientAsync("mrwho_admin_web", ct);
+
+            Console.WriteLine("Shared PostgreSQL infrastructure started successfully!");
+        }
+        catch (OperationCanceledException)
+        {
+            Console.WriteLine("Startup cancelled (timeout reached). Tests may fail.");
+            throw;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to start shared infrastructure: {ex}");
+            throw;
+        }
+    }
+
+    private static async Task WaitForOpenIddictClientAsync(string clientId, CancellationToken ct)
+    {
+        try
+        {
+            Console.WriteLine($"Waiting for OpenIddict client registration via HTTP (client_id={clientId})...");
+            var sw = Stopwatch.StartNew();
+            var maxWait = TimeSpan.FromSeconds(45);
+            var delay = TimeSpan.FromMilliseconds(750);
+            bool ready = false;
+            var http = GetSharedApp().CreateHttpClient("mrwho", "https");
+
+            while (sw.Elapsed < maxWait && !ct.IsCancellationRequested)
             {
-                Console.WriteLine("? Waiting for OpenIddict admin client registration (mrwho_admin_web)...");
-                var sw = System.Diagnostics.Stopwatch.StartNew();
-                var maxWait = TimeSpan.FromSeconds(45);
-                var delay = TimeSpan.FromMilliseconds(500);
-                bool ready = false;
-                while (sw.Elapsed < maxWait)
+                try
                 {
-                    using var scope = _app.Services.CreateScope();
-                    var mgr = scope.ServiceProvider.GetService<IOpenIddictApplicationManager>();
-                    if (mgr != null)
+                    using var resp = await http.GetAsync($"debug/openiddict-application?client_id={clientId}", ct);
+                    if (resp.IsSuccessStatusCode)
                     {
-                        var appReg = mgr.FindByClientIdAsync("mrwho_admin_web").GetAwaiter().GetResult();
-                        if (appReg != null)
+                        var json = await resp.Content.ReadAsStringAsync(ct);
+                        if (!string.IsNullOrWhiteSpace(json))
                         {
-                            ready = true;
-                            break;
+                            // basic validation: ensure 'clientId' or 'client_id' present in payload
+                            if (json.Contains(clientId, StringComparison.OrdinalIgnoreCase))
+                            {
+                                ready = true;
+                                break;
+                            }
                         }
                     }
-                    Thread.Sleep(delay);
                 }
-                if (!ready)
+                catch (HttpRequestException)
                 {
-                    Console.WriteLine("?? Timed out waiting for OpenIddict admin client registration; tests may fail with invalid_client.");
+                    // ignore until service responds
                 }
-                else
-                {
-                    Console.WriteLine("? OpenIddict admin client registration detected.");
-                }
+                await Task.Delay(delay, ct);
             }
-            catch (Exception ex)
+            if (!ready)
             {
-                Console.WriteLine($"?? Exception while waiting for OpenIddict readiness: {ex.Message}");
+                Console.WriteLine("Timed out waiting for OpenIddict client registration; tests may still work if not required.");
             }
-
-            _isInitialized = true;
-            Console.WriteLine("? Shared PostgreSQL infrastructure started successfully!");
+            else
+            {
+                Console.WriteLine("OpenIddict client registration detected.");
+            }
         }
-        await Task.CompletedTask; // Ensure method is async
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Exception while polling for OpenIddict client: {ex.Message}");
+        }
     }
 
     /// <summary>
@@ -125,9 +149,9 @@ public static class SharedTestInfrastructure
     {
         if (_app != null)
         {
-            Console.WriteLine("?? Cleaning up shared Aspire infrastructure...");
+            Console.WriteLine("Cleaning up shared Aspire infrastructure...");
             await _app.DisposeAsync();
-            Console.WriteLine("? Shared infrastructure cleanup completed!");
+            Console.WriteLine("Shared infrastructure cleanup completed!");
         }
     }
 
@@ -136,11 +160,7 @@ public static class SharedTestInfrastructure
     /// </summary>
     public static DistributedApplication GetSharedApp()
     {
-        if (!_isInitialized || _app == null)
-        {
-            throw new InvalidOperationException("Shared infrastructure not initialized. Make sure [AssemblyInitialize] ran.");
-        }
-        return _app;
+        return _app ?? throw new Exception("Not initialized");
     }
 
     /// <summary>
@@ -149,46 +169,6 @@ public static class SharedTestInfrastructure
     public static HttpClient CreateHttpClient(string serviceName, bool disableRedirects = false)
     {
         var client = GetSharedApp().CreateHttpClient(serviceName, "https");
-        if (!disableRedirects)
-            return client;
-
-        // Build a new handler chain with redirects disabled, copying base address
-        var handler = new HttpClientHandler
-        {
-            AllowAutoRedirect = false,
-            // Accept self-signed dev certificates in test environment
-            ServerCertificateCustomValidationCallback = (msg, cert, chain, errors) => true
-        };
-        var newClient = new HttpClient(handler)
-        {
-            BaseAddress = client.BaseAddress
-        };
-        foreach (var header in client.DefaultRequestHeaders)
-        {
-            newClient.DefaultRequestHeaders.TryAddWithoutValidation(header.Key, header.Value);
-        }
-        return newClient;
-    }
-}
-
-public class HttpsEnforcementHandler : DelegatingHandler
-{
-    protected override async Task<HttpResponseMessage> SendAsync(
-        HttpRequestMessage request,
-        CancellationToken cancellationToken)
-    {
-        if (request.RequestUri?.Scheme != Uri.UriSchemeHttps)
-        {
-            // Rewrite the URL to use HTTPS
-            var httpsUri = new UriBuilder(request.RequestUri!)
-            {
-                Scheme = Uri.UriSchemeHttps,
-                Port = request.RequestUri!.Port == 80 ? 443 : request.RequestUri.Port
-            }.Uri;
-
-            request.RequestUri = httpsUri;
-        }
-
-        return await base.SendAsync(request, cancellationToken);
+        return client;
     }
 }
