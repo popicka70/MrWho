@@ -22,7 +22,7 @@ public class DatabaseStateManagementTests
             var response = await httpClient.GetAsync("/api/realms");
 
             // Assert
-            response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.Unauthorized);
+            Assert.IsTrue(response.StatusCode == HttpStatusCode.OK || response.StatusCode == HttpStatusCode.Unauthorized);
         }
         finally
         {
@@ -52,7 +52,7 @@ public class DatabaseStateManagementTests
             var response = await httpClient.GetAsync("/api/realms");
 
             // Assert
-            response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.Unauthorized);
+            Assert.IsTrue(response.StatusCode == HttpStatusCode.OK || response.StatusCode == HttpStatusCode.Unauthorized);
         }
         finally
         {

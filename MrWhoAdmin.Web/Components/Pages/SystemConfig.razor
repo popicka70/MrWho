@@ -14,6 +14,7 @@
 @inject IWebHostEnvironment Env
 @inject IJSRuntime JS
 @inject Radzen.NotificationService NotificationService
+@inject IHttpClientFactory HttpClientFactory
 
 <PageTitle>System Configuration</PageTitle>
 
@@ -214,6 +215,27 @@ else
             </RadzenCard>
         </RadzenColumn>
     </RadzenRow>
+
+    <RadzenRow Gap="1.5rem" class="rz-mt-2">
+        <RadzenColumn Size="12" SizeMD="6">
+            <RadzenCard class="rz-p-3">
+                <RadzenText TextStyle="TextStyle.H6" class="rz-mb-2">
+                    <RadzenIcon Icon="build" class="rz-me-1" />
+                    Maintenance (Development)
+                </RadzenText>
+                <RadzenStack Gap="0.75rem">
+                    <RadzenAlert Visible="@(!Env.IsDevelopment())" Severity="AlertSeverity.Warning" Style="@(Env.IsDevelopment() ? "display:none" : null)">
+                        Maintenance operations available only in Development.
+                    </RadzenAlert>
+                    <RadzenButton Disabled="@(!Env.IsDevelopment() || isResyncing)" ButtonStyle="ButtonStyle.Primary" Icon="sync" Text="Resync OpenIddict Clients" Click="@(async ()=> await ResyncClientsAsync())" />
+                    @if (lastResyncResult is not null)
+                    {
+                        <RadzenBadge Text="@lastResyncResult" BadgeStyle="@(resyncSucceeded ? BadgeStyle.Success : BadgeStyle.Danger)" />
+                    }
+                </RadzenStack>
+            </RadzenCard>
+        </RadzenColumn>
+    </RadzenRow>
 }
 
 @code {
@@ -226,6 +248,11 @@ else
     private string apiBaseUrl = string.Empty;
     private string assemblyVersion = typeof(Program).Assembly.GetName().Version?.ToString() ?? "-";
 
+    // Maintenance state
+    private bool isResyncing = false;
+    private string? lastResyncResult;
+    private bool resyncSucceeded;
+
     protected override async Task OnInitializedAsync()
     {
         await base.OnInitializedAsync();
@@ -236,7 +263,6 @@ else
         cookie = CookieOptions.Get("AdminCookies");
         scopes = oidc.Scope.ToList();
 
-        // From configuration with fallback used in code
         apiBaseUrl = Configuration.GetValue<string>("MrWhoApi:BaseUrl") ?? "https://localhost:7113/";
 
         discoveryEndpoint = string.IsNullOrWhiteSpace(oidc.MetadataAddress)
@@ -305,5 +331,37 @@ else
 
         await JS.InvokeVoidAsync("navigator.clipboard.writeText", json);
         NotificationService.Notify(NotificationSeverity.Success, "Copied", "Diagnostics copied to clipboard", 3000);
+    }
+
+    private async Task ResyncClientsAsync()
+    {
+        if (isResyncing) return;
+        isResyncing = true;
+        lastResyncResult = null;
+        resyncSucceeded = false;
+        try
+        {
+            var baseUri = apiBaseUrl.TrimEnd('/');
+            // Endpoint lives on identity server root, ensure we target /debug/resync-clients
+            var url = $"{baseUri}/debug/resync-clients";
+            var client = HttpClientFactory.CreateClient();
+            using var req = new HttpRequestMessage(HttpMethod.Post, url);
+            var resp = await client.SendAsync(req);
+            var body = await resp.Content.ReadAsStringAsync();
+            resyncSucceeded = resp.IsSuccessStatusCode;
+            lastResyncResult = resyncSucceeded ? "Resync successful" : $"Resync failed: {(int)resp.StatusCode}";
+            NotificationService.Notify(resyncSucceeded ? NotificationSeverity.Success : NotificationSeverity.Error,
+                "Client Resync", lastResyncResult, 4000);
+        }
+        catch (Exception ex)
+        {
+            lastResyncResult = ex.Message;
+            NotificationService.Notify(NotificationSeverity.Error, "Client Resync", ex.Message, 5000);
+        }
+        finally
+        {
+            isResyncing = false;
+            StateHasChanged();
+        }
     }
 }

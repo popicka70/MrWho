@@ -1045,3 +1045,152 @@ public sealed class Demo1TroubleshootHandler : IRequestHandler<Demo1Troubleshoot
         return Results.Json(new { result = new { TestTimestamp = DateTime.UtcNow, Steps = steps }, summary });
     }
 }
+
+// NEW: /debug/resync-clients (POST dev-only) forces updating OpenIddict application descriptors (e.g. to pick up endpoint permission name fixes)
+public sealed record ResyncClientsRequest() : IRequest<IResult>;
+public sealed class ResyncClientsHandler : IRequestHandler<ResyncClientsRequest, IResult>
+{
+    private readonly IOidcClientService _oidcClientService;
+    private readonly ILogger<ResyncClientsHandler> _logger;
+    private readonly IHostEnvironment _env;
+
+    public ResyncClientsHandler(IOidcClientService oidcClientService, ILogger<ResyncClientsHandler> logger, IHostEnvironment env)
+    {
+        _oidcClientService = oidcClientService;
+        _logger = logger;
+        _env = env;
+    }
+
+    public async Task<IResult> Handle(ResyncClientsRequest request, CancellationToken cancellationToken)
+    {
+        if (!_env.IsDevelopment())
+        {
+            return Results.BadRequest("Client resync endpoint is only available in Development");
+        }
+
+        var clients = await _oidcClientService.GetEnabledClientsAsync();
+        var updated = new List<string>();
+        foreach (var client in clients)
+        {
+            try
+            {
+                await _oidcClientService.SyncClientWithOpenIddictAsync(client);
+                updated.Add(client.ClientId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to resync client {ClientId}", client.ClientId);
+            }
+        }
+        return Results.Ok(new { message = "Clients synchronized with OpenIddict", count = updated.Count, clients = updated, timestamp = DateTime.UtcNow });
+    }
+}
+
+// NEW: /debug/client-flags?client_id=xyz returns endpoint access flags
+public sealed record ClientFlagsRequest(string ClientId) : IRequest<IResult>;
+public sealed class ClientFlagsHandler : IRequestHandler<ClientFlagsRequest, IResult>
+{
+    private readonly IOidcClientService _oidcClientService;
+    private readonly ILogger<ClientFlagsHandler> _logger;
+
+    public ClientFlagsHandler(IOidcClientService oidcClientService, ILogger<ClientFlagsHandler> logger)
+    {
+        _oidcClientService = oidcClientService;
+        _logger = logger;
+    }
+
+    public async Task<IResult> Handle(ClientFlagsRequest request, CancellationToken cancellationToken)
+    {
+        var clients = await _oidcClientService.GetEnabledClientsAsync();
+        var client = clients.FirstOrDefault(c => c.ClientId == request.ClientId);
+        if (client == null)
+        {
+            return Results.NotFound(new { message = $"Client '{request.ClientId}' not found" });
+        }
+        return Results.Ok(new
+        {
+            client.ClientId,
+            client.Name,
+            client.ClientType,
+            client.AllowClientCredentialsFlow,
+            client.AllowAuthorizationCodeFlow,
+            client.AllowPasswordFlow,
+            client.AllowRefreshTokenFlow,
+            allowAccessToUserInfoEndpoint = client.AllowAccessToUserInfoEndpoint,
+            allowAccessToRevocationEndpoint = client.AllowAccessToRevocationEndpoint,
+            allowAccessToIntrospectionEndpoint = client.AllowAccessToIntrospectionEndpoint
+        });
+    }
+}
+
+// NEW: /debug/openiddict-application?client_id=xyz exposes OpenIddict registered permissions (runtime view)
+public sealed record OpenIddictApplicationInfoRequest(string ClientId) : IRequest<IResult>;
+public sealed class OpenIddictApplicationInfoHandler : IRequestHandler<OpenIddictApplicationInfoRequest, IResult>
+{
+    private readonly IOpenIddictApplicationManager _applicationManager;
+    private readonly ILogger<OpenIddictApplicationInfoHandler> _logger;
+
+    public OpenIddictApplicationInfoHandler(IOpenIddictApplicationManager applicationManager, ILogger<OpenIddictApplicationInfoHandler> logger)
+    {
+        _applicationManager = applicationManager;
+        _logger = logger;
+    }
+
+    public async Task<IResult> Handle(OpenIddictApplicationInfoRequest request, CancellationToken cancellationToken)
+    {
+        var app = await _applicationManager.FindByClientIdAsync(request.ClientId, cancellationToken);
+        if (app == null)
+        {
+            return Results.NotFound(new { message = $"OpenIddict application '{request.ClientId}' not found" });
+        }
+        var permissions = await _applicationManager.GetPermissionsAsync(app, cancellationToken);
+        var type = await _applicationManager.GetClientTypeAsync(app, cancellationToken);
+        var display = await _applicationManager.GetDisplayNameAsync(app, cancellationToken);
+        return Results.Ok(new
+        {
+            client_id = request.ClientId,
+            display_name = display,
+            client_type = type,
+            permissions = permissions.OrderBy(p => p).ToArray(),
+            has_introspection = permissions.Contains("endpoints.introspection"),
+            has_token = permissions.Contains("endpoints.token"),
+            has_client_credentials = permissions.Contains("grant_types.client_credentials")
+        });
+    }
+}
+
+public static class DebugEndpointMappings
+{
+    public static IEndpointRouteBuilder MapDebugResyncClients(this IEndpointRouteBuilder endpoints)
+    {
+        endpoints.MapPost("/debug/resync-clients", async (IMediator mediator, CancellationToken ct) =>
+        {
+            return await mediator.Send(new ResyncClientsRequest(), ct);
+        })
+        .WithDisplayName("Debug: Resync OpenIddict Clients")
+        .WithGroupName("debug")
+        .Produces(StatusCodes.Status200OK)
+        .Produces(StatusCodes.Status400BadRequest);
+
+        // Map client flags endpoint
+        endpoints.MapGet("/debug/client-flags", async (string client_id, IMediator mediator, CancellationToken ct) =>
+        {
+            return await mediator.Send(new ClientFlagsRequest(client_id), ct);
+        })
+        .WithDisplayName("Debug: Client Endpoint Access Flags")
+        .WithGroupName("debug")
+        .Produces(StatusCodes.Status200OK)
+        .Produces(StatusCodes.Status404NotFound);
+
+        // Map OpenIddict application info endpoint
+        endpoints.MapGet("/debug/openiddict-application", async (string client_id, IMediator mediator, CancellationToken ct) =>
+        {
+            return await mediator.Send(new OpenIddictApplicationInfoRequest(client_id), ct);
+        })
+        .WithDisplayName("Debug: OpenIddict Application Permissions")
+        .WithGroupName("debug")
+        .Produces(StatusCodes.Status200OK)
+        .Produces(StatusCodes.Status404NotFound);
+        return endpoints;
+    }
+}
