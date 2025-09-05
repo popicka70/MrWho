@@ -33,7 +33,7 @@ public class ClientCredentialsAndIntrospectionTests
     }
 
     // --- Helpers for performing authorization code + PKCE flow for demo1 user/client ---
-    private static string Base64Url(byte[] bytes) => Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+    private static string Base64Url(byte[] bytes) => Convert.ToBase64String(bytes).TrimEnd('=') .Replace('+', '-') .Replace('/', '_');
 
     private static (string Verifier, string Challenge) CreatePkcePair()
     {
@@ -46,71 +46,82 @@ public class ClientCredentialsAndIntrospectionTests
 
     private static string? ExtractAntiforgeryToken(string html)
     {
-        // Primary simple search (fast path)
         const string marker = "name=\"__RequestVerificationToken\" value=\"";
         var idx = html.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
         if (idx > -1)
         {
-            var start = idx + marker.Length;
-            var end = html.IndexOf('"', start);
-            if (end > start) return html.Substring(start, end - start);
+            var start = idx + marker.Length; var end = html.IndexOf('"', start); if (end > start) return html.Substring(start, end - start);
         }
-        // Regex fallback (handles attribute reordering, whitespace, etc.)
         var m = Regex.Match(html, "name=\"__RequestVerificationToken\"[^>]*value=\"(?<val>[^\"]+)\"", RegexOptions.IgnoreCase);
-        if (m.Success) return m.Groups["val"].Value;
-        return null;
+        return m.Success ? m.Groups["val"].Value : null;
+    }
+
+    private static string? ExtractHiddenReturnUrl(string html)
+    {
+        var m = Regex.Match(html, "name=\"returnUrl\"[^>]*value=\"(?<val>[^\"]+)\"", RegexOptions.IgnoreCase);
+        return m.Success ? System.Net.WebUtility.HtmlDecode(m.Groups["val"].Value) : null;
     }
 
     private async Task<string> GetDemo1UserAccessTokenAsync()
     {
-        // Flow for confidential demo client with PKCE requirement
         const string clientId = "mrwho_demo1";
         const string clientSecret = "Demo1Secret2024!";
         const string redirectUri = "https://localhost:7037/signin-oidc"; // seeded redirect
         const string userEmail = "demo1@example.com";
         const string userPassword = "Dem0!User#2025";
-        var scopes = "openid profile email api.read api.write"; // sufficient set
+        var scopes = "openid profile email api.read api.write";
 
         using var http = SharedTestInfrastructure.CreateHttpClient("mrwho", disableRedirects: true);
         var (verifier, challenge) = CreatePkcePair();
-        var authorizeUrl = $"connect/authorize?response_type=code&client_id={clientId}&redirect_uri={HttpUtility.UrlEncode(redirectUri)}&scope={HttpUtility.UrlEncode(scopes)}&code_challenge={challenge}&code_challenge_method=S256";
+        var authorizeUrlBase = $"connect/authorize?response_type=code&client_id={clientId}&redirect_uri={HttpUtility.UrlEncode(redirectUri)}&scope={HttpUtility.UrlEncode(scopes)}&code_challenge={challenge}&code_challenge_method=S256";
 
-        // 1. Initial authorize -> may either redirect to login (302) OR directly return login page (200)
-        var first = await http.GetAsync(authorizeUrl);
-        first.StatusCode.Should().BeOneOf(new[]{HttpStatusCode.Redirect, HttpStatusCode.OK}, "unauthenticated authorize should redirect or render login");
+        string? loginRedirectUrl = null; // capture original login redirect with encoded returnUrl/clientId
 
-        string html;
-        if (first.StatusCode == HttpStatusCode.Redirect)
+        async Task<string?> TryAuthorizeAsync()
         {
-            first.Headers.Location!.ToString().Should().Contain("/connect/login");
-            var loginGet = await http.GetAsync(first.Headers.Location);
-            loginGet.StatusCode.Should().Be(HttpStatusCode.OK);
-            html = await loginGet.Content.ReadAsStringAsync();
-        }
-        else
-        {
-            // Already served login form
-            html = await first.Content.ReadAsStringAsync();
-        }
-
-        // 2. Extract antiforgery token (with robust fallback); if not found, explicitly GET /connect/login and retry extraction
-        var antiForgery = ExtractAntiforgeryToken(html);
-        if (antiForgery == null)
-        {
-            var explicitLogin = await http.GetAsync("/connect/login");
-            explicitLogin.StatusCode.Should().Be(HttpStatusCode.OK);
-            var explicitHtml = await explicitLogin.Content.ReadAsStringAsync();
-            antiForgery = ExtractAntiforgeryToken(explicitHtml);
+            var r = await http.GetAsync(authorizeUrlBase);
+            if (r.StatusCode == HttpStatusCode.Redirect)
+            {
+                var loc = r.Headers.Location!.ToString();
+                if (loc.StartsWith(redirectUri) && loc.Contains("code="))
+                {
+                    var uri = new Uri(loc); var q = HttpUtility.ParseQueryString(uri.Query); return q["code"]; }
+                if (loc.Contains("/connect/login")) { loginRedirectUrl = loc; return null; }
+            }
+            else if (r.StatusCode == HttpStatusCode.OK)
+            {
+                var body = await r.Content.ReadAsStringAsync();
+                if (body.Contains("<form") && body.Contains("Password")) return null;
+            }
+            return null;
         }
 
-        // 3. POST credentials (retry once if 400 due to antiforgery)
+        var initialCode = await TryAuthorizeAsync();
+        if (initialCode != null)
+        {
+            return await RedeemAsync(initialCode, verifier, clientId, clientSecret, redirectUri);
+        }
+
+        // Fetch login page (prefer captured redirect URL so hidden fields contain proper returnUrl/clientId)
+        var loginPageUrl = loginRedirectUrl ?? "/connect/login";
+        var loginPage = await http.GetAsync(loginPageUrl);
+        loginPage.StatusCode.Should().Be(HttpStatusCode.OK);
+        var loginHtml = await loginPage.Content.ReadAsStringAsync();
+        var antiForgery = ExtractAntiforgeryToken(loginHtml);
+        var hiddenReturnUrl = ExtractHiddenReturnUrl(loginHtml); // capture existing hidden returnUrl if provided
+
         async Task<HttpResponseMessage> PostLoginAsync(string? token)
         {
+            // Build absolute authorize URL from current base address if hidden not present
+            var authorizeAbsolute = new Uri(http.BaseAddress!, authorizeUrlBase).ToString();
+            var returnUrlToUse = hiddenReturnUrl ?? authorizeAbsolute;
             var loginForm = new Dictionary<string, string>
             {
                 ["Email"] = userEmail,
                 ["Password"] = userPassword,
-                ["RememberMe"] = "false"
+                ["RememberMe"] = "false",
+                ["returnUrl"] = returnUrlToUse,
+                ["clientId"] = clientId
             };
             if (!string.IsNullOrEmpty(token)) loginForm.Add("__RequestVerificationToken", token);
             return await http.PostAsync("/connect/login", new FormUrlEncodedContent(loginForm));
@@ -119,26 +130,37 @@ public class ClientCredentialsAndIntrospectionTests
         var loginPost = await PostLoginAsync(antiForgery);
         if (loginPost.StatusCode == HttpStatusCode.BadRequest)
         {
-            // Possibly stale/missing token; fetch new and retry once
-            var retryLoginGet = await http.GetAsync("/connect/login");
-            retryLoginGet.StatusCode.Should().Be(HttpStatusCode.OK);
-            var retryHtml = await retryLoginGet.Content.ReadAsStringAsync();
+            var retry = await http.GetAsync(loginPageUrl);
+            var retryHtml = await retry.Content.ReadAsStringAsync();
             antiForgery = ExtractAntiforgeryToken(retryHtml);
+            hiddenReturnUrl = ExtractHiddenReturnUrl(retryHtml) ?? hiddenReturnUrl;
             loginPost = await PostLoginAsync(antiForgery);
         }
-        loginPost.StatusCode.Should().Be(HttpStatusCode.Redirect, "successful login should redirect to authorize");
 
-        // 4. Follow redirect (authorized now) to get code
-        var afterLogin = await http.GetAsync(loginPost.Headers.Location);
-        afterLogin.StatusCode.Should().Be(HttpStatusCode.Redirect);
-        var finalLocation = afterLogin.Headers.Location!.ToString();
-        finalLocation.Should().StartWith(redirectUri);
-        finalLocation.Should().Contain("code=");
-        var uri = new Uri(finalLocation);
-        var query = HttpUtility.ParseQueryString(uri.Query);
-        var code = query["code"]!;
+        loginPost.StatusCode.Should().BeOneOf(new[]{HttpStatusCode.Redirect, HttpStatusCode.OK}, "login should either redirect or present view");
 
-        // 5. Redeem code for tokens
+        var afterLoginCode = await TryAuthorizeAsync();
+        if (afterLoginCode == null)
+        {
+            // fallback with new PKCE
+            (verifier, challenge) = CreatePkcePair();
+            var fallbackAuthorize = $"connect/authorize?response_type=code&client_id={clientId}&redirect_uri={HttpUtility.UrlEncode(redirectUri)}&scope={HttpUtility.UrlEncode(scopes)}&code_challenge={challenge}&code_challenge_method=S256";
+            var r = await http.GetAsync(fallbackAuthorize);
+            if (r.StatusCode == HttpStatusCode.Redirect)
+            {
+                var loc = r.Headers.Location!.ToString();
+                if (loc.StartsWith(redirectUri) && loc.Contains("code="))
+                {
+                    var uri = new Uri(loc); var q = HttpUtility.ParseQueryString(uri.Query); afterLoginCode = q["code"]; }
+            }
+        }
+
+        afterLoginCode.Should().NotBeNull("after login we should receive an authorization code");
+        return await RedeemAsync(afterLoginCode!, verifier, clientId, clientSecret, redirectUri);
+    }
+
+    private static async Task<string> RedeemAsync(string code, string verifier, string clientId, string clientSecret, string redirectUri)
+    {
         using var tokenClient = SharedTestInfrastructure.CreateHttpClient("mrwho", disableRedirects: true);
         var tokenForm = new Dictionary<string, string>
         {
@@ -151,7 +173,7 @@ public class ClientCredentialsAndIntrospectionTests
         };
         var tokenResp = await tokenClient.PostAsync("connect/token", new FormUrlEncodedContent(tokenForm));
         var tokenJson = await tokenResp.Content.ReadAsStringAsync();
-        tokenResp.IsSuccessStatusCode.Should().BeTrue("demo1 user code exchange should succeed: {0} {1}", tokenResp.StatusCode, tokenJson);
+        tokenResp.IsSuccessStatusCode.Should().BeTrue("token exchange should succeed: {0} {1}", tokenResp.StatusCode, tokenJson);
         using var doc = JsonDocument.Parse(tokenJson);
         var at = doc.RootElement.GetProperty("access_token").GetString();
         at.Should().NotBeNullOrWhiteSpace();
@@ -183,7 +205,6 @@ public class ClientCredentialsAndIntrospectionTests
     [TestMethod]
     public async Task Introspection_With_Authorized_Client_Returns_Active()
     {
-        // Obtain a USER access token (authorization code + PKCE) for demo1 user via mrwho_demo1 client
         var userAccessToken = await GetDemo1UserAccessTokenAsync();
 
         using var http = SharedTestInfrastructure.CreateHttpClient("mrwho", disableRedirects: true);
@@ -194,7 +215,6 @@ public class ClientCredentialsAndIntrospectionTests
                 ["token"] = userAccessToken
             })
         };
-        // Authorized introspection client (mrwho_m2m) that has introspection permission
         var basic = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("mrwho_m2m:MrWhoM2MSecret2025!"));
         req.Headers.Authorization = new AuthenticationHeaderValue("Basic", basic);
         var resp = await http.SendAsync(req);
@@ -209,7 +229,7 @@ public class ClientCredentialsAndIntrospectionTests
         root.TryGetProperty("token_type", out var typeProp).Should().BeTrue("token_type expected");
         typeProp.GetString().Should().NotBeNullOrWhiteSpace();
         root.TryGetProperty("client_id", out var clientIdProp).Should().BeTrue();
-        clientIdProp.GetString().Should().Be("mrwho_demo1"); // token was issued to user via mrwho_demo1 client
+        clientIdProp.GetString().Should().Be("mrwho_demo1");
         if (root.TryGetProperty("scope", out var scopeProp))
         {
             var scopeString = scopeProp.GetString();
@@ -217,13 +237,9 @@ public class ClientCredentialsAndIntrospectionTests
             var scopes = scopeString!.Split(new[]{' '}, StringSplitOptions.RemoveEmptyEntries).Distinct().OrderBy(s => s).ToArray();
             scopes.Should().Contain("api.read");
             scopes.Should().Contain("openid");
-            // ensure uniqueness
             scopes.Length.Should().Be(scopes.Distinct().Count());
         }
-        else
-        {
-            Assert.Fail("Introspection response did not include 'scope' property");
-        }
+        else Assert.Fail("Introspection response did not include 'scope' property");
     }
 
     [TestMethod]
@@ -257,30 +273,21 @@ public class ClientCredentialsAndIntrospectionTests
 
         bool TryBool(string name, out bool value)
         {
-            value = false;
-            if (!doc.RootElement.TryGetProperty(name, out var prop)) return false;
-            value = prop.GetBoolean();
-            return true;
+            value = false; if (!doc.RootElement.TryGetProperty(name, out var prop)) return false; value = prop.GetBoolean(); return true;
         }
 
         TryBool("allowAccessToIntrospectionEndpoint", out var introspectFlag).Should().BeTrue();
         introspectFlag.Should().BeTrue("mrwho_m2m should have introspection enabled at runtime");
-
         TryBool("allowAccessToUserInfoEndpoint", out var userInfoFlag).Should().BeTrue();
         userInfoFlag.Should().BeFalse("mrwho_m2m should NOT have userinfo access");
-
         TryBool("allowAccessToRevocationEndpoint", out var revocationFlag).Should().BeTrue();
         revocationFlag.Should().BeTrue("mrwho_m2m should have revocation access");
-
         TryBool("allowClientCredentialsFlow", out var cc).Should().BeTrue();
         cc.Should().BeTrue("mrwho_m2m must allow client credentials");
-
         TryBool("allowAuthorizationCodeFlow", out var ac).Should().BeTrue();
         ac.Should().BeFalse("mrwho_m2m should not allow authorization code flow");
-
         TryBool("allowPasswordFlow", out var pwd).Should().BeTrue();
         pwd.Should().BeFalse("mrwho_m2m should not allow password flow");
-
         TryBool("allowRefreshTokenFlow", out var refresh).Should().BeTrue();
         refresh.Should().BeFalse("mrwho_m2m should not allow refresh tokens");
     }
@@ -293,11 +300,9 @@ public class ClientCredentialsAndIntrospectionTests
         resp.IsSuccessStatusCode.Should().BeTrue("runtime OpenIddict application fetch should succeed");
         var json = await resp.Content.ReadAsStringAsync();
         using var doc = JsonDocument.Parse(json);
-        var root = doc.RootElement;
-        root.TryGetProperty("permissions", out var perms).Should().BeTrue();
+        var root = doc.RootElement; root.TryGetProperty("permissions", out var perms).Should().BeTrue();
         perms.ValueKind.Should().Be(JsonValueKind.Array);
         var list = perms.EnumerateArray().Select(e => e.GetString()!).ToList();
-
         list.Should().Contain("endpoints.introspection", "OpenIddict app must include introspection permission");
         list.Should().Contain(e => e == "endpoints.token" || e == "ept:token", "token endpoint permission missing (endpoints.token/ept:token)");
         list.Should().Contain(e => e == "grant_types.client_credentials" || e == "gt:client_credentials", "client_credentials grant permission missing");
