@@ -379,7 +379,7 @@ public class OidcClientService : IOidcClientService
                 CreatedBy = "System",
                 AllowAccessToUserInfoEndpoint = true,
                 AllowAccessToRevocationEndpoint = true,
-                AllowAccessToIntrospectionEndpoint = false
+                AllowAccessToIntrospectionEndpoint = true
             };
             _context.Clients.Add(demo1Client);
             await _context.SaveChangesAsync();

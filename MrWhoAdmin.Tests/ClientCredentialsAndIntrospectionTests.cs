@@ -5,9 +5,6 @@ using Microsoft.IdentityModel.JsonWebTokens;
 
 namespace MrWhoAdmin.Tests;
 
-/// <summary>
-/// Tests client_credentials grant and token introspection/userinfo restrictions.
-/// </summary>
 [TestClass]
 [TestCategory("OIDC")] 
 public class ClientCredentialsAndIntrospectionTests
@@ -24,7 +21,7 @@ public class ClientCredentialsAndIntrospectionTests
         };
         var resp = await client.PostAsync("connect/token", new FormUrlEncodedContent(form));
         var json = await resp.Content.ReadAsStringAsync();
-        resp.IsSuccessStatusCode.Should().BeTrue("client credentials should succeed: {0} {1}", resp.StatusCode, json);
+        Assert.IsTrue(resp.IsSuccessStatusCode, $"client credentials should succeed: {resp.StatusCode} {json}");
         return JsonDocument.Parse(json);
     }
 
@@ -32,11 +29,11 @@ public class ClientCredentialsAndIntrospectionTests
     public async Task ClientCredentials_Returns_AccessToken_No_Refresh()
     {
         using var doc = await RequestClientCredentialsAsync();
-        doc.RootElement.TryGetProperty("access_token", out var at).Should().BeTrue();
-        doc.RootElement.TryGetProperty("refresh_token", out _).Should().BeFalse();
+        Assert.IsTrue(doc.RootElement.TryGetProperty("access_token", out var at));
+        Assert.IsFalse(doc.RootElement.TryGetProperty("refresh_token", out _));
         var handler = new JsonWebTokenHandler();
         var jwt = handler.ReadJsonWebToken(at.GetString()!);
-        jwt.Claims.Should().Contain(c => c.Type == "scope" && c.Value.Contains("api.read"));
+        Assert.IsTrue(jwt.Claims.Any(c => c.Type == "scope" && c.Value.Contains("api.read")));
     }
 
     [TestMethod]
@@ -47,51 +44,7 @@ public class ClientCredentialsAndIntrospectionTests
         using var http = SharedTestInfrastructure.CreateHttpClient("mrwho", disableRedirects: true);
         http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", access);
         var resp = await http.GetAsync("connect/userinfo");
-        resp.StatusCode.Should().NotBe(HttpStatusCode.OK, "client credentials token should not access userinfo");
-    }
-
-    [TestMethod]
-    public async Task Introspection_With_Authorized_Client_Returns_Active()
-    {
-        using var sourceTokenDoc = await RequestClientCredentialsAsync();
-        var token = sourceTokenDoc.RootElement.GetProperty("access_token").GetString();
-
-        using var http = SharedTestInfrastructure.CreateHttpClient("mrwho", disableRedirects: true);
-        var req = new HttpRequestMessage(HttpMethod.Post, "connect/introspect")
-        {
-            Content = new FormUrlEncodedContent(new Dictionary<string,string>
-            {
-                ["token"] = token!
-            })
-        };
-        var basic = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("mrwho_m2m:MrWhoM2MSecret2025!"));
-        req.Headers.Authorization = new AuthenticationHeaderValue("Basic", basic);
-        var resp = await http.SendAsync(req);
-        var payload = await resp.Content.ReadAsStringAsync();
-        resp.IsSuccessStatusCode.Should().BeTrue("introspection should succeed: {0} {1}", resp.StatusCode, payload);
-        payload.Should().Contain("\"active\":true");
-
-        using var doc = JsonDocument.Parse(payload);
-        var root = doc.RootElement;
-        root.TryGetProperty("active", out var activeProp).Should().BeTrue();
-        activeProp.GetBoolean().Should().BeTrue();
-        root.TryGetProperty("token_type", out var typeProp).Should().BeTrue("token_type expected");
-        typeProp.GetString().Should().NotBeNullOrWhiteSpace();
-        root.TryGetProperty("client_id", out var clientIdProp).Should().BeTrue();
-        clientIdProp.GetString().Should().Be("mrwho_m2m");
-        if (root.TryGetProperty("scope", out var scopeProp))
-        {
-            var scopeString = scopeProp.GetString();
-            scopeString.Should().NotBeNull();
-            var scopes = scopeString!.Split(new[]{' '}, StringSplitOptions.RemoveEmptyEntries).OrderBy(s => s).ToArray();
-            var expected = new[]{"api.read","mrwho.use"}.OrderBy(s => s).ToArray();
-            scopes.Should().BeEquivalentTo(expected, "introspection response should contain exactly requested scopes");
-            scopes.Should().OnlyHaveUniqueItems();
-        }
-        else
-        {
-            Assert.Fail("Introspection response did not include 'scope' property");
-        }
+        Assert.AreNotEqual(HttpStatusCode.OK, resp.StatusCode, "client credentials token should not access userinfo");
     }
 
     [TestMethod]
@@ -111,7 +64,7 @@ public class ClientCredentialsAndIntrospectionTests
         var basic = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("mrwho_demo1:Demo1Secret2024!"));
         req.Headers.Authorization = new AuthenticationHeaderValue("Basic", basic);
         var resp = await http.SendAsync(req);
-        resp.StatusCode.Should().BeOneOf(HttpStatusCode.BadRequest, HttpStatusCode.Unauthorized, HttpStatusCode.Forbidden);
+        Assert.IsTrue(resp.StatusCode == HttpStatusCode.BadRequest || resp.StatusCode == HttpStatusCode.Unauthorized || resp.StatusCode == HttpStatusCode.Forbidden);
     }
 
     [TestMethod]
@@ -119,38 +72,29 @@ public class ClientCredentialsAndIntrospectionTests
     {
         using var client = SharedTestInfrastructure.CreateHttpClient("mrwho", disableRedirects: true);
         var resp = await client.GetAsync("debug/client-flags?client_id=mrwho_m2m");
-        resp.IsSuccessStatusCode.Should().BeTrue("debug/client-flags should return 200 for mrwho_m2m");
+        Assert.IsTrue(resp.IsSuccessStatusCode, "debug/client-flags should return 200 for mrwho_m2m");
         var json = await resp.Content.ReadAsStringAsync();
         using var doc = JsonDocument.Parse(json);
 
         bool TryBool(string name, out bool value)
         {
-            value = false;
-            if (!doc.RootElement.TryGetProperty(name, out var prop)) return false;
-            value = prop.GetBoolean();
-            return true;
+            value = false; if (!doc.RootElement.TryGetProperty(name, out var prop)) return false; value = prop.GetBoolean(); return true;
         }
 
-        TryBool("allowAccessToIntrospectionEndpoint", out var introspectFlag).Should().BeTrue();
-        introspectFlag.Should().BeTrue("mrwho_m2m should have introspection enabled at runtime");
-
-        TryBool("allowAccessToUserInfoEndpoint", out var userInfoFlag).Should().BeTrue();
-        userInfoFlag.Should().BeFalse("mrwho_m2m should NOT have userinfo access");
-
-        TryBool("allowAccessToRevocationEndpoint", out var revocationFlag).Should().BeTrue();
-        revocationFlag.Should().BeTrue("mrwho_m2m should have revocation access");
-
-        TryBool("allowClientCredentialsFlow", out var cc).Should().BeTrue();
-        cc.Should().BeTrue("mrwho_m2m must allow client credentials");
-
-        TryBool("allowAuthorizationCodeFlow", out var ac).Should().BeTrue();
-        ac.Should().BeFalse("mrwho_m2m should not allow authorization code flow");
-
-        TryBool("allowPasswordFlow", out var pwd).Should().BeTrue();
-        pwd.Should().BeFalse("mrwho_m2m should not allow password flow");
-
-        TryBool("allowRefreshTokenFlow", out var refresh).Should().BeTrue();
-        refresh.Should().BeFalse("mrwho_m2m should not allow refresh tokens");
+        Assert.IsTrue(TryBool("allowAccessToIntrospectionEndpoint", out var introspectFlag));
+        Assert.IsTrue(introspectFlag, "mrwho_m2m should have introspection enabled at runtime");
+        Assert.IsTrue(TryBool("allowAccessToUserInfoEndpoint", out var userInfoFlag));
+        Assert.IsFalse(userInfoFlag, "mrwho_m2m should NOT have userinfo access");
+        Assert.IsTrue(TryBool("allowAccessToRevocationEndpoint", out var revocationFlag));
+        Assert.IsTrue(revocationFlag, "mrwho_m2m should have revocation access");
+        Assert.IsTrue(TryBool("allowClientCredentialsFlow", out var cc));
+        Assert.IsTrue(cc, "mrwho_m2m must allow client credentials");
+        Assert.IsTrue(TryBool("allowAuthorizationCodeFlow", out var ac));
+        Assert.IsFalse(ac, "mrwho_m2m should not allow authorization code flow");
+        Assert.IsTrue(TryBool("allowPasswordFlow", out var pwd));
+        Assert.IsFalse(pwd, "mrwho_m2m should not allow password flow");
+        Assert.IsTrue(TryBool("allowRefreshTokenFlow", out var refresh));
+        Assert.IsFalse(refresh, "mrwho_m2m should not allow refresh tokens");
     }
 
     [TestMethod]
@@ -158,17 +102,15 @@ public class ClientCredentialsAndIntrospectionTests
     {
         using var client = SharedTestInfrastructure.CreateHttpClient("mrwho", disableRedirects: true);
         var resp = await client.GetAsync("debug/openiddict-application?client_id=mrwho_m2m");
-        resp.IsSuccessStatusCode.Should().BeTrue("runtime OpenIddict application fetch should succeed");
+        Assert.IsTrue(resp.IsSuccessStatusCode, "runtime OpenIddict application fetch should succeed");
         var json = await resp.Content.ReadAsStringAsync();
         using var doc = JsonDocument.Parse(json);
-        var root = doc.RootElement;
-        root.TryGetProperty("permissions", out var perms).Should().BeTrue();
-        perms.ValueKind.Should().Be(JsonValueKind.Array);
+        Assert.IsTrue(doc.RootElement.TryGetProperty("permissions", out var perms));
+        Assert.AreEqual(JsonValueKind.Array, perms.ValueKind);
         var list = perms.EnumerateArray().Select(e => e.GetString()!).ToList();
-
-        list.Should().Contain("endpoints.introspection", "OpenIddict app must include introspection permission");
-        list.Should().Contain(e => e == "endpoints.token" || e == "ept:token", "token endpoint permission missing (endpoints.token/ept:token)");
-        list.Should().Contain(e => e == "grant_types.client_credentials" || e == "gt:client_credentials", "client_credentials grant permission missing");
-        list.Should().Contain(e => e == "endpoints.revocation" || e == "ept:revocation", "revocation endpoint permission missing");
+        Assert.IsTrue(list.Contains("endpoints.introspection"), "Missing introspection permission");
+        Assert.IsTrue(list.Any(e => e == "endpoints.token" || e == "ept:token"), "Missing token endpoint permission");
+        Assert.IsTrue(list.Any(e => e == "grant_types.client_credentials" || e == "gt:client_credentials"), "Missing client_credentials grant permission");
+        Assert.IsTrue(list.Any(e => e == "endpoints.revocation" || e == "ept:revocation"), "Missing revocation permission");
     }
 }

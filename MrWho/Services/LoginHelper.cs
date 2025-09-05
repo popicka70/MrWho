@@ -29,6 +29,15 @@ public sealed class LoginHelper : ILoginHelper
 
     public bool ShouldUseRecaptcha()
     {
+        // Disable reCAPTCHA for automated test runs to avoid external HTTP dependency and token requirement
+        var testFlag = Environment.GetEnvironmentVariable("MRWHO_TESTS");
+        var envName = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
+        if (string.Equals(testFlag, "1", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(envName, "Testing", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
         if (_env.IsDevelopment()) return false;
         var site = _configuration["GoogleReCaptcha:SiteKey"];
         var secret = _configuration["GoogleReCaptcha:SecretKey"];

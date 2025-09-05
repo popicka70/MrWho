@@ -17,7 +17,7 @@ public class OptimizedIntegrationTests
         var app = SharedTestInfrastructure.GetSharedApp();
 
         // Assert - If we get here, the shared infrastructure is working
-        app.Should().NotBeNull();
+        Assert.IsNotNull(app);
     }
 
     /// <summary>
@@ -33,7 +33,7 @@ public class OptimizedIntegrationTests
         var response = await httpClient.GetAsync("/api/realms?page=1&pageSize=5");
 
         // Assert
-        response.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.Unauthorized);
+        Assert.IsTrue(response.StatusCode == HttpStatusCode.OK || response.StatusCode == HttpStatusCode.Unauthorized);
     }
 
     /// <summary>
@@ -50,7 +50,7 @@ public class OptimizedIntegrationTests
         var testResponse = await httpClient.GetAsync("/api/test");
 
         // Assert
-        realmsResponse.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.Unauthorized);
-        testResponse.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.Unauthorized, HttpStatusCode.NotFound);
+        Assert.IsTrue(realmsResponse.StatusCode == HttpStatusCode.OK || realmsResponse.StatusCode == HttpStatusCode.Unauthorized);
+        Assert.IsTrue(testResponse.StatusCode == HttpStatusCode.OK || testResponse.StatusCode == HttpStatusCode.Unauthorized || testResponse.StatusCode == HttpStatusCode.NotFound);
     }
 }
