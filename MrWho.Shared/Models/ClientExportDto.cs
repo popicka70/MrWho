@@ -22,6 +22,7 @@ public class ClientExportDto
     public bool AllowClientCredentialsFlow { get; set; }
     public bool AllowPasswordFlow { get; set; }
     public bool AllowRefreshTokenFlow { get; set; }
+    public bool AllowDeviceCodeFlow { get; set; } // NEW
     public bool RequirePkce { get; set; }
     public bool RequireClientSecret { get; set; }
 

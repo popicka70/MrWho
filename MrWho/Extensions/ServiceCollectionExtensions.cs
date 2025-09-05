@@ -302,10 +302,12 @@ public static class ServiceCollectionExtensions
                        .SetUserInfoEndpointUris("/connect/userinfo")
                        .SetRevocationEndpointUris("/connect/revocation")
                        .SetIntrospectionEndpointUris("/connect/introspect")
+                       // TODO: Enable device authorization endpoints when upgrading OpenIddict packages supporting Device Code flow helpers
+                       // .SetDeviceAuthorizationEndpointUris("/connect/device")
                        // Flows
                        .AllowAuthorizationCodeFlow()
                        .AllowClientCredentialsFlow()
-                       .AllowRefreshTokenFlow(); // device auth flow deferred until package alignment
+                       .AllowRefreshTokenFlow(); // Device code flow temporarily disabled (package version missing extension)
 
                 // Conditionally enable password flow ONLY for tests to support integration tests
                 var enablePassword = string.Equals(Environment.GetEnvironmentVariable("MRWHO_TESTS"), "1", StringComparison.OrdinalIgnoreCase) ||
@@ -349,7 +351,7 @@ public static class ServiceCollectionExtensions
                 // For demo/API compatibility: issue plain signed (non-encrypted) access tokens so JwtBearer can validate
                 options.DisableAccessTokenEncryption();
 
-                // Register the ASP.NET Core host and enable passthrough for the authorization endpoint
+                // Register the ASP.NET Core host and enable passthrough for endpoints
                 options.UseAspNetCore()
                        .EnableAuthorizationEndpointPassthrough()
                        .EnableTokenEndpointPassthrough()

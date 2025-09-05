@@ -75,6 +75,11 @@ public class TokenHandler : ITokenHandler
             return await HandleRefreshTokenGrantAsync(context, request);
         }
 
+        if (string.Equals(request.GrantType, "urn:ietf:params:oauth:grant-type:device_code", StringComparison.Ordinal))
+        {
+            return await HandleDeviceCodeGrantAsync(context, request);
+        }
+
         throw new InvalidOperationException($"The specified grant type '{request.GrantType}' is not supported.");
     }
 
@@ -481,6 +486,91 @@ public class TokenHandler : ITokenHandler
         var cookieScheme = _cookieService.GetCookieSchemeForClient(request.ClientId!);
         try { await context.SignInAsync(cookieScheme, newPrincipal); } catch { }
         return Results.SignIn(newPrincipal, authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+    }
+
+    private async Task<IResult> HandleDeviceCodeGrantAsync(HttpContext context, OpenIddictRequest request)
+    {
+        string? deviceCode = null;
+        try
+        {
+            var p = request["device_code"]; // OpenIddictParameter (may be default)
+            if (p.HasValue)
+            {
+                deviceCode = (string?)p; // implicit operator to string
+            }
+        }
+        catch { }
+        if (string.IsNullOrWhiteSpace(deviceCode))
+        {
+            return Results.BadRequest(new { error = Errors.InvalidGrant, error_description = "Missing device_code" });
+        }
+
+        var record = await _db.DeviceAuthorizations.FirstOrDefaultAsync(d => d.DeviceCode == deviceCode);
+        if (record == null)
+        {
+            return Results.BadRequest(new { error = Errors.InvalidGrant, error_description = "Invalid device_code" });
+        }
+
+        // Expired?
+        if (record.ExpiresAt <= DateTime.UtcNow)
+        {
+            if (record.Status != DeviceAuthorizationStatus.Expired && record.Status != DeviceAuthorizationStatus.Consumed)
+            {
+                record.Status = DeviceAuthorizationStatus.Expired;
+                await _db.SaveChangesAsync();
+            }
+            return Results.BadRequest(new { error = "expired_token" });
+        }
+
+        // Denied
+        if (record.Status == DeviceAuthorizationStatus.Denied)
+        {
+            return Results.BadRequest(new { error = Errors.AccessDenied });
+        }
+
+        // Pending
+        if (record.Status == DeviceAuthorizationStatus.Pending)
+        {
+            var now = DateTime.UtcNow;
+            if (record.LastPolledAt != null && (now - record.LastPolledAt.Value).TotalSeconds < record.PollingIntervalSeconds)
+            {
+                record.LastPolledAt = now;
+                await _db.SaveChangesAsync();
+                return Results.BadRequest(new { error = "slow_down" });
+            }
+            record.LastPolledAt = now;
+            await _db.SaveChangesAsync();
+            return Results.BadRequest(new { error = "authorization_pending" });
+        }
+
+        if (record.Status == DeviceAuthorizationStatus.Consumed)
+        {
+            return Results.BadRequest(new { error = Errors.InvalidGrant, error_description = "device_code already used" });
+        }
+
+        if (record.Status == DeviceAuthorizationStatus.Approved && !string.IsNullOrWhiteSpace(record.Subject))
+        {
+            var user = await _userManager.FindByIdAsync(record.Subject);
+            if (user == null)
+            {
+                return Results.BadRequest(new { error = Errors.InvalidGrant, error_description = "user unavailable" });
+            }
+            var scopes = (record.Scope ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            var identity = await BuildUserIdentityAsync(user, record.ClientId, scopes);
+            var principal = new ClaimsPrincipal(identity);
+            principal.SetScopes(scopes);
+            var audRes = await ApplyAudiencesAsync(principal, record.ClientId, scopes, context);
+            if (audRes.Error)
+            {
+                return Results.BadRequest(new { error = Errors.InvalidScope, error_description = audRes.Description });
+            }
+            record.Status = DeviceAuthorizationStatus.Consumed;
+            record.ConsumedAt = DateTime.UtcNow;
+            await _db.SaveChangesAsync();
+            return Results.SignIn(principal, authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+        }
+
+        return Results.BadRequest(new { error = Errors.InvalidGrant });
     }
 
     /// <summary>

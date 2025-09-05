@@ -17,6 +17,7 @@ public class ClientDto
     public bool AllowClientCredentialsFlow { get; set; }
     public bool AllowPasswordFlow { get; set; }
     public bool AllowRefreshTokenFlow { get; set; }
+    public bool AllowDeviceCodeFlow { get; set; } // NEW
     public bool RequirePkce { get; set; }
     public bool RequireClientSecret { get; set; }
     public TimeSpan? AccessTokenLifetime { get; set; }
