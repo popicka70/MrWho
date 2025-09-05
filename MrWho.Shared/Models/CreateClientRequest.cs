@@ -31,6 +31,7 @@ public class CreateClientRequest
     public bool AllowClientCredentialsFlow { get; set; } = false;
     public bool AllowPasswordFlow { get; set; } = false;
     public bool AllowRefreshTokenFlow { get; set; } = true;
+    public bool AllowDeviceCodeFlow { get; set; } = false; // NEW
     public bool RequirePkce { get; set; } = true;
     public bool RequireClientSecret { get; set; } = true;
     public TimeSpan? AccessTokenLifetime { get; set; }
