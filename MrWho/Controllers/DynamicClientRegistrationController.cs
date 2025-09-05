@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -132,7 +133,7 @@ public class DynamicClientRegistrationController : ControllerBase
             RedirectUris = request.RedirectUris,
             PostLogoutRedirectUris = request.PostLogoutRedirectUris,
             GrantTypes = request.GrantTypes,
-            ResponseTypes = request.ResponseTypes ?? (wantsCode ? new[] { "code" } : null),
+            ResponseTypes = request.ResponseTypes ?? (wantsCode ? new List<string> { "code" } : null),
             TokenEndpointAuthMethod = secret == null ? "none" : "client_secret_post",
             Scope = normalizedScopes.Count > 0 ? string.Join(' ', normalizedScopes) : null
         };
