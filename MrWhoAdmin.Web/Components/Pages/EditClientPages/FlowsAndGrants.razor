@@ -1,4 +1,4 @@
-@using MrWho.Shared
+﻿@using MrWho.Shared
 @if (editClient.IsLoading)
 {
     <RadzenCard class="rz-my-4">
@@ -49,6 +49,17 @@ else
         </ChildContent>
         <Helper>
             <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Disabled (not recommended). Enable only if explicitly required.</RadzenText>
+        </Helper>
+    </RadzenFormField>
+    <RadzenFormField Text="Device Authorization (Device Code) Flow" Variant="Variant.Outlined">
+        <Start>
+            <RadzenCheckBox @bind-Value="@model.AllowDeviceCodeFlow" Name="deviceFlow" />
+        </Start>
+        <ChildContent>
+            <RadzenLabel Text="Enable Device Authorization Grant (RFC 8628)" Component="deviceFlow" />
+        </ChildContent>
+        <Helper>
+            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">For input‑constrained devices (TVs, consoles). Requires verification at /connect/verify.</RadzenText>
         </Helper>
     </RadzenFormField>
 

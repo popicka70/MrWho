@@ -50,6 +50,7 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
     public DbSet<UserDevice> UserDevices { get; set; }
     public DbSet<PersistentQrSession> PersistentQrSessions { get; set; }
     public DbSet<DeviceAuthenticationLog> DeviceAuthenticationLogs { get; set; }
+    public DbSet<DeviceAuthorization> DeviceAuthorizations { get; set; }
 
     // Audit logging
     public DbSet<AuditLog> AuditLogs { get; set; }
@@ -376,6 +377,15 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
                   .WithMany()
                   .HasForeignKey(l => l.UserId)
                   .OnDelete(DeleteBehavior.Restrict); // No cascade - logs are audit data, keep them
+        });
+
+        // Configure DeviceAuthorization entity
+        builder.Entity<DeviceAuthorization>(entity =>
+        {
+            entity.HasIndex(d => d.DeviceCode).IsUnique();
+            entity.HasIndex(d => d.UserCode);
+            entity.HasIndex(d => new { d.ClientId, d.Status });
+            entity.HasIndex(d => new { d.Status, d.ExpiresAt });
         });
 
         // =========================================================================
