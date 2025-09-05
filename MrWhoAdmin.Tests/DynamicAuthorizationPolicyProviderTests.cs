@@ -86,8 +86,8 @@ public class DynamicAuthorizationPolicyProviderTests
     {
         var provider = CreateProvider(out var sp);
         var policy = await provider.GetDefaultPolicyAsync();
-        policy.AuthenticationSchemes.Should().Contain("Identity.Application.c1");
-        policy.AuthenticationSchemes.Should().Contain("Identity.Application.c2");
+        Assert.IsTrue(policy.AuthenticationSchemes.Contains("Identity.Application.c1"));
+        Assert.IsTrue(policy.AuthenticationSchemes.Contains("Identity.Application.c2"));
     }
 
     [TestMethod]
@@ -95,8 +95,8 @@ public class DynamicAuthorizationPolicyProviderTests
     {
         var provider = CreateProvider(out _);
         var policy = await provider.GetPolicyAsync("Client_c1");
-        policy.Should().NotBeNull();
-        policy!.AuthenticationSchemes.Should().ContainSingle(s => s == "Identity.Application.c1");
+        Assert.IsNotNull(policy);
+        Assert.AreEqual(1, policy!.AuthenticationSchemes.Count(s => s == "Identity.Application.c1"));
     }
 
     [TestMethod]
@@ -104,15 +104,13 @@ public class DynamicAuthorizationPolicyProviderTests
     {
         var provider = CreateProvider(out var sp, Array.Empty<Client>());
         var policy = await provider.GetPolicyAsync(AuthorizationPolicies.AdminClientApi);
-        policy.Should().NotBeNull();
-        // Build principal that satisfies assertion
+        Assert.IsNotNull(policy);
         var claims = new List<Claim>
         {
             new("client_id", MrWhoConstants.AdminClientId),
             new("scope", StandardScopes.MrWhoUse)
         };
         var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, "test"));
-        // Use AuthorizationService to evaluate
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddSingleton<IAuthorizationPolicyProvider>(provider);
@@ -121,6 +119,6 @@ public class DynamicAuthorizationPolicyProviderTests
         var authSp = services.BuildServiceProvider();
         var authz = authSp.GetRequiredService<IAuthorizationService>();
         var result = await authz.AuthorizeAsync(principal, null, policy!);
-        result.Succeeded.Should().BeTrue();
+        Assert.IsTrue(result.Succeeded, "Authorization should succeed for admin client with scope");
     }
 }

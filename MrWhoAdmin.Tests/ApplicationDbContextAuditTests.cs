@@ -30,11 +30,11 @@ public class ApplicationDbContextAuditTests
         ctx.Realms.Add(new Realm { Name = "r1", DisplayName = "Realm1", IsEnabled = true });
         ctx.SaveChanges();
 
-        ctx.AuditLogs.Count().Should().Be(1);
+        Assert.AreEqual(1, ctx.AuditLogs.Count());
         var log = ctx.AuditLogs.First();
-        log.EntityType.Should().Be("Realm");
-        log.Action.Should().Be("Added");
-        log.UserId.Should().Be("user1");
+        Assert.AreEqual("Realm", log.EntityType);
+        Assert.AreEqual("Added", log.Action);
+        Assert.AreEqual("user1", log.UserId);
     }
 
     [TestMethod]
@@ -52,10 +52,10 @@ public class ApplicationDbContextAuditTests
         realm.DisplayName = "RealmTwo";
         ctx.SaveChanges(); // audit 2
 
-        ctx.AuditLogs.Count().Should().Be(2);
+        Assert.AreEqual(2, ctx.AuditLogs.Count());
         var modLog = ctx.AuditLogs.OrderBy(l => l.OccurredAt).Last();
-        modLog.Action.Should().Be("Modified");
-        modLog.Changes.Should().Contain("DisplayName");
+        Assert.AreEqual("Modified", modLog.Action);
+        Assert.IsTrue(modLog.Changes?.Contains("DisplayName") ?? false);
     }
 
     [TestMethod]
@@ -70,7 +70,7 @@ public class ApplicationDbContextAuditTests
         ctx.Realms.Remove(realm);
         ctx.SaveChanges();
 
-        ctx.AuditLogs.Count().Should().Be(2); // add + delete
-        ctx.AuditLogs.OrderBy(l => l.OccurredAt).Last().Action.Should().Be("Deleted");
+        Assert.AreEqual(2, ctx.AuditLogs.Count()); // add + delete
+        Assert.AreEqual("Deleted", ctx.AuditLogs.OrderBy(l => l.OccurredAt).Last().Action);
     }
 }

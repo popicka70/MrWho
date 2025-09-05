@@ -76,11 +76,11 @@ public class ClientRoleServiceTests
         await fx.Service.AddRoleToUserAsync(fx.User.Id, fx.Client.ClientId, "editor");
 
         var roles = await fx.Service.GetClientRolesAsync(fx.User.Id, fx.Client.ClientId);
-        roles.Should().Contain("editor");
+        Assert.IsTrue(roles.Contains("editor"), "Role 'editor' should be assigned");
 
         // Cache hit path
         var rolesSecond = await fx.Service.GetClientRolesAsync(fx.User.Id, fx.Client.ClientId);
-        rolesSecond.Should().BeEquivalentTo(roles);
+        CollectionAssert.AreEquivalent(roles.ToList(), rolesSecond.ToList(), "Cached roles should match first retrieval");
     }
 
     [TestMethod]
@@ -88,10 +88,10 @@ public class ClientRoleServiceTests
     {
         var fx = new TestFixture();
         await fx.Service.AddRoleToUserAsync(fx.User.Id, fx.Client.ClientId, "viewer");
-        (await fx.Service.GetClientRolesAsync(fx.User.Id, fx.Client.ClientId)).Should().Contain("viewer");
+        Assert.IsTrue((await fx.Service.GetClientRolesAsync(fx.User.Id, fx.Client.ClientId)).Contains("viewer"));
 
         await fx.Service.RemoveRoleFromUserAsync(fx.User.Id, fx.Client.ClientId, "viewer");
-        (await fx.Service.GetClientRolesAsync(fx.User.Id, fx.Client.ClientId)).Should().NotContain("viewer");
+        Assert.IsFalse((await fx.Service.GetClientRolesAsync(fx.User.Id, fx.Client.ClientId)).Contains("viewer"));
     }
 
     [DataTestMethod]
@@ -104,7 +104,9 @@ public class ClientRoleServiceTests
         await fx.Service.AddRoleToUserAsync(fx.User.Id, fx.Client.ClientId, "clientRole");
         var roles = await fx.Service.GetEffectiveRolesAsync(fx.User.Id, fx.Client.ClientId, inclusion);
 
-        roles.Any(r => r.Equals("globalAdmin", StringComparison.OrdinalIgnoreCase)).Should().Be(expectGlobal);
-        roles.Contains("clientRole").Should().Be(expectClient);
+        var hasGlobal = roles.Any(r => r.Equals("globalAdmin", StringComparison.OrdinalIgnoreCase));
+        Assert.AreEqual(expectGlobal, hasGlobal, $"Global role expectation mismatch for {inclusion}");
+        var hasClient = roles.Contains("clientRole");
+        Assert.AreEqual(expectClient, hasClient, $"Client role expectation mismatch for {inclusion}");
     }
 }

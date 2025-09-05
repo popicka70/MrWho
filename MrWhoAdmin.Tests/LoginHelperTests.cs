@@ -32,7 +32,7 @@ public class LoginHelperTests
             ["GoogleReCaptcha:SecretKey"] = "secret"
         }, environmentName: "Development");
 
-        helper.ShouldUseRecaptcha().Should().BeFalse();
+        Assert.IsFalse(helper.ShouldUseRecaptcha());
     }
 
     [TestMethod]
@@ -49,7 +49,7 @@ public class LoginHelperTests
                 ["GoogleReCaptcha:SiteKey"] = "site",
                 ["GoogleReCaptcha:SecretKey"] = "secret"
             }, environmentName: "Production");
-            helper.ShouldUseRecaptcha().Should().BeTrue();
+            Assert.IsTrue(helper.ShouldUseRecaptcha());
         }
         finally
         {
@@ -64,7 +64,7 @@ public class LoginHelperTests
         var helper = CreateHelper(new Dictionary<string,string?>(), environmentName: "Development");
         var ctx = new DefaultHttpContext();
         var result = await helper.VerifyRecaptchaAsync(ctx, token: null, actionExpected: "login");
-        result.Should().BeTrue("recaptcha disabled should always return true");
+        Assert.IsTrue(result, "recaptcha disabled should always return true");
     }
 
     [TestMethod]
@@ -83,7 +83,7 @@ public class LoginHelperTests
             }, environmentName: "Production");
             var ctx = new DefaultHttpContext();
             var ok = await helper.VerifyRecaptchaAsync(ctx, token: null, actionExpected: "login");
-            ok.Should().BeFalse();
+            Assert.IsFalse(ok);
         }
         finally
         {
@@ -100,7 +100,7 @@ public class LoginHelperTests
     public void IsLocalUrl_Works(string url, bool expected)
     {
         var helper = CreateHelper();
-        helper.IsLocalUrl(url).Should().Be(expected);
+        Assert.AreEqual(expected, helper.IsLocalUrl(url));
     }
 
     [TestMethod]
@@ -108,7 +108,7 @@ public class LoginHelperTests
     {
         var helper = CreateHelper();
         var cid = helper.TryExtractClientIdFromReturnUrl("https://server/connect/authorize?client_id=abc123&scope=openid");
-        cid.Should().Be("abc123");
+        Assert.AreEqual("abc123", cid);
     }
 
     [TestMethod]
@@ -116,13 +116,13 @@ public class LoginHelperTests
     {
         var helper = CreateHelper();
         var cid = helper.TryExtractClientIdFromReturnUrl("/connect/authorize?client_id=xyz&scope=openid");
-        cid.Should().Be("xyz");
+        Assert.AreEqual("xyz", cid);
     }
 
     [TestMethod]
     public void GetRecaptchaSiteKey_Null_WhenDisabled()
     {
         var helper = CreateHelper();
-        helper.GetRecaptchaSiteKey().Should().BeNull();
+        Assert.IsNull(helper.GetRecaptchaSiteKey());
     }
 }

@@ -38,7 +38,7 @@ public class ClientRoleServiceAdditionalTests
         await svc.AddRoleToUserAsync(user.Id, client.ClientId, "alpha");
         await svc.AddRoleToUserAsync(user.Id, client.ClientId, "alpha");
         var roles = await svc.GetClientRolesAsync(user.Id, client.ClientId);
-        roles.Count(r => r == "alpha").Should().Be(1);
+        Assert.AreEqual(1, roles.Count(r => r == "alpha"), "Role should not duplicate");
     }
 
     [TestMethod]
@@ -47,6 +47,6 @@ public class ClientRoleServiceAdditionalTests
         var (svc, _, user, client) = Create();
         await svc.AddRoleToUserAsync(user.Id, client.ClientId, "Beta");
         await svc.RemoveRoleFromUserAsync(user.Id, client.ClientId, "beta");
-        (await svc.GetClientRolesAsync(user.Id, client.ClientId)).Should().NotContain("Beta");
+        Assert.IsFalse((await svc.GetClientRolesAsync(user.Id, client.ClientId)).Contains("Beta"), "Role removal should be case-insensitive");
     }
 }

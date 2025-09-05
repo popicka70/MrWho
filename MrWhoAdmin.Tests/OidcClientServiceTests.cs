@@ -44,8 +44,8 @@ public class OidcClientServiceTests
     {
         var (db, svc, appMgr, scopeMgr, _) = Create();
         await svc.InitializeEssentialDataAsync();
-        db.Realms.Any(r => r.Name == "admin").Should().BeTrue();
-        db.Clients.Any(c => c.ClientId == MrWhoConstants.AdminClientId).Should().BeTrue();
+        Assert.IsTrue(db.Realms.Any(r => r.Name == "admin"));
+        Assert.IsTrue(db.Clients.Any(c => c.ClientId == MrWhoConstants.AdminClientId));
         appMgr.Verify(m => m.CreateAsync(It.Is<OpenIddictApplicationDescriptor>(d => d.ClientId == MrWhoConstants.AdminClientId), It.IsAny<CancellationToken>()), Times.AtLeastOnce());
         scopeMgr.Verify(s => s.CreateAsync(It.Is<OpenIddictScopeDescriptor>(d => d.Name == StandardScopes.MrWhoUse), It.IsAny<CancellationToken>()), Times.AtLeastOnce());
     }

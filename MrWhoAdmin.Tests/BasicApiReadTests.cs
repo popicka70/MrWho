@@ -33,8 +33,7 @@ public class BasicApiReadTests
         using var content = new FormUrlEncodedContent(form);
         var response = await client.PostAsync("connect/token", content); // relative path to dynamic base
         var json = await response.Content.ReadAsStringAsync();
-        response.IsSuccessStatusCode.Should().BeTrue(
-            "token request should succeed (status {0}) payload: {1}", response.StatusCode, json);
+        Assert.IsTrue(response.IsSuccessStatusCode, $"token request should succeed (status {response.StatusCode}) payload: {json}");
         using var doc = JsonDocument.Parse(json);
         return doc.RootElement.TryGetProperty("access_token", out var at) ? at.GetString() : null;
     }
@@ -42,7 +41,7 @@ public class BasicApiReadTests
     private async Task<HttpClient> CreateAuthorizedClientAsync()
     {
         var token = await GetAccessTokenAsync();
-        token.Should().NotBeNullOrEmpty("access token should be present");
+        Assert.IsFalse(string.IsNullOrEmpty(token), "access token should be present");
 
         var client = SharedTestInfrastructure.CreateHttpClient("mrwho", disableRedirects: true);
         client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -52,9 +51,9 @@ public class BasicApiReadTests
     private static async Task<(string? FirstId, string RawJson)> GetFirstItemAsync(HttpClient client, string relativeListUrl)
     {
         var resp = await client.GetAsync(relativeListUrl);
-        resp.StatusCode.Should().Be(HttpStatusCode.OK, "{0} should return 200", relativeListUrl);
+        Assert.AreEqual(HttpStatusCode.OK, resp.StatusCode, $"{relativeListUrl} should return 200");
         var payload = await resp.Content.ReadAsStringAsync();
-        payload.Should().Contain("items", "paged result should contain items property");
+        Assert.IsTrue(payload.Contains("items"), "paged result should contain items property");
         try
         {
             using var doc = JsonDocument.Parse(payload);
@@ -75,7 +74,7 @@ public class BasicApiReadTests
     public async Task Can_Acquire_Token_With_M2M_Client()
     {
         var token = await GetAccessTokenAsync();
-        token.Should().NotBeNullOrEmpty();
+        Assert.IsFalse(string.IsNullOrEmpty(token));
     }
 
     [TestMethod]
@@ -83,9 +82,9 @@ public class BasicApiReadTests
     {
         using var client = await CreateAuthorizedClientAsync();
         var resp = await client.GetAsync("api/realms?page=1&pageSize=5");
-        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.AreEqual(HttpStatusCode.OK, resp.StatusCode);
         var payload = await resp.Content.ReadAsStringAsync();
-        payload.Should().Contain("items");
+        Assert.IsTrue(payload.Contains("items"));
     }
 
     [TestMethod]
@@ -93,9 +92,9 @@ public class BasicApiReadTests
     {
         using var client = await CreateAuthorizedClientAsync();
         var resp = await client.GetAsync("api/apiresources?page=1&pageSize=5");
-        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.AreEqual(HttpStatusCode.OK, resp.StatusCode);
         var payload = await resp.Content.ReadAsStringAsync();
-        payload.Should().Contain("items");
+        Assert.IsTrue(payload.Contains("items"));
     }
 
     [TestMethod]
@@ -103,9 +102,9 @@ public class BasicApiReadTests
     {
         using var client = await CreateAuthorizedClientAsync();
         var resp = await client.GetAsync("api/identityresources?page=1&pageSize=5");
-        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.AreEqual(HttpStatusCode.OK, resp.StatusCode);
         var payload = await resp.Content.ReadAsStringAsync();
-        payload.Should().Contain("items");
+        Assert.IsTrue(payload.Contains("items"));
     }
 
     // === Additional list endpoints ===
@@ -115,8 +114,9 @@ public class BasicApiReadTests
     {
         using var client = await CreateAuthorizedClientAsync();
         var resp = await client.GetAsync("api/clients?page=1&pageSize=5");
-        resp.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await resp.Content.ReadAsStringAsync()).Should().Contain("items");
+        Assert.AreEqual(HttpStatusCode.OK, resp.StatusCode);
+        var payload = await resp.Content.ReadAsStringAsync();
+        Assert.IsTrue(payload.Contains("items"));
     }
 
     [TestMethod]
@@ -124,8 +124,9 @@ public class BasicApiReadTests
     {
         using var client = await CreateAuthorizedClientAsync();
         var resp = await client.GetAsync("api/scopes?page=1&pageSize=5");
-        resp.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await resp.Content.ReadAsStringAsync()).Should().Contain("items");
+        Assert.AreEqual(HttpStatusCode.OK, resp.StatusCode);
+        var payload = await resp.Content.ReadAsStringAsync();
+        Assert.IsTrue(payload.Contains("items"));
     }
 
     [TestMethod]
@@ -133,8 +134,9 @@ public class BasicApiReadTests
     {
         using var client = await CreateAuthorizedClientAsync();
         var resp = await client.GetAsync("api/roles?page=1&pageSize=5");
-        resp.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await resp.Content.ReadAsStringAsync()).Should().Contain("items");
+        Assert.AreEqual(HttpStatusCode.OK, resp.StatusCode);
+        var payload = await resp.Content.ReadAsStringAsync();
+        Assert.IsTrue(payload.Contains("items"));
     }
 
     [TestMethod]
@@ -142,8 +144,9 @@ public class BasicApiReadTests
     {
         using var client = await CreateAuthorizedClientAsync();
         var resp = await client.GetAsync("api/users?page=1&pageSize=5");
-        resp.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await resp.Content.ReadAsStringAsync()).Should().Contain("items");
+        Assert.AreEqual(HttpStatusCode.OK, resp.StatusCode);
+        var payload = await resp.Content.ReadAsStringAsync();
+        Assert.IsTrue(payload.Contains("items"));
     }
 
     [TestMethod]
@@ -151,8 +154,9 @@ public class BasicApiReadTests
     {
         using var client = await CreateAuthorizedClientAsync();
         var resp = await client.GetAsync("api/claimtypes?page=1&pageSize=5");
-        resp.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await resp.Content.ReadAsStringAsync()).Should().Contain("type");
+        Assert.AreEqual(HttpStatusCode.OK, resp.StatusCode);
+        var payload = await resp.Content.ReadAsStringAsync();
+        Assert.IsTrue(payload.Contains("type"));
     }
 
     [TestMethod]
@@ -160,9 +164,9 @@ public class BasicApiReadTests
     {
         using var client = await CreateAuthorizedClientAsync();
         var resp = await client.GetAsync("api/clienttypes"); // may not be paged
-        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.AreEqual(HttpStatusCode.OK, resp.StatusCode);
         var payload = await resp.Content.ReadAsStringAsync();
-        payload.Length.Should().BeGreaterThan(2); // expect non-empty JSON (e.g., array)
+        Assert.IsTrue(payload.Length > 2, "expect non-empty JSON (e.g., array)");
     }
 
     // === Detail & export endpoints (conditional) ===
@@ -174,10 +178,11 @@ public class BasicApiReadTests
         var (id, _) = await GetFirstItemAsync(client, "api/realms?page=1&pageSize=1");
         if (string.IsNullOrEmpty(id)) return; // no realms yet
         var detail = await client.GetAsync($"api/realms/{id}");
-        detail.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.AreEqual(HttpStatusCode.OK, detail.StatusCode);
         var export = await client.GetAsync($"api/realms/{id}/export");
-        export.StatusCode.Should().Be(HttpStatusCode.OK);
-        (await export.Content.ReadAsStringAsync()).Should().Contain("\"name\"");
+        Assert.AreEqual(HttpStatusCode.OK, export.StatusCode);
+        var expPayload = await export.Content.ReadAsStringAsync();
+        Assert.IsTrue(expPayload.Contains("\"name\""));
     }
 
     [TestMethod]
@@ -187,9 +192,9 @@ public class BasicApiReadTests
         var (id, _) = await GetFirstItemAsync(client, "api/clients?page=1&pageSize=1");
         if (string.IsNullOrEmpty(id)) return; // no clients yet
         var detail = await client.GetAsync($"api/clients/{id}");
-        detail.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.AreEqual(HttpStatusCode.OK, detail.StatusCode);
         var export = await client.GetAsync($"api/clients/{id}/export");
-        export.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.AreEqual(HttpStatusCode.OK, export.StatusCode);
     }
 
     [TestMethod]
@@ -199,7 +204,7 @@ public class BasicApiReadTests
         var (id, _) = await GetFirstItemAsync(client, "api/apiresources?page=1&pageSize=1");
         if (string.IsNullOrEmpty(id)) return; // none
         var detail = await client.GetAsync($"api/apiresources/{id}");
-        detail.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.AreEqual(HttpStatusCode.OK, detail.StatusCode);
     }
 
     [TestMethod]
@@ -209,6 +214,6 @@ public class BasicApiReadTests
         var (id, _) = await GetFirstItemAsync(client, "api/identityresources?page=1&pageSize=1");
         if (string.IsNullOrEmpty(id)) return; // none
         var detail = await client.GetAsync($"api/identityresources/{id}");
-        detail.StatusCode.Should().Be(HttpStatusCode.OK);
+        Assert.AreEqual(HttpStatusCode.OK, detail.StatusCode);
     }
 }

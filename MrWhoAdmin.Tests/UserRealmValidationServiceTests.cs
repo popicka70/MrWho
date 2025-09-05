@@ -66,8 +66,8 @@ public class UserRealmValidationServiceTests
     {
         var fx = new Fixture();
         var res = await fx.Service.ValidateUserRealmAccessAsync(fx.User, fx.Client.ClientId);
-        res.IsValid.Should().BeTrue();
-        res.ClientRealm.Should().Be("r1");
+        Assert.IsTrue(res.IsValid);
+        Assert.AreEqual("r1", res.ClientRealm);
     }
 
     [TestMethod]
@@ -75,8 +75,8 @@ public class UserRealmValidationServiceTests
     {
         var fx = new Fixture(clientEnabled: false);
         var res = await fx.Service.ValidateUserRealmAccessAsync(fx.User, fx.Client.ClientId);
-        res.IsValid.Should().BeFalse();
-        res.ErrorCode.Should().Be("CLIENT_DISABLED");
+        Assert.IsFalse(res.IsValid);
+        Assert.AreEqual("CLIENT_DISABLED", res.ErrorCode);
     }
 
     [TestMethod]
@@ -84,8 +84,8 @@ public class UserRealmValidationServiceTests
     {
         var fx = new Fixture(realmEnabled: false);
         var res = await fx.Service.ValidateUserRealmAccessAsync(fx.User, fx.Client.ClientId);
-        res.IsValid.Should().BeFalse();
-        res.ErrorCode.Should().Be("CLIENT_DISABLED");
+        Assert.IsFalse(res.IsValid);
+        Assert.AreEqual("CLIENT_DISABLED", res.ErrorCode);
     }
 
     [TestMethod]
@@ -93,8 +93,8 @@ public class UserRealmValidationServiceTests
     {
         var fx = new Fixture(assignUser: false);
         var res = await fx.Service.ValidateUserRealmAccessAsync(fx.User, fx.Client.ClientId);
-        res.IsValid.Should().BeFalse();
-        res.ErrorCode.Should().Be("CLIENT_USER_NOT_ASSIGNED");
+        Assert.IsFalse(res.IsValid);
+        Assert.AreEqual("CLIENT_USER_NOT_ASSIGNED", res.ErrorCode);
     }
 
     [TestMethod]
@@ -102,7 +102,7 @@ public class UserRealmValidationServiceTests
     {
         var fx = new Fixture();
         var res = await fx.Service.ValidateUserRealmAccessAsync(fx.User, "missing");
-        res.IsValid.Should().BeFalse();
-        res.ErrorCode.Should().Be("CLIENT_NOT_FOUND");
+        Assert.IsFalse(res.IsValid);
+        Assert.AreEqual("CLIENT_NOT_FOUND", res.ErrorCode);
     }
 }
