@@ -102,6 +102,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IClientRoleService, ClientRoleService>();
 
         services.AddHostedService<UserProfileBackfillHostedService>();
+        services.AddScoped<IReturnUrlStore, ReturnUrlStore>();
+        services.AddHostedService<ReturnUrlCleanupHostedService>();
 
         return services;
     }
@@ -276,6 +278,7 @@ public static class ServiceCollectionExtensions
 
     public static IServiceCollection AddMrWhoOpenIddict(this IServiceCollection services, IConfiguration configuration, IWebHostEnvironment environment)
     {
+        // Configure OpenIddict (core + server + validation)
         services.AddOpenIddict()
             .AddCore(options =>
             {
@@ -284,8 +287,8 @@ public static class ServiceCollectionExtensions
             })
             .AddServer(options =>
             {
-                // Allow setting a static issuer via configuration/environment for reverse proxy/Docker scenarios
-                var issuer = configuration["OpenIddict:Issuer"]; // maps from env OPENIDDICT__ISSUER
+                // Issuer
+                var issuer = configuration["OpenIddict:Issuer"];
                 if (!string.IsNullOrWhiteSpace(issuer))
                 {
                     options.SetIssuer(new Uri(issuer, UriKind.Absolute));
@@ -294,22 +297,23 @@ public static class ServiceCollectionExtensions
                 // Custom UserInfo handler descriptor (uses IUserInfoHandler)
                 options.AddEventHandler(CustomUserInfoHandler.Descriptor);
 
-                // Enable endpoints (added revocation + introspection for step 2)
-                options.SetAuthorizationEndpointUris("/connect/authorize")
-                       .SetTokenEndpointUris("/connect/token")
-                       .SetEndSessionEndpointUris("/connect/logout")
-                       .SetConfigurationEndpointUris("/.well-known/openid-configuration")
-                       .SetUserInfoEndpointUris("/connect/userinfo")
-                       .SetRevocationEndpointUris("/connect/revocation")
-                       .SetIntrospectionEndpointUris("/connect/introspect")
-                       // TODO: Enable device authorization endpoints when upgrading OpenIddict packages supporting Device Code flow helpers
-                       // .SetDeviceAuthorizationEndpointUris("/connect/device")
-                       // Flows
-                       .AllowAuthorizationCodeFlow()
-                       .AllowClientCredentialsFlow()
-                       .AllowRefreshTokenFlow(); // Device code flow temporarily disabled (package version missing extension)
+                // Endpoints
+                options
+                    .SetAuthorizationEndpointUris("/connect/authorize")
+                    .SetTokenEndpointUris("/connect/token")
+                    .SetEndSessionEndpointUris("/connect/logout")
+                    .SetUserInfoEndpointUris("/connect/userinfo")
+                    .SetRevocationEndpointUris("/connect/revocation")
+                    .SetIntrospectionEndpointUris("/connect/introspect")
+                    // PAR endpoint
+                    .SetPushedAuthorizationEndpointUris("/connect/par");
 
-                // Conditionally enable password flow ONLY for tests to support integration tests
+                // Flows
+                options.AllowAuthorizationCodeFlow()
+                       .AllowClientCredentialsFlow()
+                       .AllowRefreshTokenFlow();
+
+                // Password grant only for tests
                 var enablePassword = string.Equals(Environment.GetEnvironmentVariable("MRWHO_TESTS"), "1", StringComparison.OrdinalIgnoreCase) ||
                                      environment.IsEnvironment("Testing");
                 if (enablePassword)
@@ -317,45 +321,47 @@ public static class ServiceCollectionExtensions
                     options.AllowPasswordFlow();
                 }
 
-                // Enforce PKCE for auth code flow (Option 1)
+                // Security/policy
                 options.RequireProofKeyForCodeExchange();
 
-                // Configure token lifetimes for better refresh token experience
-                options.SetAccessTokenLifetime(TimeSpan.FromMinutes(60))    // 1 hour access tokens
-                       .SetRefreshTokenLifetime(TimeSpan.FromDays(14));     // 14 days refresh tokens
+                // Token lifetimes
+                options.SetAccessTokenLifetime(TimeSpan.FromMinutes(60))
+                       .SetRefreshTokenLifetime(TimeSpan.FromDays(14));
 
-                // Refresh token rotation (Option 2): enable in non-development
                 if (environment.IsDevelopment())
                 {
                     options.DisableRollingRefreshTokens();
                 }
-                // In non-development, rolling refresh tokens remain enabled by default; no explicit call needed
 
-                // Register scopes (including API scopes)
-                options.RegisterScopes(StandardScopes.OpenId,
-                                      OpenIddictConstants.Scopes.Email,
-                                      OpenIddictConstants.Scopes.Profile,
-                                      OpenIddictConstants.Scopes.Roles,
-                                      OpenIddictConstants.Scopes.OfflineAccess,
-                                      StandardScopes.ApiRead,
-                                      StandardScopes.ApiWrite,
-                                      StandardScopes.MrWhoUse,
-                                      "roles.global",
-                                      "roles.client",
-                                      "roles.all");
+                // Scopes
+                options.RegisterScopes(
+                    StandardScopes.OpenId,
+                    OpenIddictConstants.Scopes.Email,
+                    OpenIddictConstants.Scopes.Profile,
+                    OpenIddictConstants.Scopes.Roles,
+                    OpenIddictConstants.Scopes.OfflineAccess,
+                    StandardScopes.ApiRead,
+                    StandardScopes.ApiWrite,
+                    StandardScopes.MrWhoUse,
+                    "roles.global",
+                    "roles.client",
+                    "roles.all");
 
-                // Register the signing and encryption credentials
+                // Credentials
                 options.AddDevelopmentEncryptionCertificate()
                        .AddDevelopmentSigningCertificate();
 
-                // For demo/API compatibility: issue plain signed (non-encrypted) access tokens so JwtBearer can validate
+                // Access token format for demo
                 options.DisableAccessTokenEncryption();
 
-                // Register the ASP.NET Core host and enable passthrough for endpoints
+                // JAR/JARM/PAR related: enable authorization request caching so large/signed requests (JAR) can be flowed safely
+                options.EnableAuthorizationRequestCaching();
+
+                // ASP.NET Core integration
                 options.UseAspNetCore()
                        .EnableAuthorizationEndpointPassthrough()
                        .EnableTokenEndpointPassthrough()
-                       .EnableEndSessionEndpointPassthrough(); // leave device/verification with default UI for now
+                       .EnableEndSessionEndpointPassthrough();
             })
             .AddValidation(options =>
             {
