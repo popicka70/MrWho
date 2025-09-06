@@ -252,4 +252,30 @@ public class ClientsApiService : IClientsApiService
             return false;
         }
     }
+
+    public async Task<(bool ok, string? secret)> RotateSecretAsync(string id, string? newSecret = null, DateTime? expiresAtUtc = null, bool retireOld = true)
+    {
+        try
+        {
+            var payload = new RotateClientSecretRequest { NewSecret = newSecret, ExpiresAtUtc = expiresAtUtc, RetireOld = retireOld };
+            var json = JsonSerializer.Serialize(payload, _jsonOptions);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var resp = await _httpClient.PostAsync($"api/clients/{id}/rotate-secret", content);
+            if (!resp.IsSuccessStatusCode)
+            {
+                var err = await resp.Content.ReadAsStringAsync();
+                _logger.LogWarning("RotateSecret failed for {Id}: {Status} {Body}", id, resp.StatusCode, err);
+                return (false, null);
+            }
+            var respJson = await resp.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(respJson);
+            var secret = doc.RootElement.TryGetProperty("secret", out var s) ? s.GetString() : null;
+            return (true, secret);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "RotateSecretAsync failed for client {Id}", id);
+            return (false, null);
+        }
+    }
 }

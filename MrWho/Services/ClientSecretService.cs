@@ -54,6 +54,27 @@ public sealed class ClientSecretService : IClientSecretService
         client.ClientSecret = "{HASHED}";
         await _db.SaveChangesAsync(ct);
 
+        // Audit - do not include plaintext or hash
+        try
+        {
+            _db.AuditLogs.Add(new AuditLog
+            {
+                OccurredAt = DateTime.UtcNow,
+                UserId = null,
+                UserName = null,
+                IpAddress = null,
+                EntityType = nameof(Client),
+                EntityId = client.Id,
+                Action = "SecretRotated",
+                Changes = System.Text.Json.JsonSerializer.Serialize(new { NewSecretCreatedAtUtc = rec.CreatedAt, ExpiresAtUtc = rec.ExpiresAt, Algorithm = rec.Algo })
+            });
+            await _db.SaveChangesAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to write audit for secret rotation of client {ClientId}", client.ClientId);
+        }
+
         _logger.LogInformation("Created new secret for client {ClientId}", client.ClientId);
         return (rec, providedPlaintext == null ? plain : null);
     }

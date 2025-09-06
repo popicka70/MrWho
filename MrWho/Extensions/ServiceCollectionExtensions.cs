@@ -45,6 +45,7 @@ public static class ServiceCollectionExtensions
         // Client secret hashing and rotation services
         services.AddSingleton<IClientSecretHasher, Pbkdf2ClientSecretHasher>();
         services.AddScoped<IClientSecretService, ClientSecretService>();
+        services.AddHostedService<ClientSecretBackfillHostedService>(); // backfill legacy plaintext
 
         // Register client cookie services
         services.AddScoped<IDynamicCookieService, DynamicCookieService>();

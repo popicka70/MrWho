@@ -36,6 +36,39 @@ public class ClientsController : ControllerBase
         _clientSecretService = clientSecretService;
     }
 
+    /// <summary>
+    /// Rotate client secret. Returns the new plaintext once. Admin-only.
+    /// </summary>
+    [HttpPost("{id}/rotate-secret")]
+    public async Task<ActionResult<object>> RotateSecret(string id, [FromBody] RotateClientSecretRequest? request)
+    {
+        var client = await _context.Clients.FirstOrDefaultAsync(c => c.Id == id || c.ClientId == id);
+        if (client is null)
+            return NotFound("Client not found");
+
+        var requiresSecret = (client.ClientType == ClientType.Confidential || client.ClientType == ClientType.Machine) && client.RequireClientSecret;
+        if (!requiresSecret)
+            return BadRequest("This client type does not use client secrets");
+
+        var expiresAt = request?.ExpiresAtUtc;
+        var retireOld = request?.RetireOld ?? true;
+
+        var result = await _clientSecretService.SetNewSecretAsync(client.Id, providedPlaintext: request?.NewSecret, expiresAt: expiresAt, markOldAsRetired: retireOld);
+        var plain = result.plainSecret ?? request?.NewSecret;
+
+        try
+        {
+            await UpdateOpenIddictApplication(client, plaintextSecret: plain);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to sync rotated secret with OpenIddict for client {ClientId}", client.ClientId);
+        }
+
+        var response = new { clientId = client.ClientId, secret = plain, expiresAtUtc = result.record.ExpiresAt };
+        return Ok(response);
+    }
+
     [HttpGet]
     public async Task<ActionResult<PagedResult<ClientDto>>> GetClients(
         [FromQuery] int page = 1,
@@ -909,7 +942,7 @@ public class ClientsController : ControllerBase
                 {
                     await _clientSecretService.SetNewSecretAsync(client.Id, providedPlaintext: request.ClientSecret);
                 }
-
+                
                 // Create OpenIddict application only if valid
                 if (!requiresSecret || !string.IsNullOrWhiteSpace(request.ClientSecret))
                 {
@@ -1100,15 +1133,6 @@ public class ClientsController : ControllerBase
                 client.AllowQrLoginQuick = request.AllowQrLoginQuick;
                 client.AllowQrLoginSecure = request.AllowQrLoginSecure;
                 client.AllowCodeLogin = request.AllowCodeLogin;
-
-                client.AudienceMode = request.AudienceMode;
-                client.PrimaryAudience = request.PrimaryAudience;
-                client.IncludeAudInIdToken = request.IncludeAudInIdToken;
-                client.RequireExplicitAudienceScope = request.RequireExplicitAudienceScope;
-                client.RoleInclusionOverride = request.RoleInclusionOverride;
-
-                client.UpdatedAt = DateTime.UtcNow;
-                client.UpdatedBy = User.Identity?.Name;
 
                 // Update redirect URIs if provided
                 if (request.RedirectUris != null)
@@ -1350,22 +1374,61 @@ public class ClientsController : ControllerBase
 
         descriptor.Permissions.Add(OpenIddictConstants.Permissions.Endpoints.Token);
 
-        // Add scopes and permissions
-        foreach (var scope in request.Scopes)
+        // PAR permissions and requirements
+        if (client.ParMode is PushedAuthorizationMode.Enabled or PushedAuthorizationMode.Required)
         {
-            if (scope == "openid")
-                descriptor.Permissions.Add("oidc:scope:openid");
-            else if (scope == "email")
-                descriptor.Permissions.Add(OpenIddictConstants.Permissions.Scopes.Email);
-            else if (scope == "profile")
-                descriptor.Permissions.Add(OpenIddictConstants.Permissions.Scopes.Profile);
-            else if (scope == "roles")
-                descriptor.Permissions.Add(OpenIddictConstants.Permissions.Scopes.Roles);
+            descriptor.Permissions.Add(OpenIddictConstants.Permissions.Endpoints.PushedAuthorization);
+        }
+        if (client.ParMode is PushedAuthorizationMode.Required)
+        {
+            descriptor.Requirements.Add(OpenIddictConstants.Requirements.Features.PushedAuthorizationRequests);
         }
 
+        // Add scopes as application permissions (scp:*)
+        var hasOpenId = false;
+        foreach (var scope in request.Scopes)
+        {
+            if (string.Equals(scope, "openid", StringComparison.OrdinalIgnoreCase))
+            {
+                descriptor.Permissions.Add("scp:openid");
+                hasOpenId = true;
+            }
+            else
+            {
+                descriptor.Permissions.Add($"scp:{scope}");
+            }
+        }
+        if (hasOpenId)
+        {
+            descriptor.Permissions.Add(OpenIddictConstants.Permissions.Endpoints.EndSession);
+        }
+
+        // Add endpoint permissions based on configured flags
+        if (client.AllowAccessToUserInfoEndpoint == true && hasOpenId)
+        {
+            descriptor.Permissions.Add("endpoints.userinfo");
+        }
+        if (client.AllowAccessToRevocationEndpoint == true)
+        {
+            descriptor.Permissions.Add("endpoints.revocation");
+        }
+        if (client.AllowAccessToIntrospectionEndpoint == true)
+        {
+            descriptor.Permissions.Add("endpoints.introspection");
+        }
+
+        // Include any additional stored permissions verbatim (excluding legacy forms)
         foreach (var permission in request.Permissions)
         {
-            descriptor.Permissions.Add(permission);
+            if (permission is "endpoints:userinfo" or "endpoints:revocation" or "endpoints:introspection" ||
+                permission is "endpoints/userinfo" or "endpoints/revocation" or "endpoints/introspection")
+            {
+                continue;
+            }
+            if (!descriptor.Permissions.Contains(permission))
+            {
+                descriptor.Permissions.Add(permission);
+            }
         }
 
         // Add redirect URIs

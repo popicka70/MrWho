@@ -464,7 +464,7 @@ public class OidcClientService : IOidcClientService
         }
         else
         {
-            var legacy = demo1Client.Permissions.Where(p => p.Permission.StartsWith("oidc:scope:") || (p.Permission.StartsWith("api.") && !p.Permission.StartsWith("scp:")) || p.Permission == "scp:openid").ToList();
+            var legacy = demo1Client.Permissions.Where(p => p.Permission.StartsWith("oidc:scope:") || (p.Permission.StartsWith("api." ) && !p.Permission.StartsWith("scp:")) || p.Permission == "scp:openid").ToList();
             if (legacy.Any()) { _context.ClientPermissions.RemoveRange(legacy); await _context.SaveChangesAsync(); }
 
             // Backfill ParMode for demo1 if missing
@@ -897,14 +897,29 @@ public class OidcClientService : IOidcClientService
     {
         try
         {
-            if ((client.ClientType == ClientType.Confidential || client.ClientType == ClientType.Machine) && client.RequireClientSecret && string.IsNullOrWhiteSpace(client.ClientSecret))
-            {
-                _logger.LogWarning("Skipping OpenIddict sync for client '{ClientId}': missing secret.", client.ClientId);
-                return;
-            }
+            // Determine if this client requires a secret (confidential or machine with RequireClientSecret=true)
+            bool requiresSecret = (client.ClientType == ClientType.Confidential || client.ClientType == ClientType.Machine) && client.RequireClientSecret;
 
+            // Try find existing OpenIddict app first
             var existingClient = await _applicationManager.FindByClientIdAsync(client.ClientId);
+
             var descriptor = BuildDescriptor(client);
+
+            // If a secret is required but we didn't set one on the descriptor (e.g. local redacted "{HASHED}"),
+            // then: create requires a secret; update will be skipped to avoid validation error and preserve existing secret.
+            if (requiresSecret && string.IsNullOrWhiteSpace(descriptor.ClientSecret))
+            {
+                if (existingClient is null)
+                {
+                    _logger.LogWarning("Skipping OpenIddict sync for client '{ClientId}': confidential/machine app requires a secret to be created.", client.ClientId);
+                    return;
+                }
+                else
+                {
+                    _logger.LogWarning("Skipping OpenIddict update for client '{ClientId}': secret is redacted/unknown. Rotate the secret or set a clear-text secret to allow updating other properties.", client.ClientId);
+                    return;
+                }
+            }
 
             if (existingClient == null)
             {
