@@ -306,6 +306,8 @@ public class OidcClientService : IOidcClientService
 
             var redirectUris = new[]
             {
+                "https://mrwhoadmin.onrender.com/signin-oidc",
+                "https://mrwhoadmin.onrender.com/callback",
                 "https://localhost:7257/signin-oidc",
                 "https://localhost:7257/callback",
                 "http://localhost:8081/signin-oidc",
@@ -318,6 +320,8 @@ public class OidcClientService : IOidcClientService
             {
                 "https://localhost:7257/",
                 "https://localhost:7257/signout-callback-oidc",
+                "https://mrwhoadmin.onrender.com/",
+                "https://mrwhoadmin.onrender.com/signout-callback-oidc",
                 "http://localhost:8081/",
                 "http://localhost:8081/signout-callback-oidc"
             }.Concat(adminDevHttpPostLogout);
