@@ -106,7 +106,7 @@ public class JarTests
         var disco = await GetDiscoveryAsync(http);
 
         const string clientId = "mrwho_demo1";
-        const string clientSecret = "Demo1Secret2025_SymmetricKey_32bytes!!";
+        const string clientSecret = "FTZvvlIIFdmtBg7IdBql9EEXRDj1xwLmi1qW9fGbJBY";
         const string redirectUri = "https://localhost:7037/signin-oidc";
         const string scope = "openid profile email roles offline_access api.read";
 
@@ -143,7 +143,7 @@ public class JarTests
         var disco = await GetDiscoveryAsync(http);
 
         const string clientId = "mrwho_demo1";
-        const string clientSecret = "Demo1Secret2025_SymmetricKey_32bytes!!";
+        const string clientSecret = "FTZvvlIIFdmtBg7IdBql9EEXRDj1xwLmi1qW9fGbJBY";
         const string redirectUri = "https://localhost:7037/signin-oidc";
         const string scope = "openid profile";
 

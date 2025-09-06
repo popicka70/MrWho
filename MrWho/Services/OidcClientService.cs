@@ -280,7 +280,7 @@ public class OidcClientService : IOidcClientService
             adminClient = new Client
             {
                 ClientId = "mrwho_admin_web",
-                ClientSecret = "MrWhoAdmin2024!SecretKey", // admin secret length is sufficient for HS256
+                ClientSecret = "FTZvvlIIFdmtBg7IdBql9EEXRDj1xwLmi1qW9fGbJBY", // admin secret length is sufficient for HS256
                 Name = "MrWho Admin Web Application",
                 Description = "Official web administration interface for MrWho OIDC server",
                 RealmId = adminRealm.Id,
@@ -424,7 +424,7 @@ public class OidcClientService : IOidcClientService
             "http://localhost:5092/signout-callback-oidc"
         };
 
-        const string Demo1LongSecret = "Demo1Secret2025_SymmetricKey_32bytes!!"; // >= 32 bytes for HS256
+        const string Demo1LongSecret = "FTZvvlIIFdmtBg7IdBql9EEXRDj1xwLmi1qW9fGbJBY"; // >= 32 bytes for HS256
 
         if (demo1Client == null)
         {

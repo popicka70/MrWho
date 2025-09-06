@@ -15,7 +15,7 @@ Successfully implemented a complete demo application (MrWhoDemo1) with authentic
 
 ### 2. **Demo1 Client Configuration**
 - Client ID: `mrwho_demo1`
-- Client Secret: `Demo1Secret2024!`
+- Client Secret: `FTZvvlIIFdmtBg7IdBql9EEXRDj1xwLmi1qW9fGbJBY`
 - Type: Confidential
 - Flows: Authorization Code Flow with PKCE
 - Redirect URIs: `https://localhost:7037/signin-oidc`, `https://localhost:7037/callback`

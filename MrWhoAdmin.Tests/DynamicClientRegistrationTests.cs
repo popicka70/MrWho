@@ -17,7 +17,7 @@ public class DynamicClientRegistrationTests
         {
             ["grant_type"] = "password",
             ["client_id"] = "mrwho_admin_web",
-            ["client_secret"] = "MrWhoAdmin2024!SecretKey",
+            ["client_secret"] = "FTZvvlIIFdmtBg7IdBql9EEXRDj1xwLmi1qW9fGbJBY",
             ["username"] = "admin@mrwho.local",
             ["password"] = "Adm1n#2025!G7x",
             ["scope"] = scope
