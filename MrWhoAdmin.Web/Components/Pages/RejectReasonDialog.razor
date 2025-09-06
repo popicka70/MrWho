@@ -1,0 +1,22 @@
+@using Radzen
+@using Radzen.Blazor
+
+<RadzenTemplateForm Data="@this">
+    <RadzenFormField Text="Reason" Variant="Variant.Outlined">
+        <RadzenTextArea @bind-Value="reason" Style="width:100%; min-height: 140px" />
+    </RadzenFormField>
+    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+        <RadzenButton Text="Cancel" ButtonStyle="ButtonStyle.Light" Click="@(async ()=> { DialogService.Close(null); await Task.CompletedTask; })" />
+        <RadzenButton Text="Reject" ButtonStyle="ButtonStyle.Danger" Click="@(async ()=> await OnSubmit())" />
+    </RadzenStack>
+</RadzenTemplateForm>
+
+@code {
+    [Inject] DialogService DialogService { get; set; } = default!;
+    private string? reason;
+    private Task OnSubmit()
+    {
+        DialogService.Close(reason);
+        return Task.CompletedTask;
+    }
+}

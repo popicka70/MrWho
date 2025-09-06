@@ -61,7 +61,7 @@ public class ClientCredentialsAndIntrospectionTests
                 ["token"] = token!
             })
         };
-        var basic = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("mrwho_demo1:Demo1Secret2024!"));
+        var basic = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("mrwho_demo1:FTZvvlIIFdmtBg7IdBql9EEXRDj1xwLmi1qW9fGbJBY"));
         req.Headers.Authorization = new AuthenticationHeaderValue("Basic", basic);
         var resp = await http.SendAsync(req);
         Assert.IsTrue(resp.StatusCode == HttpStatusCode.BadRequest || resp.StatusCode == HttpStatusCode.Unauthorized || resp.StatusCode == HttpStatusCode.Forbidden);

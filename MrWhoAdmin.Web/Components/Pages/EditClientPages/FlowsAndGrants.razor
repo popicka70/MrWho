@@ -86,10 +86,32 @@ else
             <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Not applicable for public clients.</RadzenText>
         </Helper>
     </RadzenFormField>
+
+    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600 rz-mt-2">Advanced</RadzenText>
+    <RadzenFormField Text="Pushed Authorization Requests (PAR)" Variant="Variant.Outlined">
+        <ChildContent>
+            <RadzenDropDown @bind-Value="model.ParMode"
+                            TValue="PushedAuthorizationMode?"
+                            Data="@parModes"
+                            TextProperty="Text" ValueProperty="Value"
+                            Style="width: 100%;"/>
+        </ChildContent>
+        <Helper>
+            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Disabled = no PAR. Enabled = client may use PAR. Required = client must use PAR (request_uri).</RadzenText>
+        </Helper>
+    </RadzenFormField>
 </RadzenStack>
 }
 
 @code {
     [Parameter] public EditClient editClient { get; set; } = null!;
     private CreateClientRequest model => editClient.model;
+
+    private IEnumerable<object> parModes => new[]
+    {
+        new { Text = "Use realm default", Value = (PushedAuthorizationMode?)null },
+        new { Text = "Disabled", Value = (PushedAuthorizationMode?)PushedAuthorizationMode.Disabled },
+        new { Text = "Enabled",  Value = (PushedAuthorizationMode?)PushedAuthorizationMode.Enabled },
+        new { Text = "Required", Value = (PushedAuthorizationMode?)PushedAuthorizationMode.Required }
+    };
 }

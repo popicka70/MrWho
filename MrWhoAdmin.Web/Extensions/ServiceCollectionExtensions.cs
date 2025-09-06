@@ -261,6 +261,15 @@ public static class ServiceCollectionExtensions
         });
         // Note: No authentication handler needed for local health endpoints
         
+        // Client Registrations API service (admin approvals for dynamic client registration)
+        services.AddHttpClient<IClientRegistrationsApiService, ClientRegistrationsApiService>(client =>
+        {
+            client.BaseAddress = new Uri(mrWhoApiBaseUrl);
+            client.DefaultRequestHeaders.Add("Accept", "application/json");
+            client.Timeout = defaultTimeout;
+        })
+        .AddHttpMessageHandler<AuthenticationDelegatingHandler>();
+
         return services;
     }
 
@@ -353,7 +362,7 @@ public static class ServiceCollectionExtensions
         
         options.Authority = authConfig.GetValue<string>("Authority") ?? "https://localhost:7113/";
         options.ClientId = authConfig.GetValue<string>("ClientId") ?? "mrwho_admin_web";
-        options.ClientSecret = authConfig.GetValue<string>("ClientSecret") ?? "MrWhoAdmin2024!SecretKey";
+        options.ClientSecret = authConfig.GetValue<string>("ClientSecret") ?? "FTZvvlIIFdmtBg7IdBql9EEXRDj1xwLmi1qW9fGbJBY";
         
         options.ResponseType = "code";
         options.SaveTokens = true; // CRITICAL: This saves tokens for API calls

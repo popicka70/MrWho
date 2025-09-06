@@ -84,11 +84,15 @@ else
                 <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center" Wrap="Radzen.FlexWrap.Wrap">
                     <RadzenTextBox @bind-Value="@model.ClientSecret" Style="width: 100%; max-width: 520px;" Placeholder="@(editClient.IsEdit ? "Leave blank to keep unchanged" : "Enter or generate a secret")" />
                     <RadzenButton Icon="password" Text="Generate" ButtonStyle="ButtonStyle.Secondary" Click="@editClient.GenerateSecret" />
+                    @if (editClient.IsEdit)
+                    {
+                        <RadzenButton Icon="refresh" Text="Rotate" ButtonStyle="ButtonStyle.Danger" Click="@(async () => await RotateSecretAsync())" />
+                    }
                 </RadzenStack>
             </ChildContent>
             <Helper>
                 <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                    Required for Confidential and Machine clients when Require Client Secret is enabled. Do not share publicly.
+                    Client secrets are write-only and will not be displayed. Rotate to generate a new secret and copy it now.
                 </RadzenText>
             </Helper>
         </RadzenFormField>
@@ -168,4 +172,33 @@ else
     [Parameter]
     public EditClient editClient { get; set; } = null!;
     private CreateClientRequest model => editClient.model;
+
+    [Inject] private MrWhoAdmin.Web.Services.IClientsApiService ClientsApiService { get; set; } = null!;
+    [Inject] private Radzen.NotificationService NotificationService { get; set; } = null!;
+    [Inject] private ILogger<BasicInformation> Logger { get; set; } = null!;
+
+    private async Task RotateSecretAsync()
+    {
+        try
+        {
+            var (ok, secret) = await ClientsApiService.RotateSecretAsync(editClient.Id!);
+            if (!ok || string.IsNullOrWhiteSpace(secret))
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Rotate failed", "Secret rotation failed");
+                return;
+            }
+            NotificationService.Notify(new NotificationMessage
+            {
+                Severity = NotificationSeverity.Warning,
+                Summary = "New Client Secret",
+                Detail = $"Copy now: {secret}",
+                Duration = 15000
+            });
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "RotateSecretAsync UI failed for client {Id}", editClient.Id);
+            NotificationService.Notify(NotificationSeverity.Error, "Error", "Rotate secret failed");
+        }
+    }
 }

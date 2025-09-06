@@ -25,7 +25,7 @@ services:
       DISABLE_HTTPS_REDIRECT: "true"
       Authentication__Authority: http://mrwho:8080
       Authentication__ClientId: mrwho_admin_web
-      Authentication__ClientSecret: ${ADMIN_CLIENT_SECRET:-MrWhoAdmin2024!SecretKey}
+      Authentication__ClientSecret: ${ADMIN_CLIENT_SECRET:-FTZvvlIIFdmtBg7IdBql9EEXRDj1xwLmi1qW9fGbJBY}
       MrWhoApi__BaseUrl: http://mrwho:8080/
     depends_on:
       - mrwho

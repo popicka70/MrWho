@@ -20,6 +20,10 @@ public class ClientDto
     public bool AllowDeviceCodeFlow { get; set; } // NEW
     public bool RequirePkce { get; set; }
     public bool RequireClientSecret { get; set; }
+
+    // PAR options (enum)
+    public PushedAuthorizationMode? ParMode { get; set; }
+
     public TimeSpan? AccessTokenLifetime { get; set; }
     public TimeSpan? RefreshTokenLifetime { get; set; }
     public TimeSpan? AuthorizationCodeLifetime { get; set; }

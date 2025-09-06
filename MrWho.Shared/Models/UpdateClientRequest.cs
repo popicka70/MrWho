@@ -26,6 +26,10 @@ public class UpdateClientRequest
     public bool? AllowDeviceCodeFlow { get; set; } // NEW
     public bool? RequirePkce { get; set; }
     public bool? RequireClientSecret { get; set; }
+
+    // PAR mode
+    public PushedAuthorizationMode? ParMode { get; set; }
+
     public TimeSpan? AccessTokenLifetime { get; set; }
     public TimeSpan? RefreshTokenLifetime { get; set; }
     public TimeSpan? AuthorizationCodeLifetime { get; set; }

@@ -4,6 +4,7 @@ using MrWho.Data;
 using MrWho.Models;
 using MrWho.Shared;
 using OpenIddict.Abstractions;
+using OpenIddict.EntityFrameworkCore.Models; // added
 
 namespace MrWho.Services;
 
@@ -111,10 +112,17 @@ public class OidcClientService : IOidcClientService
         var descriptor = new OpenIddictApplicationDescriptor
         {
             ClientId = client.ClientId,
-            ClientSecret = client.ClientSecret,
             DisplayName = client.Name,
             ClientType = client.ClientType == ClientType.Public ? OpenIddictConstants.ClientTypes.Public : OpenIddictConstants.ClientTypes.Confidential
         };
+
+        // Only propagate a concrete secret to OpenIddict when we actually have one.
+        // When the local Client.ClientSecret is the redaction marker from hashing ("{HASHED}"),
+        // skip setting ClientSecret so OpenIddict keeps its current stored hash.
+        if (!string.IsNullOrWhiteSpace(client.ClientSecret) && !string.Equals(client.ClientSecret, "{HASHED}", StringComparison.Ordinal))
+        {
+            descriptor.ClientSecret = client.ClientSecret;
+        }
 
         if (client.AllowAuthorizationCodeFlow)
         {
@@ -129,6 +137,16 @@ public class OidcClientService : IOidcClientService
         if (client.AllowRefreshTokenFlow)
             descriptor.Permissions.Add(OpenIddictConstants.Permissions.GrantTypes.RefreshToken);
         descriptor.Permissions.Add(OpenIddictConstants.Permissions.Endpoints.Token);
+
+        // PAR handling by enum mode
+        if (client.ParMode is PushedAuthorizationMode.Enabled or PushedAuthorizationMode.Required)
+        {
+            descriptor.Permissions.Add(OpenIddictConstants.Permissions.Endpoints.PushedAuthorization);
+        }
+        if (client.ParMode is PushedAuthorizationMode.Required)
+        {
+            descriptor.Requirements.Add(OpenIddictConstants.Requirements.Features.PushedAuthorizationRequests);
+        }
 
         var (hasOpenId, scopePerms) = BuildScopePermissions(client.Scopes.Select(s => s.Scope));
         foreach (var p in scopePerms) descriptor.Permissions.Add(p);
@@ -246,12 +264,24 @@ public class OidcClientService : IOidcClientService
             .Include(c => c.Permissions)
             .FirstOrDefaultAsync(c => c.ClientId == "mrwho_admin_web");
 
+        // Helper dev URIs for admin app (http profile in launchSettings)
+        var adminDevHttpRedirects = new[]
+        {
+            "http://localhost:5298/signin-oidc",
+            "http://localhost:5298/callback"
+        };
+        var adminDevHttpPostLogout = new[]
+        {
+            "http://localhost:5298/",
+            "http://localhost:5298/signout-callback-oidc"
+        };
+
         if (adminClient == null)
         {
             adminClient = new Client
             {
                 ClientId = "mrwho_admin_web",
-                ClientSecret = "MrWhoAdmin2024!SecretKey",
+                ClientSecret = "FTZvvlIIFdmtBg7IdBql9EEXRDj1xwLmi1qW9fGbJBY", // admin secret length is sufficient for HS256
                 Name = "MrWho Admin Web Application",
                 Description = "Official web administration interface for MrWho OIDC server",
                 RealmId = adminRealm.Id,
@@ -266,7 +296,9 @@ public class OidcClientService : IOidcClientService
                 CreatedBy = "System",
                 AllowAccessToUserInfoEndpoint = true,
                 AllowAccessToRevocationEndpoint = true,
-                AllowAccessToIntrospectionEndpoint = false
+                AllowAccessToIntrospectionEndpoint = false,
+                // Enable PAR for admin web by default so the OIDC client can use PAR
+                ParMode = PushedAuthorizationMode.Enabled
             };
 
             _context.Clients.Add(adminClient);
@@ -277,12 +309,8 @@ public class OidcClientService : IOidcClientService
                 "https://localhost:7257/signin-oidc",
                 "https://localhost:7257/callback",
                 "http://localhost:8081/signin-oidc",
-                "http://localhost:8081/callback",
-                "https://mrwho.onrender.com/signin-oidc",
-                "https://mrwho.onrender.com/callback",
-                "https://mrwhoadmin.onrender.com/signin-oidc",
-                "https://mrwhoadmin.onrender.com/callback"
-            };
+                "http://localhost:8081/callback"
+            }.Concat(adminDevHttpRedirects);
             foreach (var uri in redirectUris)
                 _context.ClientRedirectUris.Add(new ClientRedirectUri { ClientId = adminClient.Id, Uri = uri });
 
@@ -291,12 +319,8 @@ public class OidcClientService : IOidcClientService
                 "https://localhost:7257/",
                 "https://localhost:7257/signout-callback-oidc",
                 "http://localhost:8081/",
-                "http://localhost:8081/signout-callback-oidc",
-                "https://mrwho.onrender.com/",
-                "https://mrwho.onrender.com/signout-callback-oidc",
-                "https://mrwhoadmin.onrender.com/",
-                "https://mrwhoadmin.onrender.com/signout-callback-oidc"
-            };
+                "http://localhost:8081/signout-callback-oidc"
+            }.Concat(adminDevHttpPostLogout);
             foreach (var uri in postLogoutUris)
                 _context.ClientPostLogoutUris.Add(new ClientPostLogoutUri { ClientId = adminClient.Id, Uri = uri });
 
@@ -327,7 +351,7 @@ public class OidcClientService : IOidcClientService
         }
         else
         {
-            var legacy = adminClient.Permissions.Where(p => p.Permission.StartsWith("oidc:scope:") || (p.Permission.StartsWith("api.") && !p.Permission.StartsWith("scp:")) || p.Permission == "scp:openid").ToList();
+            var legacy = adminClient.Permissions.Where(p => p.Permission.StartsWith("oidc:scope:") || (p.Permission.StartsWith("api.")) && !p.Permission.StartsWith("scp:") || p.Permission == "scp:openid").ToList();
             if (legacy.Any())
             {
                 _context.ClientPermissions.RemoveRange(legacy);
@@ -339,6 +363,37 @@ public class OidcClientService : IOidcClientService
                 _context.ClientPermissions.Add(new ClientPermission { ClientId = adminClient.Id, Permission = "scp:mrwho.use" });
                 await _context.SaveChangesAsync();
             }
+            // Backfill: enable PAR for admin client if not explicitly configured
+            if (adminClient.ParMode == null)
+            {
+                adminClient.ParMode = PushedAuthorizationMode.Enabled;
+                adminClient.UpdatedAt = DateTime.UtcNow;
+                adminClient.UpdatedBy = "Backfill";
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Backfilled ParMode=Enabled for admin client");
+            }
+
+            // Ensure dev HTTP redirect URIs exist for admin app when using http profile (5298)
+            var existingRedirects = adminClient.RedirectUris.Select(r => r.Uri).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            foreach (var uri in adminDevHttpRedirects)
+            {
+                if (!existingRedirects.Contains(uri))
+                {
+                    _context.ClientRedirectUris.Add(new ClientRedirectUri { ClientId = adminClient.Id, Uri = uri });
+                    _logger.LogInformation("Added admin redirect URI: {Uri}", uri);
+                }
+            }
+            var existingPostLogout = adminClient.PostLogoutUris.Select(r => r.Uri).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            foreach (var uri in adminDevHttpPostLogout)
+            {
+                if (!existingPostLogout.Contains(uri))
+                {
+                    _context.ClientPostLogoutUris.Add(new ClientPostLogoutUri { ClientId = adminClient.Id, Uri = uri });
+                    _logger.LogInformation("Added admin post-logout URI: {Uri}", uri);
+                }
+            }
+            await _context.SaveChangesAsync();
+
             // Enable password flow dynamically in test environment if not already enabled
             if (isTesting && !adminClient.AllowPasswordFlow)
             {
@@ -346,7 +401,6 @@ public class OidcClientService : IOidcClientService
                 adminClient.UpdatedAt = DateTime.UtcNow;
                 adminClient.UpdatedBy = "TestSetup";
                 await _context.SaveChangesAsync();
-                // Explicit permission not required here; SyncClientWithOpenIddictAsync will add it via descriptor
                 _logger.LogInformation("Enabled password grant for admin client in test environment");
             }
         }
@@ -359,12 +413,26 @@ public class OidcClientService : IOidcClientService
             .Include(c => c.Permissions)
             .FirstOrDefaultAsync(c => c.ClientId == "mrwho_demo1");
 
+        // Known dev HTTP URIs for demo1 app (from launchSettings)
+        var demo1DevHttpRedirects = new[]
+        {
+            "http://localhost:5092/signin-oidc",
+            "http://localhost:5092/callback"
+        };
+        var demo1DevHttpPostLogout = new[]
+        {
+            "http://localhost:5092/",
+            "http://localhost:5092/signout-callback-oidc"
+        };
+
+        const string Demo1LongSecret = "FTZvvlIIFdmtBg7IdBql9EEXRDj1xwLmi1qW9fGbJBY"; // >= 32 bytes for HS256
+
         if (demo1Client == null)
         {
             demo1Client = new Client
             {
                 ClientId = "mrwho_demo1",
-                ClientSecret = "Demo1Secret2024!",
+                ClientSecret = Demo1LongSecret,
                 Name = "MrWho Demo Application 1",
                 Description = "Demo application showcasing MrWho OIDC integration",
                 RealmId = demoRealm.Id,
@@ -379,14 +447,15 @@ public class OidcClientService : IOidcClientService
                 CreatedBy = "System",
                 AllowAccessToUserInfoEndpoint = true,
                 AllowAccessToRevocationEndpoint = true,
-                AllowAccessToIntrospectionEndpoint = true
+                AllowAccessToIntrospectionEndpoint = true,
+                ParMode = PushedAuthorizationMode.Enabled
             };
             _context.Clients.Add(demo1Client);
             await _context.SaveChangesAsync();
 
-            foreach (var uri in new[] { "https://localhost:7037/signin-oidc", "https://localhost:7037/callback" })
+            foreach (var uri in new[] { "https://localhost:7037/signin-oidc", "https://localhost:7037/callback" }.Concat(demo1DevHttpRedirects))
                 _context.ClientRedirectUris.Add(new ClientRedirectUri { ClientId = demo1Client.Id, Uri = uri });
-            foreach (var uri in new[] { "https://localhost:7037/", "https://localhost:7037/signout-callback-oidc" })
+            foreach (var uri in new[] { "https://localhost:7037/", "https://localhost:7037/signout-callback-oidc" }.Concat(demo1DevHttpPostLogout))
                 _context.ClientPostLogoutUris.Add(new ClientPostLogoutUri { ClientId = demo1Client.Id, Uri = uri });
             foreach (var scope in new[] { StandardScopes.OpenId, StandardScopes.Email, StandardScopes.Profile, StandardScopes.Roles, StandardScopes.OfflineAccess, StandardScopes.ApiRead, StandardScopes.ApiWrite })
                 _context.ClientScopes.Add(new ClientScope { ClientId = demo1Client.Id, Scope = scope });
@@ -396,8 +465,48 @@ public class OidcClientService : IOidcClientService
         }
         else
         {
-            var legacy = demo1Client.Permissions.Where(p => p.Permission.StartsWith("oidc:scope:") || (p.Permission.StartsWith("api.") && !p.Permission.StartsWith("scp:")) || p.Permission == "scp:openid").ToList();
+            var legacy = demo1Client.Permissions.Where(p => p.Permission.StartsWith("oidc:scope:") || (p.Permission.StartsWith("api." ) && !p.Permission.StartsWith("scp:")) || p.Permission == "scp:openid").ToList();
             if (legacy.Any()) { _context.ClientPermissions.RemoveRange(legacy); await _context.SaveChangesAsync(); }
+
+            // Backfill ParMode for demo1 if missing
+            if (demo1Client.ParMode == null)
+            {
+                demo1Client.ParMode = PushedAuthorizationMode.Enabled;
+                demo1Client.UpdatedAt = DateTime.UtcNow;
+                demo1Client.UpdatedBy = "Backfill";
+                await _context.SaveChangesAsync();
+            }
+
+            // Backfill: ensure client secret is long enough for HS256 request object signatures
+            if (string.IsNullOrWhiteSpace(demo1Client.ClientSecret) || demo1Client.ClientSecret.Length < 32)
+            {
+                demo1Client.ClientSecret = Demo1LongSecret;
+                demo1Client.UpdatedAt = DateTime.UtcNow;
+                demo1Client.UpdatedBy = "Backfill";
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Updated demo1 client secret to meet HS256 length requirements");
+            }
+
+            // Ensure dev HTTP redirect/post-logout URIs exist
+            var existingDemo1Redirects = demo1Client.RedirectUris.Select(r => r.Uri).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            foreach (var uri in demo1DevHttpRedirects)
+            {
+                if (!existingDemo1Redirects.Contains(uri))
+                {
+                    _context.ClientRedirectUris.Add(new ClientRedirectUri { ClientId = demo1Client.Id, Uri = uri });
+                    _logger.LogInformation("Added demo1 redirect URI: {Uri}", uri);
+                }
+            }
+            var existingDemo1PostLogout = demo1Client.PostLogoutUris.Select(r => r.Uri).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            foreach (var uri in demo1DevHttpPostLogout)
+            {
+                if (!existingDemo1PostLogout.Contains(uri))
+                {
+                    _context.ClientPostLogoutUris.Add(new ClientPostLogoutUri { ClientId = demo1Client.Id, Uri = uri });
+                    _logger.LogInformation("Added demo1 post-logout URI: {Uri}", uri);
+                }
+            }
+            await _context.SaveChangesAsync();
         }
 
         // m2m client
@@ -583,6 +692,97 @@ public class OidcClientService : IOidcClientService
             _logger.LogError(ex, "Failed to sync service M2M client 'mrwho_m2m'");
             throw; // fail fast so invalid_client is surfaced early
         }
+
+        // DEMO NUGET CLIENT (mrwho_demo_nuget)
+        var nugetClient = await _context.Clients
+            .Include(c => c.RedirectUris)
+            .Include(c => c.PostLogoutUris)
+            .Include(c => c.Scopes)
+            .Include(c => c.Permissions)
+            .FirstOrDefaultAsync(c => c.ClientId == "mrwho_demo_nuget");
+
+        // Common dev ports when no launchSettings exists: 5000 (http), 5001 (https)
+        var nugetHttpsPorts = new[] { "5001" };
+        var nugetHttpPorts = new[] { "5000" };
+
+        var nugetRedirects = nugetHttpsPorts.Select(p => $"https://localhost:{p}/signin-oidc").Concat(
+                              nugetHttpPorts.Select(p => $"http://localhost:{p}/signin-oidc"));
+        var nugetPostLogout = nugetHttpsPorts.Select(p => $"https://localhost:{p}/signout-callback-oidc").Concat(
+                              nugetHttpPorts.Select(p => $"http://localhost:{p}/signout-callback-oidc"))
+                              .Concat(nugetHttpsPorts.Select(p => $"https://localhost:{p}/"))
+                              .Concat(nugetHttpPorts.Select(p => $"http://localhost:{p}/"));
+
+        if (nugetClient == null)
+        {
+            nugetClient = new Client
+            {
+                ClientId = "mrwho_demo_nuget",
+                ClientSecret = null, // public client by default
+                Name = "MrWho Demo NuGet App",
+                Description = "Sample app using MrWho.ClientAuth NuGet",
+                RealmId = demoRealm.Id,
+                IsEnabled = true,
+                ClientType = ClientType.Public,
+                AllowAuthorizationCodeFlow = true,
+                AllowClientCredentialsFlow = false,
+                AllowPasswordFlow = false,
+                AllowRefreshTokenFlow = true,
+                RequirePkce = true,
+                RequireClientSecret = false,
+                CreatedBy = "System",
+                AllowAccessToUserInfoEndpoint = true,
+                AllowAccessToRevocationEndpoint = true,
+                AllowAccessToIntrospectionEndpoint = false,
+                ParMode = PushedAuthorizationMode.Enabled
+            };
+            _context.Clients.Add(nugetClient);
+            await _context.SaveChangesAsync();
+
+            foreach (var uri in nugetRedirects)
+                _context.ClientRedirectUris.Add(new ClientRedirectUri { ClientId = nugetClient.Id, Uri = uri });
+            foreach (var uri in nugetPostLogout)
+                _context.ClientPostLogoutUris.Add(new ClientPostLogoutUri { ClientId = nugetClient.Id, Uri = uri });
+
+            foreach (var scope in new[] { StandardScopes.OpenId, StandardScopes.Email, StandardScopes.Profile, StandardScopes.Roles, StandardScopes.OfflineAccess, StandardScopes.ApiRead })
+                _context.ClientScopes.Add(new ClientScope { ClientId = nugetClient.Id, Scope = scope });
+
+            foreach (var p in new[]
+            {
+                OpenIddictConstants.Permissions.Endpoints.Authorization,
+                OpenIddictConstants.Permissions.Endpoints.Token,
+                OpenIddictConstants.Permissions.Endpoints.EndSession,
+                OpenIddictConstants.Permissions.GrantTypes.AuthorizationCode,
+                OpenIddictConstants.Permissions.GrantTypes.RefreshToken,
+                OpenIddictConstants.Permissions.ResponseTypes.Code
+            })
+                _context.ClientPermissions.Add(new ClientPermission { ClientId = nugetClient.Id, Permission = p });
+
+            await _context.SaveChangesAsync();
+            _logger.LogInformation("Created nuget demo client 'mrwho_demo_nuget' with default localhost ports 5000/5001");
+        }
+        else
+        {
+            // Backfill PAR and URIs
+            if (nugetClient.ParMode == null)
+            {
+                nugetClient.ParMode = PushedAuthorizationMode.Enabled;
+                nugetClient.UpdatedAt = DateTime.UtcNow;
+                nugetClient.UpdatedBy = "Backfill";
+                await _context.SaveChangesAsync();
+            }
+
+            var existingNugetRedirects = nugetClient.RedirectUris.Select(r => r.Uri).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            foreach (var uri in nugetRedirects)
+                if (!existingNugetRedirects.Contains(uri))
+                    _context.ClientRedirectUris.Add(new ClientRedirectUri { ClientId = nugetClient.Id, Uri = uri });
+
+            var existingNugetPostLogout = nugetClient.PostLogoutUris.Select(r => r.Uri).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            foreach (var uri in nugetPostLogout)
+                if (!existingNugetPostLogout.Contains(uri))
+                    _context.ClientPostLogoutUris.Add(new ClientPostLogoutUri { ClientId = nugetClient.Id, Uri = uri });
+
+            await _context.SaveChangesAsync();
+        }
     }
 
     public async Task InitializeDefaultRealmAndClientsAsync()
@@ -625,7 +825,9 @@ public class OidcClientService : IOidcClientService
                 CreatedBy = "System",
                 AllowAccessToUserInfoEndpoint = true,
                 AllowAccessToRevocationEndpoint = true,
-                AllowAccessToIntrospectionEndpoint = true
+                AllowAccessToIntrospectionEndpoint = true,
+                // Enable PAR to match OIDC handler behavior when server advertises PAR
+                ParMode = PushedAuthorizationMode.Enabled
             };
             _context.Clients.Add(defaultClient);
             await _context.SaveChangesAsync();
@@ -664,6 +866,15 @@ public class OidcClientService : IOidcClientService
                 await _context.SaveChangesAsync();
                 _logger.LogInformation("Cleaned {Count} legacy scope permissions from default client", legacy.Count);
             }
+            // Backfill ParMode if not set to ensure compatibility with server-advertised PAR
+            if (defaultClient.ParMode == null)
+            {
+                defaultClient.ParMode = PushedAuthorizationMode.Enabled;
+                defaultClient.UpdatedAt = DateTime.UtcNow;
+                defaultClient.UpdatedBy = "Backfill";
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Backfilled ParMode=Enabled for default client 'postman_client'");
+            }
         }
 
         var enabledClients = await GetEnabledClientsAsync();
@@ -687,14 +898,59 @@ public class OidcClientService : IOidcClientService
     {
         try
         {
-            if ((client.ClientType == ClientType.Confidential || client.ClientType == ClientType.Machine) && client.RequireClientSecret && string.IsNullOrWhiteSpace(client.ClientSecret))
+            // Determine if this client requires a secret (confidential or machine with RequireClientSecret=true)
+            bool requiresSecret = (client.ClientType == ClientType.Confidential || client.ClientType == ClientType.Machine) && client.RequireClientSecret;
+
+            // Try find existing OpenIddict app first
+            var existingClient = await _applicationManager.FindByClientIdAsync(client.ClientId);
+
+            // First pass using the supplied client instance
+            var descriptor = BuildDescriptor(client);
+
+            // If a secret is required but not present on the descriptor, fetch the current client from DB
+            if (requiresSecret && string.IsNullOrWhiteSpace(descriptor.ClientSecret))
             {
-                _logger.LogWarning("Skipping OpenIddict sync for client '{ClientId}': missing secret.", client.ClientId);
-                return;
+                var dbClient = await _context.Clients
+                    .AsNoTracking()
+                    .Include(c => c.RedirectUris)
+                    .Include(c => c.PostLogoutUris)
+                    .Include(c => c.Scopes)
+                    .Include(c => c.Permissions)
+                    .FirstOrDefaultAsync(c => c.Id == client.Id || c.ClientId == client.ClientId);
+                if (dbClient != null)
+                {
+                    var dbDescriptor = BuildDescriptor(dbClient);
+                    if (!string.IsNullOrWhiteSpace(dbDescriptor.ClientSecret))
+                    {
+                        descriptor = dbDescriptor;
+                    }
+                }
             }
 
-            var existingClient = await _applicationManager.FindByClientIdAsync(client.ClientId);
-            var descriptor = BuildDescriptor(client);
+            // If still missing, try pulling the stored secret from the OpenIddict EF entity (hashed or raw depending on config)
+            if (requiresSecret && string.IsNullOrWhiteSpace(descriptor.ClientSecret) && existingClient is not null)
+            {
+                if (existingClient is OpenIddictEntityFrameworkCoreApplication efApp && !string.IsNullOrWhiteSpace(efApp.ClientSecret))
+                {
+                    descriptor.ClientSecret = efApp.ClientSecret;
+                }
+            }
+
+            // If a secret is required but we still didn't set one on the descriptor,
+            // then: creation requires a secret; update will be skipped to avoid validation error and preserve existing secret.
+            if (requiresSecret && string.IsNullOrWhiteSpace(descriptor.ClientSecret))
+            {
+                if (existingClient is null)
+                {
+                    _logger.LogWarning("Skipping OpenIddict sync for client '{ClientId}': confidential/machine app requires a secret to be created.", client.ClientId);
+                    return;
+                }
+                else
+                {
+                    _logger.LogWarning("Skipping OpenIddict update for client '{ClientId}': secret is redacted/unknown. Rotate the secret or set a clear-text secret to allow updating other properties.", client.ClientId);
+                    return;
+                }
+            }
 
             if (existingClient == null)
             {

@@ -4,13 +4,14 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MrWho.Data;
 using MrWho.Models;
+using MrWho.Shared; // added
 using MrWho.Shared.Models;
 
 namespace MrWho.Controllers;
 
 [ApiController]
 [Route("api/registrations")] 
-[Authorize(Policy = MrWho.Shared.AuthorizationPolicies.AdminClientApi)]
+[Authorize(Policy = AuthorizationPolicies.AdminClientApi)]
 public class RegistrationsController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
