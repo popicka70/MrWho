@@ -9,7 +9,7 @@ namespace MrWhoAdmin.Tests;
 [TestCategory("OIDC")] 
 public class ClientCredentialsAndIntrospectionTests
 {
-    private async Task<JsonDocument> RequestClientCredentialsAsync(string clientId = "mrwho_m2m", string secret = "MrWhoM2MSecret2025!")
+    private async Task<JsonDocument> RequestClientCredentialsAsync(string clientId = "mrwho_m2m", string secret = "FTZvvlIIFdmtBg7IdBql9EEXRDj1xwLmi1qW9fGbJBY")
     {
         using var client = SharedTestInfrastructure.CreateHttpClient("mrwho", disableRedirects: true);
         var form = new Dictionary<string, string>
