@@ -93,7 +93,7 @@ public class AdditionalAuthFlowTests
         {
             ["grant_type"] = "client_credentials",
             ["client_id"] = "mrwho_m2m",
-            ["client_secret"] = "MrWhoM2MSecret2025!",
+            ["client_secret"] = "FTZvvlIIFdmtBg7IdBql9EEXRDj1xwLmi1qW9fGbJBY",
             ["scope"] = "mrwho.use offline_access" // attempt to get offline_access
         });
         var root = doc.RootElement;

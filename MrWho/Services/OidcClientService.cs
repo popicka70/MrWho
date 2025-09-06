@@ -615,7 +615,7 @@ public class OidcClientService : IOidcClientService
             serviceM2M = new Client
             {
                 ClientId = "mrwho_m2m",
-                ClientSecret = "MrWhoM2MSecret2025!",
+                ClientSecret = "FTZvvlIIFdmtBg7IdBql9EEXRDj1xwLmi1qW9fGbJBY",
                 Name = "MrWho Service M2M Client",
                 Description = "Standard machine client (client_credentials) for calling protected MrWho API endpoints requiring mrwho.use",
                 RealmId = adminRealm.Id,
