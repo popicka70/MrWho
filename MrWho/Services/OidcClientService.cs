@@ -4,6 +4,7 @@ using MrWho.Data;
 using MrWho.Models;
 using MrWho.Shared;
 using OpenIddict.Abstractions;
+using OpenIddict.EntityFrameworkCore.Models; // added
 
 namespace MrWho.Services;
 
@@ -903,10 +904,40 @@ public class OidcClientService : IOidcClientService
             // Try find existing OpenIddict app first
             var existingClient = await _applicationManager.FindByClientIdAsync(client.ClientId);
 
+            // First pass using the supplied client instance
             var descriptor = BuildDescriptor(client);
 
-            // If a secret is required but we didn't set one on the descriptor (e.g. local redacted "{HASHED}"),
-            // then: create requires a secret; update will be skipped to avoid validation error and preserve existing secret.
+            // If a secret is required but not present on the descriptor, fetch the current client from DB
+            if (requiresSecret && string.IsNullOrWhiteSpace(descriptor.ClientSecret))
+            {
+                var dbClient = await _context.Clients
+                    .AsNoTracking()
+                    .Include(c => c.RedirectUris)
+                    .Include(c => c.PostLogoutUris)
+                    .Include(c => c.Scopes)
+                    .Include(c => c.Permissions)
+                    .FirstOrDefaultAsync(c => c.Id == client.Id || c.ClientId == client.ClientId);
+                if (dbClient != null)
+                {
+                    var dbDescriptor = BuildDescriptor(dbClient);
+                    if (!string.IsNullOrWhiteSpace(dbDescriptor.ClientSecret))
+                    {
+                        descriptor = dbDescriptor;
+                    }
+                }
+            }
+
+            // If still missing, try pulling the stored secret from the OpenIddict EF entity (hashed or raw depending on config)
+            if (requiresSecret && string.IsNullOrWhiteSpace(descriptor.ClientSecret) && existingClient is not null)
+            {
+                if (existingClient is OpenIddictEntityFrameworkCoreApplication efApp && !string.IsNullOrWhiteSpace(efApp.ClientSecret))
+                {
+                    descriptor.ClientSecret = efApp.ClientSecret;
+                }
+            }
+
+            // If a secret is required but we still didn't set one on the descriptor,
+            // then: creation requires a secret; update will be skipped to avoid validation error and preserve existing secret.
             if (requiresSecret && string.IsNullOrWhiteSpace(descriptor.ClientSecret))
             {
                 if (existingClient is null)
