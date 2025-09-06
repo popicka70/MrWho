@@ -4,6 +4,7 @@ using MrWho.Data;
 using MrWho.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.RateLimiting; // added
 
 namespace MrWho.Controllers;
 
@@ -21,6 +22,7 @@ public class DeviceAuthorizationController : Controller
     // POST /connect/device  (RFC 8628 Step 1)
     [HttpPost("device")]
     [AllowAnonymous]
+    [EnableRateLimiting("rl.device")] // rate limit device authorization initiation
     public async Task<IActionResult> CreateDeviceAuthorization([FromForm] string client_id, [FromForm] string? scope = null)
     {
         if (string.IsNullOrWhiteSpace(client_id)) return BadRequest(new { error = "invalid_request", error_description = "client_id required" });
@@ -81,6 +83,7 @@ public class DeviceAuthorizationController : Controller
     // GET /connect/verify?user_code=XXXX-XXXX  (user enters code)
     [HttpGet("verify")]
     [AllowAnonymous]
+    [EnableRateLimiting("rl.verify")] // rate limit verification lookups
     public async Task<IActionResult> VerifyDeviceUserCode([FromQuery] string? user_code)
     {
         // If not authenticated, defer until after login (but keep code)
@@ -134,6 +137,7 @@ public class DeviceAuthorizationController : Controller
     // POST /connect/verify (approve/deny)
     [HttpPost("verify")]
     [ValidateAntiForgeryToken]
+    [EnableRateLimiting("rl.verify")] // rate limit verification posts
     public async Task<IActionResult> PostVerify([FromForm] string user_code, [FromForm] string action)
     {
         if (User.Identity?.IsAuthenticated != true)
