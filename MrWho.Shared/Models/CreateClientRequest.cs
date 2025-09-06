@@ -34,6 +34,10 @@ public class CreateClientRequest
     public bool AllowDeviceCodeFlow { get; set; } = false; // NEW
     public bool RequirePkce { get; set; } = true;
     public bool RequireClientSecret { get; set; } = true;
+
+    // PAR mode
+    public PushedAuthorizationMode? ParMode { get; set; }
+
     public TimeSpan? AccessTokenLifetime { get; set; }
     public TimeSpan? RefreshTokenLifetime { get; set; }
     public TimeSpan? AuthorizationCodeLifetime { get; set; }

@@ -1,0 +1,26 @@
+@using Radzen
+@using Radzen.Blazor
+
+<RadzenStack Gap="0.5rem">
+    <RadzenText TextStyle="TextStyle.H4">@Details?.ClientName</RadzenText>
+    <RadzenText>Submitted: @Details?.SubmittedAt (by @Details?.SubmittedByUserName)</RadzenText>
+    <RadzenDivider />
+    <RadzenText TextStyle="TextStyle.H5">Request</RadzenText>
+
+    <RadzenFormField Text="Grant Types" Variant="Variant.Outlined">
+        <RadzenChips Value="@Details?.Request?.GrantTypes" ReadOnly="true" />
+    </RadzenFormField>
+    <RadzenFormField Text="Redirect URIs" Variant="Variant.Outlined">
+        <RadzenListBox Data="@Details?.Request?.RedirectUris" TValue="string" />
+    </RadzenFormField>
+    <RadzenFormField Text="Post Logout Redirect URIs" Variant="Variant.Outlined">
+        <RadzenListBox Data="@Details?.Request?.PostLogoutRedirectUris" TValue="string" />
+    </RadzenFormField>
+    <RadzenFormField Text="Scopes" Variant="Variant.Outlined">
+        <RadzenText>@Details?.Request?.Scope</RadzenText>
+    </RadzenFormField>
+</RadzenStack>
+
+@code {
+    [Parameter] public PendingClientRegistrationDetails? Details { get; set; }
+}

@@ -107,7 +107,7 @@ builder.Services.AddAuthentication(options =>
     options.SignInScheme = demo1CookieScheme;
     options.Authority = "https://localhost:7113"; // Identity Server
     options.ClientId = "mrwho_demo1";
-    options.ClientSecret = "Demo1Secret2024!";
+    options.ClientSecret = "FTZvvlIIFdmtBg7IdBql9EEXRDj1xwLmi1qW9fGbJBY";
     options.ResponseType = OpenIdConnectResponseType.Code;
     
     // Scopes
@@ -125,6 +125,14 @@ builder.Services.AddAuthentication(options =>
     
     // Use PKCE for additional security
     options.UsePkce = true;
+
+    // Force skip PAR regardless of discovery or defaults
+    options.Events ??= new OpenIdConnectEvents();
+    options.Events.OnPushAuthorization = context =>
+    {
+        context.SkipPush();
+        return Task.CompletedTask;
+    };
     
     // SSL configuration for production authority
     options.RequireHttpsMetadata = true; // Production: require HTTPS metadata
@@ -153,21 +161,18 @@ builder.Services.AddAuthentication(options =>
     options.SignedOutRedirectUri = "/?logout=success";
     
     // Events for diagnostics
-    options.Events = new OpenIdConnectEvents
+    options.Events.OnTokenValidated = context =>
     {
-        OnTokenValidated = context =>
-        {
-            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-            logger.LogDebug("Demo1 claims in ID token: {Claims}", 
-                string.Join(", ", context.Principal?.Claims.Select(c => $"{c.Type}={c.Value}") ?? Array.Empty<string>()));
-            return Task.CompletedTask;
-        },
-        OnAuthenticationFailed = context =>
-        {
-            var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-            logger.LogError("Demo1 Authentication failed: {Error}", context.Exception?.Message);
-            return Task.CompletedTask;
-        }
+        var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+        logger.LogDebug("Demo1 claims in ID token: {Claims}", 
+            string.Join(", ", context.Principal?.Claims.Select(c => $"{c.Type}={c.Value}") ?? Array.Empty<string>()));
+        return Task.CompletedTask;
+    };
+    options.Events.OnAuthenticationFailed = context =>
+    {
+        var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+        logger.LogError("Demo1 Authentication failed: {Error}", context.Exception?.Message);
+        return Task.CompletedTask;
     };
 });
 

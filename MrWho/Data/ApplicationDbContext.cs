@@ -27,6 +27,9 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
     public DbSet<ClientPermission> ClientPermissions { get; set; }
     public DbSet<ClientUser> ClientUsers { get; set; }
     
+    // NEW: Client secret history (hashed secrets + metadata)
+    public DbSet<ClientSecretHistory> ClientSecretHistories { get; set; }
+    
     // NEW: Identity brokering entities
     public DbSet<IdentityProvider> IdentityProviders { get; set; }
     public DbSet<ClientIdentityProvider> ClientIdentityProviders { get; set; }
@@ -76,6 +79,12 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
 
     // NEW: Claim types registry
     public DbSet<ClaimType> ClaimTypes { get; set; } = null!;
+
+    // NEW: Return URL entries (for concise URLs with expiration)
+    public DbSet<ReturnUrlEntry> ReturnUrlEntries => Set<ReturnUrlEntry>();
+
+    // NEW: Pending dynamic client registrations
+    public DbSet<PendingClientRegistration> PendingClientRegistrations => Set<PendingClientRegistration>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -151,6 +160,20 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
             entity.Property(c => c.AuthorizationCodeLifetime).HasConversion(
                 v => v.HasValue ? v.Value.TotalMinutes : (double?)null,
                 v => v.HasValue ? TimeSpan.FromMinutes(v.Value) : null);
+        });
+
+        // Configure ClientSecretHistory entity
+        builder.Entity<ClientSecretHistory>(entity =>
+        {
+            entity.HasKey(s => s.Id);
+            entity.Property(s => s.SecretHash).HasMaxLength(2000).IsRequired();
+            entity.Property(s => s.Algo).HasMaxLength(50).IsRequired();
+            entity.HasOne(s => s.Client)
+                  .WithMany()
+                  .HasForeignKey(s => s.ClientId)
+                  .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(s => new { s.ClientId, s.Status });
+            entity.HasIndex(s => new { s.ClientId, s.CreatedAt });
         });
 
         // Configure ClientUser entity (user-client assignments)
@@ -389,6 +412,16 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
         });
 
         // =========================================================================
+        // PendingClientRegistration configuration
+        // =========================================================================
+        builder.Entity<PendingClientRegistration>(entity =>
+        {
+            entity.HasKey(p => p.Id);
+            entity.HasIndex(p => new { p.Status, p.SubmittedAt });
+            entity.Property(p => p.RawRequestJson).IsRequired();
+        });
+
+        // =========================================================================
         // AUDIT LOG CONFIGURATION
         // =========================================================================
         builder.Entity<AuditLog>(entity =>
@@ -451,6 +484,13 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
             entity.Property(ct => ct.Type).IsRequired();
         });
 
+        // Configure ReturnUrlEntry entity
+        builder.Entity<ReturnUrlEntry>(b =>
+        {
+            b.HasKey(x => x.Id);
+            b.HasIndex(x => x.ExpiresAt);
+        });
+
         // Provider-specific tuning: MySQL row size limits -> move large strings to longtext
         if (Database.ProviderName?.Contains("MySql", StringComparison.OrdinalIgnoreCase) == true)
         {
@@ -500,10 +540,23 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
                 entity.Property(p => p.ReturnUrl).HasColumnType("longtext");
             });
 
+            builder.Entity<PendingClientRegistration>(entity =>
+            {
+                entity.Property(p => p.RawRequestJson).HasColumnType("longtext");
+                entity.Property(p => p.RedirectUrisCsv).HasColumnType("longtext");
+                entity.Property(p => p.Scope).HasColumnType("longtext");
+            });
+
             // Ensure audit log can store large payloads
             builder.Entity<AuditLog>(entity =>
             {
                 entity.Property(a => a.Changes).HasColumnType("longtext");
+            });
+
+            // Long text for secret hashes as well
+            builder.Entity<ClientSecretHistory>(entity =>
+            {
+                entity.Property(s => s.SecretHash).HasColumnType("longtext");
             });
         }
 
@@ -513,6 +566,18 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
             builder.Entity<AuditLog>(entity =>
             {
                 entity.Property(a => a.Changes).HasColumnType("text");
+            });
+
+            builder.Entity<PendingClientRegistration>(entity =>
+            {
+                entity.Property(p => p.RawRequestJson).HasColumnType("text");
+                entity.Property(p => p.RedirectUrisCsv).HasColumnType("text");
+                entity.Property(p => p.Scope).HasColumnType("text");
+            });
+
+            builder.Entity<ClientSecretHistory>(entity =>
+            {
+                entity.Property(s => s.SecretHash).HasColumnType("text");
             });
         }
 
@@ -595,6 +660,12 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
             {
                 if (!prop.Metadata.IsPrimaryKey())
                 {
+                    // Avoid logging sensitive secret values
+                    if (prop.Metadata.Name.Equals(nameof(Client.ClientSecret), StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
                     object? oldVal = null;
                     object? newVal = null;
 

@@ -22,16 +22,49 @@ namespace MrWho.Controllers;
 public class AuthController : Controller
 {
     private readonly IMediator _mediator;
+    private readonly IReturnUrlStore _returnUrlStore;
 
-    public AuthController(IMediator mediator)
+    public AuthController(IMediator mediator, IReturnUrlStore returnUrlStore)
     {
-        _mediator = mediator; // added
+        _mediator = mediator;
+        _returnUrlStore = returnUrlStore;
     }
 
     [HttpGet("login")]
-    [EnableRateLimiting("rl.login")] // limit login page fetches
+    [EnableRateLimiting("rl.login")]
     public async Task<IActionResult> Login(string? returnUrl = null, string? clientId = null, string? mode = null)
-        => await _mediator.Send(new LoginGetRequest(HttpContext, returnUrl, clientId, mode));
+    {
+        // If using PAR (request_uri present) or the URL is long, store and redirect to short form to keep address bar clean.
+        if (!string.IsNullOrEmpty(returnUrl) &&
+            (returnUrl.Contains("request_uri=", StringComparison.OrdinalIgnoreCase) || returnUrl.Length > 256))
+        {
+            var id = await _returnUrlStore.SaveAsync(returnUrl, clientId, TimeSpan.FromMinutes(10));
+            return Redirect($"/connect/login-short?id={Uri.EscapeDataString(id)}&clientId={Uri.EscapeDataString(clientId ?? string.Empty)}");
+        }
+        return await _mediator.Send(new LoginGetRequest(HttpContext, returnUrl, clientId, mode));
+    }
+
+    [HttpGet("login-short")]
+    [EnableRateLimiting("rl.login")]
+    public async Task<IActionResult> LoginShort(string id, string? clientId = null, string? mode = null)
+    {
+        var resolved = await _returnUrlStore.ResolveAsync(id);
+        if (string.IsNullOrEmpty(resolved))
+        {
+            // Fallback to normal login without a returnUrl
+            return await _mediator.Send(new LoginGetRequest(HttpContext, null, clientId, mode));
+        }
+        return await _mediator.Send(new LoginGetRequest(HttpContext, resolved, clientId, mode));
+    }
+
+    [HttpPost("login-short")]
+    [ValidateAntiForgeryToken]
+    [EnableRateLimiting("rl.login")]
+    public async Task<IActionResult> LoginShortPost(string id, [FromForm] LoginViewModel model, string? clientId = null)
+    {
+        var resolved = await _returnUrlStore.ResolveAsync(id);
+        return await _mediator.Send(new LoginPostRequest(HttpContext, model, resolved, clientId));
+    }
 
     [HttpPost("login")]
     [ValidateAntiForgeryToken]

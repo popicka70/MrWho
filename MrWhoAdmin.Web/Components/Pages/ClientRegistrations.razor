@@ -1,0 +1,151 @@
+@page "/identity/client-registrations"
+@attribute [Authorize]
+@rendermode InteractiveServer
+@using Radzen
+@using Radzen.Blazor
+@inject IClientRegistrationsApiService Api
+@inject NotificationService Notifications
+@inject ILogger<ClientRegistrations> Logger
+@inject NavigationManager Nav
+@inject DialogService DialogService
+
+<PageTitle>Client Registrations - MrWho Admin</PageTitle>
+
+<RadzenStack Gap="0.75rem">
+    <RadzenText TextStyle="TextStyle.H3" TagName="TagName.H1" class="rz-pt-4">
+        <RadzenIcon Icon="app_registration" class="rz-me-1" />
+        Pending Client Registrations
+    </RadzenText>
+
+    <RadzenCard>
+        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" class="rz-mb-3">
+            <RadzenButton Icon="refresh" Text="Refresh" ButtonStyle="ButtonStyle.Light" Click="@(async ()=> await LoadAsync())" />
+        </RadzenStack>
+
+        @if (isLoading)
+        {
+            <RadzenProgressBarCircular ShowValue="false" Mode="ProgressBarMode.Indeterminate" />
+            <RadzenText class="rz-mt-3">Loading pending registrations...</RadzenText>
+        }
+        else if (items.Count == 0)
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Info" ShowIcon="true">
+                <RadzenText>No pending client registrations.</RadzenText>
+            </RadzenAlert>
+        }
+        else
+        {
+            <RadzenDataGrid Data="@items" TItem="PendingClientRegistrationItem" AllowPaging="true" PageSize="20">
+                <Columns>
+                    <RadzenDataGridColumn TItem="PendingClientRegistrationItem" Property="ClientName" Title="Client" />
+                    <RadzenDataGridColumn TItem="PendingClientRegistrationItem" Property="SubmittedByUserName" Title="Submitted By" />
+                    <RadzenDataGridColumn TItem="PendingClientRegistrationItem" Property="SubmittedAt" Title="Submitted" />
+                    <RadzenDataGridColumn TItem="PendingClientRegistrationItem" Property="TokenEndpointAuthMethod" Title="Auth Method" />
+                    <RadzenDataGridColumn TItem="PendingClientRegistrationItem" Property="Scope" Title="Scopes" />
+                    <RadzenDataGridColumn TItem="PendingClientRegistrationItem" Title="Actions" Width="280px" Sortable="false">
+                        <Template Context="it">
+                            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                                <RadzenButton Text="View" Icon="visibility" Click="@(async ()=> await ViewDetails(it))" />
+                                <RadzenButton Text="Approve" Icon="check" ButtonStyle="ButtonStyle.Success" Click="@(async ()=> await ApproveAsync(it))" />
+                                <RadzenButton Text="Reject" Icon="close" ButtonStyle="ButtonStyle.Danger" Click="@(async ()=> await RejectAsync(it))" />
+                            </RadzenStack>
+                        </Template>
+                    </RadzenDataGridColumn>
+                </Columns>
+            </RadzenDataGrid>
+        }
+    </RadzenCard>
+</RadzenStack>
+
+@code {
+    private bool isLoading = true;
+    private List<PendingClientRegistrationItem> items = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        try
+        {
+            var pageResult = await Api.GetPendingAsync(1, 50);
+            items = pageResult.Items ?? new();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load pending client registrations");
+            Notifications.Notify(NotificationSeverity.Error, "Error", "Failed to load pending client registrations");
+        }
+        finally { isLoading = false; }
+    }
+
+    private async Task ViewDetails(PendingClientRegistrationItem item)
+    {
+        try
+        {
+            var details = await Api.GetAsync(item.Id);
+            if (details == null)
+            {
+                Notifications.Notify(NotificationSeverity.Warning, "Not Found", "Registration not found");
+                return;
+            }
+            var parameters = new Dictionary<string, object?> { ["Details"] = details };
+            await DialogService.OpenAsync<ClientRegistrationDetailsDialog>($"Registration {details.Id}", parameters, new DialogOptions { Width = "900px", Height = "600px" });
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load registration details");
+        }
+    }
+
+    private async Task ApproveAsync(PendingClientRegistrationItem item)
+    {
+        try
+        {
+            var result = await Api.ApproveAsync(item.Id);
+            if (result == null)
+            {
+                Notifications.Notify(NotificationSeverity.Error, "Error", "Approve failed");
+                return;
+            }
+            var clientId = !string.IsNullOrWhiteSpace(result.ClientId) ? result.ClientId : result.Client_Id;
+            Notifications.Notify(NotificationSeverity.Success, "Approved", $"Created client {clientId}");
+            await LoadAsync();
+            if (!string.IsNullOrWhiteSpace(clientId))
+            {
+                Nav.NavigateTo($"/clients?search={Uri.EscapeDataString(clientId)}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Approve failed");
+            Notifications.Notify(NotificationSeverity.Error, "Error", "Approve failed");
+        }
+    }
+
+    private async Task RejectAsync(PendingClientRegistrationItem item)
+    {
+        try
+        {
+            var result = await DialogService.OpenAsync<RejectReasonDialog>("Reject registration", null, new DialogOptions { Width = "600px" });
+            var reason = result as string;
+            if (reason == null) return; // canceled
+            var ok = await Api.RejectAsync(item.Id, reason);
+            if (!ok)
+            {
+                Notifications.Notify(NotificationSeverity.Error, "Error", "Reject failed");
+                return;
+            }
+            Notifications.Notify(NotificationSeverity.Success, "Rejected", $"Rejected {item.ClientName}");
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Reject failed");
+            Notifications.Notify(NotificationSeverity.Error, "Error", "Reject failed");
+        }
+    }
+}

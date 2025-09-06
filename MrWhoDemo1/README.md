@@ -53,7 +53,7 @@ Use these credentials when redirected to the MrWho Identity Server:
 ### Client Configuration
 
 - **Client ID**: `mrwho_demo1`
-- **Client Secret**: `Demo1Secret2024!`
+- **Client Secret**: `FTZvvlIIFdmtBg7IdBql9EEXRDj1xwLmi1qW9fGbJBY`
 - **Realm**: `demo`
 - **Client Type**: Confidential
 - **Flows**: Authorization Code Flow with PKCE

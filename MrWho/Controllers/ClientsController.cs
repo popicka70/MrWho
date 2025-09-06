@@ -4,9 +4,11 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MrWho.Data;
 using MrWho.Models;
+using MrWho.Services; // added
+using MrWho.Shared;
 using MrWho.Shared.Models;
 using OpenIddict.Abstractions;
-using MrWho.Shared;
+using OpenIddict.EntityFrameworkCore.Models;
 
 namespace MrWho.Controllers;
 
@@ -19,17 +21,53 @@ public class ClientsController : ControllerBase
     private readonly ILogger<ClientsController> _logger;
     private readonly IOpenIddictApplicationManager _applicationManager;
     private readonly UserManager<IdentityUser> _userManager;
+    private readonly IClientSecretService _clientSecretService; // added
 
     public ClientsController(
         ApplicationDbContext context, 
         ILogger<ClientsController> logger,
         IOpenIddictApplicationManager applicationManager,
-        UserManager<IdentityUser> userManager)
+        UserManager<IdentityUser> userManager,
+        IClientSecretService clientSecretService) // added
     {
         _context = context;
         _logger = logger;
         _applicationManager = applicationManager;
         _userManager = userManager;
+        _clientSecretService = clientSecretService;
+    }
+
+    /// <summary>
+    /// Rotate client secret. Returns the new plaintext once. Admin-only.
+    /// </summary>
+    [HttpPost("{id}/rotate-secret")]
+    public async Task<ActionResult<object>> RotateSecret(string id, [FromBody] RotateClientSecretRequest? request)
+    {
+        var client = await _context.Clients.FirstOrDefaultAsync(c => c.Id == id || c.ClientId == id);
+        if (client is null)
+            return NotFound("Client not found");
+
+        var requiresSecret = (client.ClientType == ClientType.Confidential || client.ClientType == ClientType.Machine) && client.RequireClientSecret;
+        if (!requiresSecret)
+            return BadRequest("This client type does not use client secrets");
+
+        var expiresAt = request?.ExpiresAtUtc;
+        var retireOld = request?.RetireOld ?? true;
+
+        var result = await _clientSecretService.SetNewSecretAsync(client.Id, providedPlaintext: request?.NewSecret, expiresAt: expiresAt, markOldAsRetired: retireOld);
+        var plain = result.plainSecret ?? request?.NewSecret;
+
+        try
+        {
+            await UpdateOpenIddictApplication(client, plaintextSecret: plain);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to sync rotated secret with OpenIddict for client {ClientId}", client.ClientId);
+        }
+
+        var response = new { clientId = client.ClientId, secret = plain, expiresAtUtc = result.record.ExpiresAt };
+        return Ok(response);
     }
 
     [HttpGet]
@@ -155,7 +193,9 @@ public class ClientsController : ControllerBase
                 PrimaryAudience = c.PrimaryAudience,
                 IncludeAudInIdToken = c.IncludeAudInIdToken,
                 RequireExplicitAudienceScope = c.RequireExplicitAudienceScope,
-                RoleInclusionOverride = c.RoleInclusionOverride
+                RoleInclusionOverride = c.RoleInclusionOverride,
+                // PAR
+                ParMode = c.ParMode
             })
             .ToListAsync();
 
@@ -266,6 +306,7 @@ public class ClientsController : ControllerBase
             CustomLoginPageUrl = client.CustomLoginPageUrl,
             CustomLogoutPageUrl = client.CustomLogoutPageUrl,
             CustomErrorPageUrl = client.CustomErrorPageUrl,
+            // login options
             AllowPasskeyLogin = client.AllowPasskeyLogin,
             AllowQrLoginQuick = client.AllowQrLoginQuick,
             AllowQrLoginSecure = client.AllowQrLoginSecure,
@@ -274,7 +315,9 @@ public class ClientsController : ControllerBase
             PrimaryAudience = client.PrimaryAudience,
             IncludeAudInIdToken = client.IncludeAudInIdToken,
             RequireExplicitAudienceScope = client.RequireExplicitAudienceScope,
-            RoleInclusionOverride = client.RoleInclusionOverride
+            RoleInclusionOverride = client.RoleInclusionOverride,
+            // PAR
+            ParMode = client.ParMode
         };
 
         return Ok(clientDto);
@@ -475,7 +518,9 @@ public class ClientsController : ControllerBase
             RequireExplicitAudienceScope = client.RequireExplicitAudienceScope,
             ExportedBy = User?.Identity?.Name ?? "System",
             ExportedAtUtc = DateTime.UtcNow,
-            FormatVersion = "1.2"
+            FormatVersion = "1.2",
+            // PAR
+            ParMode = client.ParMode
         };
         // Assigned users (by username/email only)
         var assignedUsers = await _context.ClientUsers
@@ -524,6 +569,8 @@ public class ClientsController : ControllerBase
                 var now = DateTime.UtcNow;
                 var userName = User?.Identity?.Name;
 
+                var requiresSecret = (dto.ClientType == ClientType.Confidential || dto.ClientType == ClientType.Machine) && dto.RequireClientSecret;
+
                 if (client == null)
                 {
                     client = new Client
@@ -538,10 +585,11 @@ public class ClientsController : ControllerBase
                     _context.Clients.Add(client);
 
                     // If confidential and requires secret, generate one
-                    if ((dto.ClientType == ClientType.Confidential || dto.ClientType == ClientType.Machine) && dto.RequireClientSecret)
+                    if (requiresSecret)
                     {
                         generatedSecret = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
-                        client.ClientSecret = generatedSecret;
+                        // Use redaction marker in entity; actual hash recorded below after SaveChanges
+                        client.ClientSecret = "{HASHED}";
                     }
                 }
 
@@ -561,6 +609,8 @@ public class ClientsController : ControllerBase
                 client.AuthorizationCodeLifetime = dto.AuthorizationCodeLifetime;
                 client.IdTokenLifetimeMinutes = dto.IdTokenLifetimeMinutes;
                 client.DeviceCodeLifetimeMinutes = dto.DeviceCodeLifetimeMinutes;
+                // PAR
+                client.ParMode = dto.ParMode;
 
                 client.SessionTimeoutHours = dto.SessionTimeoutHours;
                 client.UseSlidingSessionExpiration = dto.UseSlidingSessionExpiration;
@@ -651,48 +701,10 @@ public class ClientsController : ControllerBase
 
                 await _context.SaveChangesAsync();
 
-                // Apply assigned users if provided
-                if (dto.AssignedUsers?.Count > 0)
+                // If we generated a secret for this import, create a history record now
+                if (requiresSecret && !string.IsNullOrWhiteSpace(generatedSecret))
                 {
-                    // Load current assignments
-                    var currentAssignments = await _context.ClientUsers.Where(cu => cu.ClientId == client.Id).ToListAsync();
-
-                    // Build target user IDs from references
-                    var targetUserIds = new HashSet<string>();
-                    foreach (var uref in dto.AssignedUsers)
-                    {
-                        IdentityUser? user = null;
-                        if (!string.IsNullOrWhiteSpace(uref.UserName))
-                            user = await _userManager.FindByNameAsync(uref.UserName);
-                        if (user == null && !string.IsNullOrWhiteSpace(uref.Email))
-                            user = await _userManager.FindByEmailAsync(uref.Email);
-
-                        if (user != null)
-                        {
-                            targetUserIds.Add(user.Id);
-                            if (!currentAssignments.Any(a => a.UserId == user.Id))
-                            {
-                                _context.ClientUsers.Add(new ClientUser
-                                {
-                                    ClientId = client.Id,
-                                    UserId = user.Id,
-                                    CreatedAt = now,
-                                    CreatedBy = userName
-                                });
-                            }
-                        }
-                    }
-
-                    // Remove assignments that are not in import list
-                    foreach (var ass in currentAssignments)
-                    {
-                        if (!targetUserIds.Contains(ass.UserId))
-                        {
-                            _context.ClientUsers.Remove(ass);
-                        }
-                    }
-
-                    await _context.SaveChangesAsync();
+                    await _clientSecretService.SetNewSecretAsync(client.Id, providedPlaintext: generatedSecret);
                 }
 
                 await tx.CommitAsync();
@@ -735,7 +747,6 @@ public class ClientsController : ControllerBase
                     Scopes = full.Scopes.Select(s => s.Scope).ToList(),
                     Permissions = full.Permissions.Select(p => p.Permission).ToList(),
                     Audiences = full.Audiences.Select(a => a.Audience).ToList(),
-
                     // dynamic fields
                     SessionTimeoutHours = full.SessionTimeoutHours,
                     UseSlidingSessionExpiration = full.UseSlidingSessionExpiration,
@@ -786,12 +797,13 @@ public class ClientsController : ControllerBase
                     CustomLoginPageUrl = full.CustomLoginPageUrl,
                     CustomLogoutPageUrl = full.CustomLogoutPageUrl,
                     CustomErrorPageUrl = full.CustomErrorPageUrl,
-
                     // login options
                     AllowPasskeyLogin = full.AllowPasskeyLogin,
                     AllowQrLoginQuick = full.AllowQrLoginQuick,
                     AllowQrLoginSecure = full.AllowQrLoginSecure,
-                    AllowCodeLogin = full.AllowCodeLogin
+                    AllowCodeLogin = full.AllowCodeLogin,
+                    // PAR
+                    ParMode = full.ParMode
                 };
 
                 var result = new ClientImportResult
@@ -849,7 +861,8 @@ public class ClientsController : ControllerBase
                 var client = new Client
                 {
                     ClientId = request.ClientId,
-                    ClientSecret = request.ClientSecret,
+                    // Do NOT store plaintext; use redaction marker to avoid leakage
+                    ClientSecret = requiresSecret ? "{HASHED}" : null,
                     Name = request.Name,
                     Description = request.Description,
                     RealmId = request.RealmId,
@@ -877,7 +890,10 @@ public class ClientsController : ControllerBase
                     PrimaryAudience = request.PrimaryAudience,
                     IncludeAudInIdToken = request.IncludeAudInIdToken,
                     RequireExplicitAudienceScope = request.RequireExplicitAudienceScope,
-                    RoleInclusionOverride = request.RoleInclusionOverride
+                    RoleInclusionOverride = request.RoleInclusionOverride,
+
+                    // PAR
+                    ParMode = request.ParMode
                 };
 
                 _context.Clients.Add(client);
@@ -935,8 +951,14 @@ public class ClientsController : ControllerBase
 
                 await _context.SaveChangesAsync();
 
+                // Hash and record secret only after client exists in DB
+                if (requiresSecret && !string.IsNullOrWhiteSpace(request.ClientSecret))
+                {
+                    await _clientSecretService.SetNewSecretAsync(client.Id, providedPlaintext: request.ClientSecret);
+                }
+                
                 // Create OpenIddict application only if valid
-                if (!requiresSecret || !string.IsNullOrWhiteSpace(client.ClientSecret))
+                if (!requiresSecret || !string.IsNullOrWhiteSpace(request.ClientSecret))
                 {
                     await CreateOpenIddictApplication(client, request);
                 }
@@ -985,7 +1007,9 @@ public class ClientsController : ControllerBase
                     AllowPasskeyLogin = client.AllowPasskeyLogin,
                     AllowQrLoginQuick = client.AllowQrLoginQuick,
                     AllowQrLoginSecure = client.AllowQrLoginSecure,
-                    AllowCodeLogin = client.AllowCodeLogin
+                    AllowCodeLogin = client.AllowCodeLogin,
+                    // PAR
+                    ParMode = client.ParMode
                 };
 
                 return CreatedAtAction(nameof(GetClient), new { id = client.Id }, clientDto);
@@ -1021,10 +1045,14 @@ public class ClientsController : ControllerBase
         // validate secret requirement before persisting/creating openiddict app
         var targetType = request.ClientType ?? client.ClientType;
         var requireSecret = (targetType == ClientType.Confidential || targetType == ClientType.Machine) && (request.RequireClientSecret ?? client.RequireClientSecret);
-        var targetSecret = string.IsNullOrWhiteSpace(request.ClientSecret) ? client.ClientSecret : request.ClientSecret;
-        if (requireSecret && string.IsNullOrWhiteSpace(targetSecret))
+
+        // Allow update without re-entering secret if an active (non-expired) secret exists in history
+        var hasActiveSecret = await _context.ClientSecretHistories
+            .AnyAsync(h => h.ClientId == client.Id && h.Status == ClientSecretStatus.Active && (h.ExpiresAt == null || h.ExpiresAt > DateTime.UtcNow));
+
+        if (requireSecret && string.IsNullOrWhiteSpace(request.ClientSecret) && !hasActiveSecret)
         {
-            return ValidationProblem("ClientSecret is required for confidential or machine clients when RequireClientSecret is true.");
+            return ValidationProblem("ClientSecret is required for confidential or machine clients when no active secret exists. Provide it once or rotate the secret.");
         }
 
         // Use execution strategy for transaction handling with retry support
@@ -1035,8 +1063,7 @@ public class ClientsController : ControllerBase
             try
             {
                 // Update basic properties
-                if (!string.IsNullOrEmpty(request.ClientSecret))
-                    client.ClientSecret = request.ClientSecret;
+                // Do NOT assign plaintext secret directly; handle rotation later
                 if (!string.IsNullOrEmpty(request.Name))
                     client.Name = request.Name;
                 client.Description = request.Description;
@@ -1121,20 +1148,7 @@ public class ClientsController : ControllerBase
                 client.CustomLogoutPageUrl = request.CustomLogoutPageUrl;
                 client.CustomErrorPageUrl = request.CustomErrorPageUrl;
 
-                // login options
-                client.AllowPasskeyLogin = request.AllowPasskeyLogin;
-                client.AllowQrLoginQuick = request.AllowQrLoginQuick;
-                client.AllowQrLoginSecure = request.AllowQrLoginSecure;
-                client.AllowCodeLogin = request.AllowCodeLogin;
-
-                client.AudienceMode = request.AudienceMode;
-                client.PrimaryAudience = request.PrimaryAudience;
-                client.IncludeAudInIdToken = request.IncludeAudInIdToken;
-                client.RequireExplicitAudienceScope = request.RequireExplicitAudienceScope;
-                client.RoleInclusionOverride = request.RoleInclusionOverride;
-
-                client.UpdatedAt = DateTime.UtcNow;
-                client.UpdatedBy = User.Identity?.Name;
+                client.ParMode = request.ParMode;
 
                 // Update redirect URIs if provided
                 if (request.RedirectUris != null)
@@ -1208,18 +1222,25 @@ public class ClientsController : ControllerBase
 
                 await _context.SaveChangesAsync();
                 _logger.LogInformation("Client '{ClientId}' updated in database", client.ClientId);
-                
-                // Update OpenIddict application (only if valid)
-                if (!requireSecret || !string.IsNullOrWhiteSpace(client.ClientSecret))
-                {
-                    await UpdateOpenIddictApplication(client);
-                }
-                else
-                {
-                    _logger.LogWarning("Skipping OpenIddict application update for client '{ClientId}' due to missing secret for confidential/machine client.", client.ClientId);
-                }
 
+                // Rotate secret if a new one is provided
+                if (!string.IsNullOrWhiteSpace(request.ClientSecret))
+                {
+                    // Ensure redaction marker on the entity and create history record
+                    await _clientSecretService.SetNewSecretAsync(client.Id, providedPlaintext: request.ClientSecret);
+                }
+                
                 await transaction.CommitAsync();
+
+                // Try syncing OpenIddict after committing DB changes so DB update never rolls back due to sync issues
+                try
+                {
+                    await UpdateOpenIddictApplication(client, request.ClientSecret);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "OpenIddict sync failed for client '{ClientId}'. DB changes were committed.", client.ClientId);
+                }
 
                 _logger.LogInformation("Client '{ClientId}' updated successfully", client.ClientId);
                 
@@ -1316,7 +1337,10 @@ public class ClientsController : ControllerBase
                     AllowPasskeyLogin = client.AllowPasskeyLogin,
                     AllowQrLoginQuick = client.AllowQrLoginQuick,
                     AllowQrLoginSecure = client.AllowQrLoginSecure,
-                    AllowCodeLogin = client.AllowCodeLogin
+                    AllowCodeLogin = client.AllowCodeLogin,
+
+                    // PAR
+                    ParMode = client.ParMode
                 };
 
                 return clientDto;
@@ -1337,7 +1361,7 @@ public class ClientsController : ControllerBase
         var descriptor = new OpenIddictApplicationDescriptor
         {
             ClientId = client.ClientId,
-            ClientSecret = client.ClientSecret,
+            ClientSecret = request.ClientSecret, // use plaintext provided at creation
             DisplayName = client.Name,
             ClientType = client.ClientType == ClientType.Public 
                 ? OpenIddictConstants.ClientTypes.Public 
@@ -1369,22 +1393,61 @@ public class ClientsController : ControllerBase
 
         descriptor.Permissions.Add(OpenIddictConstants.Permissions.Endpoints.Token);
 
-        // Add scopes and permissions
-        foreach (var scope in request.Scopes)
+        // PAR permissions and requirements
+        if (client.ParMode is PushedAuthorizationMode.Enabled or PushedAuthorizationMode.Required)
         {
-            if (scope == "openid")
-                descriptor.Permissions.Add("oidc:scope:openid");
-            else if (scope == "email")
-                descriptor.Permissions.Add(OpenIddictConstants.Permissions.Scopes.Email);
-            else if (scope == "profile")
-                descriptor.Permissions.Add(OpenIddictConstants.Permissions.Scopes.Profile);
-            else if (scope == "roles")
-                descriptor.Permissions.Add(OpenIddictConstants.Permissions.Scopes.Roles);
+            descriptor.Permissions.Add(OpenIddictConstants.Permissions.Endpoints.PushedAuthorization);
+        }
+        if (client.ParMode is PushedAuthorizationMode.Required)
+        {
+            descriptor.Requirements.Add(OpenIddictConstants.Requirements.Features.PushedAuthorizationRequests);
         }
 
+        // Add scopes as application permissions (scp:*)
+        var hasOpenId = false;
+        foreach (var scope in request.Scopes)
+        {
+            if (string.Equals(scope, "openid", StringComparison.OrdinalIgnoreCase))
+            {
+                descriptor.Permissions.Add("scp:openid");
+                hasOpenId = true;
+            }
+            else
+            {
+                descriptor.Permissions.Add($"scp:{scope}");
+            }
+        }
+        if (hasOpenId)
+        {
+            descriptor.Permissions.Add(OpenIddictConstants.Permissions.Endpoints.EndSession);
+        }
+
+        // Add endpoint permissions based on configured flags
+        if (client.AllowAccessToUserInfoEndpoint == true && hasOpenId)
+        {
+            descriptor.Permissions.Add("endpoints.userinfo");
+        }
+        if (client.AllowAccessToRevocationEndpoint == true)
+        {
+            descriptor.Permissions.Add("endpoints.revocation");
+        }
+        if (client.AllowAccessToIntrospectionEndpoint == true)
+        {
+            descriptor.Permissions.Add("endpoints.introspection");
+        }
+
+        // Include any additional stored permissions verbatim (excluding legacy forms)
         foreach (var permission in request.Permissions)
         {
-            descriptor.Permissions.Add(permission);
+            if (permission is "endpoints:userinfo" or "endpoints:revocation" or "endpoints:introspection" ||
+                permission is "endpoints/userinfo" or "endpoints/revocation" or "endpoints/introspection")
+            {
+                continue;
+            }
+            if (!descriptor.Permissions.Contains(permission))
+            {
+                descriptor.Permissions.Add(permission);
+            }
         }
 
         // Add redirect URIs
@@ -1402,28 +1465,167 @@ public class ClientsController : ControllerBase
         await _applicationManager.CreateAsync(descriptor);
     }
 
-    private async Task UpdateOpenIddictApplication(Client client)
+    private async Task UpdateOpenIddictApplication(Client client, string? plaintextSecret = null)
     {
-        var openIddictClient = await _applicationManager.FindByClientIdAsync(client.ClientId);
-        if (openIddictClient != null)
+        // Ensure we have all related navigation properties loaded for URIs/scopes/permissions
+        var fullClient = await _context.Clients
+            .Include(c => c.RedirectUris)
+            .Include(c => c.PostLogoutUris)
+            .Include(c => c.Scopes)
+            .Include(c => c.Permissions)
+            .FirstOrDefaultAsync(c => c.Id == client.Id);
+
+        if (fullClient is null)
         {
-            await _applicationManager.DeleteAsync(openIddictClient);
-            
-            var request = new CreateClientRequest
+            _logger.LogWarning("Unable to load client '{ClientId}' for OpenIddict sync.", client.ClientId);
+            return;
+        }
+
+        var existing = await _applicationManager.FindByClientIdAsync(fullClient.ClientId);
+
+        // Build a descriptor reflecting the latest state
+        var descriptor = new OpenIddictApplicationDescriptor
+        {
+            ClientId = fullClient.ClientId,
+            DisplayName = fullClient.Name,
+            ClientType = fullClient.ClientType == ClientType.Public
+                ? OpenIddictConstants.ClientTypes.Public
+                : OpenIddictConstants.ClientTypes.Confidential
+        };
+
+        // Determine if a secret is required for this client
+        var requiresSecret = fullClient.ClientType != ClientType.Public && fullClient.RequireClientSecret;
+
+        // If caller provided a plaintext secret (e.g., rotation), set it. Otherwise, reuse existing stored secret on update
+        if (requiresSecret)
+        {
+            if (!string.IsNullOrWhiteSpace(plaintextSecret))
             {
-                ClientId = client.ClientId,
-                ClientSecret = client.ClientSecret,
-                Name = client.Name,
-                Description = client.Description,
-                RealmId = client.RealmId,
-                ClientType = client.ClientType,
-                RedirectUris = client.RedirectUris.Select(ru => ru.Uri).ToList(),
-                PostLogoutUris = client.PostLogoutUris.Select(plu => plu.Uri).ToList(),
-                Scopes = client.Scopes.Select(s => s.Scope).ToList(),
-                Permissions = client.Permissions.Select(p => p.Permission).ToList()
-            };
-            
-            await CreateOpenIddictApplication(client, request);
+                descriptor.ClientSecret = plaintextSecret;
+            }
+            else if (existing is OpenIddictEntityFrameworkCoreApplication efApp && !string.IsNullOrWhiteSpace(efApp.ClientSecret))
+            {
+                // Preserve current secret by copying the stored value from OpenIddict store (typically hashed)
+                descriptor.ClientSecret = efApp.ClientSecret;
+            }
+        }
+
+        // Grants/endpoints
+        if (fullClient.AllowAuthorizationCodeFlow)
+        {
+            descriptor.Permissions.Add(OpenIddictConstants.Permissions.GrantTypes.AuthorizationCode);
+            descriptor.Permissions.Add(OpenIddictConstants.Permissions.Endpoints.Authorization);
+            descriptor.Permissions.Add(OpenIddictConstants.Permissions.ResponseTypes.Code);
+        }
+        if (fullClient.AllowClientCredentialsFlow)
+        {
+            descriptor.Permissions.Add(OpenIddictConstants.Permissions.GrantTypes.ClientCredentials);
+        }
+        if (fullClient.AllowPasswordFlow)
+        {
+            descriptor.Permissions.Add(OpenIddictConstants.Permissions.GrantTypes.Password);
+        }
+        if (fullClient.AllowRefreshTokenFlow)
+        {
+            descriptor.Permissions.Add(OpenIddictConstants.Permissions.GrantTypes.RefreshToken);
+        }
+        descriptor.Permissions.Add(OpenIddictConstants.Permissions.Endpoints.Token);
+
+        // PAR
+        if (fullClient.ParMode is PushedAuthorizationMode.Enabled or PushedAuthorizationMode.Required)
+        {
+            descriptor.Permissions.Add(OpenIddictConstants.Permissions.Endpoints.PushedAuthorization);
+        }
+        if (fullClient.ParMode is PushedAuthorizationMode.Required)
+        {
+            descriptor.Requirements.Add(OpenIddictConstants.Requirements.Features.PushedAuthorizationRequests);
+        }
+
+        // Scopes as permissions
+        var hasOpenId = false;
+        foreach (var s in fullClient.Scopes.Select(s => s.Scope))
+        {
+            if (string.Equals(s, "openid", StringComparison.OrdinalIgnoreCase))
+            {
+                descriptor.Permissions.Add("scp:openid");
+                hasOpenId = true;
+            }
+            else
+            {
+                descriptor.Permissions.Add($"scp:{s}");
+            }
+        }
+        if (hasOpenId)
+        {
+            descriptor.Permissions.Add(OpenIddictConstants.Permissions.Endpoints.EndSession);
+        }
+
+        if (fullClient.AllowAccessToUserInfoEndpoint == true && hasOpenId)
+        {
+            descriptor.Permissions.Add("endpoints.userinfo");
+        }
+        if (fullClient.AllowAccessToRevocationEndpoint == true)
+        {
+            descriptor.Permissions.Add("endpoints.revocation");
+        }
+        if (fullClient.AllowAccessToIntrospectionEndpoint == true)
+        {
+            descriptor.Permissions.Add("endpoints.introspection");
+        }
+
+        // Additional stored permissions
+        foreach (var p in fullClient.Permissions.Select(p => p.Permission))
+        {
+            if (p is "endpoints:userinfo" or "endpoints:revocation" or "endpoints:introspection" ||
+                p is "endpoints/userinfo" or "endpoints/revocation" or "endpoints/introspection")
+            {
+                continue;
+            }
+            if (!descriptor.Permissions.Contains(p))
+            {
+                descriptor.Permissions.Add(p);
+            }
+        }
+
+        // URIs
+        foreach (var uri in fullClient.RedirectUris.Select(ru => ru.Uri))
+        {
+            if (Uri.TryCreate(uri, UriKind.Absolute, out var u))
+            {
+                descriptor.RedirectUris.Add(u);
+            }
+        }
+        foreach (var uri in fullClient.PostLogoutUris.Select(pl => pl.Uri))
+        {
+            if (Uri.TryCreate(uri, UriKind.Absolute, out var u))
+            {
+                descriptor.PostLogoutRedirectUris.Add(u);
+            }
+        }
+
+        if (existing is null)
+        {
+            // If missing, only create when public or when we have a plaintext/existing secret
+            if (requiresSecret && string.IsNullOrWhiteSpace(descriptor.ClientSecret))
+            {
+                _logger.LogWarning("OpenIddict application for confidential client '{ClientId}' not found and no secret provided/available. Skipping creation.", fullClient.ClientId);
+                return;
+            }
+
+            await _applicationManager.CreateAsync(descriptor);
+            _logger.LogInformation("OpenIddict application created for client '{ClientId}'", fullClient.ClientId);
+        }
+        else
+        {
+            // If secret is required but we still don't have one, skip update to avoid clearing it
+            if (requiresSecret && string.IsNullOrWhiteSpace(descriptor.ClientSecret))
+            {
+                _logger.LogWarning("Skipping OpenIddict update for client '{ClientId}' because secret is required but not available. Rotate or supply plaintext to update.", fullClient.ClientId);
+                return;
+            }
+
+            await _applicationManager.UpdateAsync(existing, descriptor);
+            _logger.LogInformation("OpenIddict application updated for client '{ClientId}'", fullClient.ClientId);
         }
     }
 

@@ -48,7 +48,7 @@ public class AdditionalAuthFlowTests
         {
             ["grant_type"] = "password",
             ["client_id"] = "mrwho_admin_web",
-            ["client_secret"] = "MrWhoAdmin2024!SecretKey",
+            ["client_secret"] = "FTZvvlIIFdmtBg7IdBql9EEXRDj1xwLmi1qW9fGbJBY",
             ["username"] = "demo1@example.com", // belongs to demo realm
             ["password"] = "Dem0!User#2025",
             ["scope"] = "openid profile email offline_access mrwho.use"
@@ -67,7 +67,7 @@ public class AdditionalAuthFlowTests
         {
             ["grant_type"] = "password",
             ["client_id"] = "mrwho_admin_web",
-            ["client_secret"] = "MrWhoAdmin2024!SecretKey",
+            ["client_secret"] = "FTZvvlIIFdmtBg7IdBql9EEXRDj1xwLmi1qW9fGbJBY",
             ["username"] = "admin@mrwho.local",
             ["password"] = "Adm1n#2025!G7x",
             ["scope"] = "openid profile email offline_access" // missing mrwho.use

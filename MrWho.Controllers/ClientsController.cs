@@ -31,6 +31,7 @@ public class ClientsController : ControllerBase
             .Select(c => new ClientDto
             {
                 // ...existing mapped properties before audiences...
+                ParMode = c.ParMode,
                 Audiences = c.Audiences.Select(a => a.Audience).ToList(),
                 AudienceMode = c.AudienceMode,
                 PrimaryAudience = c.PrimaryAudience,
@@ -58,6 +59,7 @@ public class ClientsController : ControllerBase
         var dto = new ClientDto
         {
             // ...existing mappings...
+            ParMode = client.ParMode,
             Audiences = client.Audiences.Select(a => a.Audience).ToList(),
             AudienceMode = client.AudienceMode,
             PrimaryAudience = client.PrimaryAudience,
@@ -80,6 +82,7 @@ public class ClientsController : ControllerBase
         var client = new Client
         {
             // ...existing assignments...
+            ParMode = request.ParMode,
             AudienceMode = request.AudienceMode,
             PrimaryAudience = request.PrimaryAudience,
             IncludeAudInIdToken = request.IncludeAudInIdToken,
@@ -104,6 +107,7 @@ public class ClientsController : ControllerBase
         var dto = new ClientDto
         {
             // ...existing mappings...
+            ParMode = client.ParMode,
             Audiences = client.Audiences.Select(a => a.Audience).ToList(),
             AudienceMode = client.AudienceMode,
             PrimaryAudience = client.PrimaryAudience,
@@ -128,6 +132,7 @@ public class ClientsController : ControllerBase
             .FirstOrDefaultAsync(c => c.Id == id || c.ClientId == id);
         if (client == null) return NotFound();
         // ...existing property updates...
+        if (request.ParMode.HasValue) client.ParMode = request.ParMode;
         if (request.AudienceMode.HasValue) client.AudienceMode = request.AudienceMode;
         if (request.PrimaryAudience != null) client.PrimaryAudience = request.PrimaryAudience;
         if (request.IncludeAudInIdToken.HasValue) client.IncludeAudInIdToken = request.IncludeAudInIdToken;
@@ -153,6 +158,7 @@ public class ClientsController : ControllerBase
         var dto = new ClientDto
         {
             // ...existing mappings...
+            ParMode = client.ParMode,
             Audiences = client.Audiences.Select(a => a.Audience).ToList(),
             AudienceMode = client.AudienceMode,
             PrimaryAudience = client.PrimaryAudience,
@@ -176,6 +182,7 @@ public class ClientsController : ControllerBase
         var export = new ClientExportDto
         {
             // ...existing mappings...
+            ParMode = client.ParMode,
             Audiences = client.Audiences.Select(a=>a.Audience).ToList(),
             AudienceMode = client.AudienceMode,
             PrimaryAudience = client.PrimaryAudience,
@@ -196,6 +203,7 @@ public class ClientsController : ControllerBase
     {
         // ...existing logic before applying simple props...
         // After locating client entity 'client'
+        client.ParMode = dto.ParMode;
         client.AudienceMode = dto.AudienceMode;
         client.PrimaryAudience = dto.PrimaryAudience;
         client.IncludeAudInIdToken = dto.IncludeAudInIdToken;
