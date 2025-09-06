@@ -39,6 +39,9 @@ public partial class Client
     public bool RequirePkce { get; set; } = true;
     public bool RequireClientSecret { get; set; } = true;
 
+    // PAR (Pushed Authorization Requests) mode
+    public PushedAuthorizationMode? ParMode { get; set; }
+
     // =========================================================================
     // DYNAMIC TOKEN LIFETIME CONFIGURATION
     // =========================================================================

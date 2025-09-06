@@ -26,6 +26,9 @@ public class ClientExportDto
     public bool RequirePkce { get; set; }
     public bool RequireClientSecret { get; set; }
 
+    // PAR
+    public PushedAuthorizationMode? ParMode { get; set; }
+
     // Token lifetimes
     public TimeSpan? AccessTokenLifetime { get; set; }
     public TimeSpan? RefreshTokenLifetime { get; set; }
