@@ -273,7 +273,7 @@ public class OidcClientService : IOidcClientService
             adminClient = new Client
             {
                 ClientId = "mrwho_admin_web",
-                ClientSecret = "MrWhoAdmin2024!SecretKey",
+                ClientSecret = "MrWhoAdmin2024!SecretKey", // admin secret length is sufficient for HS256
                 Name = "MrWho Admin Web Application",
                 Description = "Official web administration interface for MrWho OIDC server",
                 RealmId = adminRealm.Id,
@@ -417,12 +417,14 @@ public class OidcClientService : IOidcClientService
             "http://localhost:5092/signout-callback-oidc"
         };
 
+        const string Demo1LongSecret = "Demo1Secret2025_SymmetricKey_32bytes!!"; // >= 32 bytes for HS256
+
         if (demo1Client == null)
         {
             demo1Client = new Client
             {
                 ClientId = "mrwho_demo1",
-                ClientSecret = "Demo1Secret2024!",
+                ClientSecret = Demo1LongSecret,
                 Name = "MrWho Demo Application 1",
                 Description = "Demo application showcasing MrWho OIDC integration",
                 RealmId = demoRealm.Id,
@@ -465,6 +467,16 @@ public class OidcClientService : IOidcClientService
                 demo1Client.UpdatedAt = DateTime.UtcNow;
                 demo1Client.UpdatedBy = "Backfill";
                 await _context.SaveChangesAsync();
+            }
+
+            // Backfill: ensure client secret is long enough for HS256 request object signatures
+            if (string.IsNullOrWhiteSpace(demo1Client.ClientSecret) || demo1Client.ClientSecret.Length < 32)
+            {
+                demo1Client.ClientSecret = Demo1LongSecret;
+                demo1Client.UpdatedAt = DateTime.UtcNow;
+                demo1Client.UpdatedBy = "Backfill";
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Updated demo1 client secret to meet HS256 length requirements");
             }
 
             // Ensure dev HTTP redirect/post-logout URIs exist
