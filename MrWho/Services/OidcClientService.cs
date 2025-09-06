@@ -111,10 +111,17 @@ public class OidcClientService : IOidcClientService
         var descriptor = new OpenIddictApplicationDescriptor
         {
             ClientId = client.ClientId,
-            ClientSecret = client.ClientSecret,
             DisplayName = client.Name,
             ClientType = client.ClientType == ClientType.Public ? OpenIddictConstants.ClientTypes.Public : OpenIddictConstants.ClientTypes.Confidential
         };
+
+        // Only propagate a concrete secret to OpenIddict when we actually have one.
+        // When the local Client.ClientSecret is the redaction marker from hashing ("{HASHED}"),
+        // skip setting ClientSecret so OpenIddict keeps its current stored hash.
+        if (!string.IsNullOrWhiteSpace(client.ClientSecret) && !string.Equals(client.ClientSecret, "{HASHED}", StringComparison.Ordinal))
+        {
+            descriptor.ClientSecret = client.ClientSecret;
+        }
 
         if (client.AllowAuthorizationCodeFlow)
         {

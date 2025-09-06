@@ -42,6 +42,10 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IOidcClientService, OidcClientService>();
         services.AddScoped<IOpenIddictScopeSyncService, OpenIddictScopeSyncService>();
 
+        // Client secret hashing and rotation services
+        services.AddSingleton<IClientSecretHasher, Pbkdf2ClientSecretHasher>();
+        services.AddScoped<IClientSecretService, ClientSecretService>();
+
         // Register client cookie services
         services.AddScoped<IDynamicCookieService, DynamicCookieService>();
         

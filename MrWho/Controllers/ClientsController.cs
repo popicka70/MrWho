@@ -7,6 +7,7 @@ using MrWho.Models;
 using MrWho.Shared.Models;
 using OpenIddict.Abstractions;
 using MrWho.Shared;
+using MrWho.Services; // added
 
 namespace MrWho.Controllers;
 
@@ -19,17 +20,20 @@ public class ClientsController : ControllerBase
     private readonly ILogger<ClientsController> _logger;
     private readonly IOpenIddictApplicationManager _applicationManager;
     private readonly UserManager<IdentityUser> _userManager;
+    private readonly IClientSecretService _clientSecretService; // added
 
     public ClientsController(
         ApplicationDbContext context, 
         ILogger<ClientsController> logger,
         IOpenIddictApplicationManager applicationManager,
-        UserManager<IdentityUser> userManager)
+        UserManager<IdentityUser> userManager,
+        IClientSecretService clientSecretService) // added
     {
         _context = context;
         _logger = logger;
         _applicationManager = applicationManager;
         _userManager = userManager;
+        _clientSecretService = clientSecretService;
     }
 
     [HttpGet]
@@ -266,6 +270,7 @@ public class ClientsController : ControllerBase
             CustomLoginPageUrl = client.CustomLoginPageUrl,
             CustomLogoutPageUrl = client.CustomLogoutPageUrl,
             CustomErrorPageUrl = client.CustomErrorPageUrl,
+            // login options
             AllowPasskeyLogin = client.AllowPasskeyLogin,
             AllowQrLoginQuick = client.AllowQrLoginQuick,
             AllowQrLoginSecure = client.AllowQrLoginSecure,
@@ -524,6 +529,8 @@ public class ClientsController : ControllerBase
                 var now = DateTime.UtcNow;
                 var userName = User?.Identity?.Name;
 
+                var requiresSecret = (dto.ClientType == ClientType.Confidential || dto.ClientType == ClientType.Machine) && dto.RequireClientSecret;
+
                 if (client == null)
                 {
                     client = new Client
@@ -538,10 +545,11 @@ public class ClientsController : ControllerBase
                     _context.Clients.Add(client);
 
                     // If confidential and requires secret, generate one
-                    if ((dto.ClientType == ClientType.Confidential || dto.ClientType == ClientType.Machine) && dto.RequireClientSecret)
+                    if (requiresSecret)
                     {
                         generatedSecret = Convert.ToBase64String(Guid.NewGuid().ToByteArray());
-                        client.ClientSecret = generatedSecret;
+                        // Use redaction marker in entity; actual hash recorded below after SaveChanges
+                        client.ClientSecret = "{HASHED}";
                     }
                 }
 
@@ -651,48 +659,10 @@ public class ClientsController : ControllerBase
 
                 await _context.SaveChangesAsync();
 
-                // Apply assigned users if provided
-                if (dto.AssignedUsers?.Count > 0)
+                // If we generated a secret for this import, create a history record now
+                if (requiresSecret && !string.IsNullOrWhiteSpace(generatedSecret))
                 {
-                    // Load current assignments
-                    var currentAssignments = await _context.ClientUsers.Where(cu => cu.ClientId == client.Id).ToListAsync();
-
-                    // Build target user IDs from references
-                    var targetUserIds = new HashSet<string>();
-                    foreach (var uref in dto.AssignedUsers)
-                    {
-                        IdentityUser? user = null;
-                        if (!string.IsNullOrWhiteSpace(uref.UserName))
-                            user = await _userManager.FindByNameAsync(uref.UserName);
-                        if (user == null && !string.IsNullOrWhiteSpace(uref.Email))
-                            user = await _userManager.FindByEmailAsync(uref.Email);
-
-                        if (user != null)
-                        {
-                            targetUserIds.Add(user.Id);
-                            if (!currentAssignments.Any(a => a.UserId == user.Id))
-                            {
-                                _context.ClientUsers.Add(new ClientUser
-                                {
-                                    ClientId = client.Id,
-                                    UserId = user.Id,
-                                    CreatedAt = now,
-                                    CreatedBy = userName
-                                });
-                            }
-                        }
-                    }
-
-                    // Remove assignments that are not in import list
-                    foreach (var ass in currentAssignments)
-                    {
-                        if (!targetUserIds.Contains(ass.UserId))
-                        {
-                            _context.ClientUsers.Remove(ass);
-                        }
-                    }
-
-                    await _context.SaveChangesAsync();
+                    await _clientSecretService.SetNewSecretAsync(client.Id, providedPlaintext: generatedSecret);
                 }
 
                 await tx.CommitAsync();
@@ -735,7 +705,6 @@ public class ClientsController : ControllerBase
                     Scopes = full.Scopes.Select(s => s.Scope).ToList(),
                     Permissions = full.Permissions.Select(p => p.Permission).ToList(),
                     Audiences = full.Audiences.Select(a => a.Audience).ToList(),
-
                     // dynamic fields
                     SessionTimeoutHours = full.SessionTimeoutHours,
                     UseSlidingSessionExpiration = full.UseSlidingSessionExpiration,
@@ -786,7 +755,6 @@ public class ClientsController : ControllerBase
                     CustomLoginPageUrl = full.CustomLoginPageUrl,
                     CustomLogoutPageUrl = full.CustomLogoutPageUrl,
                     CustomErrorPageUrl = full.CustomErrorPageUrl,
-
                     // login options
                     AllowPasskeyLogin = full.AllowPasskeyLogin,
                     AllowQrLoginQuick = full.AllowQrLoginQuick,
@@ -849,7 +817,8 @@ public class ClientsController : ControllerBase
                 var client = new Client
                 {
                     ClientId = request.ClientId,
-                    ClientSecret = request.ClientSecret,
+                    // Do NOT store plaintext; use redaction marker to avoid leakage
+                    ClientSecret = requiresSecret ? "{HASHED}" : null,
                     Name = request.Name,
                     Description = request.Description,
                     RealmId = request.RealmId,
@@ -935,8 +904,14 @@ public class ClientsController : ControllerBase
 
                 await _context.SaveChangesAsync();
 
+                // Hash and record secret only after client exists in DB
+                if (requiresSecret && !string.IsNullOrWhiteSpace(request.ClientSecret))
+                {
+                    await _clientSecretService.SetNewSecretAsync(client.Id, providedPlaintext: request.ClientSecret);
+                }
+
                 // Create OpenIddict application only if valid
-                if (!requiresSecret || !string.IsNullOrWhiteSpace(client.ClientSecret))
+                if (!requiresSecret || !string.IsNullOrWhiteSpace(request.ClientSecret))
                 {
                     await CreateOpenIddictApplication(client, request);
                 }
@@ -1035,8 +1010,7 @@ public class ClientsController : ControllerBase
             try
             {
                 // Update basic properties
-                if (!string.IsNullOrEmpty(request.ClientSecret))
-                    client.ClientSecret = request.ClientSecret;
+                // Do NOT assign plaintext secret directly; handle rotation later
                 if (!string.IsNullOrEmpty(request.Name))
                     client.Name = request.Name;
                 client.Description = request.Description;
@@ -1208,11 +1182,18 @@ public class ClientsController : ControllerBase
 
                 await _context.SaveChangesAsync();
                 _logger.LogInformation("Client '{ClientId}' updated in database", client.ClientId);
-                
-                // Update OpenIddict application (only if valid)
-                if (!requireSecret || !string.IsNullOrWhiteSpace(client.ClientSecret))
+
+                // Rotate secret if a new one is provided
+                if (!string.IsNullOrWhiteSpace(request.ClientSecret))
                 {
-                    await UpdateOpenIddictApplication(client);
+                    // Ensure redaction marker on the entity and create history record
+                    await _clientSecretService.SetNewSecretAsync(client.Id, providedPlaintext: request.ClientSecret);
+                }
+                
+                // Update OpenIddict application (only if valid). Use plaintext when rotating.
+                if (!requireSecret || !string.IsNullOrWhiteSpace(request.ClientSecret) || !string.IsNullOrWhiteSpace(client.ClientSecret))
+                {
+                    await UpdateOpenIddictApplication(client, request.ClientSecret);
                 }
                 else
                 {
@@ -1337,7 +1318,7 @@ public class ClientsController : ControllerBase
         var descriptor = new OpenIddictApplicationDescriptor
         {
             ClientId = client.ClientId,
-            ClientSecret = client.ClientSecret,
+            ClientSecret = request.ClientSecret, // use plaintext provided at creation
             DisplayName = client.Name,
             ClientType = client.ClientType == ClientType.Public 
                 ? OpenIddictConstants.ClientTypes.Public 
@@ -1402,7 +1383,7 @@ public class ClientsController : ControllerBase
         await _applicationManager.CreateAsync(descriptor);
     }
 
-    private async Task UpdateOpenIddictApplication(Client client)
+    private async Task UpdateOpenIddictApplication(Client client, string? plaintextSecret = null)
     {
         var openIddictClient = await _applicationManager.FindByClientIdAsync(client.ClientId);
         if (openIddictClient != null)
@@ -1412,7 +1393,7 @@ public class ClientsController : ControllerBase
             var request = new CreateClientRequest
             {
                 ClientId = client.ClientId,
-                ClientSecret = client.ClientSecret,
+                ClientSecret = plaintextSecret, // pass the fresh plaintext when rotating
                 Name = client.Name,
                 Description = client.Description,
                 RealmId = client.RealmId,
