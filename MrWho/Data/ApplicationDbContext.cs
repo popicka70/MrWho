@@ -80,6 +80,9 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
     // NEW: Return URL entries (for concise URLs with expiration)
     public DbSet<ReturnUrlEntry> ReturnUrlEntries => Set<ReturnUrlEntry>();
 
+    // NEW: Pending dynamic client registrations
+    public DbSet<PendingClientRegistration> PendingClientRegistrations => Set<PendingClientRegistration>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
@@ -392,6 +395,16 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
         });
 
         // =========================================================================
+        // PendingClientRegistration configuration
+        // =========================================================================
+        builder.Entity<PendingClientRegistration>(entity =>
+        {
+            entity.HasKey(p => p.Id);
+            entity.HasIndex(p => new { p.Status, p.SubmittedAt });
+            entity.Property(p => p.RawRequestJson).IsRequired();
+        });
+
+        // =========================================================================
         // AUDIT LOG CONFIGURATION
         // =========================================================================
         builder.Entity<AuditLog>(entity =>
@@ -510,6 +523,13 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
                 entity.Property(p => p.ReturnUrl).HasColumnType("longtext");
             });
 
+            builder.Entity<PendingClientRegistration>(entity =>
+            {
+                entity.Property(p => p.RawRequestJson).HasColumnType("longtext");
+                entity.Property(p => p.RedirectUrisCsv).HasColumnType("longtext");
+                entity.Property(p => p.Scope).HasColumnType("longtext");
+            });
+
             // Ensure audit log can store large payloads
             builder.Entity<AuditLog>(entity =>
             {
@@ -523,6 +543,13 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
             builder.Entity<AuditLog>(entity =>
             {
                 entity.Property(a => a.Changes).HasColumnType("text");
+            });
+
+            builder.Entity<PendingClientRegistration>(entity =>
+            {
+                entity.Property(p => p.RawRequestJson).HasColumnType("text");
+                entity.Property(p => p.RedirectUrisCsv).HasColumnType("text");
+                entity.Property(p => p.Scope).HasColumnType("text");
             });
         }
 

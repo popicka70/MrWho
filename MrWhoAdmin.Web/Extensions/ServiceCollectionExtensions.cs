@@ -261,6 +261,15 @@ public static class ServiceCollectionExtensions
         });
         // Note: No authentication handler needed for local health endpoints
         
+        // Client Registrations API service (admin approvals for dynamic client registration)
+        services.AddHttpClient<IClientRegistrationsApiService, ClientRegistrationsApiService>(client =>
+        {
+            client.BaseAddress = new Uri(mrWhoApiBaseUrl);
+            client.DefaultRequestHeaders.Add("Accept", "application/json");
+            client.Timeout = defaultTimeout;
+        })
+        .AddHttpMessageHandler<AuthenticationDelegatingHandler>();
+
         return services;
     }
 
