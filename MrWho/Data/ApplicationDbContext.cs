@@ -77,6 +77,9 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
     // NEW: Claim types registry
     public DbSet<ClaimType> ClaimTypes { get; set; } = null!;
 
+    // NEW: Return URL entries (for concise URLs with expiration)
+    public DbSet<ReturnUrlEntry> ReturnUrlEntries => Set<ReturnUrlEntry>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
@@ -449,6 +452,13 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
             entity.HasKey(ct => ct.Id);
             entity.HasIndex(ct => ct.Type).IsUnique();
             entity.Property(ct => ct.Type).IsRequired();
+        });
+
+        // Configure ReturnUrlEntry entity
+        builder.Entity<ReturnUrlEntry>(b =>
+        {
+            b.HasKey(x => x.Id);
+            b.HasIndex(x => x.ExpiresAt);
         });
 
         // Provider-specific tuning: MySQL row size limits -> move large strings to longtext

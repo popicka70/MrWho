@@ -102,6 +102,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IClientRoleService, ClientRoleService>();
 
         services.AddHostedService<UserProfileBackfillHostedService>();
+        services.AddScoped<IReturnUrlStore, ReturnUrlStore>();
+        services.AddHostedService<ReturnUrlCleanupHostedService>();
 
         return services;
     }
