@@ -309,11 +309,16 @@ public static class ServiceCollectionExtensions
                     .SetEndSessionEndpointUris("/connect/logout")
                     .SetUserInfoEndpointUris("/connect/userinfo")
                     .SetRevocationEndpointUris("/connect/revocation")
-                    .SetIntrospectionEndpointUris("/connect/introspect")
-                    // PAR endpoint
-                    .SetPushedAuthorizationEndpointUris("/connect/par");
+                    .SetIntrospectionEndpointUris("/connect/introspect");
+
+                // Advertise/enable PAR endpoint only when explicitly enabled in configuration
+                // This prevents clients using the default UseIfAvailable behavior from attempting PAR
+                // when specific clients are not allowed to use it (avoids ID2183 unauthorized_client).
                 var parEnabled = configuration.GetValue<bool?>("OpenIddict:EnablePar") ?? false;
-                var parEnabled = configuration.GetValue<bool?>("OpenIddict:EnablePar") ?? true;
+                if (parEnabled)
+                {
+                    options.SetPushedAuthorizationEndpointUris("/connect/par");
+                }
 
                 // Flows
                 options.AllowAuthorizationCodeFlow()
