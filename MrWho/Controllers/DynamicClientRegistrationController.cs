@@ -33,6 +33,7 @@ public class DynamicClientRegistrationController : ControllerBase
     }
 
     [HttpPost]
+    [Consumes("application/json")]
     [Produces("application/json")]
     public async Task<IActionResult> Register([FromBody] DynamicClientRegistrationRequest request, CancellationToken ct)
     {
