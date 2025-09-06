@@ -4,6 +4,12 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.Extensions.Options;
 using MrWho.Options;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using MrWho.Data;
+using MrWho.Models;
+using MrWho.Shared;
+using OpenIddict.Abstractions;
 
 namespace MrWho.Controllers;
 
@@ -16,17 +22,23 @@ public class DebugController : ControllerBase
     private readonly IOptionsMonitor<CookieAuthenticationOptions> _cookieOptions;
     private readonly MrWhoOptions _options;
     private readonly ILogger<DebugController> _logger;
+    private readonly ApplicationDbContext _db;
+    private readonly IOpenIddictScopeManager _scopeManager;
 
     public DebugController(
         IAuthenticationSchemeProvider schemeProvider,
         IOptionsMonitor<CookieAuthenticationOptions> cookieOptions,
         IOptions<MrWhoOptions> options,
-        ILogger<DebugController> logger)
+        ILogger<DebugController> logger,
+        ApplicationDbContext db,
+        IOpenIddictScopeManager scopeManager)
     {
         _schemeProvider = schemeProvider;
         _cookieOptions = cookieOptions;
         _options = options.Value;
         _logger = logger;
+        _db = db;
+        _scopeManager = scopeManager;
     }
 
     [HttpGet("cookie-separation")]
@@ -84,5 +96,17 @@ public class DebugController : ControllerBase
         };
 
         return Ok(result);
+    }
+
+    [HttpGet("metadata/jar")] // quick endpoint to show whether server will accept request/request_uri
+    public IActionResult GetJarMetadata()
+    {
+        // OpenIddict supports JAR by default; we advertise PAR in discovery already.
+        // This endpoint simply helps testers know we enabled authorization request caching (needed for large JAR).
+        return Ok(new
+        {
+            authorization_request_caching = true,
+            pushed_authorization_endpoint = "/connect/par"
+        });
     }
 }

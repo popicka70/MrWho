@@ -354,6 +354,9 @@ public static class ServiceCollectionExtensions
                 // Access token format for demo
                 options.DisableAccessTokenEncryption();
 
+                // JAR/JARM/PAR related: enable authorization request caching so large/signed requests (JAR) can be flowed safely
+                options.EnableAuthorizationRequestCaching();
+
                 // ASP.NET Core integration
                 options.UseAspNetCore()
                        .EnableAuthorizationEndpointPassthrough()
