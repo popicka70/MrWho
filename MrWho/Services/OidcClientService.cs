@@ -4,6 +4,7 @@ using MrWho.Data;
 using MrWho.Models;
 using MrWho.Shared;
 using OpenIddict.Abstractions;
+using OpenIddict.EntityFrameworkCore.Models; // added
 
 namespace MrWho.Services;
 
@@ -111,10 +112,17 @@ public class OidcClientService : IOidcClientService
         var descriptor = new OpenIddictApplicationDescriptor
         {
             ClientId = client.ClientId,
-            ClientSecret = client.ClientSecret,
             DisplayName = client.Name,
             ClientType = client.ClientType == ClientType.Public ? OpenIddictConstants.ClientTypes.Public : OpenIddictConstants.ClientTypes.Confidential
         };
+
+        // Only propagate a concrete secret to OpenIddict when we actually have one.
+        // When the local Client.ClientSecret is the redaction marker from hashing ("{HASHED}"),
+        // skip setting ClientSecret so OpenIddict keeps its current stored hash.
+        if (!string.IsNullOrWhiteSpace(client.ClientSecret) && !string.Equals(client.ClientSecret, "{HASHED}", StringComparison.Ordinal))
+        {
+            descriptor.ClientSecret = client.ClientSecret;
+        }
 
         if (client.AllowAuthorizationCodeFlow)
         {
@@ -273,7 +281,7 @@ public class OidcClientService : IOidcClientService
             adminClient = new Client
             {
                 ClientId = "mrwho_admin_web",
-                ClientSecret = "MrWhoAdmin2024!SecretKey", // admin secret length is sufficient for HS256
+                ClientSecret = "FTZvvlIIFdmtBg7IdBql9EEXRDj1xwLmi1qW9fGbJBY", // admin secret length is sufficient for HS256
                 Name = "MrWho Admin Web Application",
                 Description = "Official web administration interface for MrWho OIDC server",
                 RealmId = adminRealm.Id,
@@ -417,7 +425,7 @@ public class OidcClientService : IOidcClientService
             "http://localhost:5092/signout-callback-oidc"
         };
 
-        const string Demo1LongSecret = "Demo1Secret2025_SymmetricKey_32bytes!!"; // >= 32 bytes for HS256
+        const string Demo1LongSecret = "FTZvvlIIFdmtBg7IdBql9EEXRDj1xwLmi1qW9fGbJBY"; // >= 32 bytes for HS256
 
         if (demo1Client == null)
         {
@@ -457,7 +465,7 @@ public class OidcClientService : IOidcClientService
         }
         else
         {
-            var legacy = demo1Client.Permissions.Where(p => p.Permission.StartsWith("oidc:scope:") || (p.Permission.StartsWith("api.") && !p.Permission.StartsWith("scp:")) || p.Permission == "scp:openid").ToList();
+            var legacy = demo1Client.Permissions.Where(p => p.Permission.StartsWith("oidc:scope:") || (p.Permission.StartsWith("api." ) && !p.Permission.StartsWith("scp:")) || p.Permission == "scp:openid").ToList();
             if (legacy.Any()) { _context.ClientPermissions.RemoveRange(legacy); await _context.SaveChangesAsync(); }
 
             // Backfill ParMode for demo1 if missing
@@ -890,14 +898,59 @@ public class OidcClientService : IOidcClientService
     {
         try
         {
-            if ((client.ClientType == ClientType.Confidential || client.ClientType == ClientType.Machine) && client.RequireClientSecret && string.IsNullOrWhiteSpace(client.ClientSecret))
+            // Determine if this client requires a secret (confidential or machine with RequireClientSecret=true)
+            bool requiresSecret = (client.ClientType == ClientType.Confidential || client.ClientType == ClientType.Machine) && client.RequireClientSecret;
+
+            // Try find existing OpenIddict app first
+            var existingClient = await _applicationManager.FindByClientIdAsync(client.ClientId);
+
+            // First pass using the supplied client instance
+            var descriptor = BuildDescriptor(client);
+
+            // If a secret is required but not present on the descriptor, fetch the current client from DB
+            if (requiresSecret && string.IsNullOrWhiteSpace(descriptor.ClientSecret))
             {
-                _logger.LogWarning("Skipping OpenIddict sync for client '{ClientId}': missing secret.", client.ClientId);
-                return;
+                var dbClient = await _context.Clients
+                    .AsNoTracking()
+                    .Include(c => c.RedirectUris)
+                    .Include(c => c.PostLogoutUris)
+                    .Include(c => c.Scopes)
+                    .Include(c => c.Permissions)
+                    .FirstOrDefaultAsync(c => c.Id == client.Id || c.ClientId == client.ClientId);
+                if (dbClient != null)
+                {
+                    var dbDescriptor = BuildDescriptor(dbClient);
+                    if (!string.IsNullOrWhiteSpace(dbDescriptor.ClientSecret))
+                    {
+                        descriptor = dbDescriptor;
+                    }
+                }
             }
 
-            var existingClient = await _applicationManager.FindByClientIdAsync(client.ClientId);
-            var descriptor = BuildDescriptor(client);
+            // If still missing, try pulling the stored secret from the OpenIddict EF entity (hashed or raw depending on config)
+            if (requiresSecret && string.IsNullOrWhiteSpace(descriptor.ClientSecret) && existingClient is not null)
+            {
+                if (existingClient is OpenIddictEntityFrameworkCoreApplication efApp && !string.IsNullOrWhiteSpace(efApp.ClientSecret))
+                {
+                    descriptor.ClientSecret = efApp.ClientSecret;
+                }
+            }
+
+            // If a secret is required but we still didn't set one on the descriptor,
+            // then: creation requires a secret; update will be skipped to avoid validation error and preserve existing secret.
+            if (requiresSecret && string.IsNullOrWhiteSpace(descriptor.ClientSecret))
+            {
+                if (existingClient is null)
+                {
+                    _logger.LogWarning("Skipping OpenIddict sync for client '{ClientId}': confidential/machine app requires a secret to be created.", client.ClientId);
+                    return;
+                }
+                else
+                {
+                    _logger.LogWarning("Skipping OpenIddict update for client '{ClientId}': secret is redacted/unknown. Rotate the secret or set a clear-text secret to allow updating other properties.", client.ClientId);
+                    return;
+                }
+            }
 
             if (existingClient == null)
             {

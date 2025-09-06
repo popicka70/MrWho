@@ -27,6 +27,9 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
     public DbSet<ClientPermission> ClientPermissions { get; set; }
     public DbSet<ClientUser> ClientUsers { get; set; }
     
+    // NEW: Client secret history (hashed secrets + metadata)
+    public DbSet<ClientSecretHistory> ClientSecretHistories { get; set; }
+    
     // NEW: Identity brokering entities
     public DbSet<IdentityProvider> IdentityProviders { get; set; }
     public DbSet<ClientIdentityProvider> ClientIdentityProviders { get; set; }
@@ -157,6 +160,20 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
             entity.Property(c => c.AuthorizationCodeLifetime).HasConversion(
                 v => v.HasValue ? v.Value.TotalMinutes : (double?)null,
                 v => v.HasValue ? TimeSpan.FromMinutes(v.Value) : null);
+        });
+
+        // Configure ClientSecretHistory entity
+        builder.Entity<ClientSecretHistory>(entity =>
+        {
+            entity.HasKey(s => s.Id);
+            entity.Property(s => s.SecretHash).HasMaxLength(2000).IsRequired();
+            entity.Property(s => s.Algo).HasMaxLength(50).IsRequired();
+            entity.HasOne(s => s.Client)
+                  .WithMany()
+                  .HasForeignKey(s => s.ClientId)
+                  .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(s => new { s.ClientId, s.Status });
+            entity.HasIndex(s => new { s.ClientId, s.CreatedAt });
         });
 
         // Configure ClientUser entity (user-client assignments)
@@ -535,6 +552,12 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
             {
                 entity.Property(a => a.Changes).HasColumnType("longtext");
             });
+
+            // Long text for secret hashes as well
+            builder.Entity<ClientSecretHistory>(entity =>
+            {
+                entity.Property(s => s.SecretHash).HasColumnType("longtext");
+            });
         }
 
         // Provider-specific tuning: PostgreSQL -> use text for large strings
@@ -550,6 +573,11 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
                 entity.Property(p => p.RawRequestJson).HasColumnType("text");
                 entity.Property(p => p.RedirectUrisCsv).HasColumnType("text");
                 entity.Property(p => p.Scope).HasColumnType("text");
+            });
+
+            builder.Entity<ClientSecretHistory>(entity =>
+            {
+                entity.Property(s => s.SecretHash).HasColumnType("text");
             });
         }
 
@@ -632,6 +660,12 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
             {
                 if (!prop.Metadata.IsPrimaryKey())
                 {
+                    // Avoid logging sensitive secret values
+                    if (prop.Metadata.Name.Equals(nameof(Client.ClientSecret), StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
                     object? oldVal = null;
                     object? newVal = null;
 

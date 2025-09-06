@@ -147,7 +147,7 @@ public class TokenRefreshService : ITokenRefreshService
             var authConfig = _configuration.GetSection("Authentication");
             var authority = authConfig.GetValue<string>("Authority") ?? "https://localhost:7113/";
             var clientId = authConfig.GetValue<string>("ClientId") ?? "mrwho_admin_web";
-            var clientSecret = authConfig.GetValue<string>("ClientSecret") ?? "MrWhoAdmin2024!SecretKey";
+            var clientSecret = authConfig.GetValue<string>("ClientSecret") ?? "FTZvvlIIFdmtBg7IdBql9EEXRDj1xwLmi1qW9fGbJBY";
 
             using var httpClient = _httpClientFactory.CreateClient();
             

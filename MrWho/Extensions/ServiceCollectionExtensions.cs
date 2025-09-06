@@ -42,6 +42,11 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IOidcClientService, OidcClientService>();
         services.AddScoped<IOpenIddictScopeSyncService, OpenIddictScopeSyncService>();
 
+        // Client secret hashing and rotation services
+        services.AddSingleton<IClientSecretHasher, Pbkdf2ClientSecretHasher>();
+        services.AddScoped<IClientSecretService, ClientSecretService>();
+        services.AddHostedService<ClientSecretBackfillHostedService>(); // backfill legacy plaintext
+
         // Register client cookie services
         services.AddScoped<IDynamicCookieService, DynamicCookieService>();
         
@@ -304,9 +309,16 @@ public static class ServiceCollectionExtensions
                     .SetEndSessionEndpointUris("/connect/logout")
                     .SetUserInfoEndpointUris("/connect/userinfo")
                     .SetRevocationEndpointUris("/connect/revocation")
-                    .SetIntrospectionEndpointUris("/connect/introspect")
-                    // PAR endpoint
-                    .SetPushedAuthorizationEndpointUris("/connect/par");
+                    .SetIntrospectionEndpointUris("/connect/introspect");
+
+                // Advertise/enable PAR endpoint only when explicitly enabled in configuration
+                // This prevents clients using the default UseIfAvailable behavior from attempting PAR
+                // when specific clients are not allowed to use it (avoids ID2183 unauthorized_client).
+                var parEnabled = configuration.GetValue<bool?>("OpenIddict:EnablePar") ?? false;
+                if (parEnabled)
+                {
+                    options.SetPushedAuthorizationEndpointUris("/connect/par");
+                }
 
                 // Flows
                 options.AllowAuthorizationCodeFlow()

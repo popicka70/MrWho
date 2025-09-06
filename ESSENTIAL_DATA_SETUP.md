@@ -17,7 +17,7 @@ The MrWho OIDC server now automatically creates essential data that must always 
 
 ### 2. Admin Client
 - **Client ID**: `mrwho_admin_web`
-- **Client Secret**: `MrWhoAdmin2024!SecretKey`
+- **Client Secret**: `FTZvvlIIFdmtBg7IdBql9EEXRDj1xwLmi1qW9fGbJBY`
 - **Name**: "MrWho Admin Web Application"
 - **Description**: "Official web administration interface for MrWho OIDC server"
 - **Type**: Confidential

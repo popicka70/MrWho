@@ -22,4 +22,7 @@ public interface IClientsApiService
     Task<List<ClientIdentityProviderDto>> GetIdentityLinksAsync(string clientId);
     Task<ClientIdentityProviderDto?> AddIdentityLinkAsync(string clientId, string providerId, ClientIdentityProviderDto? dto = null);
     Task<bool> RemoveIdentityLinkAsync(string clientId, string linkId);
+
+    // Secrets
+    Task<(bool ok, string? secret)> RotateSecretAsync(string id, string? newSecret = null, DateTime? expiresAtUtc = null, bool retireOld = true);
 }
