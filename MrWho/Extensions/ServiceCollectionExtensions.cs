@@ -312,6 +312,8 @@ public static class ServiceCollectionExtensions
                     .SetIntrospectionEndpointUris("/connect/introspect")
                     // PAR endpoint
                     .SetPushedAuthorizationEndpointUris("/connect/par");
+                var parEnabled = configuration.GetValue<bool?>("OpenIddict:EnablePar") ?? false;
+                var parEnabled = configuration.GetValue<bool?>("OpenIddict:EnablePar") ?? true;
 
                 // Flows
                 options.AllowAuthorizationCodeFlow()
