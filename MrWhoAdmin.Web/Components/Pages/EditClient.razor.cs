@@ -245,7 +245,8 @@ namespace MrWhoAdmin.Web.Components.Pages
                 PrimaryAudience = client.PrimaryAudience,
                 IncludeAudInIdToken = client.IncludeAudInIdToken,
                 RequireExplicitAudienceScope = client.RequireExplicitAudienceScope,
-                RoleInclusionOverride = client.RoleInclusionOverride
+                RoleInclusionOverride = client.RoleInclusionOverride, 
+                ParMode = client.ParMode
             };
         }
 
@@ -328,7 +329,8 @@ namespace MrWhoAdmin.Web.Components.Pages
                 PrimaryAudience = model.PrimaryAudience,
                 IncludeAudInIdToken = model.IncludeAudInIdToken,
                 RequireExplicitAudienceScope = model.RequireExplicitAudienceScope,
-                RoleInclusionOverride = model.RoleInclusionOverride
+                RoleInclusionOverride = model.RoleInclusionOverride,
+                ParMode = model.ParMode
             };
             update.ClientSecret = string.IsNullOrWhiteSpace(model.ClientSecret) ? null : model.ClientSecret;
             return update;
@@ -416,7 +418,8 @@ namespace MrWhoAdmin.Web.Components.Pages
                 PrimaryAudience = model.PrimaryAudience,
                 IncludeAudInIdToken = model.IncludeAudInIdToken,
                 RequireExplicitAudienceScope = model.RequireExplicitAudienceScope,
-                RoleInclusionOverride = model.RoleInclusionOverride
+                RoleInclusionOverride = model.RoleInclusionOverride,
+                ParMode = model.ParMode
             };
         }
 
@@ -660,6 +663,7 @@ namespace MrWhoAdmin.Web.Components.Pages
             model.AllowQrLoginQuick = null;
             model.AllowQrLoginSecure = null;
             model.AllowCodeLogin = null;
+            model.ParMode = null;
             StateHasChanged();
             return Task.CompletedTask;
         }

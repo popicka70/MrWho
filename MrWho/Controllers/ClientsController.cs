@@ -193,7 +193,9 @@ public class ClientsController : ControllerBase
                 PrimaryAudience = c.PrimaryAudience,
                 IncludeAudInIdToken = c.IncludeAudInIdToken,
                 RequireExplicitAudienceScope = c.RequireExplicitAudienceScope,
-                RoleInclusionOverride = c.RoleInclusionOverride
+                RoleInclusionOverride = c.RoleInclusionOverride,
+                // PAR
+                ParMode = c.ParMode
             })
             .ToListAsync();
 
@@ -313,7 +315,9 @@ public class ClientsController : ControllerBase
             PrimaryAudience = client.PrimaryAudience,
             IncludeAudInIdToken = client.IncludeAudInIdToken,
             RequireExplicitAudienceScope = client.RequireExplicitAudienceScope,
-            RoleInclusionOverride = client.RoleInclusionOverride
+            RoleInclusionOverride = client.RoleInclusionOverride,
+            // PAR
+            ParMode = client.ParMode
         };
 
         return Ok(clientDto);
@@ -514,7 +518,9 @@ public class ClientsController : ControllerBase
             RequireExplicitAudienceScope = client.RequireExplicitAudienceScope,
             ExportedBy = User?.Identity?.Name ?? "System",
             ExportedAtUtc = DateTime.UtcNow,
-            FormatVersion = "1.2"
+            FormatVersion = "1.2",
+            // PAR
+            ParMode = client.ParMode
         };
         // Assigned users (by username/email only)
         var assignedUsers = await _context.ClientUsers
@@ -603,6 +609,8 @@ public class ClientsController : ControllerBase
                 client.AuthorizationCodeLifetime = dto.AuthorizationCodeLifetime;
                 client.IdTokenLifetimeMinutes = dto.IdTokenLifetimeMinutes;
                 client.DeviceCodeLifetimeMinutes = dto.DeviceCodeLifetimeMinutes;
+                // PAR
+                client.ParMode = dto.ParMode;
 
                 client.SessionTimeoutHours = dto.SessionTimeoutHours;
                 client.UseSlidingSessionExpiration = dto.UseSlidingSessionExpiration;
@@ -793,7 +801,9 @@ public class ClientsController : ControllerBase
                     AllowPasskeyLogin = full.AllowPasskeyLogin,
                     AllowQrLoginQuick = full.AllowQrLoginQuick,
                     AllowQrLoginSecure = full.AllowQrLoginSecure,
-                    AllowCodeLogin = full.AllowCodeLogin
+                    AllowCodeLogin = full.AllowCodeLogin,
+                    // PAR
+                    ParMode = full.ParMode
                 };
 
                 var result = new ClientImportResult
@@ -880,7 +890,10 @@ public class ClientsController : ControllerBase
                     PrimaryAudience = request.PrimaryAudience,
                     IncludeAudInIdToken = request.IncludeAudInIdToken,
                     RequireExplicitAudienceScope = request.RequireExplicitAudienceScope,
-                    RoleInclusionOverride = request.RoleInclusionOverride
+                    RoleInclusionOverride = request.RoleInclusionOverride,
+
+                    // PAR
+                    ParMode = request.ParMode
                 };
 
                 _context.Clients.Add(client);
@@ -994,7 +1007,9 @@ public class ClientsController : ControllerBase
                     AllowPasskeyLogin = client.AllowPasskeyLogin,
                     AllowQrLoginQuick = client.AllowQrLoginQuick,
                     AllowQrLoginSecure = client.AllowQrLoginSecure,
-                    AllowCodeLogin = client.AllowCodeLogin
+                    AllowCodeLogin = client.AllowCodeLogin,
+                    // PAR
+                    ParMode = client.ParMode
                 };
 
                 return CreatedAtAction(nameof(GetClient), new { id = client.Id }, clientDto);
@@ -1132,6 +1147,8 @@ public class ClientsController : ControllerBase
                 client.CustomLoginPageUrl = request.CustomLoginPageUrl;
                 client.CustomLogoutPageUrl = request.CustomLogoutPageUrl;
                 client.CustomErrorPageUrl = request.CustomErrorPageUrl;
+
+                client.ParMode = request.ParMode;
 
                 // Update redirect URIs if provided
                 if (request.RedirectUris != null)
@@ -1320,7 +1337,10 @@ public class ClientsController : ControllerBase
                     AllowPasskeyLogin = client.AllowPasskeyLogin,
                     AllowQrLoginQuick = client.AllowQrLoginQuick,
                     AllowQrLoginSecure = client.AllowQrLoginSecure,
-                    AllowCodeLogin = client.AllowCodeLogin
+                    AllowCodeLogin = client.AllowCodeLogin,
+
+                    // PAR
+                    ParMode = client.ParMode
                 };
 
                 return clientDto;
