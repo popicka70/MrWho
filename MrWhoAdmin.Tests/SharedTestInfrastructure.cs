@@ -14,7 +14,18 @@ namespace MrWhoAdmin.Tests;
 public static class SharedTestInfrastructure
 {
     private static DistributedApplication? _app;
-    private static readonly TimeSpan StartupTimeout = TimeSpan.FromSeconds(180); // Generous timeout for initial startup
+    private static TimeSpan StartupTimeout => GetStartupTimeout(); // Allow override via env var
+
+    private static TimeSpan GetStartupTimeout()
+    {
+        var env = Environment.GetEnvironmentVariable("MRWHO_TESTS_STARTUP_TIMEOUT_SECONDS");
+        if (int.TryParse(env, out var seconds) && seconds > 0)
+        {
+            return TimeSpan.FromSeconds(seconds);
+        }
+        // Default increased timeout for slower machines/CI
+        return TimeSpan.FromSeconds(300);
+    }
 
     /// <summary>
     /// Initialize shared infrastructure once for the entire test assembly
@@ -22,7 +33,7 @@ public static class SharedTestInfrastructure
     [AssemblyInitialize]
     public static async Task AssemblyInitialize(TestContext context)
     {
-        Console.WriteLine("Starting shared PostgreSQL Aspire infrastructure for all integration tests (async)...");
+        Console.WriteLine($"Starting shared PostgreSQL Aspire infrastructure for all integration tests (async)... Timeout: {StartupTimeout}");
 
         // Signal AppHost that we are in test mode so it provisions Postgres
         Environment.SetEnvironmentVariable("MRWHO_TESTS", "1");
