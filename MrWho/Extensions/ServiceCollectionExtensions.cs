@@ -110,6 +110,14 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IReturnUrlStore, ReturnUrlStore>();
         services.AddHostedService<ReturnUrlCleanupHostedService>();
 
+        // ============================================================================
+        // KEY MANAGEMENT & ROTATION
+        // ============================================================================
+        services.AddOptions<KeyManagementOptions>().BindConfiguration(KeyManagementOptions.SectionName).ValidateDataAnnotations();
+        services.AddSingleton<IKeyManagementService, KeyManagementService>();
+        services.AddHostedService<KeyRotationHostedService>();
+        services.AddSingleton<IPostConfigureOptions<OpenIddict.Server.OpenIddictServerOptions>, OpenIddictServerCredentialsConfigurator>();
+
         return services;
     }
 
@@ -359,12 +367,9 @@ public static class ServiceCollectionExtensions
                     "roles.client",
                     "roles.all");
 
-                // Credentials
-                options.AddDevelopmentEncryptionCertificate()
-                       .AddDevelopmentSigningCertificate();
-
+                // Credentials: now provided by OpenIddictServerCredentialsConfigurator using persisted keys
                 // Access token format for demo
-                options.DisableAccessTokenEncryption();
+                // Encryption toggle handled in post-configure as well
 
                 // JAR/JARM/PAR related: enable authorization request caching so large/signed requests (JAR) can be flowed safely
                 options.EnableAuthorizationRequestCaching();
