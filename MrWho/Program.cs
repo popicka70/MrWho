@@ -23,6 +23,8 @@ builder.AddServiceDefaults();
 
 // Bind global MrWho options from configuration
 builder.Services.Configure<MrWhoOptions>(builder.Configuration.GetSection("MrWho"));
+// Bind OIDC clients options for seeding (redirect URIs, secrets, etc.)
+builder.Services.Configure<OidcClientsOptions>(builder.Configuration.GetSection("OidcClients"));
 
 // Add services to the container using extension methods
 builder.Services.AddControllersWithViews();
