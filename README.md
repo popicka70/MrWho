@@ -2,6 +2,7 @@
 
 > Documentation: [Device Authorization (RFC 8628) Custom Implementation](docs/DEVICE_FLOW.md)
 > Comprehensive Implementation Guide: [IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
+> Persistent Keys & Rotation: [Persistent Signing & Encryption Keys](docs/PERSISTENT_KEYS.md)
 
 A modular, multi-tenant (realm‑aware) OpenID Connect / OAuth 2.1 identity service built on .NET 9, ASP.NET Core Identity and OpenIddict. Includes an administration UI (Blazor + Radzen) and dynamic runtime configuration for clients, realms, scopes, resources, claim types and authentication cookies.
 

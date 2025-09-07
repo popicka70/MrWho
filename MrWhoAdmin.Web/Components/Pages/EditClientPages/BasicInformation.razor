@@ -176,6 +176,8 @@ else
     [Inject] private MrWhoAdmin.Web.Services.IClientsApiService ClientsApiService { get; set; } = null!;
     [Inject] private Radzen.NotificationService NotificationService { get; set; } = null!;
     [Inject] private ILogger<BasicInformation> Logger { get; set; } = null!;
+    // NEW: open dialog for rotated secret
+    [Inject] private DialogService DialogService { get; set; } = null!;
 
     private async Task RotateSecretAsync()
     {
@@ -187,13 +189,23 @@ else
                 NotificationService.Notify(NotificationSeverity.Error, "Rotate failed", "Secret rotation failed");
                 return;
             }
-            NotificationService.Notify(new NotificationMessage
+
+            // Show dialog with the new secret and copy button
+            var parameters = new Dictionary<string, object?>
             {
-                Severity = NotificationSeverity.Warning,
-                Summary = "New Client Secret",
-                Detail = $"Copy now: {secret}",
-                Duration = 15000
-            });
+                ["Secret"] = secret
+            };
+
+            await DialogService.OpenAsync<RotateClientSecretDialog>(
+                title: "New Client Secret",
+                parameters: parameters,
+                options: new DialogOptions
+                {
+                    Width = "740px",
+                    CloseDialogOnOverlayClick = false,
+                    Resizable = false,
+                    Draggable = true
+                });
         }
         catch (Exception ex)
         {
