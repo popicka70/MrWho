@@ -1,6 +1,6 @@
 # MrWho OIDC Enterprise Readiness Roadmap
 
-Last updated: 2025-09-05
+Last updated: 2025-09-07
 
 ## 1. Purpose
 Structured, phased plan to evolve the MrWho OpenID Connect / OAuth2 platform (OpenIddict-based) into an enterprise?grade identity and authorization service. Phases balance protocol completeness, security posture, governance, and operational excellence.
@@ -8,7 +8,7 @@ Structured, phased plan to evolve the MrWho OpenID Connect / OAuth2 platform (Op
 ## 2. Current Implemented Capabilities (Baseline)
 - Core grants: Authorization Code + PKCE (enforced), Client Credentials, Refresh Token (rolling in non-dev), Password (tests only).
 - Endpoints: authorization, token, userinfo, revocation, introspection, end session, discovery.
-- Realms (basic model) + per-realm default token lifetime fields (not yet enforced at issuance).
+- Realms (basic model) + per-realm default token lifetime fields enforced at issuance; per?client overrides supported.
 - Dynamic DB?backed client + scope management with synchronization to OpenIddict.
 - Standard + custom scopes (api.read, api.write, mrwho.use, roles variants).
 - Rate limiting (fixed window, IP based) for key endpoints.
@@ -23,7 +23,7 @@ Structured, phased plan to evolve the MrWho OpenID Connect / OAuth2 platform (Op
 |----------|----------|
 | Protocol & Security | Device flow, dynamic client registration, PAR/JAR/JARM, token exchange, resource indicators, DPoP, mTLS, front/back?channel logout notifications, JWE, key rotation strategy, PoP tokens, reference tokens option |
 | Identity & Claims | Consent UI + persistence, claim transformation/mapping policies (per realm/client), attribute release control, SCIM 2.0, groups/roles aggregation, self?service profile & session mgmt, realm claim isolation |
-| Client & Governance | Secret hashing + rotation metadata, approval workflow, per-client lifetimes enforcement, soft delete/versioning, per-client rate limits/quotas, tenant (realm) isolation of keys & policies |
+| Client & Governance | Secret hashing + rotation metadata, approval workflow, soft delete/versioning, per-client rate limits/quotas, tenant (realm) isolation of keys & policies |
 | Authentication Assurance | MFA (TOTP, WebAuthn/passkeys), step-up policies, adaptive/risk signals, password breach checks, session concurrency & idle revocation, device fingerprint & management UI |
 | Observability & Ops | Structured audit/event store, OpenTelemetry metrics/traces, security event streaming (CAEP), health/readiness depth checks, SIEM export, config-as-code export/import, disaster recovery runbooks |
 | Token & Session | Resource/audience negotiation (RFC 8707), CAE (continuous access evaluation) hooks, session revocation APIs, refresh token reuse detection logging, per-scope audience restrictions |
@@ -38,7 +38,7 @@ Goal: Close critical protocol/security gaps blocking production adoption.
 - Implement dynamic client registration (protected; admin approval queue).
 - Hash stored client secrets (PBKDF2/Argon2) + rotation metadata (Created, LastUsed, Expires, IsCompromised flags).
 - Persistent signing & encryption keys (replace dev certs) + automated rotation framework (publish overlapping JWKS; retirement policy).
-- Enforce per-realm/client token lifetimes during issuance.
+- Enforce per-realm/client token lifetimes during issuance. (Completed)
 - Front-channel + back-channel logout notification support (OIDC logout specs).
 - Consent service (UI + storage) – baseline (remember/forget decisions, scope diffing).
 - Structured audit log (append-only) for auth events, token issuance, admin changes.
@@ -75,7 +75,7 @@ Goal: Close critical protocol/security gaps blocking production adoption.
 ## 5. Immediate Sprint Backlog (Suggested Sequence)
 1. Persistent key material + rotation scaffolding (dual set publication, rollover job).
 2. Client secret hashing + migration (+ admin UI to rotate).
-3. Per-realm token lifetime enforcement middleware/service.
+3. Per-realm token lifetime enforcement middleware/service. (Completed)
 4. Device authorization flow implementation (endpoints + integration tests).
 5. Consent persistence + basic UI + issuance pipeline hook.
 6. Structured audit log store (EF table + lightweight writer + query API) + log critical events.
@@ -95,7 +95,7 @@ Goal: Close critical protocol/security gaps blocking production adoption.
 | Consent | Stored decisions; auto-expire on scope/claim expansion |
 | Logout | Front + back channel events + admin UI session view |
 | Audit | Append-only table + integrity hash (optional in Phase 1) |
-| Token Lifetimes | Realm + client overrides applied centrally in issuance pipeline |
+| Token Lifetimes | Realm + client overrides applied centrally in issuance pipeline (Completed) |
 
 ## 8. Open Issues to Clarify
 - Multi-region deployment requirements (affects key replication strategy?).
@@ -129,7 +129,7 @@ Goal: Close critical protocol/security gaps blocking production adoption.
 1. Approve Phase 1 scope list.
 2. Create EF migrations for new tables (SecretHistory, KeyMaterial, Consent, AuditEvent).
 3. Implement key management service abstraction (load, sign, rotate) + background rotation job skeleton.
-4. Add issuance pipeline hook to enforce per-realm/client lifetimes.
+4. Add issuance pipeline hook to enforce per-realm/client lifetimes. (Completed)
 5. Add device flow endpoints + tests.
 6. Implement consent service + UI + issuance filter.
 7. Add secret hashing migration + rotation endpoint.

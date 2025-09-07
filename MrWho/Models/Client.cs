@@ -347,6 +347,22 @@ public partial class Client
         return AuthorizationCodeLifetime ?? Realm?.AuthorizationCodeLifetime ?? TimeSpan.FromMinutes(10);
     }
     
+    /// <summary>Gets the effective ID token lifetime, with fallbacks</summary>
+    public TimeSpan GetEffectiveIdTokenLifetime()
+    {
+        if (IdTokenLifetimeMinutes.HasValue && IdTokenLifetimeMinutes.Value > 0)
+            return TimeSpan.FromMinutes(IdTokenLifetimeMinutes.Value);
+        return Realm?.IdTokenLifetime ?? TimeSpan.FromMinutes(60);
+    }
+
+    /// <summary>Gets the effective device code lifetime, with fallbacks</summary>
+    public TimeSpan GetEffectiveDeviceCodeLifetime()
+    {
+        if (DeviceCodeLifetimeMinutes.HasValue && DeviceCodeLifetimeMinutes.Value > 0)
+            return TimeSpan.FromMinutes(DeviceCodeLifetimeMinutes.Value);
+        return Realm?.DeviceCodeLifetime ?? TimeSpan.FromMinutes(10);
+    }
+    
     // ============================================================================
     // AUDIENCE CONFIGURATION (CLIENT-LEVEL OVERRIDES)
     // ============================================================================

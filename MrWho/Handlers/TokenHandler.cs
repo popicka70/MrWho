@@ -133,6 +133,28 @@ public class TokenHandler : ITokenHandler
         return identity;
     }
 
+    private async Task ApplyLifetimesAsync(ClaimsPrincipal principal, string clientId, IEnumerable<string> scopes)
+    {
+        try
+        {
+            var client = await _db.Clients.Include(c => c.Realm).FirstOrDefaultAsync(c => c.ClientId == clientId);
+            if (client == null) return;
+
+            principal.SetAccessTokenLifetime(client.GetEffectiveAccessTokenLifetime());
+            principal.SetIdentityTokenLifetime(client.GetEffectiveIdTokenLifetime());
+
+            // Refresh tokens only when applicable (offline_access requested or refresh flow issues a new one)
+            if (scopes.Contains(OpenIddictConstants.Scopes.OfflineAccess))
+            {
+                principal.SetRefreshTokenLifetime(client.GetEffectiveRefreshTokenLifetime());
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to apply token lifetimes for client {ClientId}", clientId);
+        }
+    }
+
     private RoleInclusion ResolveRoleInclusion(IEnumerable<string> scopes)
     {
         var set = scopes.ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -358,6 +380,9 @@ public class TokenHandler : ITokenHandler
             return Results.Forbid(forbidProps, new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
         }
 
+        // Apply per-client/realm token lifetimes
+        await ApplyLifetimesAsync(principal, clientId, scopes);
+
         // Try persisting session
         var cookieScheme = _cookieService.GetCookieSchemeForClient(clientId);
         try
@@ -407,6 +432,8 @@ public class TokenHandler : ITokenHandler
             });
             return Results.Forbid(forbidProps, new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
         }
+
+        await ApplyLifetimesAsync(principal, clientId, request.GetScopes());
         return Results.SignIn(principal, authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
     }
 
@@ -455,6 +482,8 @@ public class TokenHandler : ITokenHandler
             });
             return Results.Forbid(forbidProps, new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
         }
+
+        await ApplyLifetimesAsync(principal, clientId, scopes);
         return Results.SignIn(principal, authenticationScheme: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
     }
 
@@ -482,6 +511,8 @@ public class TokenHandler : ITokenHandler
             });
             return Results.Forbid(forbidProps, new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
         }
+        // Apply lifetimes for newly issued tokens
+        await ApplyLifetimesAsync(newPrincipal, request.ClientId!, scopes);
         // Update session cookie if possible
         var cookieScheme = _cookieService.GetCookieSchemeForClient(request.ClientId!);
         try { await context.SignInAsync(cookieScheme, newPrincipal); } catch { }
@@ -564,6 +595,8 @@ public class TokenHandler : ITokenHandler
             {
                 return Results.BadRequest(new { error = Errors.InvalidScope, error_description = audRes.Description });
             }
+            // Apply lifetimes for device grant issuance
+            await ApplyLifetimesAsync(principal, record.ClientId, scopes);
             record.Status = DeviceAuthorizationStatus.Consumed;
             record.ConsumedAt = DateTime.UtcNow;
             await _db.SaveChangesAsync();
