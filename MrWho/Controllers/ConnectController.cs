@@ -81,6 +81,26 @@ public class ConnectController : Controller
     public Task<IActionResult> InvalidScopes([FromQuery] string? returnUrl, [FromQuery] string? clientId, [FromQuery] string? missing, [FromQuery] string? requested)
         => _mediator.Send(new InvalidScopesGetRequest(HttpContext, returnUrl, clientId, missing, requested));
 
+    // GET /connect/consent
+    [Authorize]
+    [HttpGet("consent")]
+    public Task<IActionResult> Consent([FromQuery] string returnUrl, [FromQuery] string clientId)
+        => _mediator.Send(new MrWho.Handlers.Auth.ConsentGetRequest(HttpContext, returnUrl, clientId));
+
+    // POST /connect/consent
+    [Authorize]
+    [ValidateAntiForgeryToken]
+    [HttpPost("consent")]
+    public Task<IActionResult> ConsentPost([FromForm] string returnUrl, [FromForm] string clientId, [FromForm] string[] scopes, [FromForm] bool remember)
+        => _mediator.Send(new MrWho.Handlers.Auth.ConsentPostRequest(HttpContext, returnUrl, clientId, scopes, remember));
+
+    // POST /connect/consent/forget
+    [Authorize]
+    [ValidateAntiForgeryToken]
+    [HttpPost("consent/forget")]
+    public Task<IActionResult> ConsentForget([FromForm] string clientId)
+        => _mediator.Send(new MrWho.Handlers.Auth.ConsentForgetRequest(HttpContext, clientId));
+
     private IActionResult Wrap(IResult result) => new ResultWrapper(result);
 
     private sealed class ResultWrapper : IActionResult
