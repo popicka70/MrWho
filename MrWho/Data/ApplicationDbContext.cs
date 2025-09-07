@@ -86,6 +86,9 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
     // NEW: Pending dynamic client registrations
     public DbSet<PendingClientRegistration> PendingClientRegistrations => Set<PendingClientRegistration>();
 
+    // NEW: Persistent cryptographic keys for OpenIddict (signing/encryption) with rotation metadata
+    public DbSet<KeyMaterial> KeyMaterials => Set<KeyMaterial>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
@@ -491,6 +494,15 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
             b.HasIndex(x => x.ExpiresAt);
         });
 
+        // Configure KeyMaterial entity
+        builder.Entity<KeyMaterial>(b =>
+        {
+            b.HasKey(k => k.Id);
+            b.HasIndex(k => new { k.Use, k.Status, k.ActivateAt });
+            b.HasIndex(k => new { k.Use, k.IsPrimary });
+            b.HasIndex(k => k.Kid).IsUnique();
+        });
+
         // Provider-specific tuning: MySQL row size limits -> move large strings to longtext
         if (Database.ProviderName?.Contains("MySql", StringComparison.OrdinalIgnoreCase) == true)
         {
@@ -558,6 +570,12 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
             {
                 entity.Property(s => s.SecretHash).HasColumnType("longtext");
             });
+
+            // Long text for private key PEM
+            builder.Entity<KeyMaterial>(entity =>
+            {
+                entity.Property(k => k.PrivateKeyPem).HasColumnType("longtext");
+            });
         }
 
         // Provider-specific tuning: PostgreSQL -> use text for large strings
@@ -578,6 +596,11 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
             builder.Entity<ClientSecretHistory>(entity =>
             {
                 entity.Property(s => s.SecretHash).HasColumnType("text");
+            });
+
+            builder.Entity<KeyMaterial>(entity =>
+            {
+                entity.Property(k => k.PrivateKeyPem).HasColumnType("text");
             });
         }
 
