@@ -19,6 +19,9 @@ using OpenIddict.Client.AspNetCore;
 using OpenIddict.Client.SystemNetHttp;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Hosting;
+using MrWho.Handlers.Auth;
+using MrWho.Services.Mediator; // add mediator interfaces
+using Microsoft.AspNetCore.Mvc; // for IActionResult
 
 namespace MrWho.Extensions;
 
@@ -118,6 +121,11 @@ public static class ServiceCollectionExtensions
         services.AddHostedService<KeyRotationHostedService>();
         services.AddSingleton<IPostConfigureOptions<OpenIddict.Server.OpenIddictServerOptions>, OpenIddictServerCredentialsConfigurator>();
 
+        // ============================================================================
+        // CONSENT SERVICE
+        // ============================================================================
+        services.AddScoped<IConsentService, ConsentService>();
+
         return services;
     }
 
@@ -129,7 +137,7 @@ public static class ServiceCollectionExtensions
         var isDevelopment = builder.Environment.IsDevelopment();
 
         var connectionName = config["Database:ConnectionName"] ?? "mrwhodb";
-        var connectionString = config.GetConnectionString(connectionName) ?? config[$"ConnectionStrings:{connectionName}"];
+        var connectionString = config.GetConnectionString(connectionName) ?? config[$"ConnectionStrings:{connectionName}"]; 
 
         // Provide a sensible local default for tooling/migrations if not configured
         if (string.IsNullOrWhiteSpace(connectionString))

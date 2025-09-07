@@ -2,6 +2,8 @@ using Microsoft.Extensions.DependencyInjection;
 using MrWho.Endpoints;
 using MrWho.Services.Mediator;
 using Microsoft.AspNetCore.Mvc; // added
+using MrWho.Handlers.Auth; // for consent handlers
+using Microsoft.AspNetCore.Http; // for IResult
 
 namespace MrWho.Extensions;
 
@@ -25,6 +27,11 @@ public static class MediatorServiceCollectionExtensions
         services.AddTransient<IRequestHandler<MrWho.Endpoints.Auth.RegisterGetRequest, IActionResult>, MrWho.Handlers.Auth.RegisterGetHandler>();
         services.AddTransient<IRequestHandler<MrWho.Endpoints.Auth.RegisterPostRequest, IActionResult>, MrWho.Handlers.Auth.RegisterPostHandler>();
         services.AddTransient<IRequestHandler<MrWho.Endpoints.Auth.RegisterSuccessGetRequest, IActionResult>, MrWho.Handlers.Auth.RegisterSuccessGetHandler>();
+
+        // Consent handlers
+        services.AddTransient<IRequestHandler<ConsentGetRequest, IActionResult>, ConsentGetHandler>();
+        services.AddTransient<IRequestHandler<ConsentPostRequest, IActionResult>, ConsentPostHandler>();
+        services.AddTransient<IRequestHandler<ConsentForgetRequest, IActionResult>, ConsentForgetHandler>();
 
     // Debug endpoint handlers
     services.AddTransient<IRequestHandler<DebugIndexRequest, IResult>, DebugIndexHandler>();
