@@ -3,11 +3,14 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using MrWho.Data;
 using OpenIddict.Client;
+using Microsoft.AspNetCore.Authorization;
+using MrWho.Shared;
 
 namespace MrWho.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Policy = AuthorizationPolicies.AdminClientApi)]
 public class DiagnoseExternalClientController : ControllerBase
 {
     private readonly OpenIddictClientOptions _clientOptions;
@@ -19,7 +22,7 @@ public class DiagnoseExternalClientController : ControllerBase
         _db = db;
     }
 
-    [HttpGet("registrations")] 
+    [HttpGet("registrations")]
     public ActionResult<object> GetRegistrations()
     {
         var regs = _clientOptions.Registrations.Select(r => new
