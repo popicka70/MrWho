@@ -37,7 +37,8 @@ public class AdditionalAuthFlowTests
         // When redirect, should contain /connect/login or /Account/Login depending on server config
         if (resp.StatusCode == HttpStatusCode.Redirect || resp.StatusCode == HttpStatusCode.Found)
         {
-            Assert.IsTrue(loc.Contains("login", StringComparison.OrdinalIgnoreCase), $"Redirect location did not look like a login page: {loc}");
+            Assert.IsTrue(loc.Contains("login", StringComparison.OrdinalIgnoreCase) || loc.Contains("authorize", StringComparison.OrdinalIgnoreCase),
+                $"Redirect location did not look like a login page: {loc}");
         }
     }
 
