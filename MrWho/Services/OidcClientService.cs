@@ -276,45 +276,12 @@ public class OidcClientService : IOidcClientService
             .Include(c => c.Permissions)
             .FirstOrDefaultAsync(c => c.ClientId == "mrwho_admin_web");
 
-        // Load configured URIs for admin client
+        // Load configured URIs for admin client strictly from options (no hardcoded defaults)
         var cfgAdmin = _clientOptions.Value.Admin ?? new OidcClientsOptions.ClientOptions();
         if (string.IsNullOrWhiteSpace(cfgAdmin.ClientId)) cfgAdmin.ClientId = "mrwho_admin_web";
 
-        // Helper dev URIs for admin app (http profile in launchSettings)
-        var adminDevHttpRedirects = new[]
-        {
-            "http://localhost:5298/signin-oidc",
-            "http://localhost:5298/callback"
-        };
-        var adminDevHttpPostLogout = new[]
-        {
-            "http://localhost:5298/",
-            "http://localhost:5298/signout-callback-oidc"
-        };
-
-        var adminConfiguredRedirects = (cfgAdmin.RedirectUris?.Length > 0
-            ? cfgAdmin.RedirectUris
-            : new[]
-            {
-                "https://mrwhoadmin.onrender.com/signin-oidc",
-                "https://mrwhoadmin.onrender.com/callback",
-                "https://localhost:7257/signin-oidc",
-                "https://localhost:7257/callback",
-                "http://localhost:8081/signin-oidc",
-                "http://localhost:8081/callback"
-            }).Concat(adminDevHttpRedirects);
-
-        var adminConfiguredPostLogout = (cfgAdmin.PostLogoutRedirectUris?.Length > 0
-            ? cfgAdmin.PostLogoutRedirectUris
-            : new[]
-            {
-                "https://localhost:7257/",
-                "https://localhost:7257/signout-callback-oidc",
-                "https://mrwhoadmin.onrender.com/",
-                "https://mrwhoadmin.onrender.com/signout-callback-oidc",
-                "http://localhost:8081/",
-                "http://localhost:8081/signout-callback-oidc"
-            }).Concat(adminDevHttpPostLogout);
+        var adminConfiguredRedirects = (IEnumerable<string>)(cfgAdmin.RedirectUris ?? Array.Empty<string>());
+        var adminConfiguredPostLogout = (IEnumerable<string>)(cfgAdmin.PostLogoutRedirectUris ?? Array.Empty<string>());
 
         if (adminClient == null)
         {
@@ -442,26 +409,8 @@ public class OidcClientService : IOidcClientService
         var cfgDemo1 = _clientOptions.Value.Demo1 ?? new OidcClientsOptions.ClientOptions();
         if (string.IsNullOrWhiteSpace(cfgDemo1.ClientId)) cfgDemo1.ClientId = "mrwho_demo1";
 
-        // Known dev HTTP URIs for demo1 app (from launchSettings)
-        var demo1DevHttpRedirects = new[]
-        {
-            "http://localhost:5092/signin-oidc",
-            "http://localhost:5092/callback"
-        };
-        var demo1DevHttpPostLogout = new[]
-        {
-            "http://localhost:5092/",
-            "http://localhost:5092/signout-callback-oidc"
-        };
-
-        var demo1ConfiguredRedirects = (cfgDemo1.RedirectUris?.Length > 0
-            ? cfgDemo1.RedirectUris
-            : new[] { "https://localhost:7037/signin-oidc", "https://localhost:7037/callback" })
-            .Concat(demo1DevHttpRedirects);
-        var demo1ConfiguredPostLogout = (cfgDemo1.PostLogoutRedirectUris?.Length > 0
-            ? cfgDemo1.PostLogoutRedirectUris
-            : new[] { "https://localhost:7037/", "https://localhost:7037/signout-callback-oidc" })
-            .Concat(demo1DevHttpPostLogout);
+        var demo1ConfiguredRedirects = (IEnumerable<string>)(cfgDemo1.RedirectUris ?? Array.Empty<string>());
+        var demo1ConfiguredPostLogout = (IEnumerable<string>)(cfgDemo1.PostLogoutRedirectUris ?? Array.Empty<string>());
 
         const string Demo1LongSecret = "FTZvvlIIFdmtBg7IdBql9EEXRDj1xwLmi1qW9fGbJBY"; // >= 32 bytes for HS256
 
@@ -742,19 +691,8 @@ public class OidcClientService : IOidcClientService
         var cfgNuget = _clientOptions.Value.Nuget ?? new OidcClientsOptions.ClientOptions();
         if (string.IsNullOrWhiteSpace(cfgNuget.ClientId)) cfgNuget.ClientId = "mrwho_demo_nuget";
 
-        // Common dev ports when no launchSettings exists: 5000 (http), 5001 (https)
-        var nugetHttpsPorts = new[] { "5001" };
-        var nugetHttpPorts = new[] { "5000" };
-
-        var nugetRedirectsDefaults = nugetHttpsPorts.Select(p => $"https://localhost:{p}/signin-oidc").Concat(
-                              nugetHttpPorts.Select(p => $"http://localhost:{p}/signin-oidc"));
-        var nugetPostLogoutDefaults = nugetHttpsPorts.Select(p => $"https://localhost:{p}/signout-callback-oidc").Concat(
-                              nugetHttpPorts.Select(p => $"http://localhost:{p}/signout-callback-oidc"))
-                              .Concat(nugetHttpsPorts.Select(p => $"https://localhost:{p}/"))
-                              .Concat(nugetHttpPorts.Select(p => $"http://localhost:{p}/"));
-
-        var nugetConfiguredRedirects = (cfgNuget.RedirectUris?.Length > 0 ? cfgNuget.RedirectUris : nugetRedirectsDefaults);
-        var nugetConfiguredPostLogout = (cfgNuget.PostLogoutRedirectUris?.Length > 0 ? cfgNuget.PostLogoutRedirectUris : nugetPostLogoutDefaults);
+        var nugetConfiguredRedirects = (IEnumerable<string>)(cfgNuget.RedirectUris ?? Array.Empty<string>());
+        var nugetConfiguredPostLogout = (IEnumerable<string>)(cfgNuget.PostLogoutRedirectUris ?? Array.Empty<string>());
 
         if (nugetClient == null)
         {
@@ -806,7 +744,7 @@ public class OidcClientService : IOidcClientService
         }
         else
         {
-            // Backfill PAR and URIs
+            // Backfill PAR and ensure configured URIs exist
             if (nugetClient.ParMode == null)
             {
                 nugetClient.ParMode = PushedAuthorizationMode.Enabled;
@@ -839,12 +777,8 @@ public class OidcClientService : IOidcClientService
         var cfgDefault = _clientOptions.Value.Default ?? new OidcClientsOptions.ClientOptions();
         if (string.IsNullOrWhiteSpace(cfgDefault.ClientId)) cfgDefault.ClientId = "postman_client";
 
-        var defaultRedirects = cfgDefault.RedirectUris?.Length > 0
-            ? cfgDefault.RedirectUris
-            : new[] { "https://localhost:7001/callback", "http://localhost:5001/callback", "https://localhost:7002/", "https://localhost:7002/callback", "https://localhost:7002/signin-oidc" };
-        var defaultPostLogout = cfgDefault.PostLogoutRedirectUris?.Length > 0
-            ? cfgDefault.PostLogoutRedirectUris
-            : new[] { "https://localhost:7001/", "http://localhost:5001/", "https://localhost:7002/", "https://localhost:7002/signout-callback-oidc" };
+        var defaultRedirects = (IEnumerable<string>)(cfgDefault.RedirectUris ?? Array.Empty<string>());
+        var defaultPostLogout = (IEnumerable<string>)(cfgDefault.PostLogoutRedirectUris ?? Array.Empty<string>());
 
         if (defaultClient == null)
         {
