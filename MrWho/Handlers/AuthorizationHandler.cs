@@ -188,11 +188,6 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
             // Prefer explicit redirect over Challenge because Challenge inside the authorization endpoint
             // (with OpenIddict passthrough) produced a blank page in some configurations.
             return Results.Redirect(loginUrl);
-
-            /* Previous behaviour (kept for reference):
-            var props = new AuthenticationProperties { RedirectUri = context.Request.GetDisplayUrl() };
-            return Results.Challenge(props, new[] { cookieScheme });
-            */
         }
 
         // 4) Realm and profile checks (defense-in-depth)
@@ -293,6 +288,21 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
 
         var authPrincipal = new ClaimsPrincipal(claimsIdentity);
         authPrincipal.SetScopes(request.GetScopes());
+
+        // NEW: enforce per-client/realm authorization code lifetime
+        try
+        {
+            var dbClient = await _context.Clients.Include(c => c.Realm).FirstOrDefaultAsync(c => c.ClientId == clientId);
+            if (dbClient != null)
+            {
+                var codeTtl = dbClient.GetEffectiveAuthorizationCodeLifetime();
+                authPrincipal.SetAuthorizationCodeLifetime(codeTtl);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to set authorization code lifetime for client {ClientId}", clientId);
+        }
 
         // Best-effort: ensure client cookie exists for next requests (only after validation)
         if (!await _dynamicCookieService.IsAuthenticatedForClientAsync(clientId))

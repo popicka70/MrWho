@@ -10,6 +10,7 @@
 @inject IClientsApiService ClientsApi
 @inject DialogService DialogService
 @inject IJSRuntime JS
+@inject IRealmsApiService RealmsApi
 
 <PageTitle>Client Details - MrWho Admin</PageTitle>
 
@@ -215,17 +216,37 @@
                         <div style="padding: 1rem; max-height: 550px; overflow-y: auto;">
                             <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Token Lifetimes</RadzenText>
                             <RadzenRow>
-                                <RadzenColumn Size="12" SizeMD="4">
+                                <RadzenColumn Size="12" SizeMD="6">
                                     <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Access Token</RadzenText>
                                     <RadzenText>@(FormatTimeSpan(client.AccessTokenLifetime))</RadzenText>
+                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Effective</RadzenText>
+                                    <RadzenText>@EffectiveAccessToken()</RadzenText>
                                 </RadzenColumn>
-                                <RadzenColumn Size="12" SizeMD="4">
+                                <RadzenColumn Size="12" SizeMD="6">
                                     <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Refresh Token</RadzenText>
                                     <RadzenText>@(FormatTimeSpan(client.RefreshTokenLifetime))</RadzenText>
+                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Effective</RadzenText>
+                                    <RadzenText>@EffectiveRefreshToken()</RadzenText>
                                 </RadzenColumn>
-                                <RadzenColumn Size="12" SizeMD="4">
+                            </RadzenRow>
+                            <RadzenRow>
+                                <RadzenColumn Size="12" SizeMD="6">
                                     <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Authorization Code</RadzenText>
                                     <RadzenText>@(FormatTimeSpan(client.AuthorizationCodeLifetime))</RadzenText>
+                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Effective</RadzenText>
+                                    <RadzenText>@EffectiveAuthorizationCode()</RadzenText>
+                                </RadzenColumn>
+                                <RadzenColumn Size="12" SizeMD="6">
+                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Realm Defaults</RadzenText>
+                                    @if (realm != null)
+                                    {
+                                        <RadzenText>Access: @FormatTimeSpan(realm.AccessTokenLifetime) • Refresh: @FormatTimeSpan(realm.RefreshTokenLifetime) • Code: @FormatTimeSpan(realm.AuthorizationCodeLifetime)</RadzenText>
+                                        <RadzenText>Id Token: @FormatTimeSpan(realm.IdTokenLifetime) • Device Code: @FormatTimeSpan(realm.DeviceCodeLifetime)</RadzenText>
+                                    }
+                                    else
+                                    {
+                                        <RadzenText class="rz-color-secondary">Loading...</RadzenText>
+                                    }
                                 </RadzenColumn>
                             </RadzenRow>
 
@@ -234,10 +255,14 @@
                                 <RadzenColumn Size="12" SizeMD="3">
                                     <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">ID Token Lifetime</RadzenText>
                                     <RadzenText>@FormatNullableMinutes(client.IdTokenLifetimeMinutes)</RadzenText>
+                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Effective</RadzenText>
+                                    <RadzenText>@EffectiveIdToken()</RadzenText>
                                 </RadzenColumn>
                                 <RadzenColumn Size="12" SizeMD="3">
                                     <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Device Code Lifetime</RadzenText>
                                     <RadzenText>@FormatNullableMinutes(client.DeviceCodeLifetimeMinutes)</RadzenText>
+                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Effective</RadzenText>
+                                    <RadzenText>@EffectiveDeviceCode()</RadzenText>
                                 </RadzenColumn>
                                 <RadzenColumn Size="12" SizeMD="3">
                                     <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Access Token Type</RadzenText>
@@ -246,20 +271,6 @@
                                 <RadzenColumn Size="12" SizeMD="3">
                                     <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Max Refresh Tokens/User</RadzenText>
                                     <RadzenText>@(client.MaxRefreshTokensPerUser?.ToString() ?? "Unlimited")</RadzenText>
-                                </RadzenColumn>
-                            </RadzenRow>
-                            <RadzenRow>
-                                <RadzenColumn Size="12" SizeMD="4">
-                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">One-time Refresh Tokens</RadzenText>
-                                    <RadzenBadge BadgeStyle="@GetBoolBadge(client.UseOneTimeRefreshTokens)" Text="@FormatBool(client.UseOneTimeRefreshTokens)" />
-                                </RadzenColumn>
-                                <RadzenColumn Size="12" SizeMD="4">
-                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Hash Access Tokens</RadzenText>
-                                    <RadzenBadge BadgeStyle="@GetBoolBadge(client.HashAccessTokens)" Text="@FormatBool(client.HashAccessTokens)" />
-                                </RadzenColumn>
-                                <RadzenColumn Size="12" SizeMD="4">
-                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Update Claims On Refresh</RadzenText>
-                                    <RadzenBadge BadgeStyle="@GetBoolBadge(client.UpdateAccessTokenClaimsOnRefresh)" Text="@FormatBool(client.UpdateAccessTokenClaimsOnRefresh)" />
                                 </RadzenColumn>
                             </RadzenRow>
                         </div>
@@ -566,6 +577,7 @@
     [Parameter] public string? Id { get; set; }
 
     private ClientDto? client;
+    private RealmDto? realm;
     private bool isLoading = false;
     private bool isToggling = false;
     private int selectedTabIndex = 0;
@@ -591,6 +603,10 @@
             {
                 NotificationService.Notify(NotificationSeverity.Error, "Error", "Client not found or not accessible");
             }
+            else
+            {
+                realm = await RealmsApi.GetRealmAsync(client.RealmId);
+            }
         }
         catch (Exception ex)
         {
@@ -601,6 +617,37 @@
         {
             isLoading = false;
         }
+    }
+
+    private string EffectiveAccessToken()
+    {
+        if (client == null) return "-";
+        var span = client.AccessTokenLifetime ?? realm?.AccessTokenLifetime;
+        return span.HasValue ? FormatTimeSpan(span) : "-";
+    }
+    private string EffectiveRefreshToken()
+    {
+        if (client == null) return "-";
+        var span = client.RefreshTokenLifetime ?? realm?.RefreshTokenLifetime;
+        return span.HasValue ? FormatTimeSpan(span) : "-";
+    }
+    private string EffectiveAuthorizationCode()
+    {
+        if (client == null) return "-";
+        var span = client.AuthorizationCodeLifetime ?? realm?.AuthorizationCodeLifetime;
+        return span.HasValue ? FormatTimeSpan(span) : "-";
+    }
+    private string EffectiveIdToken()
+    {
+        if (client == null) return "-";
+        var minutes = client.IdTokenLifetimeMinutes ?? (int)Math.Round((realm?.IdTokenLifetime ?? TimeSpan.FromMinutes(60)).TotalMinutes);
+        return $"{minutes}m";
+    }
+    private string EffectiveDeviceCode()
+    {
+        if (client == null) return "-";
+        var minutes = client.DeviceCodeLifetimeMinutes ?? (int)Math.Round((realm?.DeviceCodeLifetime ?? TimeSpan.FromMinutes(10)).TotalMinutes);
+        return $"{minutes}m";
     }
 
     private async Task Toggle()
@@ -673,7 +720,7 @@
 
     private string FormatTimeSpan(TimeSpan? value)
     {
-        if (value == null) return "-";
+        if (value == null) return "Default";
         var ts = value.Value;
         if (ts.TotalDays >= 1)
         {
