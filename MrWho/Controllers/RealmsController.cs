@@ -824,6 +824,13 @@ public class RealmsController : ControllerBase
             return NotFound();
         }
 
+        // Token lifetimes
+        realm.AccessTokenLifetime = request.AccessTokenLifetime;
+        realm.RefreshTokenLifetime = request.RefreshTokenLifetime;
+        realm.AuthorizationCodeLifetime = request.AuthorizationCodeLifetime;
+        realm.IdTokenLifetime = request.IdTokenLifetime;
+        realm.DeviceCodeLifetime = request.DeviceCodeLifetime;
+
         // Map all defaults and branding fields
         realm.DefaultSessionTimeoutHours = request.DefaultSessionTimeoutHours;
         realm.DefaultRememberMeDurationDays = request.DefaultRememberMeDurationDays;
