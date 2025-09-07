@@ -89,6 +89,9 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
     // NEW: Persistent cryptographic keys for OpenIddict (signing/encryption) with rotation metadata
     public DbSet<KeyMaterial> KeyMaterials => Set<KeyMaterial>();
 
+    // NEW: Consents
+    public DbSet<Consent> Consents => Set<Consent>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
@@ -503,6 +506,13 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
             b.HasIndex(k => k.Kid).IsUnique();
         });
 
+        // Configure Consent entity
+        builder.Entity<Consent>(b =>
+        {
+            b.HasKey(c => c.Id);
+            b.HasIndex(c => new { c.UserId, c.ClientId }).IsUnique();
+        });
+
         // Provider-specific tuning: MySQL row size limits -> move large strings to longtext
         if (Database.ProviderName?.Contains("MySql", StringComparison.OrdinalIgnoreCase) == true)
         {
@@ -576,6 +586,12 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
             {
                 entity.Property(k => k.PrivateKeyPem).HasColumnType("longtext");
             });
+
+            // Long text for Consent scopes json
+            builder.Entity<Consent>(entity =>
+            {
+                entity.Property(c => c.GrantedScopesJson).HasColumnType("longtext");
+            });
         }
 
         // Provider-specific tuning: PostgreSQL -> use text for large strings
@@ -601,6 +617,11 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
             builder.Entity<KeyMaterial>(entity =>
             {
                 entity.Property(k => k.PrivateKeyPem).HasColumnType("text");
+            });
+
+            builder.Entity<Consent>(entity =>
+            {
+                entity.Property(c => c.GrantedScopesJson).HasColumnType("text");
             });
         }
 

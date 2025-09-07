@@ -9,6 +9,7 @@ using Microsoft.AspNetCore;
 using MrWho.Data;
 using Microsoft.EntityFrameworkCore;
 using MrWho.Models;
+using Microsoft.AspNetCore.WebUtilities;
 
 namespace MrWho.Handlers;
 
@@ -26,6 +27,7 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
     private readonly IUserRealmValidationService _realmValidationService;
     private readonly ApplicationDbContext _context;
     private readonly ILogger<OidcAuthorizationHandler> _logger;
+    private readonly IConsentService _consentService;
 
     public OidcAuthorizationHandler(
         UserManager<IdentityUser> userManager,
@@ -34,7 +36,8 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         IDynamicCookieService dynamicCookieService,
         IUserRealmValidationService realmValidationService,
         ApplicationDbContext context,
-        ILogger<OidcAuthorizationHandler> logger)
+        ILogger<OidcAuthorizationHandler> logger,
+        IConsentService consentService)
     {
         _userManager = userManager;
         _signInManager = signInManager;
@@ -43,6 +46,7 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         _realmValidationService = realmValidationService;
         _context = context;
         _logger = logger;
+        _consentService = consentService;
     }
 
     public async Task<IResult> HandleAuthorizationRequestAsync(HttpContext context)
@@ -101,8 +105,7 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
                 if (clientPrincipal?.Identity?.IsAuthenticated == true)
                 {
                     _logger.LogDebug("User already authenticated for client {ClientId}", clientId);
-                    var sub = clientPrincipal.FindFirst(ClaimTypes.NameIdentifier) ??
-                              clientPrincipal.FindFirst(OpenIddictConstants.Claims.Subject);
+                    var sub = clientPrincipal.FindFirst(ClaimTypes.NameIdentifier) ?? clientPrincipal.FindFirst(OpenIddictConstants.Claims.Subject);
                     if (sub != null)
                     {
                         authUser = await _userManager.FindByIdAsync(sub.Value);
@@ -237,6 +240,45 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
             return Results.Redirect(accessDeniedUrl);
         }
 
+        // 4b) Consent check: if any new scopes are requested that were not previously granted, show consent UI
+        try
+        {
+            // Skip consent prompt if this request already has a one-time approval flag
+            try
+            {
+                var currentUrl = context.Request.GetDisplayUrl();
+                var uri = new Uri(currentUrl);
+                var q = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+                if (q.TryGetValue("mrwho_consent", out var v) && v.ToString() == "ok")
+                {
+                    goto SKIP_CONSENT;
+                }
+            }
+            catch { }
+
+            var requestedScopes = request.GetScopes();
+            if (requestedScopes.Any())
+            {
+                var consent = await _consentService.GetAsync(authUser.Id, clientId);
+                var granted = consent?.GetGrantedScopes() ?? Array.Empty<string>();
+                var missing = _consentService.DiffMissingScopes(requestedScopes, granted);
+                if (missing.Count > 0)
+                {
+                    var currentUrl = context.Request.GetDisplayUrl();
+                    var scopesParam = string.Join(" ", requestedScopes);
+                    var consentUrl = "/connect/consent?" +
+                                     $"clientId={Uri.EscapeDataString(clientId)}&returnUrl={Uri.EscapeDataString(currentUrl)}" +
+                                     (string.IsNullOrEmpty(scopesParam) ? string.Empty : $"&requested={Uri.EscapeDataString(scopesParam)}");
+                    return Results.Redirect(consentUrl);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Consent check failed for client {ClientId}. Proceeding without consent prompt.", clientId);
+        }
+
+        SKIP_CONSENT:
         // 5) Build authorization principal
         var claimsIdentity = new ClaimsIdentity(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
 
