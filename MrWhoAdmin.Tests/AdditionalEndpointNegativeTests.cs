@@ -6,7 +6,8 @@ namespace MrWhoAdmin.Tests;
 [TestCategory("Integration")] 
 public class AdditionalEndpointNegativeTests
 {
-    private HttpClient CreateServerClient() => SharedTestInfrastructure.CreateHttpClient("mrwho", disableRedirects: true);
+    // Disable redirects and cookies to avoid leaking authentication state from other tests via shared handlers/cookies.
+    private HttpClient CreateServerClient() => SharedTestInfrastructure.CreateHttpClient("mrwho", disableRedirects: true, disableCookies: true);
 
     [TestMethod]
     public async Task QrLogin_Status_With_Invalid_Token_Returns_NotFound_Or_Expired()

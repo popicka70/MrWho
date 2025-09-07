@@ -175,11 +175,38 @@ public static class SharedTestInfrastructure
     }
 
     /// <summary>
-    /// Create an HTTP client for a specific service. Set disableRedirects=true to preserve Authorization header.
+    /// Create an HTTP client for a specific service.
+    /// Optional flags allow disabling redirects and cookies to avoid cross-test auth leakage.
     /// </summary>
-    public static HttpClient CreateHttpClient(string serviceName, bool disableRedirects = false)
+    public static HttpClient CreateHttpClient(string serviceName, bool disableRedirects = false, bool disableCookies = false)
     {
-        var client = GetSharedApp().CreateHttpClient(serviceName, "https");
+        // Use Aspire to get a correctly-based client first (to learn BaseAddress)
+        var baseClient = GetSharedApp().CreateHttpClient(serviceName, "https");
+        var baseAddress = baseClient.BaseAddress;
+
+        // Fast path: keep Aspire's client when no special behavior requested
+        if (!disableRedirects && !disableCookies)
+        {
+            return baseClient;
+        }
+
+        // Otherwise, dispose the initial client and create an isolated handler/client
+        baseClient.Dispose();
+
+        var handler = new HttpClientHandler
+        {
+            AllowAutoRedirect = !disableRedirects,
+            UseCookies = !disableCookies,
+            ClientCertificateOptions = ClientCertificateOption.Manual,
+            // Accept any HTTPS certificate (dev certs) but reject non-HTTPS
+            ServerCertificateCustomValidationCallback = (msg, cert, chain, errors) => msg?.RequestUri?.Scheme == Uri.UriSchemeHttps
+        };
+
+        var client = new HttpClient(handler)
+        {
+            BaseAddress = baseAddress
+        };
+
         return client;
     }
 }
