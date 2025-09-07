@@ -4,7 +4,9 @@ using MrWho.Data;
 using MrWho.Models;
 using MrWho.Shared;
 using OpenIddict.Abstractions;
-using OpenIddict.EntityFrameworkCore.Models; // added
+using OpenIddict.EntityFrameworkCore.Models;
+using Microsoft.Extensions.Options;
+using MrWho.Options;
 
 namespace MrWho.Services;
 
@@ -12,30 +14,40 @@ public class OidcClientService : IOidcClientService
 {
     private readonly ApplicationDbContext _context;
     private readonly IOpenIddictApplicationManager _applicationManager;
-    private readonly IOpenIddictScopeManager _scopeManager; // added
+    private readonly IOpenIddictScopeManager _scopeManager;
     private readonly UserManager<IdentityUser> _userManager;
     private readonly ILogger<OidcClientService> _logger;
-
-    // Removed incorrect custom endpoint permission constants. OpenIddict uses dot notation e.g. "endpoints.introspection".
-    // We'll rely on OpenIddictConstants when available and literal strings for those not exposed (fallback list maintained below).
+    private readonly IOptions<OidcClientsOptions> _clientOptions;
 
     // Fallback literal permissions for endpoints not exposed as constants in current OpenIddict version
     private const string UserInfoEndpointPermission = "endpoints.userinfo"; // correct form
     private const string RevocationEndpointPermission = "endpoints.revocation"; // correct form
     private const string IntrospectionEndpointPermission = "endpoints.introspection"; // correct form
 
+    // Back-compat overload for tests and legacy callers without options
     public OidcClientService(
         ApplicationDbContext context,
         IOpenIddictApplicationManager applicationManager,
-        IOpenIddictScopeManager scopeManager, // added
+        IOpenIddictScopeManager scopeManager,
         UserManager<IdentityUser> userManager,
         ILogger<OidcClientService> logger)
+        : this(context, applicationManager, scopeManager, userManager, logger, Microsoft.Extensions.Options.Options.Create(new OidcClientsOptions()))
+    { }
+
+    public OidcClientService(
+        ApplicationDbContext context,
+        IOpenIddictApplicationManager applicationManager,
+        IOpenIddictScopeManager scopeManager,
+        UserManager<IdentityUser> userManager,
+        ILogger<OidcClientService> logger,
+        IOptions<OidcClientsOptions> clientOptions)
     {
         _context = context;
         _applicationManager = applicationManager;
-        _scopeManager = scopeManager; // added
+        _scopeManager = scopeManager;
         _userManager = userManager;
         _logger = logger;
+        _clientOptions = clientOptions;
     }
 
     private async Task BackfillEndpointAccessFlagsAsync()
@@ -264,6 +276,10 @@ public class OidcClientService : IOidcClientService
             .Include(c => c.Permissions)
             .FirstOrDefaultAsync(c => c.ClientId == "mrwho_admin_web");
 
+        // Load configured URIs for admin client
+        var cfgAdmin = _clientOptions.Value.Admin ?? new OidcClientsOptions.ClientOptions();
+        if (string.IsNullOrWhiteSpace(cfgAdmin.ClientId)) cfgAdmin.ClientId = "mrwho_admin_web";
+
         // Helper dev URIs for admin app (http profile in launchSettings)
         var adminDevHttpRedirects = new[]
         {
@@ -276,12 +292,36 @@ public class OidcClientService : IOidcClientService
             "http://localhost:5298/signout-callback-oidc"
         };
 
+        var adminConfiguredRedirects = (cfgAdmin.RedirectUris?.Length > 0
+            ? cfgAdmin.RedirectUris
+            : new[]
+            {
+                "https://mrwhoadmin.onrender.com/signin-oidc",
+                "https://mrwhoadmin.onrender.com/callback",
+                "https://localhost:7257/signin-oidc",
+                "https://localhost:7257/callback",
+                "http://localhost:8081/signin-oidc",
+                "http://localhost:8081/callback"
+            }).Concat(adminDevHttpRedirects);
+
+        var adminConfiguredPostLogout = (cfgAdmin.PostLogoutRedirectUris?.Length > 0
+            ? cfgAdmin.PostLogoutRedirectUris
+            : new[]
+            {
+                "https://localhost:7257/",
+                "https://localhost:7257/signout-callback-oidc",
+                "https://mrwhoadmin.onrender.com/",
+                "https://mrwhoadmin.onrender.com/signout-callback-oidc",
+                "http://localhost:8081/",
+                "http://localhost:8081/signout-callback-oidc"
+            }).Concat(adminDevHttpPostLogout);
+
         if (adminClient == null)
         {
             adminClient = new Client
             {
-                ClientId = "mrwho_admin_web",
-                ClientSecret = "FTZvvlIIFdmtBg7IdBql9EEXRDj1xwLmi1qW9fGbJBY", // admin secret length is sufficient for HS256
+                ClientId = cfgAdmin.ClientId!,
+                ClientSecret = string.IsNullOrWhiteSpace(cfgAdmin.ClientSecret) ? "FTZvvlIIFdmtBg7IdBql9EEXRDj1xwLmi1qW9fGbJBY" : cfgAdmin.ClientSecret, // allow override via config
                 Name = "MrWho Admin Web Application",
                 Description = "Official web administration interface for MrWho OIDC server",
                 RealmId = adminRealm.Id,
@@ -304,28 +344,10 @@ public class OidcClientService : IOidcClientService
             _context.Clients.Add(adminClient);
             await _context.SaveChangesAsync();
 
-            var redirectUris = new[]
-            {
-                "https://mrwhoadmin.onrender.com/signin-oidc",
-                "https://mrwhoadmin.onrender.com/callback",
-                "https://localhost:7257/signin-oidc",
-                "https://localhost:7257/callback",
-                "http://localhost:8081/signin-oidc",
-                "http://localhost:8081/callback"
-            }.Concat(adminDevHttpRedirects);
-            foreach (var uri in redirectUris)
+            foreach (var uri in adminConfiguredRedirects)
                 _context.ClientRedirectUris.Add(new ClientRedirectUri { ClientId = adminClient.Id, Uri = uri });
 
-            var postLogoutUris = new[]
-            {
-                "https://localhost:7257/",
-                "https://localhost:7257/signout-callback-oidc",
-                "https://mrwhoadmin.onrender.com/",
-                "https://mrwhoadmin.onrender.com/signout-callback-oidc",
-                "http://localhost:8081/",
-                "http://localhost:8081/signout-callback-oidc"
-            }.Concat(adminDevHttpPostLogout);
-            foreach (var uri in postLogoutUris)
+            foreach (var uri in adminConfiguredPostLogout)
                 _context.ClientPostLogoutUris.Add(new ClientPostLogoutUri { ClientId = adminClient.Id, Uri = uri });
 
             var scopes = new[] { StandardScopes.OpenId, StandardScopes.Email, StandardScopes.Profile, StandardScopes.Roles, StandardScopes.OfflineAccess, StandardScopes.ApiRead, StandardScopes.ApiWrite, StandardScopes.MrWhoUse };
@@ -351,7 +373,7 @@ public class OidcClientService : IOidcClientService
             _context.ClientPermissions.Add(new ClientPermission { ClientId = adminClient.Id, Permission = "scp:mrwho.use" });
 
             await _context.SaveChangesAsync();
-            _logger.LogInformation("Created admin client 'mrwho_admin_web' with standardized permissions (PasswordGrant={Password})", isTesting);
+            _logger.LogInformation("Created admin client '{ClientId}' with standardized permissions (PasswordGrant={Password})", adminClient.ClientId, isTesting);
         }
         else
         {
@@ -377,9 +399,9 @@ public class OidcClientService : IOidcClientService
                 _logger.LogInformation("Backfilled ParMode=Enabled for admin client");
             }
 
-            // Ensure dev HTTP redirect URIs exist for admin app when using http profile (5298)
+            // Ensure configured redirect/post-logout URIs exist
             var existingRedirects = adminClient.RedirectUris.Select(r => r.Uri).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            foreach (var uri in adminDevHttpRedirects)
+            foreach (var uri in adminConfiguredRedirects)
             {
                 if (!existingRedirects.Contains(uri))
                 {
@@ -388,7 +410,7 @@ public class OidcClientService : IOidcClientService
                 }
             }
             var existingPostLogout = adminClient.PostLogoutUris.Select(r => r.Uri).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            foreach (var uri in adminDevHttpPostLogout)
+            foreach (var uri in adminConfiguredPostLogout)
             {
                 if (!existingPostLogout.Contains(uri))
                 {
@@ -417,6 +439,9 @@ public class OidcClientService : IOidcClientService
             .Include(c => c.Permissions)
             .FirstOrDefaultAsync(c => c.ClientId == "mrwho_demo1");
 
+        var cfgDemo1 = _clientOptions.Value.Demo1 ?? new OidcClientsOptions.ClientOptions();
+        if (string.IsNullOrWhiteSpace(cfgDemo1.ClientId)) cfgDemo1.ClientId = "mrwho_demo1";
+
         // Known dev HTTP URIs for demo1 app (from launchSettings)
         var demo1DevHttpRedirects = new[]
         {
@@ -429,14 +454,23 @@ public class OidcClientService : IOidcClientService
             "http://localhost:5092/signout-callback-oidc"
         };
 
+        var demo1ConfiguredRedirects = (cfgDemo1.RedirectUris?.Length > 0
+            ? cfgDemo1.RedirectUris
+            : new[] { "https://localhost:7037/signin-oidc", "https://localhost:7037/callback" })
+            .Concat(demo1DevHttpRedirects);
+        var demo1ConfiguredPostLogout = (cfgDemo1.PostLogoutRedirectUris?.Length > 0
+            ? cfgDemo1.PostLogoutRedirectUris
+            : new[] { "https://localhost:7037/", "https://localhost:7037/signout-callback-oidc" })
+            .Concat(demo1DevHttpPostLogout);
+
         const string Demo1LongSecret = "FTZvvlIIFdmtBg7IdBql9EEXRDj1xwLmi1qW9fGbJBY"; // >= 32 bytes for HS256
 
         if (demo1Client == null)
         {
             demo1Client = new Client
             {
-                ClientId = "mrwho_demo1",
-                ClientSecret = Demo1LongSecret,
+                ClientId = cfgDemo1.ClientId!,
+                ClientSecret = string.IsNullOrWhiteSpace(cfgDemo1.ClientSecret) ? Demo1LongSecret : cfgDemo1.ClientSecret,
                 Name = "MrWho Demo Application 1",
                 Description = "Demo application showcasing MrWho OIDC integration",
                 RealmId = demoRealm.Id,
@@ -457,9 +491,9 @@ public class OidcClientService : IOidcClientService
             _context.Clients.Add(demo1Client);
             await _context.SaveChangesAsync();
 
-            foreach (var uri in new[] { "https://localhost:7037/signin-oidc", "https://localhost:7037/callback" }.Concat(demo1DevHttpRedirects))
+            foreach (var uri in demo1ConfiguredRedirects)
                 _context.ClientRedirectUris.Add(new ClientRedirectUri { ClientId = demo1Client.Id, Uri = uri });
-            foreach (var uri in new[] { "https://localhost:7037/", "https://localhost:7037/signout-callback-oidc" }.Concat(demo1DevHttpPostLogout))
+            foreach (var uri in demo1ConfiguredPostLogout)
                 _context.ClientPostLogoutUris.Add(new ClientPostLogoutUri { ClientId = demo1Client.Id, Uri = uri });
             foreach (var scope in new[] { StandardScopes.OpenId, StandardScopes.Email, StandardScopes.Profile, StandardScopes.Roles, StandardScopes.OfflineAccess, StandardScopes.ApiRead, StandardScopes.ApiWrite })
                 _context.ClientScopes.Add(new ClientScope { ClientId = demo1Client.Id, Scope = scope });
@@ -484,16 +518,16 @@ public class OidcClientService : IOidcClientService
             // Backfill: ensure client secret is long enough for HS256 request object signatures
             if (string.IsNullOrWhiteSpace(demo1Client.ClientSecret) || demo1Client.ClientSecret.Length < 32)
             {
-                demo1Client.ClientSecret = Demo1LongSecret;
+                demo1Client.ClientSecret = string.IsNullOrWhiteSpace(cfgDemo1.ClientSecret) ? Demo1LongSecret : cfgDemo1.ClientSecret;
                 demo1Client.UpdatedAt = DateTime.UtcNow;
                 demo1Client.UpdatedBy = "Backfill";
                 await _context.SaveChangesAsync();
                 _logger.LogInformation("Updated demo1 client secret to meet HS256 length requirements");
             }
 
-            // Ensure dev HTTP redirect/post-logout URIs exist
+            // Ensure configured redirect/post-logout URIs exist
             var existingDemo1Redirects = demo1Client.RedirectUris.Select(r => r.Uri).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            foreach (var uri in demo1DevHttpRedirects)
+            foreach (var uri in demo1ConfiguredRedirects)
             {
                 if (!existingDemo1Redirects.Contains(uri))
                 {
@@ -502,7 +536,7 @@ public class OidcClientService : IOidcClientService
                 }
             }
             var existingDemo1PostLogout = demo1Client.PostLogoutUris.Select(r => r.Uri).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            foreach (var uri in demo1DevHttpPostLogout)
+            foreach (var uri in demo1ConfiguredPostLogout)
             {
                 if (!existingDemo1PostLogout.Contains(uri))
                 {
@@ -522,8 +556,8 @@ public class OidcClientService : IOidcClientService
         {
             m2mClient = new Client
             {
-                ClientId = "mrwho_demo_api_client",
-                ClientSecret = "DemoApiClientSecret2025!",
+                ClientId = _clientOptions.Value.M2M?.ClientId ?? "mrwho_demo_api_client",
+                ClientSecret = _clientOptions.Value.M2M?.ClientSecret ?? "DemoApiClientSecret2025!",
                 Name = "MrWho Demo API Machine Client",
                 Description = "Machine-to-machine client (client_credentials) for calling MrWhoDemoApi",
                 RealmId = demoRealm.Id,
@@ -618,8 +652,8 @@ public class OidcClientService : IOidcClientService
         {
             serviceM2M = new Client
             {
-                ClientId = "mrwho_m2m",
-                ClientSecret = "FTZvvlIIFdmtBg7IdBql9EEXRDj1xwLmi1qW9fGbJBY",
+                ClientId = _clientOptions.Value.ServiceM2M?.ClientId ?? "mrwho_m2m",
+                ClientSecret = _clientOptions.Value.ServiceM2M?.ClientSecret ?? "FTZvvlIIFdmtBg7IdBql9EEXRDj1xwLmi1qW9fGbJBY",
                 Name = "MrWho Service M2M Client",
                 Description = "Standard machine client (client_credentials) for calling protected MrWho API endpoints requiring mrwho.use",
                 RealmId = adminRealm.Id,
@@ -705,23 +739,29 @@ public class OidcClientService : IOidcClientService
             .Include(c => c.Permissions)
             .FirstOrDefaultAsync(c => c.ClientId == "mrwho_demo_nuget");
 
+        var cfgNuget = _clientOptions.Value.Nuget ?? new OidcClientsOptions.ClientOptions();
+        if (string.IsNullOrWhiteSpace(cfgNuget.ClientId)) cfgNuget.ClientId = "mrwho_demo_nuget";
+
         // Common dev ports when no launchSettings exists: 5000 (http), 5001 (https)
         var nugetHttpsPorts = new[] { "5001" };
         var nugetHttpPorts = new[] { "5000" };
 
-        var nugetRedirects = nugetHttpsPorts.Select(p => $"https://localhost:{p}/signin-oidc").Concat(
+        var nugetRedirectsDefaults = nugetHttpsPorts.Select(p => $"https://localhost:{p}/signin-oidc").Concat(
                               nugetHttpPorts.Select(p => $"http://localhost:{p}/signin-oidc"));
-        var nugetPostLogout = nugetHttpsPorts.Select(p => $"https://localhost:{p}/signout-callback-oidc").Concat(
+        var nugetPostLogoutDefaults = nugetHttpsPorts.Select(p => $"https://localhost:{p}/signout-callback-oidc").Concat(
                               nugetHttpPorts.Select(p => $"http://localhost:{p}/signout-callback-oidc"))
                               .Concat(nugetHttpsPorts.Select(p => $"https://localhost:{p}/"))
                               .Concat(nugetHttpPorts.Select(p => $"http://localhost:{p}/"));
+
+        var nugetConfiguredRedirects = (cfgNuget.RedirectUris?.Length > 0 ? cfgNuget.RedirectUris : nugetRedirectsDefaults);
+        var nugetConfiguredPostLogout = (cfgNuget.PostLogoutRedirectUris?.Length > 0 ? cfgNuget.PostLogoutRedirectUris : nugetPostLogoutDefaults);
 
         if (nugetClient == null)
         {
             nugetClient = new Client
             {
-                ClientId = "mrwho_demo_nuget",
-                ClientSecret = null, // public client by default
+                ClientId = cfgNuget.ClientId!,
+                ClientSecret = string.IsNullOrWhiteSpace(cfgNuget.ClientSecret) ? null : cfgNuget.ClientSecret, // public client by default
                 Name = "MrWho Demo NuGet App",
                 Description = "Sample app using MrWho.ClientAuth NuGet",
                 RealmId = demoRealm.Id,
@@ -742,9 +782,9 @@ public class OidcClientService : IOidcClientService
             _context.Clients.Add(nugetClient);
             await _context.SaveChangesAsync();
 
-            foreach (var uri in nugetRedirects)
+            foreach (var uri in nugetConfiguredRedirects)
                 _context.ClientRedirectUris.Add(new ClientRedirectUri { ClientId = nugetClient.Id, Uri = uri });
-            foreach (var uri in nugetPostLogout)
+            foreach (var uri in nugetConfiguredPostLogout)
                 _context.ClientPostLogoutUris.Add(new ClientPostLogoutUri { ClientId = nugetClient.Id, Uri = uri });
 
             foreach (var scope in new[] { StandardScopes.OpenId, StandardScopes.Email, StandardScopes.Profile, StandardScopes.Roles, StandardScopes.OfflineAccess, StandardScopes.ApiRead })
@@ -762,7 +802,7 @@ public class OidcClientService : IOidcClientService
                 _context.ClientPermissions.Add(new ClientPermission { ClientId = nugetClient.Id, Permission = p });
 
             await _context.SaveChangesAsync();
-            _logger.LogInformation("Created nuget demo client 'mrwho_demo_nuget' with default localhost ports 5000/5001");
+            _logger.LogInformation("Created nuget demo client '{ClientId}' with configured/default localhost ports", nugetClient.ClientId);
         }
         else
         {
@@ -776,32 +816,19 @@ public class OidcClientService : IOidcClientService
             }
 
             var existingNugetRedirects = nugetClient.RedirectUris.Select(r => r.Uri).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            foreach (var uri in nugetRedirects)
+            foreach (var uri in nugetConfiguredRedirects)
                 if (!existingNugetRedirects.Contains(uri))
                     _context.ClientRedirectUris.Add(new ClientRedirectUri { ClientId = nugetClient.Id, Uri = uri });
 
             var existingNugetPostLogout = nugetClient.PostLogoutUris.Select(r => r.Uri).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            foreach (var uri in nugetPostLogout)
+            foreach (var uri in nugetConfiguredPostLogout)
                 if (!existingNugetPostLogout.Contains(uri))
                     _context.ClientPostLogoutUris.Add(new ClientPostLogoutUri { ClientId = nugetClient.Id, Uri = uri });
 
             await _context.SaveChangesAsync();
         }
-    }
 
-    public async Task InitializeDefaultRealmAndClientsAsync()
-    {
-        await BackfillEndpointAccessFlagsAsync();
-
-        var defaultRealm = await _context.Realms.FirstOrDefaultAsync(r => r.Name == "default");
-        if (defaultRealm == null)
-        {
-            defaultRealm = new Realm { Name = "default", DisplayName = "Default Realm", Description = "Default realm for OIDC clients", IsEnabled = true, CreatedBy = "System" };
-            _context.Realms.Add(defaultRealm);
-            await _context.SaveChangesAsync();
-            _logger.LogInformation("Created default realm");
-        }
-
+        // Default realm/client (postman)
         var defaultClient = await _context.Clients
             .Include(c => c.RedirectUris)
             .Include(c => c.PostLogoutUris)
@@ -809,15 +836,25 @@ public class OidcClientService : IOidcClientService
             .Include(c => c.Permissions)
             .FirstOrDefaultAsync(c => c.ClientId == "postman_client");
 
+        var cfgDefault = _clientOptions.Value.Default ?? new OidcClientsOptions.ClientOptions();
+        if (string.IsNullOrWhiteSpace(cfgDefault.ClientId)) cfgDefault.ClientId = "postman_client";
+
+        var defaultRedirects = cfgDefault.RedirectUris?.Length > 0
+            ? cfgDefault.RedirectUris
+            : new[] { "https://localhost:7001/callback", "http://localhost:5001/callback", "https://localhost:7002/", "https://localhost:7002/callback", "https://localhost:7002/signin-oidc" };
+        var defaultPostLogout = cfgDefault.PostLogoutRedirectUris?.Length > 0
+            ? cfgDefault.PostLogoutRedirectUris
+            : new[] { "https://localhost:7001/", "http://localhost:5001/", "https://localhost:7002/", "https://localhost:7002/signout-callback-oidc" };
+
         if (defaultClient == null)
         {
             defaultClient = new Client
             {
-                ClientId = "postman_client",
-                ClientSecret = "postman_secret",
+                ClientId = cfgDefault.ClientId!,
+                ClientSecret = cfgDefault.ClientSecret ?? "postman_secret",
                 Name = "Postman Test Client",
                 Description = "Default test client for development",
-                RealmId = defaultRealm.Id,
+                RealmId = (await _context.Realms.FirstAsync(r => r.Name == "default")).Id,
                 IsEnabled = true,
                 ClientType = ClientType.Confidential,
                 AllowAuthorizationCodeFlow = true,
@@ -843,7 +880,6 @@ public class OidcClientService : IOidcClientService
             foreach (var scope in new[] { StandardScopes.OpenId, StandardScopes.Email, StandardScopes.Profile, StandardScopes.Roles })
                 _context.ClientScopes.Add(new ClientScope { ClientId = defaultClient.Id, Scope = scope });
 
-            // Only grant/endpoint permissions; no scope-derived stored perms
             foreach (var permission in new[]
             {
                 OpenIddictConstants.Permissions.Endpoints.Authorization,
@@ -858,11 +894,11 @@ public class OidcClientService : IOidcClientService
                 _context.ClientPermissions.Add(new ClientPermission { ClientId = defaultClient.Id, Permission = permission });
 
             await _context.SaveChangesAsync();
-            _logger.LogInformation("Created default client 'postman_client'");
+            _logger.LogInformation("Created default client '{ClientId}'", defaultClient.ClientId);
         }
         else
         {
-            // Remove legacy stored scope permissions in default client
+            // Clean legacy permissions
             var legacy = defaultClient.Permissions.Where(p => p.Permission.StartsWith("oidc:scope:") || p.Permission == "scp:openid" || p.Permission.StartsWith("scp:email") || p.Permission.StartsWith("scp:profile") || p.Permission.StartsWith("scp:roles") ).ToList();
             if (legacy.Any())
             {
@@ -870,20 +906,33 @@ public class OidcClientService : IOidcClientService
                 await _context.SaveChangesAsync();
                 _logger.LogInformation("Cleaned {Count} legacy scope permissions from default client", legacy.Count);
             }
-            // Backfill ParMode if not set to ensure compatibility with server-advertised PAR
             if (defaultClient.ParMode == null)
             {
                 defaultClient.ParMode = PushedAuthorizationMode.Enabled;
                 defaultClient.UpdatedAt = DateTime.UtcNow;
                 defaultClient.UpdatedBy = "Backfill";
                 await _context.SaveChangesAsync();
-                _logger.LogInformation("Backfilled ParMode=Enabled for default client 'postman_client'");
             }
-        }
 
-        var enabledClients = await GetEnabledClientsAsync();
-        foreach (var client in enabledClients)
-            await SyncClientWithOpenIddictAsync(client);
+            // Ensure configured redirects/post-logout exist
+            var existingDefaultRedirects = defaultClient.RedirectUris.Select(r => r.Uri).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            foreach (var uri in defaultRedirects)
+                if (!existingDefaultRedirects.Contains(uri))
+                    _context.ClientRedirectUris.Add(new ClientRedirectUri { ClientId = defaultClient.Id, Uri = uri });
+
+            var existingDefaultPostLogout = defaultClient.PostLogoutUris.Select(r => r.Uri).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            foreach (var uri in defaultPostLogout)
+                if (!existingDefaultPostLogout.Contains(uri))
+                    _context.ClientPostLogoutUris.Add(new ClientPostLogoutUri { ClientId = defaultClient.Id, Uri = uri });
+
+            await _context.SaveChangesAsync();
+        }
+    }
+
+    public async Task InitializeDefaultRealmAndClientsAsync()
+    {
+        // Reuse the comprehensive initializer to ensure defaults are present
+        await InitializeEssentialDataAsync();
     }
 
     public async Task<IEnumerable<Client>> GetEnabledClientsAsync()
