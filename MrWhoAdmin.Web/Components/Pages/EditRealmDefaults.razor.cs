@@ -20,6 +20,33 @@ public partial class EditRealmDefaults
     internal int selectedTabIndex;
     internal string? realmDisplayName; // new: holds realm name for UI
 
+    // Numeric wrappers for TimeSpan lifetimes
+    internal int accessTokenMinutes
+    {
+        get => (int)Math.Round((model.AccessTokenLifetime == default ? MrWho.Shared.MrWhoConstants.TokenLifetimes.AccessToken : model.AccessTokenLifetime).TotalMinutes);
+        set => model.AccessTokenLifetime = TimeSpan.FromMinutes(value);
+    }
+    internal int refreshTokenDays
+    {
+        get => (int)Math.Max(1, Math.Round((model.RefreshTokenLifetime == default ? MrWho.Shared.MrWhoConstants.TokenLifetimes.RefreshToken : model.RefreshTokenLifetime).TotalDays));
+        set => model.RefreshTokenLifetime = TimeSpan.FromDays(value);
+    }
+    internal int authorizationCodeMinutes
+    {
+        get => (int)Math.Round((model.AuthorizationCodeLifetime == default ? MrWho.Shared.MrWhoConstants.TokenLifetimes.AuthorizationCode : model.AuthorizationCodeLifetime).TotalMinutes);
+        set => model.AuthorizationCodeLifetime = TimeSpan.FromMinutes(value);
+    }
+    internal int idTokenMinutes
+    {
+        get => (int)Math.Round((model.IdTokenLifetime == default ? TimeSpan.FromMinutes(60) : model.IdTokenLifetime).TotalMinutes);
+        set => model.IdTokenLifetime = TimeSpan.FromMinutes(value);
+    }
+    internal int deviceCodeMinutes
+    {
+        get => (int)Math.Round((model.DeviceCodeLifetime == default ? TimeSpan.FromMinutes(10) : model.DeviceCodeLifetime).TotalMinutes);
+        set => model.DeviceCodeLifetime = TimeSpan.FromMinutes(value);
+    }
+
     internal List<DropdownItem<string>> sameSitePolicies = new();
     internal List<DropdownItem<string>> availableMfaMethods = new();
     internal List<DropdownItem<string>> availableThemes = new()
@@ -89,25 +116,43 @@ public partial class EditRealmDefaults
 
     private static UpdateRealmDefaultsRequest MapRealmToDefaultsRequest(RealmDto realm) => new()
     {
+        // Token lifetime defaults
+        AccessTokenLifetime = realm.AccessTokenLifetime,
+        RefreshTokenLifetime = realm.RefreshTokenLifetime,
+        AuthorizationCodeLifetime = realm.AuthorizationCodeLifetime,
+        IdTokenLifetime = realm.IdTokenLifetime,
+        DeviceCodeLifetime = realm.DeviceCodeLifetime,
+
+        // Session & cookies
         DefaultSessionTimeoutHours = realm.DefaultSessionTimeoutHours,
         DefaultRememberMeDurationDays = realm.DefaultRememberMeDurationDays,
         DefaultUseSlidingSessionExpiration = realm.DefaultUseSlidingSessionExpiration,
         DefaultCookieSameSitePolicy = realm.DefaultCookieSameSitePolicy,
         DefaultRequireHttpsForCookies = realm.DefaultRequireHttpsForCookies,
+
+        // Security & compliance
         DefaultRequireConsent = realm.DefaultRequireConsent,
         DefaultAllowRememberConsent = realm.DefaultAllowRememberConsent,
         DefaultMaxRefreshTokensPerUser = realm.DefaultMaxRefreshTokensPerUser,
         DefaultUseOneTimeRefreshTokens = realm.DefaultUseOneTimeRefreshTokens,
         DefaultIncludeJwtId = realm.DefaultIncludeJwtId,
+
+        // MFA
         DefaultRequireMfa = realm.DefaultRequireMfa,
         DefaultMfaGracePeriodMinutes = realm.DefaultMfaGracePeriodMinutes,
         DefaultAllowedMfaMethods = realm.DefaultAllowedMfaMethods,
         DefaultRememberMfaForSession = realm.DefaultRememberMfaForSession,
+
+        // Rate limiting
         DefaultRateLimitRequestsPerMinute = realm.DefaultRateLimitRequestsPerMinute,
         DefaultRateLimitRequestsPerHour = realm.DefaultRateLimitRequestsPerHour,
         DefaultRateLimitRequestsPerDay = realm.DefaultRateLimitRequestsPerDay,
+
+        // Logging
         DefaultEnableDetailedErrors = realm.DefaultEnableDetailedErrors,
         DefaultLogSensitiveData = realm.DefaultLogSensitiveData,
+
+        // Branding
         DefaultThemeName = realm.DefaultThemeName,
         RealmCustomCssUrl = realm.RealmCustomCssUrl,
         RealmLogoUri = realm.RealmLogoUri,
@@ -170,6 +215,14 @@ public partial class EditRealmDefaults
     {
         var ok = await DialogService.Confirm("Reset all realm defaults to system-wide defaults?", "Reset to System Defaults", new ConfirmOptions(){OkButtonText="Reset",CancelButtonText="Cancel"});
         if (ok != true) return;
+        // Token lifetimes
+        model.AccessTokenLifetime = MrWho.Shared.MrWhoConstants.TokenLifetimes.AccessToken;
+        model.RefreshTokenLifetime = MrWho.Shared.MrWhoConstants.TokenLifetimes.RefreshToken;
+        model.AuthorizationCodeLifetime = MrWho.Shared.MrWhoConstants.TokenLifetimes.AuthorizationCode;
+        model.IdTokenLifetime = TimeSpan.FromMinutes(60);
+        model.DeviceCodeLifetime = TimeSpan.FromMinutes(10);
+
+        // Other defaults
         model.DefaultSessionTimeoutHours = 8;
         model.DefaultRememberMeDurationDays = 30;
         model.DefaultUseSlidingSessionExpiration = true;

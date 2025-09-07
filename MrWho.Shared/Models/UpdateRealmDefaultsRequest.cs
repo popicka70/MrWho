@@ -7,6 +7,13 @@ namespace MrWho.Shared.Models;
 /// </summary>
 public class UpdateRealmDefaultsRequest
 {
+    // Token Lifetime Defaults (realm-level)
+    public TimeSpan AccessTokenLifetime { get; set; }
+    public TimeSpan RefreshTokenLifetime { get; set; }
+    public TimeSpan AuthorizationCodeLifetime { get; set; }
+    public TimeSpan IdTokenLifetime { get; set; }
+    public TimeSpan DeviceCodeLifetime { get; set; }
+
     // Session & Cookie Defaults
     public int DefaultSessionTimeoutHours { get; set; }
     public int DefaultRememberMeDurationDays { get; set; }
