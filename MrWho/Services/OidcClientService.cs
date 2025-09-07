@@ -788,7 +788,7 @@ public class OidcClientService : IOidcClientService
                 ClientSecret = cfgDefault.ClientSecret ?? "postman_secret",
                 Name = "Postman Test Client",
                 Description = "Default test client for development",
-                RealmId = (await _context.Realms.FirstAsync(r => r.Name == "default")).Id,
+                RealmId = (await _context.Realms.FirstAsync(r => r.Name == "demo")).Id,
                 IsEnabled = true,
                 ClientType = ClientType.Confidential,
                 AllowAuthorizationCodeFlow = true,
