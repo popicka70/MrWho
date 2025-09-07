@@ -14,7 +14,18 @@ namespace MrWhoAdmin.Tests;
 public static class SharedTestInfrastructure
 {
     private static DistributedApplication? _app;
-    private static readonly TimeSpan StartupTimeout = TimeSpan.FromSeconds(180); // Generous timeout for initial startup
+    private static TimeSpan StartupTimeout => GetStartupTimeout(); // Allow override via env var
+
+    private static TimeSpan GetStartupTimeout()
+    {
+        var env = Environment.GetEnvironmentVariable("MRWHO_TESTS_STARTUP_TIMEOUT_SECONDS");
+        if (int.TryParse(env, out var seconds) && seconds > 0)
+        {
+            return TimeSpan.FromSeconds(seconds);
+        }
+        // Default increased timeout for slower machines/CI
+        return TimeSpan.FromSeconds(300);
+    }
 
     /// <summary>
     /// Initialize shared infrastructure once for the entire test assembly
@@ -22,7 +33,7 @@ public static class SharedTestInfrastructure
     [AssemblyInitialize]
     public static async Task AssemblyInitialize(TestContext context)
     {
-        Console.WriteLine("Starting shared PostgreSQL Aspire infrastructure for all integration tests (async)...");
+        Console.WriteLine($"Starting shared PostgreSQL Aspire infrastructure for all integration tests (async)... Timeout: {StartupTimeout}");
 
         // Signal AppHost that we are in test mode so it provisions Postgres
         Environment.SetEnvironmentVariable("MRWHO_TESTS", "1");
@@ -164,11 +175,38 @@ public static class SharedTestInfrastructure
     }
 
     /// <summary>
-    /// Create an HTTP client for a specific service. Set disableRedirects=true to preserve Authorization header.
+    /// Create an HTTP client for a specific service.
+    /// Optional flags allow disabling redirects and cookies to avoid cross-test auth leakage.
     /// </summary>
-    public static HttpClient CreateHttpClient(string serviceName, bool disableRedirects = false)
+    public static HttpClient CreateHttpClient(string serviceName, bool disableRedirects = false, bool disableCookies = false)
     {
-        var client = GetSharedApp().CreateHttpClient(serviceName, "https");
+        // Use Aspire to get a correctly-based client first (to learn BaseAddress)
+        var baseClient = GetSharedApp().CreateHttpClient(serviceName, "https");
+        var baseAddress = baseClient.BaseAddress;
+
+        // Fast path: keep Aspire's client when no special behavior requested
+        if (!disableRedirects && !disableCookies)
+        {
+            return baseClient;
+        }
+
+        // Otherwise, dispose the initial client and create an isolated handler/client
+        baseClient.Dispose();
+
+        var handler = new HttpClientHandler
+        {
+            AllowAutoRedirect = !disableRedirects,
+            UseCookies = !disableCookies,
+            ClientCertificateOptions = ClientCertificateOption.Manual,
+            // Accept any HTTPS certificate (dev certs) but reject non-HTTPS
+            ServerCertificateCustomValidationCallback = (msg, cert, chain, errors) => msg?.RequestUri?.Scheme == Uri.UriSchemeHttps
+        };
+
+        var client = new HttpClient(handler)
+        {
+            BaseAddress = baseAddress
+        };
+
         return client;
     }
 }

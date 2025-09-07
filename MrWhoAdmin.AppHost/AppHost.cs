@@ -1,5 +1,7 @@
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
+using Microsoft.Extensions.Hosting; // for HostOptions
+using Microsoft.Extensions.DependencyInjection; // for IServiceCollection.Configure
 using System.IO;
 
 var builder = DistributedApplication.CreateBuilder(args);
@@ -7,6 +9,12 @@ var builder = DistributedApplication.CreateBuilder(args);
 // Detect test environment via custom env var or environment name
 var isTesting = string.Equals(Environment.GetEnvironmentVariable("MRWHO_TESTS"), "1", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(builder.Environment.EnvironmentName, "Testing", StringComparison.OrdinalIgnoreCase);
+
+// Increase graceful shutdown timeout to avoid TaskCanceled noise on shutdown in slower environments/tests
+builder.Services.Configure<HostOptions>(options =>
+{
+    options.ShutdownTimeout = TimeSpan.FromSeconds(60);
+});
 
 var mrWho = builder.AddProject<Projects.MrWho>("mrwho")
     .WithExternalHttpEndpoints();
@@ -49,4 +57,17 @@ var demoNuget = builder.AddProject<Projects.MrWhoDemoNuget>("mrwhodemonuget")
     .WaitFor(mrWho);
 
 
-builder.Build().Run();
+var app = builder.Build();
+try
+{
+    // Use async run and swallow cancellation to prevent AggregateException(TaskCanceled) on shutdown
+    await app.RunAsync();
+}
+catch (TaskCanceledException)
+{
+    // Suppress in case some hosts surface TaskCanceled directly
+}
+catch (OperationCanceledException)
+{
+    // Expected during controlled shutdown (e.g., test harness cancellation). Suppress noisy exception.
+}
