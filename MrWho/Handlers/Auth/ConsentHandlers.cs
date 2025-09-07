@@ -13,7 +13,7 @@ using Microsoft.AspNetCore.WebUtilities;
 
 namespace MrWho.Handlers.Auth;
 
-public sealed record ConsentGetRequest(HttpContext HttpContext, string ReturnUrl, string ClientId) : IRequest<IActionResult>;
+public sealed record ConsentGetRequest(HttpContext HttpContext, string ReturnUrl, string ClientId, string? Requested = null) : IRequest<IActionResult>;
 public sealed record ConsentPostRequest(HttpContext HttpContext, string ReturnUrl, string ClientId, string[] Scopes, bool Remember) : IRequest<IActionResult>;
 public sealed record ConsentForgetRequest(HttpContext HttpContext, string ClientId) : IRequest<IActionResult>;
 
@@ -43,29 +43,32 @@ public sealed class ConsentGetHandler : IRequestHandler<ConsentGetRequest, IActi
             vd["ThemeName"] = client.ThemeName ?? client.Realm?.DefaultThemeName;
         }
 
-        // Parse requested scopes from the returnUrl (authorize request)
-        try
+        // Determine requested scopes
+        string[] requestedScopes = Array.Empty<string>();
+        if (!string.IsNullOrWhiteSpace(request.Requested))
         {
-            var uri = new Uri(request.ReturnUrl);
-            var q = QueryHelpers.ParseQuery(uri.Query);
-            var scopeParam = q.TryGetValue(OpenIddictConstants.Parameters.Scope, out var sv) ? sv.ToString() : string.Empty;
-            var requestedScopes = scopeParam.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-
-            var userId = request.HttpContext.User.FindFirstValue(OpenIddictConstants.Claims.Subject) ?? request.HttpContext.User.FindFirstValue(ClaimTypes.NameIdentifier);
-            var existing = userId == null ? null : await _consentService.GetAsync(userId, request.ClientId, cancellationToken);
-            var alreadyGranted = existing?.GetGrantedScopes() ?? Array.Empty<string>();
-            var missing = _consentService.DiffMissingScopes(requestedScopes, alreadyGranted);
-
-            vd["RequestedScopes"] = requestedScopes;
-            vd["AlreadyGranted"] = alreadyGranted.ToArray();
-            vd["MissingScopes"] = missing.ToArray();
+            requestedScopes = request.Requested.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         }
-        catch
+        else
         {
-            vd["RequestedScopes"] = Array.Empty<string>();
-            vd["AlreadyGranted"] = Array.Empty<string>();
-            vd["MissingScopes"] = Array.Empty<string>();
+            try
+            {
+                var uri = new Uri(request.ReturnUrl);
+                var q = QueryHelpers.ParseQuery(uri.Query);
+                var scopeParam = q.TryGetValue(OpenIddictConstants.Parameters.Scope, out var sv) ? sv.ToString() : string.Empty;
+                requestedScopes = scopeParam.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            }
+            catch { }
         }
+
+        var userId = request.HttpContext.User.FindFirstValue(OpenIddictConstants.Claims.Subject) ?? request.HttpContext.User.FindFirstValue(ClaimTypes.NameIdentifier);
+        var existing = userId == null ? null : await _consentService.GetAsync(userId, request.ClientId, cancellationToken);
+        var alreadyGranted = existing?.GetGrantedScopes() ?? Array.Empty<string>();
+        var missing = _consentService.DiffMissingScopes(requestedScopes, alreadyGranted);
+
+        vd["RequestedScopes"] = requestedScopes;
+        vd["AlreadyGranted"] = alreadyGranted.ToArray();
+        vd["MissingScopes"] = missing.ToArray();
 
         return new ViewResult { ViewName = "Consent", ViewData = vd };
     }

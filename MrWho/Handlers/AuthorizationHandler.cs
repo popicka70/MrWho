@@ -265,8 +265,10 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
                 if (missing.Count > 0)
                 {
                     var currentUrl = context.Request.GetDisplayUrl();
+                    var scopesParam = string.Join(" ", requestedScopes);
                     var consentUrl = "/connect/consent?" +
-                                     $"clientId={Uri.EscapeDataString(clientId)}&returnUrl={Uri.EscapeDataString(currentUrl)}";
+                                     $"clientId={Uri.EscapeDataString(clientId)}&returnUrl={Uri.EscapeDataString(currentUrl)}" +
+                                     (string.IsNullOrEmpty(scopesParam) ? string.Empty : $"&requested={Uri.EscapeDataString(scopesParam)}");
                     return Results.Redirect(consentUrl);
                 }
             }

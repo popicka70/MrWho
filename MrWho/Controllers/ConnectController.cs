@@ -84,8 +84,8 @@ public class ConnectController : Controller
     // GET /connect/consent
     [Authorize]
     [HttpGet("consent")]
-    public Task<IActionResult> Consent([FromQuery] string returnUrl, [FromQuery] string clientId)
-        => _mediator.Send(new MrWho.Handlers.Auth.ConsentGetRequest(HttpContext, returnUrl, clientId));
+    public Task<IActionResult> Consent([FromQuery] string returnUrl, [FromQuery] string clientId, [FromQuery] string? requested)
+        => _mediator.Send(new MrWho.Handlers.Auth.ConsentGetRequest(HttpContext, returnUrl, clientId, requested));
 
     // POST /connect/consent
     [Authorize]
