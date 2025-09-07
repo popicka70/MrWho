@@ -1,33 +1,88 @@
+@using MrWho.Shared.Models
+
 <RadzenStack Gap="0.75rem" class="rz-mb-4">
     <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Token Lifetimes</RadzenText>
     <RadzenStack Gap="1rem">
         <RadzenRow>
             <RadzenColumn Size="12" SizeMD="6">
-                <RadzenFormField Text="ID Token Lifetime (Minutes)" Variant="Variant.Outlined">
+                <RadzenFormField Text="Access Token Lifetime (Minutes)" Variant="Variant.Outlined">
                     <ChildContent>
-                        <RadzenNumeric @bind-Value="@model.IdTokenLifetimeMinutes" Min="1" Max="1440" Style="width: 100%;" Placeholder="Leave empty to use default" />
+                        <RadzenNumeric @bind-Value="accessTokenLifetimeMinutes" Min="1" Max="1440" Style="width: 100%;" Placeholder="Leave empty to use realm default" />
                     </ChildContent>
                     <Helper>
-                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                            How long ID tokens remain valid (1-1440 minutes)
-                        </RadzenText>
+                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                Effective: @EffectiveAccessTokenMinutes min (Realm default: @RealmAccessTokenMinutes min)
+                            </RadzenText>
+                            <RadzenButton Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Text="Reset to default" Click="@(() => { editClient.model.AccessTokenLifetime = null; StateHasChanged(); })" />
+                        </RadzenStack>
                     </Helper>
                 </RadzenFormField>
             </RadzenColumn>
             <RadzenColumn Size="12" SizeMD="6">
-                <RadzenFormField Text="Device Code Lifetime (Minutes)" Variant="Variant.Outlined">
+                <RadzenFormField Text="Refresh Token Lifetime (Days)" Variant="Variant.Outlined">
                     <ChildContent>
-                        <RadzenNumeric @bind-Value="@model.DeviceCodeLifetimeMinutes" Min="1" Max="60" Style="width: 100%;" Placeholder="Leave empty to use default" />
+                        <RadzenNumeric @bind-Value="refreshTokenLifetimeDays" Min="1" Max="365" Style="width: 100%;" Placeholder="Leave empty to use realm default" />
                     </ChildContent>
                     <Helper>
-                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                            Device flow code validity period (1-60 minutes)
-                        </RadzenText>
+                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                Effective: @EffectiveRefreshTokenDays days (Realm default: @RealmRefreshTokenDays days)
+                            </RadzenText>
+                            <RadzenButton Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Text="Reset to default" Click="@(() => { editClient.model.RefreshTokenLifetime = null; StateHasChanged(); })" />
+                        </RadzenStack>
                     </Helper>
                 </RadzenFormField>
             </RadzenColumn>
         </RadzenRow>
         <RadzenRow>
+            <RadzenColumn Size="12" SizeMD="6">
+                <RadzenFormField Text="Authorization Code Lifetime (Minutes)" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenNumeric @bind-Value="authorizationCodeLifetimeMinutes" Min="1" Max="60" Style="width: 100%;" Placeholder="Leave empty to use realm default" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                Effective: @EffectiveAuthorizationCodeMinutes min (Realm default: @RealmAuthorizationCodeMinutes min)
+                            </RadzenText>
+                            <RadzenButton Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Text="Reset to default" Click="@(() => { editClient.model.AuthorizationCodeLifetime = null; StateHasChanged(); })" />
+                        </RadzenStack>
+                    </Helper>
+                </RadzenFormField>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="6">
+                <RadzenFormField Text="ID Token Lifetime (Minutes)" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenNumeric @bind-Value="@model.IdTokenLifetimeMinutes" Min="1" Max="1440" Style="width: 100%;" Placeholder="Leave empty to use realm default" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                Effective: @EffectiveIdTokenMinutes min (Realm default: @RealmIdTokenMinutes min)
+                            </RadzenText>
+                            <RadzenButton Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Text="Reset to default" Click="@(() => { model.IdTokenLifetimeMinutes = null; StateHasChanged(); })" />
+                        </RadzenStack>
+                    </Helper>
+                </RadzenFormField>
+            </RadzenColumn>
+        </RadzenRow>
+        <RadzenRow>
+            <RadzenColumn Size="12" SizeMD="6">
+                <RadzenFormField Text="Device Code Lifetime (Minutes)" Variant="Variant.Outlined">
+                    <ChildContent>
+                        <RadzenNumeric @bind-Value="@model.DeviceCodeLifetimeMinutes" Min="1" Max="60" Style="width: 100%;" Placeholder="Leave empty to use realm default" />
+                    </ChildContent>
+                    <Helper>
+                        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
+                                Effective: @EffectiveDeviceCodeMinutes min (Realm default: @RealmDeviceCodeMinutes min)
+                            </RadzenText>
+                            <RadzenButton Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Text="Reset to default" Click="@(() => { model.DeviceCodeLifetimeMinutes = null; StateHasChanged(); })" />
+                        </RadzenStack>
+                    </Helper>
+                </RadzenFormField>
+            </RadzenColumn>
             <RadzenColumn Size="12" SizeMD="6">
                 <RadzenFormField Text="Access Token Type" Variant="Variant.Outlined">
                     <ChildContent>
@@ -39,8 +94,6 @@
                         </RadzenText>
                     </Helper>
                 </RadzenFormField>
-            </RadzenColumn>
-            <RadzenColumn Size="12" SizeMD="6">
             </RadzenColumn>
         </RadzenRow>
     </RadzenStack>
@@ -85,4 +138,38 @@
 @code {
     [Parameter] public EditClient editClient { get; set; } = null!;
     private CreateClientRequest model => editClient.model;
+
+    // Wrapper properties for TimeSpan? fields (bind as minutes/days)
+    private int? accessTokenLifetimeMinutes
+    {
+        get => model.AccessTokenLifetime.HasValue ? (int?)Math.Round(model.AccessTokenLifetime.Value.TotalMinutes) : null;
+        set => model.AccessTokenLifetime = value.HasValue ? TimeSpan.FromMinutes(value.Value) : null;
+    }
+
+    private int? refreshTokenLifetimeDays
+    {
+        get => model.RefreshTokenLifetime.HasValue ? (int?)Math.Max(1, Math.Round(model.RefreshTokenLifetime.Value.TotalDays)) : null;
+        set => model.RefreshTokenLifetime = value.HasValue ? TimeSpan.FromDays(value.Value) : null;
+    }
+
+    private int? authorizationCodeLifetimeMinutes
+    {
+        get => model.AuthorizationCodeLifetime.HasValue ? (int?)Math.Round(model.AuthorizationCodeLifetime.Value.TotalMinutes) : null;
+        set => model.AuthorizationCodeLifetime = value.HasValue ? TimeSpan.FromMinutes(value.Value) : null;
+    }
+
+    // Effective and realm defaults for helpers
+    private RealmDto? CurrentRealm => editClient.realms.FirstOrDefault(r => r.Id == model.RealmId);
+
+    private int RealmAccessTokenMinutes => (int)Math.Round((CurrentRealm?.AccessTokenLifetime ?? MrWho.Shared.MrWhoConstants.TokenLifetimes.AccessToken).TotalMinutes);
+    private int RealmRefreshTokenDays => (int)Math.Round((CurrentRealm?.RefreshTokenLifetime ?? MrWho.Shared.MrWhoConstants.TokenLifetimes.RefreshToken).TotalDays);
+    private int RealmAuthorizationCodeMinutes => (int)Math.Round((CurrentRealm?.AuthorizationCodeLifetime ?? MrWho.Shared.MrWhoConstants.TokenLifetimes.AuthorizationCode).TotalMinutes);
+    private int RealmIdTokenMinutes => (int)Math.Round((CurrentRealm?.IdTokenLifetime ?? TimeSpan.FromMinutes(60)).TotalMinutes);
+    private int RealmDeviceCodeMinutes => (int)Math.Round((CurrentRealm?.DeviceCodeLifetime ?? TimeSpan.FromMinutes(10)).TotalMinutes);
+
+    private int EffectiveAccessTokenMinutes => accessTokenLifetimeMinutes ?? RealmAccessTokenMinutes;
+    private int EffectiveRefreshTokenDays => refreshTokenLifetimeDays ?? RealmRefreshTokenDays;
+    private int EffectiveAuthorizationCodeMinutes => authorizationCodeLifetimeMinutes ?? RealmAuthorizationCodeMinutes;
+    private int EffectiveIdTokenMinutes => model.IdTokenLifetimeMinutes ?? RealmIdTokenMinutes;
+    private int EffectiveDeviceCodeMinutes => model.DeviceCodeLifetimeMinutes ?? RealmDeviceCodeMinutes;
 }
