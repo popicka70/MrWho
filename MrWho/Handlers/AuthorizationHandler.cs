@@ -287,15 +287,16 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         }
 
         SKIP_CONSENT:
-        // 4c) MFA enforcement (per client with realm fallback + scope-sensitive for offline_access)
+        // 4c) MFA enforcement (per client with realm fallback ONLY)
         try
         {
             var dbClient = await _context.Clients.Include(c => c.Realm).FirstOrDefaultAsync(c => c.ClientId == clientId);
             if (dbClient != null)
             {
                 var requestedScopes = request.GetScopes();
-                var scopeNeedsMfa = requestedScopes.Any(s => string.Equals(s, OpenIddictConstants.Scopes.OfflineAccess, StringComparison.OrdinalIgnoreCase));
-                var requireMfa = (dbClient.RequireMfa ?? dbClient.Realm?.DefaultRequireMfa ?? false) || scopeNeedsMfa;
+                // Previous behavior also forced MFA when offline_access was requested.
+                // New policy: require MFA only when client/realm explicitly require it.
+                var requireMfa = (dbClient.RequireMfa ?? dbClient.Realm?.DefaultRequireMfa ?? false);
                 if (requireMfa)
                 {
                     var allowedMethodsJson = dbClient.AllowedMfaMethods ?? dbClient.Realm?.DefaultAllowedMfaMethods;

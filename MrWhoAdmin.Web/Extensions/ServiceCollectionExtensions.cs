@@ -449,9 +449,8 @@ public static class ServiceCollectionExtensions
         options.Scope.Add("profile");
         options.Scope.Add("email");
         options.Scope.Add("roles");
-        options.Scope.Add("offline_access"); // Needed for refresh tokens
-        // Removed api.read/api.write (Option 3) because admin web client is not permitted these API scopes.
-        // If API access is later required, re-add the scopes after granting them to the client in the server.
+        // Removed offline_access to avoid refresh tokens for Admin Web and avoid step-up prompts by policy
+        // options.Scope.Add("offline_access");
         options.Scope.Add("mrwho.use"); // Required for admin policy protected endpoints
     }
 
