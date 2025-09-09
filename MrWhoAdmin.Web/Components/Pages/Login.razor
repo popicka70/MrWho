@@ -1,0 +1,70 @@
+@page "/login"
+@attribute [AllowAnonymous]
+@rendermode InteractiveServer
+@using MrWhoAdmin.Web.Extensions
+@inject IAdminProfileService ProfileService
+@inject NavigationManager Nav
+@inject IHttpContextAccessor HttpAccessor
+
+<PageTitle>Login</PageTitle>
+
+@if (_needProfile)
+{
+    <RadzenStack Gap="1rem" class="rz-mt-4">
+        <RadzenAlert AlertStyle="AlertStyle.Info" ShowIcon="true">
+            <RadzenText>Please select a profile first.</RadzenText>
+        </RadzenAlert>
+        <RadzenButton Icon="account_tree" Text="Choose Profile" ButtonStyle="ButtonStyle.Primary" Click="@(()=> Nav.NavigateTo("/profiles"))" />
+    </RadzenStack>
+}
+else
+{
+    <RadzenStack Gap="1.25rem" class="rz-mt-6" Style="max-width:480px;">
+        <RadzenText TextStyle="TextStyle.H4">Sign in to @(_current?.DisplayName ?? "MrWho")</RadzenText>
+        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">You will be redirected to the selected MrWho identity server to authenticate.</RadzenText>
+        <RadzenButton Icon="login" Text="Sign In" ButtonStyle="ButtonStyle.Primary" Click="@(()=> BeginSignIn())" Style="width:220px;" />
+        <RadzenButton Icon="swap_horiz" Text="Switch Profile" ButtonStyle="ButtonStyle.Light" Click="@(()=> Nav.NavigateTo("/profiles?returnUrl=" + Uri.EscapeDataString(_returnUrl ?? "/")))" />
+    </RadzenStack>
+}
+
+@code {
+    private AdminProfile? _current;
+    private bool _needProfile;
+    private string? _returnUrl;
+
+    protected override void OnInitialized()
+    {
+        var all = ProfileService.GetProfiles();
+        _current = ProfileService.GetCurrentProfile();
+        _needProfile = all.Count > 1 && _current == null;
+
+        // Determine desired return URL
+        var uri = new Uri(Nav.Uri);
+        var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+        if (query.TryGetValue("returnUrl", out var rv))
+            _returnUrl = rv.FirstOrDefault();
+
+        if (string.IsNullOrWhiteSpace(_returnUrl))
+        {
+            var ctx = HttpAccessor.HttpContext;
+            if (ctx != null && ctx.Request.Cookies.TryGetValue(".MrWho.Admin.LastUrl", out var lastUrl) && !string.IsNullOrWhiteSpace(lastUrl))
+                _returnUrl = lastUrl;
+        }
+        if (string.IsNullOrWhiteSpace(_returnUrl)) _returnUrl = "/";
+
+        if (!_needProfile && all.Count == 1)
+        {
+            var ctx = HttpAccessor.HttpContext;
+            if (_current != null && ctx != null)
+            {
+                ProfileService.SetCurrentProfile(ctx, _current.Name);
+            }
+        }
+    }
+
+    private void BeginSignIn()
+    {
+        var encoded = Uri.EscapeDataString(_returnUrl ?? "/");
+        Nav.NavigateTo($"/auth/login?returnUrl={encoded}", forceLoad: true);
+    }
+}

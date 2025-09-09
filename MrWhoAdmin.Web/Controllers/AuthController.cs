@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MrWhoAdmin.Web.Services;
+using MrWhoAdmin.Web.Extensions;
 
 namespace MrWhoAdmin.Web.Controllers;
 
@@ -13,12 +14,21 @@ public class AuthController : Controller
 {
     private readonly ITokenRefreshService _tokenRefreshService;
     private readonly ILogger<AuthController> _logger;
-    private const string AdminCookieScheme = "AdminCookies"; // Match the scheme from ServiceCollectionExtensions
+    private readonly IAdminProfileService _profiles;
+    private const string AdminCookieScheme = "AdminCookies"; // legacy single-profile
 
-    public AuthController(ITokenRefreshService tokenRefreshService, ILogger<AuthController> logger)
+    public AuthController(ITokenRefreshService tokenRefreshService, ILogger<AuthController> logger, IAdminProfileService profiles)
     {
         _tokenRefreshService = tokenRefreshService;
         _logger = logger;
+        _profiles = profiles;
+    }
+
+    private (string cookieScheme, string oidcScheme)? ResolveSchemes()
+    {
+        var current = _profiles.GetCurrentProfile(HttpContext);
+        if (current == null) return null;
+        return (_profiles.GetCookieScheme(current), _profiles.GetOidcScheme(current));
     }
 
     /// <summary>
@@ -30,18 +40,23 @@ public class AuthController : Controller
     [HttpGet("/auth/login")]
     public IActionResult Login(string? returnUrl = null, bool force = false)
     {
+        var current = _profiles.GetCurrentProfile(HttpContext);
+        if (current == null)
+        {
+            // If multiple profiles exist but none selected, redirect to profile selection
+            if (_profiles.GetProfiles().Count > 1)
+                return Redirect("/profiles");
+        }
+
+        var schemes = ResolveSchemes();
+        var oidcScheme = schemes?.oidcScheme ?? OpenIdConnectDefaults.AuthenticationScheme;
         var properties = new AuthenticationProperties
         {
             RedirectUri = !string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl) ? returnUrl : "/"
         };
-
-        if (force)
-        {
-            // This item will be read in the OIDC event to add prompt=login
-            properties.Items["force"] = "1";
-        }
-
-        return Challenge(properties, OpenIdConnectDefaults.AuthenticationScheme); // Use standard OIDC scheme
+        if (force) properties.Items["force"] = "1";
+        _logger.LogInformation("Initiating login using scheme {Scheme} (profile={Profile})", oidcScheme, current?.Name);
+        return Challenge(properties, oidcScheme);
     }
 
     /// <summary>
@@ -56,50 +71,31 @@ public class AuthController : Controller
     {
         try
         {
-            _logger.LogInformation("Admin app logout requested. ReturnUrl: {ReturnUrl}, ClearAll: {ClearAll} (Server-side session isolation active)", returnUrl, clearAll);
-
+            var schemes = ResolveSchemes();
+            var cookie = schemes?.cookieScheme ?? AdminCookieScheme;
+            var oidc = schemes?.oidcScheme ?? OpenIdConnectDefaults.AuthenticationScheme;
+            _logger.LogInformation("Logout requested (profile={Profile}) cookie={Cookie} oidc={Oidc}", _profiles.GetCurrentProfile(HttpContext)?.Name, cookie, oidc);
             if (clearAll)
             {
-                // Perform a proper OIDC sign-out roundtrip to the local OP, while also clearing the local cookie scheme
-                var properties = new AuthenticationProperties
-                {
-                    RedirectUri = !string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl) ? returnUrl : "/"
-                };
-
-                _logger.LogInformation("ClearAll: returning OIDC sign-out so OP can cascade external sign-out if needed");
-
-                // IMPORTANT: return SignOut result (do not issue a Redirect here), so middleware can redirect to OP end-session
-                return SignOut(properties, OpenIdConnectDefaults.AuthenticationScheme, AdminCookieScheme);
+                var properties = new AuthenticationProperties { RedirectUri = LocalRedirectUrl(returnUrl) };
+                return SignOut(properties, oidc, cookie);
             }
-            else
+            if (HttpContext.User.Identity?.IsAuthenticated == true)
             {
-                // Standard logout - use standard OIDC scheme (server handles client-specific session isolation)
-                if (HttpContext.User.Identity?.IsAuthenticated == true)
-                {
-                    var properties = new AuthenticationProperties();
-                    if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
-                    {
-                        properties.RedirectUri = returnUrl;
-                    }
-                    
-                    _logger.LogInformation("Signing out admin app using standard OIDC (DynamicCookieService handles client isolation)");
-                    
-                    // Use standard OIDC scheme - server-side DynamicCookieService handles client isolation
-                    return SignOut(properties, OpenIdConnectDefaults.AuthenticationScheme, AdminCookieScheme);
-                }
-                
-                var redirectUrl = !string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl) ? returnUrl : "/";
-                return Redirect(redirectUrl);
+                var properties = new AuthenticationProperties { RedirectUri = LocalRedirectUrl(returnUrl) };
+                return SignOut(properties, oidc, cookie);
             }
+            return Redirect(LocalRedirectUrl(returnUrl));
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during admin app logout");
-            var fallbackUrl = !string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl) ? returnUrl : "/";
-            return Redirect(fallbackUrl);
+            _logger.LogError(ex, "Error during logout");
+            return Redirect(LocalRedirectUrl(returnUrl));
         }
     }
 
+    private string LocalRedirectUrl(string? returnUrl) => !string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl) ? returnUrl : "/";
+    
     /// <summary>
     /// Endpoint to check if re-authentication is needed and trigger it
     /// </summary>
@@ -111,34 +107,20 @@ public class AuthController : Controller
     {
         try
         {
-            _logger.LogInformation("Checking token status and triggering re-authentication if needed");
-
-            // Check if token refresh is needed
             var refreshResult = await _tokenRefreshService.RefreshTokenWithReauthAsync(HttpContext);
-            
             if (refreshResult.Success)
             {
-                _logger.LogInformation("Token is valid, redirecting to return URL");
-                var redirectUrl = !string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl) ? returnUrl : "/";
-                return Redirect(redirectUrl);
+                return Redirect(LocalRedirectUrl(returnUrl));
             }
-            
             if (refreshResult.RequiresReauth)
             {
-                _logger.LogWarning("Re-authentication required. Reason: {Reason}", refreshResult.Reason);
                 return await _tokenRefreshService.TriggerReauthenticationAsync(HttpContext, returnUrl);
             }
-
-            _logger.LogWarning("Token refresh failed but re-auth not required. Reason: {Reason}", refreshResult.Reason);
-            // Redirect with error indication
-            var errorUrl = !string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl) 
-                ? $"{returnUrl}?authError=true" 
-                : "/?authError=true";
-            return Redirect(errorUrl);
+            return Redirect(LocalRedirectUrl(returnUrl) + "?authError=true");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Exception during token check and re-authentication");
+            _logger.LogError(ex, "Exception during check-and-reauth");
             return StatusCode(500, "Authentication check failed");
         }
     }
@@ -154,32 +136,16 @@ public class AuthController : Controller
     {
         try
         {
-            _logger.LogInformation("Force refreshing token");
-
             var refreshResult = await _tokenRefreshService.RefreshTokenWithReauthAsync(HttpContext, force: true);
-            
             if (refreshResult.Success)
-            {
-                _logger.LogInformation("Token refresh successful");
-                var redirectUrl = !string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl) ? returnUrl : "/";
-                return Redirect(redirectUrl);
-            }
-            
+                return Redirect(LocalRedirectUrl(returnUrl));
             if (refreshResult.RequiresReauth)
-            {
-                _logger.LogWarning("Token refresh failed, triggering re-authentication. Reason: {Reason}", refreshResult.Reason);
                 return await _tokenRefreshService.TriggerReauthenticationAsync(HttpContext, returnUrl);
-            }
-
-            _logger.LogWarning("Token refresh failed. Reason: {Reason}", refreshResult.Reason);
-            var errorUrl = !string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl) 
-                ? $"{returnUrl}?refreshError=true" 
-                : "/?refreshError=true";
-            return Redirect(errorUrl);
+            return Redirect(LocalRedirectUrl(returnUrl) + "?refreshError=true");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Exception during forced token refresh");
+            _logger.LogError(ex, "Exception during refresh");
             return StatusCode(500, "Token refresh failed");
         }
     }
@@ -194,25 +160,23 @@ public class AuthController : Controller
         try
         {
             var isAuthenticated = HttpContext.User.Identity?.IsAuthenticated == true;
-            
             if (!isAuthenticated)
             {
-                return Ok(new { authenticated = false });
+                return Ok(new { authenticated = false, profile = _profiles.GetCurrentProfile(HttpContext)?.Name });
             }
-
             var needsRefresh = await _tokenRefreshService.IsTokenExpiredOrExpiringSoonAsync(HttpContext);
-            
-            return Ok(new 
-            { 
+            return Ok(new
+            {
                 authenticated = true,
-                needsRefresh = needsRefresh,
+                needsRefresh,
+                profile = _profiles.GetCurrentProfile(HttpContext)?.Name,
                 userName = HttpContext.User.Identity?.Name,
                 claims = HttpContext.User.Claims.Select(c => new { type = c.Type, value = c.Value }).ToList()
             });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error checking authentication status");
+            _logger.LogError(ex, "Error checking auth status");
             return Ok(new { authenticated = false, error = ex.Message });
         }
     }
