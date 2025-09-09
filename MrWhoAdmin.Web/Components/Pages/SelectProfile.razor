@@ -1,0 +1,76 @@
+@page "/profiles"
+@attribute [AllowAnonymous]
+@rendermode InteractiveServer
+@using MrWhoAdmin.Web.Extensions
+@inject IAdminProfileService ProfileService
+@inject NavigationManager Nav
+@inject ILogger<SelectProfile> Logger
+
+<PageTitle>Select Profile</PageTitle>
+
+@if (_profiles.Count == 0)
+{
+    <RadzenAlert AlertStyle="AlertStyle.Warning" ShowIcon="true">
+        <RadzenText>No profiles configured. Configure AdminProfiles in appsettings.json.</RadzenText>
+    </RadzenAlert>
+}
+else
+{
+    <RadzenStack Gap="1.25rem" class="rz-mt-4">
+        <RadzenText TextStyle="TextStyle.H4">Select MrWho Instance</RadzenText>
+        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Choose the profile / environment you want to administer.</RadzenText>
+        <RadzenRow Gap="1rem">
+            @foreach (var p in _profiles)
+            {
+                <RadzenColumn Size="12" SizeMD="4">
+                    <RadzenCard Style="border:1px solid var(--rz-border-color); position:relative;">
+                        <RadzenStack Gap="0.5rem">
+                            <RadzenText TextStyle="TextStyle.H6">@p.DisplayName</RadzenText>
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Authority: @p.Authority</RadzenText>
+                            @if (!string.IsNullOrWhiteSpace(p.ApiBaseUrl))
+                            {
+                                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">API: @p.ApiBaseUrl</RadzenText>
+                            }
+                            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+                                <RadzenButton Icon="login" Text="Use Profile" ButtonStyle="ButtonStyle.Primary" Click="@(() => NavigateSelect(p.Name))" />
+                            </RadzenStack>
+                        </RadzenStack>
+                        @if (object.ReferenceEquals(p, _current))
+                        {
+                            <RadzenBadge Text="Current" Style="position:absolute; top:6px; right:6px;" BadgeStyle="BadgeStyle.Success" />
+                        }
+                    </RadzenCard>
+                </RadzenColumn>
+            }
+        </RadzenRow>
+    </RadzenStack>
+}
+
+@code {
+    private List<AdminProfile> _profiles = new();
+    private AdminProfile? _current;
+    private string? _returnUrl;
+
+    protected override void OnInitialized()
+    {
+        _profiles = ProfileService.GetProfiles().ToList();
+        _current = ProfileService.GetCurrentProfile();
+        // Support optional returnUrl query parameter (local only)
+        var uri = new Uri(Nav.Uri);
+        var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+        if (query.TryGetValue("returnUrl", out var rv))
+        {
+            var candidate = rv.FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(candidate) && candidate.StartsWith("/"))
+                _returnUrl = candidate;
+        }
+        _returnUrl ??= "/";
+    }
+
+    private void NavigateSelect(string profileName)
+    {
+        var ret = Uri.EscapeDataString(_returnUrl ?? "/");
+        // Full page load so endpoint can set cookie headers safely
+        Nav.NavigateTo($"/profile/select?name={Uri.EscapeDataString(profileName)}&returnUrl={ret}", forceLoad: true);
+    }
+}

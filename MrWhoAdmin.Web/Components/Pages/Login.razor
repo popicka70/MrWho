@@ -1,0 +1,79 @@
+@page "/login"
+@attribute [AllowAnonymous]
+@rendermode InteractiveServer
+@using MrWhoAdmin.Web.Extensions
+@inject IAdminProfileService ProfileService
+@inject NavigationManager Nav
+
+<PageTitle>Login</PageTitle>
+
+@if (_profiles.Count > 1)
+{
+    <RadzenStack Gap="1.5rem" class="rz-mt-4" Style="max-width:900px;">
+        <RadzenText TextStyle="TextStyle.H4">Select an Identity Server Profile</RadzenText>
+        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Choose which MrWho instance you want to sign into.</RadzenText>
+        <RadzenDataGrid Data="_profiles" TItem="AdminProfile" ShowPagingSummary="false" AllowPaging="false" AllowSorting="false" Class="rz-shadow-1" Style="border:1px solid var(--rz-border-color);">
+            <Columns>
+                <RadzenDataGridColumn TItem="AdminProfile" Title="Profile" Width="220px" Filterable="false" Sortable="false">
+                    <Template Context="p">
+                        <RadzenText TextStyle="TextStyle.Subtitle2">@p.DisplayName</RadzenText>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">@p.Name</RadzenText>
+                    </Template>
+                </RadzenDataGridColumn>
+                <RadzenDataGridColumn TItem="AdminProfile" Title="Authority" Filterable="false" Sortable="false">
+                    <Template Context="p">
+                        <RadzenText class="rz-color-secondary">@p.Authority</RadzenText>
+                    </Template>
+                </RadzenDataGridColumn>
+                <RadzenDataGridColumn TItem="AdminProfile" Title="API" Filterable="false" Sortable="false">
+                    <Template Context="p">
+                        <RadzenText class="rz-color-secondary">@p.ApiBaseUrl</RadzenText>
+                    </Template>
+                </RadzenDataGridColumn>
+                <RadzenDataGridColumn TItem="AdminProfile" Title="Actions" Width="140px" Filterable="false" Sortable="false" TextAlign="TextAlign.Center">
+                    <Template Context="p">
+                        <RadzenButton Icon="login" ButtonStyle="ButtonStyle.Primary" Size="ButtonSize.Small" Text="Login" Click="@(async () => await BeginSignInAsync(p))" />
+                    </Template>
+                </RadzenDataGridColumn>
+            </Columns>
+        </RadzenDataGrid>
+    </RadzenStack>
+}
+else
+{
+    <RadzenStack Gap="1.25rem" class="rz-mt-6" Style="max-width:480px;">
+        <RadzenText TextStyle="TextStyle.H4">Sign in to @(_current?.DisplayName ?? "MrWho")</RadzenText>
+        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">You will be redirected to the selected MrWho identity server to authenticate.</RadzenText>
+        <RadzenButton Icon="login" Text="Sign In" ButtonStyle="ButtonStyle.Primary" Click="@(async () => await BeginSignInAsync(_current))" Style="width:220px;" Disabled="@(_current==null)" />
+    </RadzenStack>
+}
+
+@code {
+    private List<AdminProfile> _profiles = new();
+    private AdminProfile? _current;
+    private string _returnUrl = "/";
+
+    protected override void OnInitialized()
+    {
+        _profiles = ProfileService.GetProfiles().ToList();
+        _current = ProfileService.GetCurrentProfile();
+        var uri = new Uri(Nav.Uri);
+        var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+        if (query.TryGetValue("returnUrl", out var rv))
+        {
+            var candidate = rv.FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(candidate) && candidate.StartsWith("/"))
+                _returnUrl = candidate;
+        }
+    }
+
+    private Task BeginSignInAsync(AdminProfile? profile)
+    {
+        if (profile == null)
+            return Task.CompletedTask;
+        var encodedFinal = Uri.EscapeDataString(_returnUrl);
+        var loginAfterSelect = Uri.EscapeDataString($"/auth/login?returnUrl={encodedFinal}");
+        Nav.NavigateTo($"/profile/select?name={Uri.EscapeDataString(profile.Name)}&returnUrl={loginAfterSelect}", forceLoad: true);
+        return Task.CompletedTask;
+    }
+}

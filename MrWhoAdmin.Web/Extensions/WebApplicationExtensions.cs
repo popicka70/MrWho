@@ -48,6 +48,9 @@ public static class WebApplicationExtensions
         // CRITICAL: Add session middleware before authentication for back-channel logout support
         app.UseSession();
 
+        // NEW: enforce profile selection when multiple profiles configured
+        app.UseMiddleware<ProfileSelectionMiddleware>();
+
         // Authentication and authorization
         app.UseAuthentication();
         app.UseAuthorization();
@@ -71,26 +74,6 @@ public static class WebApplicationExtensions
     {
         const string adminCookieScheme = "AdminCookies"; // Match the scheme from AddAuthenticationServices
         
-        // Login endpoint - trigger OIDC challenge
-        app.MapGet("/login", async (HttpContext context, string? returnUrl = null) =>
-        {
-            // Ensure we have a valid return URL
-            var redirectUri = string.IsNullOrEmpty(returnUrl) || !Uri.IsWellFormedUriString(returnUrl, UriKind.Relative) 
-                ? "/" 
-                : returnUrl;
-
-            var properties = new AuthenticationProperties
-            {
-                RedirectUri = redirectUri
-            };
-
-            // Clear any existing authentication state before challenging
-            await context.SignOutAsync(adminCookieScheme);
-            
-            // Trigger OpenIdConnect challenge
-            await context.ChallengeAsync(OpenIdConnectDefaults.AuthenticationScheme, properties);
-        });
-
         // Logout endpoint
         app.MapGet("/logout", async (HttpContext context, string? returnUrl = null) =>
         {
