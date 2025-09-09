@@ -317,7 +317,8 @@ public class OidcClientService : IOidcClientService
             foreach (var uri in adminConfiguredPostLogout)
                 _context.ClientPostLogoutUris.Add(new ClientPostLogoutUri { ClientId = adminClient.Id, Uri = uri });
 
-            var scopes = new[] { StandardScopes.OpenId, StandardScopes.Email, StandardScopes.Profile, StandardScopes.Roles, StandardScopes.OfflineAccess, StandardScopes.ApiRead, StandardScopes.ApiWrite, StandardScopes.MrWhoUse };
+            // NOTE: Intentionally NOT seeding offline_access for admin web to avoid refresh tokens + MFA on first login
+            var scopes = new[] { StandardScopes.OpenId, StandardScopes.Email, StandardScopes.Profile, StandardScopes.Roles, StandardScopes.ApiRead, StandardScopes.ApiWrite, StandardScopes.MrWhoUse };
             foreach (var scope in scopes)
                 _context.ClientScopes.Add(new ClientScope { ClientId = adminClient.Id, Scope = scope });
 
@@ -332,7 +333,6 @@ public class OidcClientService : IOidcClientService
             };
             if (isTesting)
             {
-                // allow password grant ONLY for test tokens
                 basePermissions.Add(OpenIddictConstants.Permissions.GrantTypes.Password);
             }
             foreach (var p in basePermissions)
@@ -340,7 +340,7 @@ public class OidcClientService : IOidcClientService
             _context.ClientPermissions.Add(new ClientPermission { ClientId = adminClient.Id, Permission = "scp:mrwho.use" });
 
             await _context.SaveChangesAsync();
-            _logger.LogInformation("Created admin client '{ClientId}' with standardized permissions (PasswordGrant={Password})", adminClient.ClientId, isTesting);
+            _logger.LogInformation("Created admin client '{ClientId}' without offline_access scope", adminClient.ClientId);
         }
         else
         {
@@ -356,7 +356,6 @@ public class OidcClientService : IOidcClientService
                 _context.ClientPermissions.Add(new ClientPermission { ClientId = adminClient.Id, Permission = "scp:mrwho.use" });
                 await _context.SaveChangesAsync();
             }
-            // Backfill: enable PAR for admin client if not explicitly configured
             if (adminClient.ParMode == null)
             {
                 adminClient.ParMode = PushedAuthorizationMode.Enabled;
@@ -387,7 +386,18 @@ public class OidcClientService : IOidcClientService
             }
             await _context.SaveChangesAsync();
 
-            // Enable password flow dynamically in test environment if not already enabled
+            // NEW: remove offline_access scope from admin client if present
+            var offlineScopes = await _context.ClientScopes
+                .Where(s => s.ClientId == adminClient.Id && s.Scope == StandardScopes.OfflineAccess)
+                .ToListAsync();
+            if (offlineScopes.Count > 0)
+            {
+                _context.ClientScopes.RemoveRange(offlineScopes);
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Removed offline_access scope from admin client");
+            }
+
+            // Enable password grant in tests only
             if (isTesting && !adminClient.AllowPasswordFlow)
             {
                 adminClient.AllowPasswordFlow = true;

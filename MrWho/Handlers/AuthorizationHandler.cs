@@ -10,6 +10,8 @@ using MrWho.Data;
 using Microsoft.EntityFrameworkCore;
 using MrWho.Models;
 using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.AspNetCore.DataProtection;
+using System.Security.Cryptography;
 
 namespace MrWho.Handlers;
 
@@ -28,6 +30,12 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
     private readonly ApplicationDbContext _context;
     private readonly ILogger<OidcAuthorizationHandler> _logger;
     private readonly IConsentService _consentService;
+    private readonly ITimeLimitedDataProtector _mfaProtector;
+    private const string MfaCookiePrefix = ".MrWho.Mfa.";
+
+    private static readonly string[] MfaAmrValues = new[] { "mfa", "fido2" };
+
+    private string? _mfaSatisfiedMethod; // track method when satisfied via grace cookie
 
     public OidcAuthorizationHandler(
         UserManager<IdentityUser> userManager,
@@ -37,7 +45,8 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         IUserRealmValidationService realmValidationService,
         ApplicationDbContext context,
         ILogger<OidcAuthorizationHandler> logger,
-        IConsentService consentService)
+        IConsentService consentService,
+        IDataProtectionProvider dataProtectionProvider)
     {
         _userManager = userManager;
         _signInManager = signInManager;
@@ -47,6 +56,7 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         _context = context;
         _logger = logger;
         _consentService = consentService;
+        _mfaProtector = dataProtectionProvider.CreateProtector("MrWho.MfaCookie").ToTimeLimitedDataProtector();
     }
 
     public async Task<IResult> HandleAuthorizationRequestAsync(HttpContext context)
@@ -188,8 +198,6 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
                            $"returnUrl={Uri.EscapeDataString(originalAuthorizeUrl)}" +
                            (string.IsNullOrEmpty(clientId) ? string.Empty : $"&clientId={Uri.EscapeDataString(clientId)}");
 
-            // Prefer explicit redirect over Challenge because Challenge inside the authorization endpoint
-            // (with OpenIddict passthrough) produced a blank page in some configurations.
             return Results.Redirect(loginUrl);
         }
 
@@ -279,6 +287,137 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         }
 
         SKIP_CONSENT:
+        // 4c) MFA enforcement (per client with realm fallback ONLY)
+        try
+        {
+            var dbClient = await _context.Clients.Include(c => c.Realm).FirstOrDefaultAsync(c => c.ClientId == clientId);
+            if (dbClient != null)
+            {
+                var requestedScopes = request.GetScopes();
+                // Previous behavior also forced MFA when offline_access was requested.
+                // New policy: require MFA only when client/realm explicitly require it.
+                var requireMfa = (dbClient.RequireMfa ?? dbClient.Realm?.DefaultRequireMfa ?? false);
+                if (requireMfa)
+                {
+                    var allowedMethodsJson = dbClient.AllowedMfaMethods ?? dbClient.Realm?.DefaultAllowedMfaMethods;
+                    var allowedList = new List<string>();
+                    if (!string.IsNullOrWhiteSpace(allowedMethodsJson))
+                    {
+                        try { allowedList = System.Text.Json.JsonSerializer.Deserialize<List<string>>(allowedMethodsJson!) ?? new(); }
+                        catch { allowedList = new(); }
+                    }
+                    if (allowedList.Count == 0)
+                    {
+                        // Default to accepting both totp and fido2 when not specified
+                        allowedList = new List<string> { "totp", "fido2", "passkey" };
+                      }
+
+                    // Determine if current session already satisfied MFA via AMR or grace cookie
+                    var currentAmr = amrSource?.FindAll("amr").Select(c => c.Value).ToList() ?? new List<string>();
+                    var amrOk = currentAmr.Any(v => string.Equals(v, "mfa", StringComparison.Ordinal) || string.Equals(v, "fido2", StringComparison.Ordinal));
+
+                    if (!amrOk)
+                    {
+                        // Check grace/remember cookie
+                        var cookieName = MfaCookiePrefix + clientId;
+                        if (context.Request.Cookies.TryGetValue(cookieName, out var raw))
+                        {
+                            try
+                            {
+                                var payload = _mfaProtector.Unprotect(raw, out var expiration);
+                                // payload format: v1|method|ts
+                                var parts = payload.Split('|');
+                                if (parts.Length >= 3 && parts[0] == "v1")
+                                {
+                                    var method = parts[1];
+                                    // Normalize passkey/fido2 and totp to amr equivalents
+                                    bool isPasskey = string.Equals(method, "fido2", StringComparison.OrdinalIgnoreCase) || string.Equals(method, "passkey", StringComparison.OrdinalIgnoreCase);
+                                    bool isTotp = string.Equals(method, "totp", StringComparison.OrdinalIgnoreCase) || string.Equals(method, "mfa", StringComparison.OrdinalIgnoreCase);
+
+                                    var methodMatches = allowedList.Any(m =>
+                                        string.Equals(m, method, StringComparison.OrdinalIgnoreCase) ||
+                                        (string.Equals(m, "passkey", StringComparison.OrdinalIgnoreCase) && isPasskey) ||
+                                        (string.Equals(m, "totp", StringComparison.OrdinalIgnoreCase) && isTotp));
+                                    if (methodMatches)
+                                    {
+                                        amrOk = true;
+                                        _mfaSatisfiedMethod = isPasskey ? "fido2" : "mfa"; // map totp->mfa
+                                        _logger.LogDebug("MFA grace satisfied via cookie for client {ClientId} using method {Method}. Expires {Exp}", clientId, method, expiration);
+                                    }
+                                }
+                            }
+                            catch (CryptographicException cex)
+                            {
+                                _logger.LogInformation(cex, "Invalid/foreign MFA grace cookie encountered for client {ClientId}; deleting", clientId);
+                                // Delete stale cookie written by a different key ring
+                                context.Response.Cookies.Delete(cookieName);
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogDebug(ex, "Failed to validate MFA grace cookie for client {ClientId}", clientId);
+                            }
+                        }
+                    }
+
+                    if (!amrOk)
+                    {
+                        _logger.LogInformation("Step-up required (MFA) for client {ClientId}; evaluating method.", clientId);
+
+                        var originalAuthorizeUrl = context.Request.GetDisplayUrl();
+                        var passkeyAllowed = allowedList.Any(m => string.Equals(m, "fido2", StringComparison.OrdinalIgnoreCase) || string.Equals(m, "passkey", StringComparison.OrdinalIgnoreCase));
+                        var totpAllowed = allowedList.Any(m => string.Equals(m, "totp", StringComparison.OrdinalIgnoreCase));
+
+                        bool userHasWebAuthn = false;
+                        bool userTotpEnabled = false;
+                        try
+                        {
+                            userHasWebAuthn = await _context.WebAuthnCredentials.AnyAsync(c => c.UserId == authUser.Id);
+                        }
+                        catch { }
+                        try
+                        {
+                            userTotpEnabled = await _userManager.GetTwoFactorEnabledAsync(authUser);
+                        }
+                        catch { }
+
+                        // Preference order:
+                        // 1) If TOTP allowed and enabled -> challenge TOTP
+                        // 2) Else if passkey allowed and user has WebAuthn -> passkey
+                        // 3) Else if TOTP allowed but not enabled -> go to setup
+                        // 4) Else if only passkey allowed -> passkey
+                        if (totpAllowed && userTotpEnabled)
+                        {
+                            var mfaUrl = "/mfa/challenge?returnUrl=" + Uri.EscapeDataString(originalAuthorizeUrl);
+                            return Results.Redirect(mfaUrl);
+                        }
+                        if (passkeyAllowed && userHasWebAuthn)
+                        {
+                            var webauthnUrl = "/connect/login?mode=passkey&returnUrl=" + Uri.EscapeDataString(originalAuthorizeUrl) + "&clientId=" + Uri.EscapeDataString(clientId);
+                            return Results.Redirect(webauthnUrl);
+                        }
+                        if (totpAllowed && !userTotpEnabled)
+                        {
+                            var setupUrl = "/mfa/setup?returnUrl=" + Uri.EscapeDataString(originalAuthorizeUrl);
+                            return Results.Redirect(setupUrl);
+                        }
+                        if (passkeyAllowed)
+                        {
+                            var webauthnUrl = "/connect/login?mode=passkey&returnUrl=" + Uri.EscapeDataString(originalAuthorizeUrl) + "&clientId=" + Uri.EscapeDataString(clientId);
+                            return Results.Redirect(webauthnUrl);
+                        }
+
+                        // Fallback to TOTP challenge
+                        var fallbackUrl = "/mfa/challenge?returnUrl=" + Uri.EscapeDataString(originalAuthorizeUrl);
+                        return Results.Redirect(fallbackUrl);
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "MFA enforcement check failed for client {ClientId}. Proceeding without step-up.", clientId);
+        }
+
         // 5) Build authorization principal
         var claimsIdentity = new ClaimsIdentity(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
 
@@ -322,10 +461,17 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
                     claimsIdentity.AddClaim(amrClaim);
                 }
             }
+            else if (!string.IsNullOrEmpty(_mfaSatisfiedMethod))
+            {
+                // If MFA was satisfied via grace cookie, add the corresponding amr
+                var amrClaim = new Claim("amr", _mfaSatisfiedMethod);
+                amrClaim.SetDestinations(OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken);
+                claimsIdentity.AddClaim(amrClaim);
+            }
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "Failed to propagate amr claims");
+            _logger.LogDebug(ex, "Failed to propagate/add amr claims");
         }
 
         var authPrincipal = new ClaimsPrincipal(claimsIdentity);

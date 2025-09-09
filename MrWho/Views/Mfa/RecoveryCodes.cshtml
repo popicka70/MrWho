@@ -1,9 +1,11 @@
 @model string[]
 @{
     ViewData["Title"] = "Recovery Codes";
+    var returnUrl = ViewData["ReturnUrl"] as string;
+    var effectiveReturn = string.IsNullOrEmpty(returnUrl) ? "/" : returnUrl;
 }
 
-<div class="row justify-content-center">
+<div id="rc-root" class="row justify-content-center" data-return-url="@effectiveReturn">
     <div class="col-md-8 col-lg-6">
         <!-- MrWho Logo -->
         <div class="text-center mb-4">
@@ -46,30 +48,27 @@
                 </div>
                 
                 <div class="d-grid gap-2 mb-3">
-                    <button type="button" class="btn btn-outline-primary" onclick="copyAllCodes(this)">
+                    <button id="btnCopyAll" type="button" class="btn btn-outline-primary">
                         <i class="bi bi-clipboard me-2"></i><span class="btn-text">Copy All Codes</span>
                     </button>
-                    <button type="button" class="btn btn-outline-secondary" onclick="printCodes()">
+                    <button id="btnPrint" type="button" class="btn btn-outline-secondary">
                         <i class="bi bi-printer me-2"></i>Print Codes
                     </button>
                 </div>
                 
-                <!-- Confirmation Checkbox -->
+                <!-- Confirmation Checkbox and direct navigation button -->
                 <div class="form-check mb-3 p-3 bg-light rounded">
-                    <input class="form-check-input" type="checkbox" id="confirmSaved" required>
+                    <input class="form-check-input" type="checkbox" id="confirmSaved">
                     <label class="form-check-label fw-bold" for="confirmSaved">
                         <i class="bi bi-shield-check me-2 text-success"></i>
                         I have saved these recovery codes in a secure location
                     </label>
                 </div>
-                
-                <form method="get" action="/">
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-success btn-lg" id="continueBtn" disabled>
-                            <i class="bi bi-arrow-right me-2"></i>Continue to Dashboard
-                        </button>
-                    </div>
-                </form>
+                <div class="d-grid">
+                    <button type="button" class="btn btn-success btn-lg" id="continueBtn">
+                        <i class="bi bi-arrow-right me-2"></i>Continue to Dashboard
+                    </button>
+                </div>
                 
                 <div class="mt-3 text-center">
                     <small class="text-muted">
@@ -96,96 +95,5 @@
 }
 
 @section Scripts {
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const confirmCheckbox = document.getElementById('confirmSaved');
-            const continueBtn = document.getElementById('continueBtn');
-            function syncButton() {
-                if (!confirmCheckbox || !continueBtn) return;
-                if (confirmCheckbox.checked) {
-                    continueBtn.disabled = false;
-                    continueBtn.removeAttribute('disabled');
-                } else {
-                    continueBtn.disabled = true;
-                    continueBtn.setAttribute('disabled', 'disabled');
-                }
-            }
-            if (confirmCheckbox) {
-                confirmCheckbox.addEventListener('change', syncButton);
-            }
-            syncButton();
-        });
-        
-        function copyAllCodes(buttonEl) {
-            try {
-                const container = document.getElementById('recoveryCodes');
-                if (!container) return;
-                const codes = JSON.parse(container.getAttribute('data-codes') || '[]');
-                const codesText = codes.join('\n');
-                navigator.clipboard.writeText(codesText).then(function() {
-                    if (!buttonEl) return;
-                    const originalHtml = buttonEl.innerHTML;
-                    buttonEl.innerHTML = '<i class="bi bi-check me-2"></i><span class="btn-text">Copied!</span>';
-                    buttonEl.classList.remove('btn-outline-primary');
-                    buttonEl.classList.add('btn-success');
-                    setTimeout(function() {
-                        buttonEl.innerHTML = originalHtml;
-                        buttonEl.classList.remove('btn-success');
-                        buttonEl.classList.add('btn-outline-primary');
-                    }, 2000);
-                }).catch(function() {
-                    alert('Failed to copy codes to clipboard. Please copy them manually.');
-                });
-            } catch (e) {
-                alert('Copy failed: ' + e);
-            }
-        }
-        
-        function printCodes() {
-            const container = document.getElementById('recoveryCodes');
-            const codes = container ? JSON.parse(container.getAttribute('data-codes') || '[]') : [];
-            const printWindow = window.open('', '_blank');
-            const currentDate = new Date().toLocaleDateString();
-            printWindow.document.write(`
-                <html>
-                <head>
-                    <title>MrWho Recovery Codes</title>
-                    <style>
-                        body { font-family: Arial, sans-serif; margin: 40px; }
-                        .header { text-align: center; margin-bottom: 30px; }
-                        .codes { background: #f8f9fa; padding: 20px; border-radius: 8px; }
-                        .code-item { margin: 10px 0; font-size: 16px; font-family: monospace; }
-                        .warning { background: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0; }
-                        .footer { margin-top: 30px; font-size: 12px; color: #666; }
-                        .btn, .form-check, .alert { display: none !important; }
-                        .card { border: none !important; }
-                    </style>
-                </head>
-                <body>
-                    <div class="header">
-                        <h1>MrWho Recovery Codes</h1>
-                        <p>Generated on: ${currentDate}</p>
-                    </div>
-                    <div class="warning">
-                        <strong>SECURITY WARNING:</strong>
-                        <ul>
-                            <li>Each code can only be used once</li>
-                            <li>Store this document in a secure location</li>
-                            <li>Do not share these codes with anyone</li>
-                            <li>Use only if you lose access to your authenticator app</li>
-                        </ul>
-                    </div>
-                    <div class="codes">
-                        ${codes.map((code, index) => `<div class="code-item">${index + 1}. ${code}</div>`).join('')}
-                    </div>
-                    <div class="footer">
-                        <p>MrWho Identity Server - Two-Factor Authentication Recovery Codes</p>
-                    </div>
-                </body>
-                </html>
-            `);
-            printWindow.document.close();
-            printWindow.print();
-        }
-    </script>
+    <script src="~/js/recovery-codes.js" asp-append-version="true"></script>
 }
