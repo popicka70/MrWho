@@ -1,0 +1,57 @@
+@{
+    Layout = "_Layout";
+    var returnUrl = (string?)ViewData["ReturnUrl"] ?? string.Empty;
+    var clientId = (string?)ViewData["ClientId"] ?? string.Empty;
+}
+<div class="container py-5">
+    <h2 class="mb-4">Use your passkey</h2>
+    <p class="text-muted">We are starting a passkey prompt. If nothing appears, click the button below.</p>
+    <button id="btnStart" class="btn btn-primary"><i class="bi bi-shield-lock me-2"></i>Use passkey</button>
+    <div id="msg" class="text-danger mt-3" style="display:none"></div>
+</div>
+<script>
+(function(){
+  const btn = document.getElementById('btnStart');
+  const msg = document.getElementById('msg');
+  async function start(){
+    try{
+      const res = await fetch('/webauthn/login/options');
+      if(!res.ok){ throw new Error('Failed to start passkey'); }
+      const options = await res.json();
+
+      options.challenge = base64urlToBuffer(options.challenge);
+      if (!Array.isArray(options.allowCredentials) || options.allowCredentials.length === 0){
+        delete options.allowCredentials;
+      } else {
+        options.allowCredentials = options.allowCredentials.map(c=>({ ...c, id: base64urlToBuffer(c.id) }));
+      }
+
+      const assertion = await navigator.credentials.get({ publicKey: options });
+      const data = {
+        id: bufferToBase64Url(assertion.rawId),
+        rawId: bufferToBase64Url(assertion.rawId),
+        type: assertion.type,
+        extensions: assertion.getClientExtensionResults ? assertion.getClientExtensionResults() : {},
+        response: {
+          clientDataJSON: bufferToBase64Url(assertion.response.clientDataJSON),
+          authenticatorData: bufferToBase64Url(assertion.response.authenticatorData),
+          signature: bufferToBase64Url(assertion.response.signature),
+          userHandle: assertion.response.userHandle ? bufferToBase64Url(assertion.response.userHandle) : null
+        }
+      };
+      const qs = new URLSearchParams({ returnUrl: '@returnUrl', clientId: '@clientId' });
+      const verifyRes = await fetch('/webauthn/login/verify?' + qs.toString(), { method:'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+      if (verifyRes.redirected){ window.location.href = verifyRes.url; return; }
+      if (verifyRes.ok){ window.location.href = '@returnUrl' || '/'; return; }
+      const t = await verifyRes.text();
+      throw new Error(t || 'Verification failed');
+    }catch(e){ msg.style.display='block'; msg.textContent = e.message || e; }
+  }
+  btn.addEventListener('click', start);
+  if (window.PublicKeyCredential){ setTimeout(start, 100); }
+
+  // helpers
+  function bufferToBase64Url(buffer) { const bytes = new Uint8Array(buffer); let binary = ''; for (let i = 0; i < bytes.byteLength; i++) { binary += String.fromCharCode(bytes[i]); } return btoa(binary).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''); }
+  function base64urlToBuffer(baseurl){ const pad = baseurl.replace(/-/g,'+').replace(/_/g,'/'); const base = pad + '='.repeat((4 - pad.length % 4) % 4); const raw = atob(base); const out = new ArrayBuffer(raw.length); const view = new Uint8Array(out); for (let i=0;i<raw.length;i++){ view[i] = raw.charCodeAt(i); } return out; }
+})();
+</script>

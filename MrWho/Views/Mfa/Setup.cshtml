@@ -1,6 +1,7 @@
 @model MrWho.Controllers.SetupMfaViewModel
 @{
     ViewData["Title"] = "Set up Authenticator";
+    var returnUrl = ViewData["ReturnUrl"] as string;
 }
 
 <div class="row justify-content-center">
@@ -81,6 +82,10 @@
                     </h5>
                     <form method="post" action="/mfa/verify">
                         @Html.AntiForgeryToken()
+                        @if (!string.IsNullOrEmpty(returnUrl))
+                        {
+                            <input type="hidden" name="ReturnUrl" value="@returnUrl" />
+                        }
                         <div class="mb-3">
                             <label for="code" class="form-label">Enter verification code from your app</label>
                             <input id="code" 

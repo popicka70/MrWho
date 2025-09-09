@@ -126,7 +126,14 @@ builder.Services.AddSession(options =>
 
 builder.Services.AddAuthorization(options =>
 {
-    options.AddPolicy("RequireMfa", policy => policy.RequireClaim("amr", "mfa"));
+    options.AddPolicy("RequireMfa", policy =>
+    {
+        policy.RequireAssertion(ctx =>
+        {
+            // Accept either TOTP-based MFA (amr=mfa) or WebAuthn/passkey (amr=fido2)
+            return ctx.User?.Claims?.Any(c => c.Type == "amr" && (string.Equals(c.Value, "mfa", StringComparison.Ordinal) || string.Equals(c.Value, "fido2", StringComparison.Ordinal))) == true;
+        });
+    });
 });
 
 builder.Services.AddScoped<Microsoft.AspNetCore.Authentication.IClaimsTransformation, MrWho.Services.AmrClaimsTransformation>();
