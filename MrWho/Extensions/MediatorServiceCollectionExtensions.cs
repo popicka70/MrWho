@@ -33,6 +33,9 @@ public static class MediatorServiceCollectionExtensions
         services.AddTransient<IRequestHandler<ConsentPostRequest, IActionResult>, ConsentPostHandler>();
         services.AddTransient<IRequestHandler<ConsentForgetRequest, IActionResult>, ConsentForgetHandler>();
 
+        // Invalid scopes handler registration
+        services.AddTransient<IRequestHandler<MrWho.Handlers.Auth.InvalidScopesGetRequest, IActionResult>, MrWho.Handlers.Auth.InvalidScopesGetHandler>();
+
     // Debug endpoint handlers
     services.AddTransient<IRequestHandler<DebugIndexRequest, IResult>, DebugIndexHandler>();
     services.AddTransient<IRequestHandler<ClientCookiesDebugRequest, IResult>, ClientCookiesDebugHandler>();

@@ -130,6 +130,7 @@ namespace MrWhoAdmin.Web.Components.Pages
             availableMfaMethods = new()
         {
             new("Time-based OTP (TOTP)", "totp"),
+            new("Passkeys (WebAuthn)", "passkey"),
             new("SMS Verification", "sms"),
             new("Email Verification", "email"),
             new("Push Notifications", "push"),

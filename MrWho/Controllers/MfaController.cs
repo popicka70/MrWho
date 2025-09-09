@@ -10,6 +10,9 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using MrWho.Services;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.EntityFrameworkCore;
+using MrWho.Data;
 
 namespace MrWho.Controllers;
 
@@ -23,6 +26,9 @@ public class MfaController : Controller
     private readonly IQrCodeService _qr;
     private readonly IDynamicCookieService _dynamicCookieService;
     private readonly ILogger<MfaController> _logger;
+    private readonly ApplicationDbContext _db;
+    private readonly ITimeLimitedDataProtector _mfaProtector;
+    private const string MfaCookiePrefix = ".MrWho.Mfa.";
 
     private const string AuthenticatorUriFormat = "otpauth://totp/{0}:{1}?secret={2}&issuer={0}&digits=6";
 
@@ -31,7 +37,9 @@ public class MfaController : Controller
                          UrlEncoder urlEncoder,
                          IQrCodeService qr,
                          IDynamicCookieService dynamicCookieService,
-                         ILogger<MfaController> logger)
+                         ILogger<MfaController> logger,
+                         ApplicationDbContext db,
+                         IDataProtectionProvider dataProtectionProvider)
     {
         _userManager = userManager;
         _signInManager = signInManager;
@@ -39,10 +47,72 @@ public class MfaController : Controller
         _qr = qr;
         _dynamicCookieService = dynamicCookieService;
         _logger = logger;
+        _db = db;
+        _mfaProtector = dataProtectionProvider.CreateProtector("MrWho.MfaCookie").ToTimeLimitedDataProtector();
     }
 
     [HttpGet("setup")]
-    public async Task<IActionResult> Setup()
+    public async Task<IActionResult> Setup([FromQuery] string? returnUrl = null)
+    {
+        var user = await _userManager.GetUserAsync(User);
+        if (user is null) return Challenge();
+
+        var key = await _userManager.GetAuthenticatorKeyAsync(user);
+        if (string.IsNullOrEmpty(key))
+        {
+            await _userManager.ResetAuthenticatorKeyAsync(user);
+            key = await _userManager.GetAuthenticatorKeyAsync(user);
+        }
+
+        var email = await _userManager.GetEmailAsync(user) ?? await _userManager.GetUserNameAsync(user);
+        var issuer = _urlEncoder.Encode("MrWho");
+        var account = _urlEncoder.Encode(email ?? user.Id);
+        var uri = string.Format(AuthenticatorUriFormat, issuer, account, key);
+        var qrDataUri = _qr.GeneratePngDataUri(uri);
+
+        ViewData["ReturnUrl"] = returnUrl; // propagate to the view so it can post it back
+
+        return View("Setup", new SetupMfaViewModel
+        {
+            SharedKey = FormatKey(key!),
+            AuthenticatorUri = uri,
+            QrCodeDataUri = qrDataUri
+        });
+    }
+
+    [HttpPost("verify")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> Verify([FromForm] VerifyMfaInput input)
+    {
+        if (!ModelState.IsValid)
+        {
+            ViewData["ReturnUrl"] = input.ReturnUrl; // preserve returnUrl on redisplay
+            return await RebuildSetupViewAsync();
+        }
+
+        var user = await _userManager.GetUserAsync(User);
+        if (user is null) return Challenge();
+
+        var code = input.Code?.Replace(" ", string.Empty).Replace("-", string.Empty);
+        var isValid = await _userManager.VerifyTwoFactorTokenAsync(
+            user, _userManager.Options.Tokens.AuthenticatorTokenProvider, code!);
+
+        if (!isValid)
+        {
+            ModelState.AddModelError(string.Empty, "Invalid verification code.");
+            ViewData["ReturnUrl"] = input.ReturnUrl; // preserve
+            return await RebuildSetupViewAsync();
+        }
+
+        await _userManager.SetTwoFactorEnabledAsync(user, true);
+        _logger.LogInformation("User {UserId} enabled MFA.", user.Id);
+
+        var recoveryCodes = await _userManager.GenerateNewTwoFactorRecoveryCodesAsync(user, 10);
+        ViewData["ReturnUrl"] = input.ReturnUrl; // pass to RecoveryCodes page
+        return View("RecoveryCodes", (recoveryCodes ?? Enumerable.Empty<string>()).ToArray());
+    }
+
+    private async Task<IActionResult> RebuildSetupViewAsync()
     {
         var user = await _userManager.GetUserAsync(User);
         if (user is null) return Challenge();
@@ -68,59 +138,13 @@ public class MfaController : Controller
         });
     }
 
-    [HttpPost("verify")]
-    [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Verify([FromForm] VerifyMfaInput input)
-    {
-        if (!ModelState.IsValid) return BadRequest(ModelState);
-
-        var user = await _userManager.GetUserAsync(User);
-        if (user is null) return Challenge();
-
-        var code = input.Code?.Replace(" ", string.Empty).Replace("-", string.Empty);
-        var isValid = await _userManager.VerifyTwoFactorTokenAsync(
-            user, _userManager.Options.Tokens.AuthenticatorTokenProvider, code!);
-
-        if (!isValid)
-        {
-            ModelState.AddModelError(string.Empty, "Invalid verification code.");
-            // Rebuild the setup model so the page can render the QR and key again
-            var key = await _userManager.GetAuthenticatorKeyAsync(user);
-            if (string.IsNullOrEmpty(key))
-            {
-                await _userManager.ResetAuthenticatorKeyAsync(user);
-                key = await _userManager.GetAuthenticatorKeyAsync(user);
-            }
-
-            var email = await _userManager.GetEmailAsync(user) ?? await _userManager.GetUserNameAsync(user);
-            var issuer = _urlEncoder.Encode("MrWho");
-            var account = _urlEncoder.Encode(email ?? user.Id);
-            var uri = string.Format(AuthenticatorUriFormat, issuer, account, key);
-            var qrDataUri = _qr.GeneratePngDataUri(uri);
-
-            var model = new SetupMfaViewModel
-            {
-                SharedKey = FormatKey(key!),
-                AuthenticatorUri = uri,
-                QrCodeDataUri = qrDataUri
-            };
-            return View("Setup", model);
-        }
-
-        await _userManager.SetTwoFactorEnabledAsync(user, true);
-        _logger.LogInformation("User {UserId} enabled MFA.", user.Id);
-
-    var recoveryCodes = await _userManager.GenerateNewTwoFactorRecoveryCodesAsync(user, 10);
-    return View("RecoveryCodes", (recoveryCodes ?? Enumerable.Empty<string>()).ToArray());
-    }
-
     [HttpGet("recovery-codes")]
     public async Task<IActionResult> RecoveryCodes()
     {
         var user = await _userManager.GetUserAsync(User);
         if (user is null) return Challenge();
-    var codes = await _userManager.GenerateNewTwoFactorRecoveryCodesAsync(user, 10);
-    return View("RecoveryCodes", (codes ?? Enumerable.Empty<string>()).ToArray());
+        var codes = await _userManager.GenerateNewTwoFactorRecoveryCodesAsync(user, 10);
+        return View("RecoveryCodes", (codes ?? Enumerable.Empty<string>()).ToArray());
     }
 
     [HttpPost("disable")]
@@ -150,64 +174,113 @@ public class MfaController : Controller
         if (!ModelState.IsValid)
             return View("Challenge", input);
 
-        var code = input.Code?.Replace(" ", string.Empty).Replace("-", string.Empty);
-        // Complete 2FA using Identity's built-in helper (clears the two-factor cookie and signs in)
-        var result = await _signInManager.TwoFactorAuthenticatorSignInAsync(code!, input.RememberMe, input.RememberMachine);
-
-        if (!result.Succeeded)
+        var normalized = input.Code?.Replace(" ", string.Empty).Replace("-", string.Empty);
+        if (string.IsNullOrWhiteSpace(normalized))
         {
             ModelState.AddModelError(string.Empty, "Invalid code.");
             return View("Challenge", input);
         }
 
-        // Stamp the authentication method as "mfa" to ensure AMR propagation in tokens
-        var twoFactorUser = await _signInManager.GetTwoFactorAuthenticationUserAsync();
-        if (twoFactorUser is not null)
+        IdentityUser? verifiedUser = null;
+
+        // Preferred path: verify against the currently authenticated user (step-up scenario)
+        try
         {
-            await _signInManager.SignInAsync(twoFactorUser, isPersistent: input.RememberMe, authenticationMethod: "mfa");
-            
-            // CRITICAL FIX: Extract client ID from return URL and sign in with client-specific scheme
-            string? clientId = null;
-            if (!string.IsNullOrEmpty(input.ReturnUrl) && input.ReturnUrl.Contains("/connect/authorize"))
+            var currentUser = await _userManager.GetUserAsync(User);
+            if (currentUser != null)
             {
-                try
+                var ok = await _userManager.VerifyTwoFactorTokenAsync(currentUser, _userManager.Options.Tokens.AuthenticatorTokenProvider, normalized);
+                if (ok)
                 {
-                    var uri = new Uri(input.ReturnUrl);
-                    var queryParams = System.Web.HttpUtility.ParseQueryString(uri.Query);
-                    clientId = queryParams["client_id"];
-                    
-                    if (!string.IsNullOrEmpty(clientId))
-                    {
-                        _logger.LogDebug("MFA completed for client {ClientId}, signing in with client-specific authentication", clientId);
-                        await _dynamicCookieService.SignInWithClientCookieAsync(clientId, twoFactorUser, input.RememberMe);
-                        _logger.LogDebug("Successfully signed in user {UserName} with client-specific authentication for client {ClientId}", 
-                            twoFactorUser.UserName, clientId);
-                    }
-                    else
-                    {
-                        _logger.LogWarning("No client_id found in return URL: {ReturnUrl}", input.ReturnUrl);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to extract client_id from return URL or sign in with client-specific authentication: {ReturnUrl}", input.ReturnUrl);
+                    verifiedUser = currentUser;
                 }
             }
         }
-
-        if (input.RememberMachine && twoFactorUser is not null)
+        catch (Exception ex)
         {
-            await _signInManager.RememberTwoFactorClientAsync(twoFactorUser);
+            _logger.LogDebug(ex, "Direct TOTP verification against current user failed; will try TwoFactor cookie flow.");
+        }
+
+        // Fallback: use Identity's two-factor cookie flow if present
+        if (verifiedUser == null)
+        {
+            var result = await _signInManager.TwoFactorAuthenticatorSignInAsync(normalized, input.RememberMe, input.RememberMachine);
+            if (result.Succeeded)
+            {
+                try { verifiedUser = await _signInManager.GetTwoFactorAuthenticationUserAsync(); }
+                catch { verifiedUser = null; }
+            }
+        }
+
+        if (verifiedUser == null)
+        {
+            ModelState.AddModelError(string.Empty, "Invalid code.");
+            return View("Challenge", input);
+        }
+
+        // Sign-in/update AMR so the OP can issue tokens with amr=mfa
+        await _signInManager.SignInAsync(verifiedUser, isPersistent: input.RememberMe, authenticationMethod: "mfa");
+
+        // Extract client_id from returnUrl to create client-specific cookie and grace cookie
+        string? clientId = null;
+        if (!string.IsNullOrEmpty(input.ReturnUrl) && input.ReturnUrl.Contains("/connect/authorize"))
+        {
+            try
+            {
+                var uri = new Uri(input.ReturnUrl);
+                var queryParams = System.Web.HttpUtility.ParseQueryString(uri.Query);
+                clientId = queryParams["client_id"];
+
+                if (!string.IsNullOrEmpty(clientId))
+                {
+                    try
+                    {
+                        await _dynamicCookieService.SignInWithClientCookieAsync(clientId, verifiedUser, input.RememberMe);
+
+                        var dbClient = await _db.Clients.Include(c => c.Realm).FirstOrDefaultAsync(c => c.ClientId == clientId);
+                        if (dbClient != null)
+                        {
+                            var remember = dbClient.RememberMfaForSession ?? dbClient.Realm?.DefaultRememberMfaForSession ?? true;
+                            var graceMinutes = dbClient.MfaGracePeriodMinutes ?? dbClient.Realm?.DefaultMfaGracePeriodMinutes ?? 60;
+                            if (remember && graceMinutes > 0)
+                            {
+                                // Indicate the specific MFA method used: 'totp' for authenticator app
+                                var payload = $"v1|totp|{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}";
+                                var protectedValue = _mfaProtector.Protect(payload, lifetime: TimeSpan.FromMinutes(graceMinutes));
+                                var cookieName = MfaCookiePrefix + clientId;
+                                Response.Cookies.Append(cookieName, protectedValue, new CookieOptions
+                                {
+                                    HttpOnly = true,
+                                    Secure = true,
+                                    SameSite = SameSiteMode.Lax,
+                                    Expires = DateTimeOffset.UtcNow.AddMinutes(graceMinutes),
+                                    IsEssential = true
+                                });
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed client-specific cookie sign-in for client {ClientId}", clientId);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to parse client_id from return URL {ReturnUrl}", input.ReturnUrl);
+            }
+        }
+
+        if (input.RememberMachine)
+        {
+            try { await _signInManager.RememberTwoFactorClientAsync(verifiedUser); }
+            catch (Exception ex) { _logger.LogDebug(ex, "Remember device failed"); }
         }
 
         if (!string.IsNullOrEmpty(input.ReturnUrl))
         {
-            // Allow local redirects and absolute redirects that target the OIDC authorize endpoint
-            // This mirrors the logic used in AuthController to complete OIDC flows after login.
             if (Url.IsLocalUrl(input.ReturnUrl) || input.ReturnUrl.Contains("/connect/authorize", StringComparison.OrdinalIgnoreCase))
-            {
                 return Redirect(input.ReturnUrl);
-            }
         }
         return Redirect("/");
     }

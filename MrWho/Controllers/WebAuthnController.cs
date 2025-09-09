@@ -12,6 +12,7 @@ using System.Text;
 using Microsoft.AspNetCore.WebUtilities;
 using MrWho.Services;
 using System.Security.Cryptography;
+using Microsoft.AspNetCore.DataProtection;
 
 namespace MrWho.Controllers;
 
@@ -28,6 +29,8 @@ public class WebAuthnController : Controller
     private readonly string _rpName;
     private readonly IUserRealmValidationService _realmValidationService; // added
     private readonly IDynamicCookieService _dynamicCookieService; // added
+    private readonly ITimeLimitedDataProtector _mfaProtector; // for grace cookie
+    private const string MfaCookiePrefix = ".MrWho.Mfa.";
 
     public WebAuthnController(
         IConfiguration config,
@@ -35,7 +38,8 @@ public class WebAuthnController : Controller
         UserManager<IdentityUser> userManager,
         ILogger<WebAuthnController> logger,
         IUserRealmValidationService realmValidationService, // added
-        IDynamicCookieService dynamicCookieService // added
+        IDynamicCookieService dynamicCookieService, // added
+        IDataProtectionProvider dataProtectionProvider
         )
     {
         _db = db;
@@ -43,6 +47,7 @@ public class WebAuthnController : Controller
         _logger = logger;
         _realmValidationService = realmValidationService; // added
         _dynamicCookieService = dynamicCookieService; // added
+        _mfaProtector = dataProtectionProvider.CreateProtector("MrWho.MfaCookie").ToTimeLimitedDataProtector();
 
         _rpId = config["WebAuthn:RelyingPartyId"] ?? new Uri(config["OpenIddict:Issuer"] ?? "https://localhost:7113").Host;
         _rpName = config["WebAuthn:RelyingPartyName"] ?? "MrWho";
@@ -66,6 +71,16 @@ public class WebAuthnController : Controller
         origins.Add("https://localhost:7113");
         origins.Add("http://localhost:7113");
         return origins;
+    }
+
+    // Interactive WebAuthn login page: auto-starts assertion and redirects
+    [HttpGet("login")]
+    [AllowAnonymous]
+    public IActionResult Login([FromQuery] string? returnUrl = null, [FromQuery] string? clientId = null)
+    {
+        ViewData["ReturnUrl"] = returnUrl;
+        ViewData["ClientId"] = clientId;
+        return View("Login");
     }
 
     // ===== Registration: options =====
@@ -141,6 +156,20 @@ public class WebAuthnController : Controller
             }
         }
 
+        // Extract attestation info when available
+        string? aaGuid = null;
+        string? fmt = null;
+        try
+        {
+            aaGuid = (res?.Result?.Aaguid is Guid g) ? g.ToString() : res?.Result?.Aaguid?.ToString();
+        }
+        catch { }
+        try
+        {
+            fmt = res?.Result?.Fmt?.ToString();
+        }
+        catch { }
+
         var cred = new WebAuthnCredential
         {
             UserId = user.Id,
@@ -148,9 +177,9 @@ public class WebAuthnController : Controller
             PublicKey = WebEncoders.Base64UrlEncode(res.Result.PublicKey),
             UserHandle = WebEncoders.Base64UrlEncode(res.Result.User.Id),
             SignCount = 0,
-            AaGuid = null,
-            AttestationFmt = null,
-            IsDiscoverable = false,
+            AaGuid = aaGuid,
+            AttestationFmt = fmt,
+            IsDiscoverable = true,
             Nickname = null
         };
         _db.WebAuthnCredentials.Add(cred);
@@ -267,6 +296,28 @@ public class WebAuthnController : Controller
                 try
                 {
                     await _dynamicCookieService.SignInWithClientCookieAsync(clientId, user, rememberMe: true);
+
+                    // Set MFA grace cookie if client/realm allows remembering MFA
+                    var dbClient = await _db.Clients.Include(c => c.Realm).FirstOrDefaultAsync(c => c.ClientId == clientId);
+                    if (dbClient != null)
+                    {
+                        var remember = dbClient.RememberMfaForSession ?? dbClient.Realm?.DefaultRememberMfaForSession ?? true;
+                        var graceMinutes = dbClient.MfaGracePeriodMinutes ?? dbClient.Realm?.DefaultMfaGracePeriodMinutes ?? 60;
+                        if (remember && graceMinutes > 0)
+                        {
+                            var payload = $"v1|fido2|{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}";
+                            var protectedValue = _mfaProtector.Protect(payload, lifetime: TimeSpan.FromMinutes(graceMinutes));
+                            var cookieName = MfaCookiePrefix + clientId;
+                            Response.Cookies.Append(cookieName, protectedValue, new CookieOptions
+                            {
+                                HttpOnly = true,
+                                Secure = true,
+                                SameSite = SameSiteMode.Lax,
+                                Expires = DateTimeOffset.UtcNow.AddMinutes(graceMinutes),
+                                IsEssential = true
+                            });
+                        }
+                    }
                 }
                 catch (Exception ex)
                 {
