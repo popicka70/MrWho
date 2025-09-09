@@ -1,5 +1,6 @@
 ﻿@inherits LayoutComponentBase
 @inject IJSRuntime JSRuntime
+@inject MrWhoAdmin.Web.Extensions.IAdminProfileService ProfileService
 
 <RadzenComponents @rendermode="InteractiveServer" />
 
@@ -12,16 +13,6 @@
             <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="12px">
                 <AuthorizeView>
                     <Authorized>
-                        <!-- Quick Actions Dropdown (hidden on mobile) -->
-                        <RadzenDropDown TValue="string" class="rz-display-none rz-display-md-inline-flex"
-                                        Style="width: 200px;" Placeholder="Quick Actions" AllowClear="true"
-                                        Change="@OnQuickActionChange">
-                            <RadzenDropDownItem TValue="string" Text="Add New User" Value="add-user" />
-                            <RadzenDropDownItem TValue="string" Text="View Reports" Value="reports" />
-                            <RadzenDropDownItem TValue="string" Text="System Health" Value="health" />
-                            <RadzenDropDownItem TValue="string" Text="API Documentation" Value="api-docs" />
-                        </RadzenDropDown>
-                        
                         <!-- Notifications Button -->
                         <RadzenButton Icon="notifications" ButtonStyle="ButtonStyle.Light" Variant="Variant.Text" 
                                       Click="@ShowNotifications" class="rz-border-radius-50 rz-p-2" />
@@ -87,6 +78,8 @@
     [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private NotificationService NotificationService { get; set; } = default!;
     [Inject] private ContextMenuService ContextMenuService { get; set; } = default!;
+
+    protected override void OnInitialized() { }
 
     private string GetUserDisplayName(System.Security.Claims.ClaimsPrincipal user)
     {
@@ -165,28 +158,6 @@
     {
         NotificationService.Notify(NotificationSeverity.Info, "Notifications", 
             "You have no new notifications at this time.", duration: 4000);
-    }
-
-    private void OnQuickActionChange(object value)
-    {
-        if (value?.ToString() is string action)
-        {
-            switch (action)
-            {
-                case "add-user":
-                    Navigation.NavigateTo("/users/add");
-                    break;
-                case "reports":
-                    Navigation.NavigateTo("/reports");
-                    break;
-                case "health":
-                    Navigation.NavigateTo("/system/health");
-                    break;
-                case "api-docs":
-                    Navigation.NavigateTo("/dev/api-docs");
-                    break;
-            }
-        }
     }
 
     private void ShowUserContextMenu(MouseEventArgs args)
