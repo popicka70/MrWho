@@ -247,7 +247,11 @@ namespace MrWhoAdmin.Web.Components.Pages
                 IncludeAudInIdToken = client.IncludeAudInIdToken,
                 RequireExplicitAudienceScope = client.RequireExplicitAudienceScope,
                 RoleInclusionOverride = client.RoleInclusionOverride, 
-                ParMode = client.ParMode
+                ParMode = client.ParMode,
+                JarMode = client.JarMode,
+                JarmMode = client.JarmMode,
+                RequireSignedRequestObject = client.RequireSignedRequestObject,
+                AllowedRequestObjectAlgs = client.AllowedRequestObjectAlgs
             };
         }
 
@@ -331,7 +335,11 @@ namespace MrWhoAdmin.Web.Components.Pages
                 IncludeAudInIdToken = model.IncludeAudInIdToken,
                 RequireExplicitAudienceScope = model.RequireExplicitAudienceScope,
                 RoleInclusionOverride = model.RoleInclusionOverride,
-                ParMode = model.ParMode
+                ParMode = model.ParMode,
+                JarMode = model.JarMode,
+                JarmMode = model.JarmMode,
+                RequireSignedRequestObject = model.RequireSignedRequestObject,
+                AllowedRequestObjectAlgs = model.AllowedRequestObjectAlgs
             };
             update.ClientSecret = string.IsNullOrWhiteSpace(model.ClientSecret) ? null : model.ClientSecret;
             return update;
@@ -420,7 +428,11 @@ namespace MrWhoAdmin.Web.Components.Pages
                 IncludeAudInIdToken = model.IncludeAudInIdToken,
                 RequireExplicitAudienceScope = model.RequireExplicitAudienceScope,
                 RoleInclusionOverride = model.RoleInclusionOverride,
-                ParMode = model.ParMode
+                ParMode = model.ParMode,
+                JarMode = model.JarMode,
+                JarmMode = model.JarmMode,
+                RequireSignedRequestObject = model.RequireSignedRequestObject,
+                AllowedRequestObjectAlgs = model.AllowedRequestObjectAlgs
             };
         }
 

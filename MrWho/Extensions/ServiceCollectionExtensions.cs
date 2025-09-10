@@ -22,6 +22,8 @@ using Microsoft.AspNetCore.Hosting;
 using MrWho.Handlers.Auth;
 using MrWho.Services.Mediator; // add mediator interfaces
 using Microsoft.AspNetCore.Mvc; // for IActionResult
+using MrWho.Services; // ensure JarJarm types
+using MrWho.Services; // contains JarOptions, IJarReplayCache, JarJarmServerEventHandlers
 
 namespace MrWho.Extensions;
 
@@ -33,6 +35,10 @@ public static class ServiceCollectionExtensions
     {
         // Register shared accessors
         services.AddHttpContextAccessor();
+        // JAR/JARM support services
+        services.AddMemoryCache();
+        services.AddSingleton<IJarReplayCache, InMemoryJarReplayCache>();
+        services.AddOptions<JarOptions>().BindConfiguration(JarOptions.SectionName);
 
         // Register database access layer
         services.AddScoped<ISeedingService, SeedingService>();
@@ -387,6 +393,10 @@ public static class ServiceCollectionExtensions
                        .EnableAuthorizationEndpointPassthrough()
                        .EnableTokenEndpointPassthrough()
                        .EnableEndSessionEndpointPassthrough();
+
+                // Register JAR/JARM custom handlers
+                options.AddEventHandler(JarJarmServerEventHandlers.ConfigurationHandlerDescriptor);
+                options.AddEventHandler(JarJarmServerEventHandlers.ApplyAuthorizationResponseDescriptor);
             })
             .AddValidation(options =>
             {
@@ -537,31 +547,9 @@ public static class ServiceCollectionExtensions
         // Add antiforgery services
         services.AddAntiforgery(options =>
         {
-            options.HeaderName = "X-CSRF-TOKEN";
-            options.SuppressXFrameOptionsHeader = false;
+            options.HeaderName = "X-XSRF-TOKEN"; // Custom header for Angular
         });
 
         return services;
     }
-}
-
-/// <summary>
-/// Configuration options for database initialization behavior
-/// </summary>
-public class DatabaseInitializationOptions
-{
-    /// <summary>
-    /// When true, forces the use of EnsureCreatedAsync regardless of environment
-    /// </summary>
-    public bool ForceUseEnsureCreated { get; set; } = false;
-
-    /// <summary>
-    /// When true, skips migration checks and application
-    /// </summary>
-    public bool SkipMigrations { get; set; } = false;
-
-    /// <summary>
-    /// When true, recreates the database on each initialization (useful for integration tests)
-    /// </summary>
-    public bool RecreateDatabase { get; set; } = false;
 }
