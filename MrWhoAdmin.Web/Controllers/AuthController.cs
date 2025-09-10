@@ -26,8 +26,23 @@ public class AuthController : Controller
 
     private (string cookieScheme, string oidcScheme)? ResolveSchemes()
     {
+        var list = _profiles.GetProfiles();
         var current = _profiles.GetCurrentProfile(HttpContext);
-        if (current == null) return null;
+        if (current == null)
+        {
+            if (list.Count <= 1)
+            {
+                // Single profile mode without selection cookie yet – still allow default challenge
+                return (AdminCookieScheme, OpenIdConnectDefaults.AuthenticationScheme);
+            }
+            return null; // multi profile but none selected
+        }
+        if (list.Count <= 1)
+        {
+            // In single profile mode we intentionally configured standard schemes, not dynamic ones
+            return (AdminCookieScheme, OpenIdConnectDefaults.AuthenticationScheme);
+        }
+        // Multi-profile: dynamic naming
         return (_profiles.GetCookieScheme(current), _profiles.GetOidcScheme(current));
     }
 
@@ -40,22 +55,20 @@ public class AuthController : Controller
     [HttpGet("/auth/login")]
     public IActionResult Login(string? returnUrl = null, bool force = false)
     {
-        var current = _profiles.GetCurrentProfile(HttpContext);
-        if (current == null)
-        {
-            // If multiple profiles exist but none selected, redirect to profile selection
-            if (_profiles.GetProfiles().Count > 1)
-                return Redirect("/profiles");
-        }
-
         var schemes = ResolveSchemes();
-        var oidcScheme = schemes?.oidcScheme ?? OpenIdConnectDefaults.AuthenticationScheme;
+        if (schemes == null)
+        {
+            // multi-profile but no selection – go pick one
+            if (_profiles.GetProfiles().Count > 1)
+                return Redirect("/login");
+        }
+        var (cookieScheme, oidcScheme) = schemes!.Value;
         var properties = new AuthenticationProperties
         {
             RedirectUri = !string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl) ? returnUrl : "/"
         };
         if (force) properties.Items["force"] = "1";
-        _logger.LogInformation("Initiating login using scheme {Scheme} (profile={Profile})", oidcScheme, current?.Name);
+        _logger.LogInformation("Initiating login using scheme {Scheme} (cookie={Cookie})", oidcScheme, cookieScheme);
         return Challenge(properties, oidcScheme);
     }
 
@@ -72,17 +85,15 @@ public class AuthController : Controller
         try
         {
             var schemes = ResolveSchemes();
-            var cookie = schemes?.cookieScheme ?? AdminCookieScheme;
-            var oidc = schemes?.oidcScheme ?? OpenIdConnectDefaults.AuthenticationScheme;
-            _logger.LogInformation("Logout requested (profile={Profile}) cookie={Cookie} oidc={Oidc}", _profiles.GetCurrentProfile(HttpContext)?.Name, cookie, oidc);
-            if (clearAll)
+            if (schemes == null)
             {
-                var properties = new AuthenticationProperties { RedirectUri = LocalRedirectUrl(returnUrl) };
-                return SignOut(properties, oidc, cookie);
+                return Redirect(LocalRedirectUrl(returnUrl));
             }
-            if (HttpContext.User.Identity?.IsAuthenticated == true)
+            var (cookie, oidc) = schemes.Value;
+            _logger.LogInformation("Logout requested (profile={Profile}) cookie={Cookie} oidc={Oidc}", _profiles.GetCurrentProfile(HttpContext)?.Name, cookie, oidc);
+            var properties = new AuthenticationProperties { RedirectUri = LocalRedirectUrl(returnUrl) };
+            if (clearAll || HttpContext.User.Identity?.IsAuthenticated == true)
             {
-                var properties = new AuthenticationProperties { RedirectUri = LocalRedirectUrl(returnUrl) };
                 return SignOut(properties, oidc, cookie);
             }
             return Redirect(LocalRedirectUrl(returnUrl));
@@ -95,7 +106,7 @@ public class AuthController : Controller
     }
 
     private string LocalRedirectUrl(string? returnUrl) => !string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl) ? returnUrl : "/";
-    
+
     /// <summary>
     /// Endpoint to check if re-authentication is needed and trigger it
     /// </summary>
