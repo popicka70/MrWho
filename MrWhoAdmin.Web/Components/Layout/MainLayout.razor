@@ -1,6 +1,7 @@
 ﻿@inherits LayoutComponentBase
 @inject IJSRuntime JSRuntime
 @inject MrWhoAdmin.Web.Extensions.IAdminProfileService ProfileService
+@using MrWhoAdmin.Web.Extensions
 
 <RadzenComponents @rendermode="InteractiveServer" />
 
@@ -9,6 +10,19 @@
         <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0" class="rz-px-4">
             <RadzenSidebarToggle Click="@(() => sidebarExpanded = !sidebarExpanded)" />
             <RadzenLabel Text="MrWho Administration" class="rz-font-weight-bold rz-font-size-h5 rz-color-primary rz-m-0" />
+            @if (_currentProfile != null)
+            {
+                <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" class="rz-ms-4 rz-px-3 rz-py-1" style="background:linear-gradient(90deg,#2f2fb4,#3d3dcf); border:1px solid rgba(255,255,255,0.2); border-radius:6px; box-shadow:0 1px 2px rgba(0,0,0,0.25);">
+                    <RadzenIcon Icon="cloud" style="font-size:18px; color:#ffffff; opacity:.9;"
+                                Tooltip="Current MrWho Instance" TooltipPosition="TooltipPosition.Top" />
+                    <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.75rem" class="rz-m-0">
+                        <RadzenText Text="@_currentProfile.DisplayName" class="rz-m-0" style="color:#fff; font-weight:600; letter-spacing:.25px;" />
+                        <a href="@_currentProfile.Authority" target="_blank" rel="noopener" style="color:#b9c9ff; font-size:12px; text-decoration:none; font-weight:500;">
+                            @TrimAuthority(_currentProfile.Authority)
+                        </a>
+                    </RadzenStack>
+                </RadzenStack>
+            }
             <div style="flex-grow: 1;"></div>
             <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="12px">
                 <AuthorizeView>
@@ -74,12 +88,25 @@
 
 @code {
     private bool sidebarExpanded = true;
+    private AdminProfile? _currentProfile; // Hold the current profile instance
 
     [Inject] private NavigationManager Navigation { get; set; } = default!;
     [Inject] private NotificationService NotificationService { get; set; } = default!;
     [Inject] private ContextMenuService ContextMenuService { get; set; } = default!;
 
-    protected override void OnInitialized() { }
+    protected override void OnInitialized()
+    {
+        // Load the current admin profile instance on initialization
+        _currentProfile = ProfileService.GetCurrentProfile();
+    }
+
+    private static string TrimAuthority(string authority)
+    {
+        if (string.IsNullOrWhiteSpace(authority)) return string.Empty;
+        authority = authority.Trim();
+        if (authority.EndsWith("/")) authority = authority[..^1];
+        return authority;
+    }
 
     private string GetUserDisplayName(System.Security.Claims.ClaimsPrincipal user)
     {
