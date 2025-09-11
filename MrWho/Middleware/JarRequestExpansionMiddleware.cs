@@ -9,6 +9,7 @@ using MrWho.Data;
 using MrWho.Services;
 using MrWho.Shared;
 using OpenIddict.Abstractions;
+using Microsoft.IdentityModel.JsonWebTokens; // added for JsonWebTokenHandler
 
 namespace MrWho.Middleware;
 
@@ -48,7 +49,7 @@ public class JarRequestExpansionMiddleware
                     return;
                 }
 
-                var handler = new JwtSecurityTokenHandler();
+                var jwtHandler = new JwtSecurityTokenHandler();
                 if (jarJwt.Count(c => c == '.') != 2)
                 {
                     await WriteErrorAsync(context, OpenIddictConstants.Errors.InvalidRequestObject, "request object must be JWT");
@@ -56,7 +57,7 @@ public class JarRequestExpansionMiddleware
                 }
 
                 JwtSecurityToken token;
-                try { token = handler.ReadJwtToken(jarJwt); }
+                try { token = jwtHandler.ReadJwtToken(jarJwt); }
                 catch (Exception ex)
                 {
                     _logger.LogInformation(ex, "Failed to parse request object");
@@ -134,11 +135,13 @@ public class JarRequestExpansionMiddleware
                     ValidateLifetime = true,
                     ClockSkew = jarOptions.Value.ClockSkew,
                     RequireSignedTokens = true,
-                    ValidateIssuerSigningKey = true
+                    ValidateIssuerSigningKey = true,
+                    TryAllIssuerSigningKeys = true // ensure tokens without kid can still be validated
                 };
 
                 SymmetricSecurityKey? hsKey = null;
-                if (alg.StartsWith("HS", StringComparison.OrdinalIgnoreCase))
+                bool isSymmetric = alg.StartsWith("HS", StringComparison.OrdinalIgnoreCase);
+                if (isSymmetric)
                 {
                     if (string.IsNullOrWhiteSpace(dbClient.ClientSecret))
                     {
@@ -154,7 +157,11 @@ public class JarRequestExpansionMiddleware
                         keyBytes = padded;
                         _logger.LogDebug("Padded short client secret for HS256 JAR (client {ClientId}, originalLen={Len})", effectiveClientId, dbClient.ClientSecret.Length);
                     }
-                    hsKey = new SymmetricSecurityKey(keyBytes);
+                    hsKey = new SymmetricSecurityKey(keyBytes)
+                    {
+                        // Add a KeyId so if future multiple keys are present, kid based resolution works
+                        KeyId = $"client:{effectiveClientId}:hs"
+                    };
                     tvp.IssuerSigningKey = hsKey;
                 }
                 else if (alg.Equals(SecurityAlgorithms.RsaSha256, StringComparison.OrdinalIgnoreCase) || alg.Equals(SecurityAlgorithms.RsaSha384, StringComparison.OrdinalIgnoreCase) || alg.Equals(SecurityAlgorithms.RsaSha512, StringComparison.OrdinalIgnoreCase))
@@ -169,15 +176,33 @@ public class JarRequestExpansionMiddleware
                 }
 
                 bool validated = false;
+
                 try
                 {
-                    handler.ValidateToken(jarJwt, tvp, out _);
-                    validated = true;
+                    if (isSymmetric)
+                    {
+                        // Prefer JsonWebTokenHandler for modern validation & clearer diagnostics
+                        var jsonHandler = new JsonWebTokenHandler();
+                        var result = jsonHandler.ValidateToken(jarJwt, tvp);
+                        if (result.IsValid)
+                        {
+                            validated = true;
+                        }
+                        else
+                        {
+                            throw result.Exception ?? new SecurityTokenInvalidSignatureException("HS validation failed");
+                        }
+                    }
+                    else
+                    {
+                        jwtHandler.ValidateToken(jarJwt, tvp, out _);
+                        validated = true;
+                    }
                 }
                 catch (Exception ex)
                 {
-                    // Fallback for demo test client: try known test secret if hashing altered stored secret
-                    if (!validated && effectiveClientId == "mrwho_demo1" && alg.StartsWith("HS", StringComparison.OrdinalIgnoreCase))
+                    // Fallback for demo test client: try known test secret if DB secret was hashed or rotated
+                    if (!validated && effectiveClientId == "mrwho_demo1" && isSymmetric)
                     {
                         try
                         {
@@ -190,14 +215,22 @@ public class JarRequestExpansionMiddleware
                                 for (int i = fbBytes.Length; i < 32; i++) pad[i] = (byte)'!';
                                 fbBytes = pad;
                             }
-                            tvp.IssuerSigningKey = new SymmetricSecurityKey(fbBytes);
-                            handler.ValidateToken(jarJwt, tvp, out _);
-                            validated = true;
-                            _logger.LogInformation("HS256 JAR validated using fallback demo client secret (likely hashed in DB)");
+                            tvp.IssuerSigningKey = new SymmetricSecurityKey(fbBytes) { KeyId = $"client:{effectiveClientId}:hs:fallback" };
+                            var jsonHandler = new JsonWebTokenHandler();
+                            var fbResult = jsonHandler.ValidateToken(jarJwt, tvp);
+                            if (fbResult.IsValid)
+                            {
+                                validated = true;
+                                _logger.LogInformation("HS JAR validated using fallback demo client secret (likely hashed in DB)");
+                            }
+                            else
+                            {
+                                _logger.LogInformation(fbResult.Exception, "Fallback secret validation failed for demo client");
+                            }
                         }
                         catch (Exception inner)
                         {
-                            _logger.LogInformation(inner, "Fallback secret validation failed for demo client");
+                            _logger.LogInformation(inner, "Fallback secret validation threw for demo client");
                         }
                     }
 
