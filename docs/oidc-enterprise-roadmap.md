@@ -28,7 +28,7 @@ Structured, phased plan to evolve the MrWho OpenID Connect / OAuth2 platform (Op
 ## 3. Gap Summary (What Is Missing vs Enterprise Targets)
 | Category | Key Gaps |
 |----------|----------|
-| Protocol & Security | Dynamic client registration workflow (governed), token exchange, resource indicators, DPoP, mTLS, full logout notifications (front/back channel events dispatch), JWE encryption for request/response objects, key rotation policy automation (retirement UI), PoP tokens, reference tokens option, advanced JARM modes (fragment/form_post.jwt), JARM encryption, advanced audience negotiation |
+| Protocol & Security | Dynamic client registration workflow (governed), token exchange, resource indicators, DPoP, mTLS, full logout notifications (front/back channel events dispatch), JWE encryption for request/response objects, key rotation policy automation (retirement UI), PoP tokens, reference tokens option, advanced JARM modes (fragment/form_post.jwt), JARM encryption, advanced audience negotiation, configurable symmetric secret policy (algorithm-based min lengths, enforcement & downgrade) |
 | Identity & Claims | Claim transformation/mapping policies (per realm/client), attribute release control, SCIM 2.0, groups/roles aggregation, self–service profile & session mgmt, realm claim isolation |
 | Client & Governance | Approval workflow (dynamic registration), soft delete/versioning, per-client rate limits/quotas, tenant (realm) isolation of keys & policies UI |
 | Authentication Assurance | MFA policies (TOTP + WebAuthn in progress), adaptive/risk signals, password breach checks, session concurrency & idle revocation, device fingerprint & management UI, device trust scoring |
@@ -49,6 +49,7 @@ Goal: Close critical protocol/security gaps blocking production adoption.
 - Front/back channel logout notifications – PARTIAL (back-channel helper + placeholder; full events pending)
 - Consent service baseline – COMPLETE
 - Structured audit log (append-only) – SCHEMA READY (writer pending)
+- NEW: Configurable symmetric client secret policy (minimum entropy/length per HS* algorithm, validation & admin warnings) – PLANNED
 
 ### Phase 1.5 – Secure Authorization Request / Response Enhancements (NEW)
 Objective: Controlled, opt-in hardened authorization requests & responses.
@@ -61,6 +62,7 @@ Deliverables (Status):
 - Discovery metadata extensions (request_parameter_supported, request_uri_parameter_supported=false, authorization_response_iss_parameter_supported, response_modes_supported+=jwt, request_object_signing_alg_values_supported dynamic) – COMPLETE
 - Admin surface (JarMode/JarmMode/algs) – IN PROGRESS (backend fields + migration exist; UI wiring pending)
 - Tests (positive + tamper) – INITIAL (JarTests) – NEED expansion for replay & size limit
+- NEW: Add enforcement & configuration UI for client secret minimum length per allowed HS* alg (warn if HS384/512 selected but secret policy unmet) – PLANNED
 
 ### Phase 2 – Governance, Assurance & Observability (Next)
 (Unchanged – will start after audit + logout + UI tasks)
@@ -81,6 +83,7 @@ Deliverables (Status):
 7. Consent expiration: include claim expansion invalidation – NOT STARTED
 8. Expand tests: JAR replay (jti), oversize rejection, unsupported alg, JARM packaging validation – NEW
 9. Audit events for JAR/JARM failures (auth.security) – PENDING
+10. Configurable symmetric client secret policy service (min lengths: HS256>=32B, HS384>=48B, HS512>=64B) + enforcement & discovery metadata alignment – NEW
 
 ## 6. Data Model Additions (Phase 1 & 1.5)
 (No change; JAR/JARM fields present.)
@@ -96,14 +99,18 @@ Deliverables (Status):
 | Token Lifetimes | Realm + client overrides | COMPLETE |
 | JAR | Signed request object; exp<=5m; mismatch rejection; replay (jti); size limit; alg allow-list | COMPLETE (Phase 1.5) |
 | JARM | Signed JWT authorization response (code+state+iss+aud+iat+exp) | COMPLETE (baseline) |
+| Symmetric Secret Policy | Enforce algorithm-based minimum length (reject/ warn on HS384/512 if too short) | PLANNED |
 
 ## 8. Open Issues to Clarify
 (Unchanged; add: Do we require distributed replay cache for multi-node before production?)
+- NEW: Decide whether to auto-downgrade requested HS384/512 to HS256 when secret length insufficient, or hard fail.
+- NEW: Should discovery dynamically suppress HS384/512 if any configured client fails policy (global) or always advertise and rely on per-client rejection?
 
 ## 9. Acceptance Criteria Examples (Phase 1 & 1.5 Highlights)
 (Updated JAR section to include replay + size limit.)
 - JAR: Oversized (> configured) rejected; missing jti when required rejected; replayed jti rejected.
 - JARM: JWT response validated by client test harness; payload claims present; normal flow unaffected when disabled.
+- Symmetric Secret Policy: Selecting HS384 requires client secret length >= 48 bytes; otherwise admin UI blocks save and server rejects request object with invalid_client_secret policy error. Same for HS512 (>=64 bytes). HS256 accepted with >=32 bytes. No silent padding in production mode.
 
 ## 10. Risks & Mitigations
 Additions:
@@ -111,9 +118,11 @@ Additions:
 |------|------------|
 | Replay cache not distributed | Introduce distributed cache (Redis) in Phase 2 before scale-out |
 | Admin UI lagging for JAR/JARM config | Prioritize UI wiring next sprint |
+| Weak symmetric secrets accepted for stronger HS* algs | Enforce length policy; optionally disallow enabling HS384/512 until secret rotated |
+| Padding used in tests could mask production weakness | Disable padding outside test helpers; add validation layer |
 
 ## 11. Tracking & Metrics (Phase 2 Plan)
-Add planned metrics: jar_requests_total{mode,outcome,alg,replay}; jarm_responses_total{mode,outcome}.
+Add planned metrics: jar_requests_total{mode,outcome,alg,replay}; jarm_responses_total{mode,outcome}; secret_policy_violations_total{alg,outcome}; client_secret_rotation_events_total.
 
 ## 12. Next Steps (Actionable – Updated)
 1. Wire admin UI for JarMode/JarmMode + AllowedRequestObjectAlgs (multi-select) + RequireSignedRequestObject toggle.
@@ -124,6 +133,7 @@ Add planned metrics: jar_requests_total{mode,outcome,alg,replay}; jarm_responses
 6. Expand JarTests to cover replay, oversize, alg not allowed, JARM success.
 7. PAR enforcement logic for clients with Required mode (reject non-PAR requests gracefully).
 8. Plan JWE encryption (alg/enc set, key distribution, client metadata) – design doc.
+9. Implement symmetric secret policy (config section + validation + discovery filtering + admin warnings + test coverage for HS384/512 rejection paths).
 
 ---
 Prepared for: MrWho Identity Platform
