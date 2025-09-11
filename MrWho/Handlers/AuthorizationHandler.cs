@@ -39,6 +39,7 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
     private readonly IKeyManagementService _keyService; // for RS256 validation
     private readonly IJarReplayCache _jarReplayCache;
     private readonly IOptions<JarOptions> _jarOptions;
+    private readonly ISecurityAuditWriter _audit;
     private const string MfaCookiePrefix = ".MrWho.Mfa.";
 
     private static readonly string[] MfaAmrValues = new[] { "mfa", "fido2" };
@@ -57,7 +58,8 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         IDataProtectionProvider dataProtectionProvider,
         IKeyManagementService keyService,
         IJarReplayCache jarReplayCache,
-        IOptions<JarOptions> jarOptions)
+        IOptions<JarOptions> jarOptions,
+        ISecurityAuditWriter audit)
     {
         _userManager = userManager;
         _signInManager = signInManager;
@@ -71,6 +73,7 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         _keyService = keyService;
         _jarReplayCache = jarReplayCache;
         _jarOptions = jarOptions;
+        _audit = audit;
     }
 
     public async Task<IResult> HandleAuthorizationRequestAsync(HttpContext context)
@@ -80,6 +83,25 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
 
         var clientId = request.ClientId ?? string.Empty;
         _logger.LogDebug("Authorization request received for client {ClientId}", clientId);
+        // PAR required enforcement (if client requires but no request_uri present)
+        try
+        {
+            if (!string.IsNullOrEmpty(clientId))
+            {
+                var parClient = await _context.Clients.AsNoTracking().FirstOrDefaultAsync(c => c.ClientId == clientId);
+                var parMode = parClient?.ParMode ?? PushedAuthorizationMode.Disabled;
+                var hasRequestUri = !string.IsNullOrEmpty(request.RequestUri);
+                if (parMode == PushedAuthorizationMode.Required && !hasRequestUri)
+                {
+                    await _audit.WriteAsync(SecurityAudit.ParRequiredMissing, new { clientId, reason = "par_mode_required_no_request_uri" }, "warn", actorClientId: clientId);
+                    return Results.BadRequest(new { error = OpenIddictConstants.Errors.InvalidRequest, error_description = "PAR required: use request_uri from pushed authorization request" });
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "PAR enforcement check failed for {ClientId}", clientId);
+        }
 
         // ---------------------------------------------------------------------
         // JAR (JWT Secured Authorization Request) processing (preview Phase 1.5)

@@ -28,6 +28,7 @@ public class MfaController : Controller
     private readonly ILogger<MfaController> _logger;
     private readonly ApplicationDbContext _db;
     private readonly ITimeLimitedDataProtector _mfaProtector;
+    private readonly ISecurityAuditWriter _audit;
     private const string MfaCookiePrefix = ".MrWho.Mfa.";
 
     private const string AuthenticatorUriFormat = "otpauth://totp/{0}:{1}?secret={2}&issuer={0}&digits=6";
@@ -39,7 +40,8 @@ public class MfaController : Controller
                          IDynamicCookieService dynamicCookieService,
                          ILogger<MfaController> logger,
                          ApplicationDbContext db,
-                         IDataProtectionProvider dataProtectionProvider)
+                         IDataProtectionProvider dataProtectionProvider,
+                         ISecurityAuditWriter audit)
     {
         _userManager = userManager;
         _signInManager = signInManager;
@@ -49,6 +51,7 @@ public class MfaController : Controller
         _logger = logger;
         _db = db;
         _mfaProtector = dataProtectionProvider.CreateProtector("MrWho.MfaCookie").ToTimeLimitedDataProtector();
+        _audit = audit;
     }
 
     [HttpGet("setup")]
@@ -101,11 +104,13 @@ public class MfaController : Controller
         {
             ModelState.AddModelError(string.Empty, "Invalid verification code.");
             ViewData["ReturnUrl"] = input.ReturnUrl; // preserve
+            try { await _audit.WriteAsync(SecurityAudit.MfaVerifyFailed, new { userId = user?.Id }); } catch { }
             return await RebuildSetupViewAsync();
         }
 
         await _userManager.SetTwoFactorEnabledAsync(user, true);
         _logger.LogInformation("User {UserId} enabled MFA.", user.Id);
+        try { await _audit.WriteAsync(SecurityAudit.MfaEnabled, new { userId = user.Id }); } catch { }
 
         var recoveryCodes = await _userManager.GenerateNewTwoFactorRecoveryCodesAsync(user, 10);
         ViewData["ReturnUrl"] = input.ReturnUrl; // pass to RecoveryCodes page
@@ -156,6 +161,7 @@ public class MfaController : Controller
         await _userManager.SetTwoFactorEnabledAsync(user, false);
         await _userManager.ResetAuthenticatorKeyAsync(user);
         _logger.LogInformation("User {UserId} disabled MFA.", user.Id);
+        try { await _audit.WriteAsync(SecurityAudit.MfaDisabled, new { userId = user.Id }); } catch { }
         return Redirect("/profile");
     }
 
@@ -215,11 +221,13 @@ public class MfaController : Controller
         if (verifiedUser == null)
         {
             ModelState.AddModelError(string.Empty, "Invalid code.");
+            try { await _audit.WriteAsync(SecurityAudit.MfaChallengeFailed, new { userId = verifiedUser?.Id, returnUrl = input.ReturnUrl }); } catch { }
             return View("Challenge", input);
         }
 
         // Sign-in/update AMR so the OP can issue tokens with amr=mfa
         await _signInManager.SignInAsync(verifiedUser, isPersistent: input.RememberMe, authenticationMethod: "mfa");
+        try { await _audit.WriteAsync(SecurityAudit.MfaChallengeSuccess, new { userId = verifiedUser.Id, returnUrl = input.ReturnUrl }); } catch { }
 
         // Extract client_id from returnUrl to create client-specific cookie and grace cookie
         string? clientId = null;
