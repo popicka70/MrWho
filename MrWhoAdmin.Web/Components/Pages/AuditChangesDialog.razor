@@ -8,7 +8,7 @@
 @if (Item is null)
 {
     <RadzenAlert AlertStyle="AlertStyle.Warning">
-        <RadzenText>Chybí data auditu.</RadzenText>
+        <RadzenText>Missing audit data.</RadzenText>
     </RadzenAlert>
 }
 else
@@ -16,11 +16,11 @@ else
     <RadzenStack Gap="1rem" Style="min-height:480px;">
         <RadzenStack Orientation="Orientation.Horizontal" Gap="2rem" Wrap="FlexWrap.Wrap">
             <RadzenStack>
-                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Čas</RadzenText>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Time</RadzenText>
                 <RadzenText>@Item.OccurredAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")</RadzenText>
             </RadzenStack>
             <RadzenStack>
-                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Uživatel</RadzenText>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">User</RadzenText>
                 <RadzenText>@(Item.UserName ?? Item.UserId ?? "-")</RadzenText>
             </RadzenStack>
             <RadzenStack>
@@ -28,7 +28,7 @@ else
                 <RadzenText>@(Item.IpAddress ?? "-")</RadzenText>
             </RadzenStack>
             <RadzenStack>
-                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Akce</RadzenText>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Action</RadzenText>
                 <RadzenBadge Text="@Item.Action" BadgeStyle="@GetActionStyle(Item.Action)" />
             </RadzenStack>
         </RadzenStack>
@@ -58,7 +58,7 @@ else
                 </RadzenFormField>
             </RadzenColumn>
             <RadzenColumn Size="12" SizeMD="4">
-                <RadzenFormField Text="Počet změn" Variant="Variant.Outlined">
+                <RadzenFormField Text="Change count" Variant="Variant.Outlined">
                     <RadzenTextBox Value="@VisibleEntries.Count.ToString()" ReadOnly="true" Style="width:100%;" />
                 </RadzenFormField>
             </RadzenColumn>
@@ -66,21 +66,21 @@ else
 
         <RadzenCard Style="padding:0.75rem">
             <RadzenStack Orientation="Orientation.Horizontal" Gap="0.75rem" Wrap="FlexWrap.Wrap" AlignItems="AlignItems.End">
-                <RadzenFormField Text="Filtr" Variant="Variant.Outlined" Style="width:220px">
-                    <RadzenTextBox @bind-Value="_filter" Placeholder="Hledat atribut..." Style="width:100%;" />
+                <RadzenFormField Text="Filter" Variant="Variant.Outlined" Style="width:220px">
+                    <RadzenTextBox @bind-Value="_filter" Placeholder="Search attribute..." Style="width:100%;" />
                 </RadzenFormField>
-                <RadzenFormField Text="Typ změny" Variant="Variant.Outlined" Style="width:160px">
-                    <RadzenDropDown Data="@_changeTypes" @bind-Value="_filterChangeType" AllowClear="true" Placeholder="(vše)" Style="width:100%;" />
+                <RadzenFormField Text="Change type" Variant="Variant.Outlined" Style="width:160px">
+                    <RadzenDropDown Data="@_changeTypes" @bind-Value="_filterChangeType" AllowClear="true" Placeholder="(all)" Style="width:100%;" />
                 </RadzenFormField>
-                <RadzenFormField Text="Možnosti" Variant="Variant.Outlined">
+                <RadzenFormField Text="Options" Variant="Variant.Outlined">
                     <Start>
                         <RadzenCheckBox @bind-Value="_showUnchanged" Name="unchanged" />
                     </Start>
                     <ChildContent>
-                        <RadzenLabel Text="Zobrazit beze změny" Component="unchanged" />
+                        <RadzenLabel Text="Show unchanged" Component="unchanged" />
                     </ChildContent>
                 </RadzenFormField>
-                <RadzenFormField Text="Režim" Variant="Variant.Outlined">
+                <RadzenFormField Text="Mode" Variant="Variant.Outlined">
                     <Start>
                         <RadzenCheckBox @bind-Value="_rawMode" Name="rawmode" />
                     </Start>
@@ -88,9 +88,9 @@ else
                         <RadzenLabel Text="Raw JSON" Component="rawmode" />
                     </ChildContent>
                 </RadzenFormField>
-                <RadzenButton Icon="filter_alt" Text="Použít" ButtonStyle="ButtonStyle.Secondary" Click="@(async ()=> await ApplyFilterAsync())" />
+                <RadzenButton Icon="filter_alt" Text="Apply" ButtonStyle="ButtonStyle.Secondary" Click="@(async ()=> await ApplyFilterAsync())" />
                 <RadzenButton Icon="restart_alt" Text="Reset" ButtonStyle="ButtonStyle.Light" Click="@(async ()=> { ResetFilter(); await ApplyFilterAsync(); })" />
-                <RadzenButton Icon="content_copy" Text="Kopírovat" ButtonStyle="ButtonStyle.Primary" Click="@(async ()=> await CopyRawAsync())" />
+                <RadzenButton Icon="content_copy" Text="Copy" ButtonStyle="ButtonStyle.Primary" Click="@(async ()=> await CopyRawAsync())" />
                 @if (!_rawMode && VisibleEntries.Count > 0)
                 {
                     <RadzenBadge Text="@($"{VisibleEntries.Count}")" BadgeStyle="BadgeStyle.Info" Style="margin-left:4px" />
@@ -107,23 +107,23 @@ else
         else if (VisibleEntries.Count == 0)
         {
             <RadzenAlert AlertStyle="AlertStyle.Info">
-                <RadzenText>Žádné záznamy (zkontrolujte filtr nebo režim zobrazení).</RadzenText>
+                <RadzenText>No entries (check filters or display mode).</RadzenText>
             </RadzenAlert>
         }
         else
         {
             <RadzenDataGrid TItem="ChangeEntry" Data="VisibleEntries" AllowPaging="true" PageSize="20" AllowSorting="true" Style="height:100%;">
                 <Columns>
-                    <RadzenDataGridColumn TItem="ChangeEntry" Property="Status" Title="Typ" Width="120px">
+                    <RadzenDataGridColumn TItem="ChangeEntry" Property="Status" Title="Type" Width="120px">
                         <Template Context="row">
                             <RadzenBadge Text="@row.Status" BadgeStyle="@GetStatusStyle(row.Status)" />
                         </Template>
                     </RadzenDataGridColumn>
-                    <RadzenDataGridColumn TItem="ChangeEntry" Property="Property" Title="Atribut" Width="220px" />
-                    <RadzenDataGridColumn TItem="ChangeEntry" Title="Původní" Width="280px">
+                    <RadzenDataGridColumn TItem="ChangeEntry" Property="Property" Title="Property" Width="220px" />
+                    <RadzenDataGridColumn TItem="ChangeEntry" Title="Original" Width="280px">
                         <Template Context="row">@FormatValue(row.Old)</Template>
                     </RadzenDataGridColumn>
-                    <RadzenDataGridColumn TItem="ChangeEntry" Title="Nová" Width="280px">
+                    <RadzenDataGridColumn TItem="ChangeEntry" Title="New" Width="280px">
                         <Template Context="row">@FormatValue(row.New)</Template>
                     </RadzenDataGridColumn>
                 </Columns>
@@ -131,7 +131,7 @@ else
         }
 
         <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
-            <RadzenButton Text="Zavřít" Icon="close" ButtonStyle="ButtonStyle.Light" Click="@(() => DialogService.Close())" />
+            <RadzenButton Text="Close" Icon="close" ButtonStyle="ButtonStyle.Light" Click="@(() => DialogService.Close())" />
         </RadzenStack>
     </RadzenStack>
 }
@@ -254,11 +254,11 @@ else
         try
         {
             await JS.InvokeVoidAsync("navigator.clipboard.writeText", Item.Changes ?? "");
-            NotificationService.Notify(new NotificationMessage { Severity = NotificationSeverity.Success, Summary = "Zkopírováno", Detail = "Raw JSON byl zkopírován.", Duration = 2500 });
+            NotificationService.Notify(new NotificationMessage { Severity = NotificationSeverity.Success, Summary = "Copied", Detail = "Raw JSON copied to clipboard.", Duration = 2500 });
         }
         catch
         {
-            NotificationService.Notify(new NotificationMessage { Severity = NotificationSeverity.Warning, Summary = "Chyba", Detail = "Kopírování selhalo.", Duration = 3000 });
+            NotificationService.Notify(new NotificationMessage { Severity = NotificationSeverity.Warning, Summary = "Error", Detail = "Copy operation failed.", Duration = 3000 });
         }
     }
 
