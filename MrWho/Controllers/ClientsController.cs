@@ -194,8 +194,12 @@ public class ClientsController : ControllerBase
                 IncludeAudInIdToken = c.IncludeAudInIdToken,
                 RequireExplicitAudienceScope = c.RequireExplicitAudienceScope,
                 RoleInclusionOverride = c.RoleInclusionOverride,
-                // PAR
-                ParMode = c.ParMode
+                // PAR / JAR / JARM
+                ParMode = c.ParMode,
+                JarMode = c.JarMode,
+                JarmMode = c.JarmMode,
+                RequireSignedRequestObject = c.RequireSignedRequestObject,
+                AllowedRequestObjectAlgs = c.AllowedRequestObjectAlgs
             })
             .ToListAsync();
 
@@ -316,8 +320,12 @@ public class ClientsController : ControllerBase
             IncludeAudInIdToken = client.IncludeAudInIdToken,
             RequireExplicitAudienceScope = client.RequireExplicitAudienceScope,
             RoleInclusionOverride = client.RoleInclusionOverride,
-            // PAR
-            ParMode = client.ParMode
+            // PAR / JAR / JARM
+            ParMode = client.ParMode,
+            JarMode = client.JarMode,
+            JarmMode = client.JarmMode,
+            RequireSignedRequestObject = client.RequireSignedRequestObject,
+            AllowedRequestObjectAlgs = client.AllowedRequestObjectAlgs
         };
 
         return Ok(clientDto);
@@ -458,6 +466,7 @@ public class ClientsController : ControllerBase
             AllowClientCredentialsFlow = client.AllowClientCredentialsFlow,
             AllowPasswordFlow = client.AllowPasswordFlow,
             AllowRefreshTokenFlow = client.AllowRefreshTokenFlow,
+            AllowDeviceCodeFlow = client.AllowDeviceCodeFlow,
             RequirePkce = client.RequirePkce,
             RequireClientSecret = client.RequireClientSecret,
             AccessTokenLifetime = client.AccessTokenLifetime,
@@ -516,11 +525,13 @@ public class ClientsController : ControllerBase
             PrimaryAudience = client.PrimaryAudience,
             IncludeAudInIdToken = client.IncludeAudInIdToken,
             RequireExplicitAudienceScope = client.RequireExplicitAudienceScope,
-            ExportedBy = User?.Identity?.Name ?? "System",
-            ExportedAtUtc = DateTime.UtcNow,
-            FormatVersion = "1.2",
-            // PAR
-            ParMode = client.ParMode
+            RoleInclusionOverride = client.RoleInclusionOverride,
+            ParMode = client.ParMode,
+            // JAR/JARM
+            JarMode = client.JarMode,
+            JarmMode = client.JarmMode,
+            RequireSignedRequestObject = client.RequireSignedRequestObject,
+            AllowedRequestObjectAlgs = client.AllowedRequestObjectAlgs
         };
         // Assigned users (by username/email only)
         var assignedUsers = await _context.ClientUsers
@@ -602,6 +613,7 @@ public class ClientsController : ControllerBase
                 client.AllowClientCredentialsFlow = dto.AllowClientCredentialsFlow;
                 client.AllowPasswordFlow = dto.AllowPasswordFlow;
                 client.AllowRefreshTokenFlow = dto.AllowRefreshTokenFlow;
+                client.AllowDeviceCodeFlow = dto.AllowDeviceCodeFlow;
                 client.RequirePkce = dto.RequirePkce;
                 client.RequireClientSecret = dto.RequireClientSecret;
                 client.AccessTokenLifetime = dto.AccessTokenLifetime;
@@ -609,8 +621,12 @@ public class ClientsController : ControllerBase
                 client.AuthorizationCodeLifetime = dto.AuthorizationCodeLifetime;
                 client.IdTokenLifetimeMinutes = dto.IdTokenLifetimeMinutes;
                 client.DeviceCodeLifetimeMinutes = dto.DeviceCodeLifetimeMinutes;
-                // PAR
+                // PAR / JAR / JARM
                 client.ParMode = dto.ParMode;
+                client.JarMode = dto.JarMode;
+                client.JarmMode = dto.JarmMode;
+                client.RequireSignedRequestObject = dto.RequireSignedRequestObject;
+                client.AllowedRequestObjectAlgs = dto.AllowedRequestObjectAlgs;
 
                 client.SessionTimeoutHours = dto.SessionTimeoutHours;
                 client.UseSlidingSessionExpiration = dto.UseSlidingSessionExpiration;
@@ -731,6 +747,7 @@ public class ClientsController : ControllerBase
                     AllowClientCredentialsFlow = full.AllowClientCredentialsFlow,
                     AllowPasswordFlow = full.AllowPasswordFlow,
                     AllowRefreshTokenFlow = full.AllowRefreshTokenFlow,
+                    AllowDeviceCodeFlow = full.AllowDeviceCodeFlow,
                     RequirePkce = full.RequirePkce,
                     RequireClientSecret = full.RequireClientSecret,
                     AccessTokenLifetime = full.AccessTokenLifetime,
@@ -802,8 +819,12 @@ public class ClientsController : ControllerBase
                     AllowQrLoginQuick = full.AllowQrLoginQuick,
                     AllowQrLoginSecure = full.AllowQrLoginSecure,
                     AllowCodeLogin = full.AllowCodeLogin,
-                    // PAR
-                    ParMode = full.ParMode
+                    // PAR / JAR / JARM
+                    ParMode = full.ParMode,
+                    JarMode = full.JarMode,
+                    JarmMode = full.JarmMode,
+                    RequireSignedRequestObject = full.RequireSignedRequestObject,
+                    AllowedRequestObjectAlgs = full.AllowedRequestObjectAlgs
                 };
 
                 var result = new ClientImportResult
@@ -872,6 +893,7 @@ public class ClientsController : ControllerBase
                     AllowClientCredentialsFlow = request.AllowClientCredentialsFlow,
                     AllowPasswordFlow = request.AllowPasswordFlow,
                     AllowRefreshTokenFlow = request.AllowRefreshTokenFlow,
+                    AllowDeviceCodeFlow = request.AllowDeviceCodeFlow,
                     RequirePkce = request.RequirePkce,
                     RequireClientSecret = request.RequireClientSecret,
                     AccessTokenLifetime = request.AccessTokenLifetime ?? MrWhoConstants.TokenLifetimes.AccessToken,
@@ -892,8 +914,12 @@ public class ClientsController : ControllerBase
                     RequireExplicitAudienceScope = request.RequireExplicitAudienceScope,
                     RoleInclusionOverride = request.RoleInclusionOverride,
 
-                    // PAR
-                    ParMode = request.ParMode
+                    // PAR / JAR / JARM
+                    ParMode = request.ParMode,
+                    JarMode = request.JarMode,
+                    JarmMode = request.JarmMode,
+                    RequireSignedRequestObject = request.RequireSignedRequestObject,
+                    AllowedRequestObjectAlgs = request.AllowedRequestObjectAlgs
                 };
 
                 _context.Clients.Add(client);
@@ -983,6 +1009,7 @@ public class ClientsController : ControllerBase
                     AllowClientCredentialsFlow = client.AllowClientCredentialsFlow,
                     AllowPasswordFlow = client.AllowPasswordFlow,
                     AllowRefreshTokenFlow = client.AllowRefreshTokenFlow,
+                    AllowDeviceCodeFlow = client.AllowDeviceCodeFlow,
                     RequirePkce = client.RequirePkce,
                     RequireClientSecret = client.RequireClientSecret,
                     AccessTokenLifetime = client.AccessTokenLifetime,
@@ -1004,12 +1031,17 @@ public class ClientsController : ControllerBase
                     IncludeAudInIdToken = client.IncludeAudInIdToken,
                     RequireExplicitAudienceScope = client.RequireExplicitAudienceScope,
                     RoleInclusionOverride = client.RoleInclusionOverride,
+                    // login options
                     AllowPasskeyLogin = client.AllowPasskeyLogin,
                     AllowQrLoginQuick = client.AllowQrLoginQuick,
                     AllowQrLoginSecure = client.AllowQrLoginSecure,
                     AllowCodeLogin = client.AllowCodeLogin,
-                    // PAR
-                    ParMode = client.ParMode
+                    // PAR / JAR / JARM
+                    ParMode = client.ParMode,
+                    JarMode = client.JarMode,
+                    JarmMode = client.JarmMode,
+                    RequireSignedRequestObject = client.RequireSignedRequestObject,
+                    AllowedRequestObjectAlgs = client.AllowedRequestObjectAlgs
                 };
 
                 return CreatedAtAction(nameof(GetClient), new { id = client.Id }, clientDto);
@@ -1079,6 +1111,8 @@ public class ClientsController : ControllerBase
                     client.AllowPasswordFlow = request.AllowPasswordFlow.Value;
                 if (request.AllowRefreshTokenFlow.HasValue)
                     client.AllowRefreshTokenFlow = request.AllowRefreshTokenFlow.Value;
+                if (request.AllowDeviceCodeFlow.HasValue)
+                    client.AllowDeviceCodeFlow = request.AllowDeviceCodeFlow.Value;
                 if (request.RequirePkce.HasValue)
                     client.RequirePkce = request.RequirePkce.Value;
                 if (request.RequireClientSecret.HasValue)
@@ -1148,7 +1182,12 @@ public class ClientsController : ControllerBase
                 client.CustomLogoutPageUrl = request.CustomLogoutPageUrl;
                 client.CustomErrorPageUrl = request.CustomErrorPageUrl;
 
+                // PAR / JAR / JARM
                 client.ParMode = request.ParMode;
+                if (request.JarMode.HasValue) client.JarMode = request.JarMode;
+                if (request.JarmMode.HasValue) client.JarmMode = request.JarmMode;
+                if (request.RequireSignedRequestObject.HasValue) client.RequireSignedRequestObject = request.RequireSignedRequestObject;
+                if (request.AllowedRequestObjectAlgs != null) client.AllowedRequestObjectAlgs = request.AllowedRequestObjectAlgs;
 
                 // Update redirect URIs if provided
                 if (request.RedirectUris != null)
@@ -1265,6 +1304,7 @@ public class ClientsController : ControllerBase
                     AllowClientCredentialsFlow = client.AllowClientCredentialsFlow,
                     AllowPasswordFlow = client.AllowPasswordFlow,
                     AllowRefreshTokenFlow = client.AllowRefreshTokenFlow,
+                    AllowDeviceCodeFlow = client.AllowDeviceCodeFlow,
                     RequirePkce = client.RequirePkce,
                     RequireClientSecret = client.RequireClientSecret,
                     AccessTokenLifetime = client.AccessTokenLifetime,
@@ -1332,15 +1372,12 @@ public class ClientsController : ControllerBase
                     CustomLoginPageUrl = client.CustomLoginPageUrl,
                     CustomLogoutPageUrl = client.CustomLogoutPageUrl,
                     CustomErrorPageUrl = client.CustomErrorPageUrl,
-
-                    // login options
-                    AllowPasskeyLogin = client.AllowPasskeyLogin,
-                    AllowQrLoginQuick = client.AllowQrLoginQuick,
-                    AllowQrLoginSecure = client.AllowQrLoginSecure,
-                    AllowCodeLogin = client.AllowCodeLogin,
-
-                    // PAR
-                    ParMode = client.ParMode
+                    // PAR / JAR / JARM
+                    ParMode = client.ParMode,
+                    JarMode = client.JarMode,
+                    JarmMode = client.JarmMode,
+                    RequireSignedRequestObject = client.RequireSignedRequestObject,
+                    AllowedRequestObjectAlgs = client.AllowedRequestObjectAlgs
                 };
 
                 return clientDto;

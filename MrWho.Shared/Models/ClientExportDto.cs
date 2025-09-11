@@ -26,8 +26,12 @@ public class ClientExportDto
     public bool RequirePkce { get; set; }
     public bool RequireClientSecret { get; set; }
 
-    // PAR
+    // PAR / JAR / JARM
     public PushedAuthorizationMode? ParMode { get; set; }
+    public JarMode? JarMode { get; set; }
+    public JarmMode? JarmMode { get; set; }
+    public bool? RequireSignedRequestObject { get; set; }
+    public string? AllowedRequestObjectAlgs { get; set; }
 
     // Token lifetimes
     public TimeSpan? AccessTokenLifetime { get; set; }
@@ -111,7 +115,7 @@ public class ClientExportDto
     // Metadata
     public string ExportedBy { get; set; } = "System";
     public DateTime ExportedAtUtc { get; set; } = DateTime.UtcNow;
-    public string FormatVersion { get; set; } = "1.1";
+    public string FormatVersion { get; set; } = "1.2"; // bumped due to JAR/JARM fields
 
     // Audience configuration
     public AudienceMode? AudienceMode { get; set; }

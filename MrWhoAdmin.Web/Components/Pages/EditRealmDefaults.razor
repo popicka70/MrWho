@@ -2,6 +2,7 @@
 @attribute [Authorize]
 @rendermode InteractiveServer
 @using MrWho.Shared.Models
+@using MrWho.Shared
 
 <PageTitle>Realm Default Configuration - MrWho Admin</PageTitle>
 
@@ -34,11 +35,11 @@
     else
     {
         <RadzenTemplateForm Data="@model" TItem="UpdateRealmDefaultsRequest" Submit="@OnSave">
-            <RadzenTabs @bind-SelectedIndex="selectedTabIndex" TabPosition="TabPosition.Left" RenderMode="TabRenderMode.Client" 
-                        Style="width: 100%; min-height: 600px;">
+            <!-- Changed RenderMode to Server and wrapped items in <Tabs> to avoid blank content due to client tab rendering issue -->
+            <RadzenTabs @bind-SelectedIndex="selectedTabIndex" TabPosition="TabPosition.Left" RenderMode="TabRenderMode.Server" Style="width:100%; min-height:600px;">
                 <Tabs>
                     <RadzenTabsItem Text="Token Lifetimes" Icon="token">
-                        <div style="padding: 1rem; max-height: 550px; overflow-y: auto;">
+                        <div style="padding:1rem; max-height:550px; overflow-y:auto;">
                             <RadzenStack Gap="0.75rem" class="rz-mb-4">
                                 <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Default Token Lifetimes</RadzenText>
                                 <RadzenRow>
@@ -85,9 +86,8 @@
                             </RadzenStack>
                         </div>
                     </RadzenTabsItem>
-
                     <RadzenTabsItem Text="Session & Cookies" Icon="schedule">
-                        <div style="padding: 1rem; max-height: 550px; overflow-y: auto;">
+                        <div style="padding:1rem; max-height:550px; overflow-y:auto;">
                             <RadzenStack Gap="0.75rem" class="rz-mb-4">
                                 <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Default Session Configuration</RadzenText>
                                 <RadzenStack Gap="1rem">
@@ -139,13 +139,8 @@
                                 <RadzenStack Gap="1rem">
                                     <RadzenFormField Text="Default Cookie SameSite Policy" Variant="Variant.Outlined">
                                         <ChildContent>
-                                            <RadzenDropDown @bind-Value="model.DefaultCookieSameSitePolicy" Data="@sameSitePolicies" TextProperty="Text" ValueProperty="Value" Style="width: 100%;" />
+                                            <RadzenDropDown @bind-Value="model.DefaultCookieSameSitePolicy" Data="@(sameSitePolicies ?? new List<DropdownItem<string>>())" TextProperty="Text" ValueProperty="Value" Style="width: 100%;" />
                                         </ChildContent>
-                                        <Helper>
-                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                Default SameSite policy for client cookies
-                                            </RadzenText>
-                                        </Helper>
                                     </RadzenFormField>
 
                                     <RadzenFormField Text="Default HTTPS Requirement" Variant="Variant.Outlined">
@@ -155,19 +150,13 @@
                                         <ChildContent>
                                             <RadzenLabel Text="Require HTTPS for cookies by default (secure flag)" Component="defaultRequireHttpsCookies" />
                                         </ChildContent>
-                                        <Helper>
-                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                Default HTTPS requirement for client cookies
-                                            </RadzenText>
-                                        </Helper>
                                     </RadzenFormField>
                                 </RadzenStack>
                             </RadzenStack>
                         </div>
                     </RadzenTabsItem>
-
                     <RadzenTabsItem Text="Security Defaults" Icon="security">
-                        <div style="padding: 1rem; max-height: 550px; overflow-y: auto;">
+                        <div style="padding:1rem; max-height:550px; overflow-y:auto;">
                             <RadzenStack Gap="0.75rem" class="rz-mb-4">
                                 <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Default Consent Settings</RadzenText>
                                 <RadzenStack Gap="1rem">
@@ -199,26 +188,18 @@
                                                 <ChildContent>
                                                     <RadzenNumeric @bind-Value="model.DefaultMaxRefreshTokensPerUser" Min="0" Max="100" Style="width: 100%;" Placeholder="Leave empty for unlimited" />
                                                 </ChildContent>
-                                                <Helper>
-                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                        Default limit for concurrent refresh tokens per user
-                                                    </RadzenText>
-                                                </Helper>
                                             </RadzenFormField>
                                         </RadzenColumn>
                                         <RadzenColumn Size="12" SizeMD="6">
-                                            <RadzenFormField Text="Token Behavior Defaults" Variant="Variant.Outlined">
+                                            <RadzenFormField Text="Use One-Time Refresh Tokens" Variant="Variant.Outlined">
                                                 <Start>
                                                     <RadzenCheckBox @bind-Value="model.DefaultUseOneTimeRefreshTokens" Name="defaultUseOneTimeRefreshTokens" />
                                                 </Start>
                                                 <ChildContent>
                                                     <RadzenLabel Text="Use one-time refresh tokens by default (rotation)" Component="defaultUseOneTimeRefreshTokens" />
                                                 </ChildContent>
-                                                <Helper>
-                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                        Enforce refresh token rotation to improve security
-                                                    </RadzenText>
-                                                </Helper>
+                                            </RadzenFormField>
+                                            <RadzenFormField Text="Include JWT ID" Variant="Variant.Outlined">
                                                 <Start>
                                                     <RadzenCheckBox @bind-Value="model.DefaultIncludeJwtId" Name="defaultIncludeJwtId" />
                                                 </Start>
@@ -232,9 +213,8 @@
                             </RadzenStack>
                         </div>
                     </RadzenTabsItem>
-
                     <RadzenTabsItem Text="MFA Defaults" Icon="verified_user">
-                        <div style="padding: 1rem; max-height: 550px; overflow-y: auto;">
+                        <div style="padding:1rem; max-height:550px; overflow-y:auto;">
                             <RadzenStack Gap="0.75rem" class="rz-mb-4">
                                 <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Default MFA Configuration</RadzenText>
                                 <RadzenStack Gap="1rem">
@@ -256,7 +236,7 @@
                                         <RadzenColumn Size="12" SizeMD="6">
                                             <RadzenFormField Text="MFA Grace Period (Minutes)" Variant="Variant.Outlined">
                                                 <ChildContent>
-                                                    <RadzenNumeric @bind-Value="model.DefaultMfaGracePeriodMinutes" Min="0" Max="1440" Style="width: 100%;" Placeholder="Leave empty for no grace period" />
+                                                    <RadzenNumeric @bind-Value="model.DefaultMfaGracePeriodMinutes" Min="0" Max="1440" Style="width:100%;" Placeholder="Leave empty for no grace period" />
                                                 </ChildContent>
                                                 <Helper>
                                                     <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
@@ -273,11 +253,6 @@
                                                 <ChildContent>
                                                     <RadzenLabel Text="Remember MFA for session by default" Component="defaultRememberMfaForSession" />
                                                 </ChildContent>
-                                                <Helper>
-                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                        Skip MFA if already completed this session
-                                                    </RadzenText>
-                                                </Helper>
                                             </RadzenFormField>
                                         </RadzenColumn>
                                     </RadzenRow>
@@ -288,19 +263,47 @@
                                         var name = $"mfa_default_{method.Value}";
                                         <RadzenFormField Variant="Variant.Outlined">
                                             <Start>
-                                                <RadzenCheckBox Value="@IsMethodSelected(method.Value)" 
-                                                               ValueChanged="@((bool selected) => ToggleMfaMethod(method.Value, selected))"
-                                                               Name="@name" />
+                                                <RadzenCheckBox Value="@IsMethodSelected(method.Value)" ValueChanged="@((bool selected) => ToggleMfaMethod(method.Value, selected))" Name="@name" />
                                             </Start>
                                             <ChildContent>
                                                 <RadzenLabel Text="@method.Text" Component="@name" />
                                             </ChildContent>
                                         </RadzenFormField>
                                     }
-                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                        Select default MFA methods available to clients in this realm
-                                    </RadzenText>
                                 </RadzenStack>
+                            </RadzenStack>
+                        </div>
+                    </RadzenTabsItem>
+                    <RadzenTabsItem Text="JAR / JARM" Icon="gpp_maybe">
+                        <div style="padding:1rem; max-height:550px; overflow-y:auto;">
+                            <RadzenStack Gap="0.75rem" class="rz-mb-4">
+                                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Request Object (JAR) Defaults</RadzenText>
+                                <RadzenFormField Text="Default JAR Mode" Variant="Variant.Outlined">
+                                    <ChildContent>
+                                        <RadzenDropDown @bind-Value="model.DefaultJarMode" TValue="JarMode?" Data="jarModes" TextProperty="Text" ValueProperty="Value" Style="width:100%;" />
+                                    </ChildContent>
+                                </RadzenFormField>
+                                <RadzenFormField Text="Require Signed Request Objects (Default)" Variant="Variant.Outlined">
+                                    <Start>
+                                        <RadzenCheckBox @bind-Value="model.DefaultRequireSignedRequestObject" TriState="true" Name="defReqSignedJar" />
+                                    </Start>
+                                    <ChildContent>
+                                        <RadzenLabel Text="Disallow unsigned (alg=none) request objects by default" Component="defReqSignedJar" />
+                                    </ChildContent>
+                                </RadzenFormField>
+                                <RadzenFormField Text="Allowed Request Object Algs (Default)" Variant="Variant.Outlined">
+                                    <ChildContent>
+                                        <RadzenDropDown Multiple="true" AllowClear="true" @bind-Value="defaultSelectedJarAlgs" Data="defaultAllowedJarAlgs" TextProperty="Value" ValueProperty="Value" Style="width:100%;" Change="@(args => OnDefaultJarAlgsChanged())" />
+                                    </ChildContent>
+                                </RadzenFormField>
+                            </RadzenStack>
+                            <RadzenStack Gap="0.75rem" class="rz-mt-4 rz-mb-4">
+                                <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Authorization Response (JARM) Defaults</RadzenText>
+                                <RadzenFormField Text="Default JARM Mode" Variant="Variant.Outlined">
+                                    <ChildContent>
+                                        <RadzenDropDown @bind-Value="model.DefaultJarmMode" TValue="JarmMode?" Data="jarmModes" TextProperty="Text" ValueProperty="Value" Style="width:100%;" />
+                                    </ChildContent>
+                                </RadzenFormField>
                             </RadzenStack>
                         </div>
                     </RadzenTabsItem>
@@ -309,7 +312,6 @@
 
             <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" class="rz-mt-4" JustifyContent="JustifyContent.SpaceBetween">
                 <RadzenButton Text="Back to Realms" Icon="arrow_back" ButtonStyle="ButtonStyle.Light" Click="@BackToRealm" />
-                
                 <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
                     <RadzenButton Text="Reset to System Defaults" Icon="restore" ButtonStyle="ButtonStyle.Warning" Click="@(async () => await ResetToSystemDefaults())" />
                     <RadzenButton Text="Save Default Configuration" Icon="save" ButtonStyle="ButtonStyle.Primary" ButtonType="ButtonType.Submit" />
@@ -318,3 +320,38 @@
         </RadzenTemplateForm>
     }
 </RadzenCard>
+
+@code {
+    private IEnumerable<object> jarModes => new[]
+    {
+        new { Text = "Use system default", Value = (JarMode?)null },
+        new { Text = "Disabled", Value = (JarMode?)JarMode.Disabled },
+        new { Text = "Optional", Value = (JarMode?)JarMode.Optional },
+        new { Text = "Required", Value = (JarMode?)JarMode.Required }
+    };
+    private IEnumerable<object> jarmModes => new[]
+    {
+        new { Text = "Use system default", Value = (JarmMode?)null },
+        new { Text = "Disabled", Value = (JarmMode?)JarmMode.Disabled },
+        new { Text = "Optional", Value = (JarmMode?)JarmMode.Optional },
+        new { Text = "Required", Value = (JarmMode?)JarmMode.Required }
+    };
+
+    private class AlgItem { public string Value { get; set; } = string.Empty; }
+    private List<AlgItem> defaultAllowedJarAlgs = new() { new() { Value = "RS256" }, new() { Value = "HS256" } };
+    private IList<string> defaultSelectedJarAlgs = new List<string>();
+
+    protected override void OnParametersSet()
+    {
+        defaultSelectedJarAlgs = string.IsNullOrWhiteSpace(model.DefaultAllowedRequestObjectAlgs)
+            ? new List<string>()
+            : model.DefaultAllowedRequestObjectAlgs.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+    }
+
+    private void OnDefaultJarAlgsChanged()
+    {
+        model.DefaultAllowedRequestObjectAlgs = defaultSelectedJarAlgs.Any() ? string.Join(',', defaultSelectedJarAlgs) : null;
+    }
+}
