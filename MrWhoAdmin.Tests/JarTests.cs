@@ -103,8 +103,14 @@ public class JarTests
         return await http.GetAsync(url);
     }
 
-    private static bool IsAuthRedirect(HttpResponseMessage resp)
-        => resp.StatusCode == HttpStatusCode.Redirect && (resp.Headers.Location?.ToString().Contains("/connect/login", StringComparison.OrdinalIgnoreCase) ?? false);
+    private static bool IsAcceptableAuthRedirect(HttpResponseMessage resp)
+    {
+        if ((int)resp.StatusCode < 300 || (int)resp.StatusCode > 399) return false;
+        var loc = resp.Headers.Location?.ToString() ?? string.Empty;
+        // Accept any /connect/* or /mfa/* intermediate as successful progression of auth flow
+        return loc.Contains("/connect/", StringComparison.OrdinalIgnoreCase) ||
+               loc.Contains("/mfa/", StringComparison.OrdinalIgnoreCase);
+    }
 
     // ===== Existing baseline tests (kept) =====
 
@@ -123,7 +129,8 @@ public class JarTests
             Assert.Fail("Expected redirect or OK, got 400. Body: " + await resp.Content.ReadAsStringAsync());
         }
 
-        Assert.IsTrue(IsAuthRedirect(resp) || resp.StatusCode == HttpStatusCode.OK, $"Unexpected status {resp.StatusCode}");
+        // Accept OK (already processed) or any intermediate redirect in auth pipeline
+        Assert.IsTrue(IsAcceptableAuthRedirect(resp) || resp.StatusCode == HttpStatusCode.OK, $"Unexpected status {resp.StatusCode} Location={resp.Headers.Location}");
     }
 
     [TestMethod]
@@ -137,8 +144,8 @@ public class JarTests
         var badJar = jar.Substring(0, jar.Length - 1) + (jar.EndsWith("A") ? "B" : "A");
         var resp = await SendAuthorizeAsync(http, badJar, DemoClientId);
 
-        var ok = (int)resp.StatusCode >= 400 || !IsAuthRedirect(resp);
-        Assert.IsTrue(ok, "Tampered JAR should not be treated as valid login redirect");
+        var ok = (int)resp.StatusCode >= 400 || !IsAcceptableAuthRedirect(resp);
+        Assert.IsTrue(ok, "Tampered JAR should not be treated as valid auth redirect");
     }
 
     // ===== New tests =====
@@ -164,12 +171,11 @@ public class JarTests
 
         var jar = CreateJar(authz, DemoClientId, DemoClientSecret, RedirectUri, BaseScope, includeJti: true);
         var first = await SendAuthorizeAsync(http, jar, DemoClientId);
-        Assert.IsTrue(IsAuthRedirect(first) || first.StatusCode == HttpStatusCode.OK, "First use of JAR should succeed (redirect/login page)");
+        Assert.IsTrue(IsAcceptableAuthRedirect(first) || first.StatusCode == HttpStatusCode.OK, "First use of JAR should succeed (redirect/login/consent/MFA)");
 
         var second = await SendAuthorizeAsync(http, jar, DemoClientId);
-        // Expect rejection (400) or at least not redirecting to login again.
         bool replayRejected = (int)second.StatusCode >= 400 && second.StatusCode != HttpStatusCode.InternalServerError;
-        Assert.IsTrue(replayRejected || !IsAuthRedirect(second), "Replayed JAR (same jti) should be rejected");
+        Assert.IsTrue(replayRejected || !IsAcceptableAuthRedirect(second), "Replayed JAR (same jti) should be rejected");
     }
 
     [TestMethod]
@@ -181,7 +187,7 @@ public class JarTests
 
         var jar = CreateJar(authz, DemoClientId, DemoClientSecret, RedirectUri, BaseScope, includeJti: false);
         var resp = await SendAuthorizeAsync(http, jar, DemoClientId);
-        Assert.IsTrue((int)resp.StatusCode >= 400 || !IsAuthRedirect(resp), "Missing jti should cause rejection");
+        Assert.IsTrue((int)resp.StatusCode >= 400 || !IsAcceptableAuthRedirect(resp), "Missing jti should cause rejection");
     }
 
     [TestMethod]
@@ -191,10 +197,9 @@ public class JarTests
         using var disco = await GetDiscoveryAsync(http);
         var authz = disco.RootElement.GetProperty("authorization_endpoint").GetString()!;
 
-        // Use HS384 (assuming only HS256/RS256 allowed)
         var jar = CreateJar(authz, DemoClientId, DemoClientSecret, RedirectUri, BaseScope, signingAlg: SecurityAlgorithms.HmacSha384);
         var resp = await SendAuthorizeAsync(http, jar, DemoClientId);
-        Assert.IsTrue((int)resp.StatusCode >= 400 || !IsAuthRedirect(resp), "Unsupported alg should be rejected");
+        Assert.IsTrue((int)resp.StatusCode >= 400 || !IsAcceptableAuthRedirect(resp), "Unsupported alg should be rejected");
     }
 
     [TestMethod]
@@ -204,10 +209,8 @@ public class JarTests
         using var disco = await GetDiscoveryAsync(http);
         var authz = disco.RootElement.GetProperty("authorization_endpoint").GetString()!;
 
-        // Create large pad > default 4096 limit to trigger size rejection.
         var jar = CreateJar(authz, DemoClientId, DemoClientSecret, RedirectUri, BaseScope, padLength: 6000);
         var resp = await SendAuthorizeAsync(http, jar, DemoClientId);
-        // If size enforcement occurs we expect 400; if not (limit different) we allow fallback but log warning.
         if ((int)resp.StatusCode < 400)
         {
             Console.WriteLine($"[WARN] Oversize JAR not rejected (status {resp.StatusCode}). Adjust MaxRequestObjectBytes or pad length if needed.");
