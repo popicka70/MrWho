@@ -133,6 +133,9 @@ public static class ServiceCollectionExtensions
         // ============================================================================
         services.AddScoped<IConsentService, ConsentService>();
 
+        // register security audit writer
+        services.AddScoped<ISecurityAuditWriter, SecurityAuditWriter>();
+
         return services;
     }
 

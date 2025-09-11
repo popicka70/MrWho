@@ -98,9 +98,10 @@ internal sealed class JarmAuthorizationResponseHandler : IOpenIddictServerHandle
     private readonly ILogger<JarmAuthorizationResponseHandler> _logger;
     private readonly IKeyManagementService _keyService;
     private readonly JarOptions _jarOptions;
+    private readonly ISecurityAuditWriter _auditWriter; // injected
 
-    public JarmAuthorizationResponseHandler(ILogger<JarmAuthorizationResponseHandler> logger, IKeyManagementService keyService, Microsoft.Extensions.Options.IOptions<JarOptions> jarOptions)
-    { _logger = logger; _keyService = keyService; _jarOptions = jarOptions.Value; }
+    public JarmAuthorizationResponseHandler(ILogger<JarmAuthorizationResponseHandler> logger, IKeyManagementService keyService, Microsoft.Extensions.Options.IOptions<JarOptions> jarOptions, ISecurityAuditWriter auditWriter)
+    { _logger = logger; _keyService = keyService; _jarOptions = jarOptions.Value; _auditWriter = auditWriter; }
 
     public async ValueTask HandleAsync(ApplyAuthorizationResponseContext context)
     {
@@ -174,10 +175,12 @@ internal sealed class JarmAuthorizationResponseHandler : IOpenIddictServerHandle
             }
             response["response"] = jwt;
             _logger.LogDebug("Issued JARM JWT (iss={Issuer}, aud={Aud}, codePresent={HasCode}, errorPresent={HasError})", issuer, clientId, !string.IsNullOrEmpty(codeValue), !string.IsNullOrEmpty(errorValue));
+            try { await _auditWriter.WriteAsync("auth.security", errorValue==null?"jarm.issued":"jarm.error", new { clientId, hasCode = codeValue!=null, error = errorValue, state = stateValue }, "info", actorClientId: clientId); } catch { }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to create JARM response JWT");
+            try { await _auditWriter.WriteAsync("auth.security", "jarm.failure", new { ex = ex.Message }, "error"); } catch { }
         }
     }
 }

@@ -26,8 +26,12 @@ public sealed class OidcLogoutHandler : IRequestHandler<MrWho.Endpoints.OidcLogo
     public async Task<IResult> Handle(MrWho.Endpoints.OidcLogoutRequest request, CancellationToken cancellationToken)
     {
         var context = request.HttpContext;
-        var oidcRequest = context.GetOpenIddictServerRequest() ??
-                          throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
+        var oidcRequest = context.GetOpenIddictServerRequest();
+        if (oidcRequest is null)
+        {
+            throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
+        }
+        var audit = context.RequestServices.GetService<ISecurityAuditWriter>();
 
         try
         {
@@ -74,11 +78,13 @@ public sealed class OidcLogoutHandler : IRequestHandler<MrWho.Endpoints.OidcLogo
             }
 
             await _dynamicCookieService.SignOutFromClientAsync(clientId);
+            if (audit != null) await audit.WriteAsync("auth.security", "logout.client", new { clientId }, "info", actorClientId: clientId, ip: context.Connection.RemoteIpAddress?.ToString());
             return Results.SignOut(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error processing OIDC logout");
+            if (audit != null) await audit.WriteAsync("auth.security", "logout.error", new { ex = ex.Message }, "error", ip: context.Connection.RemoteIpAddress?.ToString());
             return Results.Problem("Error processing logout");
         }
     }

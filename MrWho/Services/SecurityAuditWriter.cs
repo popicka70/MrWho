@@ -7,11 +7,6 @@ using MrWho.Models;
 
 namespace MrWho.Services;
 
-public interface ISecurityAuditWriter
-{
-    Task<SecurityAuditEvent> WriteAsync(string category, string eventType, object? data = null, string? level = null, string? actorUserId = null, string? actorClientId = null, string? ip = null, CancellationToken ct = default);
-}
-
 public sealed class SecurityAuditWriter : ISecurityAuditWriter
 {
     private readonly ApplicationDbContext _db;
@@ -23,7 +18,8 @@ public sealed class SecurityAuditWriter : ISecurityAuditWriter
         _logger = logger;
     }
 
-    public async Task<SecurityAuditEvent> WriteAsync(string category, string eventType, object? data = null, string? level = null, string? actorUserId = null, string? actorClientId = null, string? ip = null, CancellationToken ct = default)
+    public async Task<SecurityAuditEvent> WriteAsync(string category, string eventType, object? data = null,
+        string? level = null, string? actorUserId = null, string? actorClientId = null, string? ip = null, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(category)) category = "general";
         if (string.IsNullOrWhiteSpace(eventType)) eventType = "unknown";
