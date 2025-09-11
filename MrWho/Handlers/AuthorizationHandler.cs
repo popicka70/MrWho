@@ -83,6 +83,46 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
 
         var clientId = request.ClientId ?? string.Empty;
         _logger.LogDebug("Authorization request received for client {ClientId}", clientId);
+
+        // Resolve pushed authorization request if request_uri present
+        if (!string.IsNullOrEmpty(request.RequestUri) && request.RequestUri.StartsWith("urn:ietf:params:oauth:request_uri:", StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                var parId = request.RequestUri.Split(':').Last();
+                var par = await _context.Set<PushedAuthorizationRequest>().FirstOrDefaultAsync(p => p.Id == parId);
+                if (par != null)
+                {
+                    if (par.ExpiresAt < DateTime.UtcNow)
+                    {
+                        await _audit.WriteAsync(SecurityAudit.ParExpired, new { clientId = par.ClientId, requestUri = par.RequestUri }, "warn", actorClientId: par.ClientId);
+                        return Results.BadRequest(new { error = OpenIddictConstants.Errors.InvalidRequest, error_description = "request_uri expired" });
+                    }
+                    if (par.ConsumedAt != null)
+                    {
+                        return Results.BadRequest(new { error = OpenIddictConstants.Errors.InvalidRequest, error_description = "request_uri already used" });
+                    }
+                    // Merge stored parameters into current request (original precedence maintained)
+                    var stored = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(par.ParametersJson) ?? new();
+                    foreach (var kv in stored)
+                    {
+                        // Only set if not already provided on query
+                        if (request.GetParameter(kv.Key) is null)
+                        {
+                            request.SetParameter(kv.Key, kv.Value);
+                        }
+                    }
+                    par.ConsumedAt = DateTime.UtcNow;
+                    await _context.SaveChangesAsync();
+                    await _audit.WriteAsync(SecurityAudit.ParConsumed, new { clientId = par.ClientId, requestUri = par.RequestUri }, "info", actorClientId: par.ClientId);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Failed to resolve PAR request_uri {RequestUri}", request.RequestUri);
+            }
+        }
+
         // PAR required enforcement (if client requires but no request_uri present)
         try
         {

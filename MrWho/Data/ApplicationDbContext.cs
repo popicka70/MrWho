@@ -93,6 +93,9 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
     // NEW: Consents
     public DbSet<Consent> Consents => Set<Consent>();
 
+    // NEW: Pushed Authorization Requests (PAR)
+    public DbSet<PushedAuthorizationRequest> PushedAuthorizationRequests => Set<PushedAuthorizationRequest>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
@@ -522,6 +525,18 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
             b.Property(e => e.DataJson).HasColumnType("text");
         });
 
+        // Configure PushedAuthorizationRequest entity (PAR)
+        builder.Entity<PushedAuthorizationRequest>(b =>
+        {
+            b.HasKey(p => p.Id);
+            b.HasIndex(p => p.RequestUri).IsUnique();
+            b.HasIndex(p => p.ExpiresAt);
+            b.HasIndex(p => new { p.ClientId, p.ExpiresAt });
+            b.Property(p => p.RequestUri).HasMaxLength(300).IsRequired();
+            b.Property(p => p.ClientId).HasMaxLength(200).IsRequired();
+            b.Property(p => p.ParametersHash).HasMaxLength(128);
+        });
+
         // Provider-specific tuning: MySQL row size limits -> move large strings to longtext
         if (Database.ProviderName?.Contains("MySql", StringComparison.OrdinalIgnoreCase) == true)
         {
@@ -601,6 +616,11 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
             {
                 entity.Property(c => c.GrantedScopesJson).HasColumnType("longtext");
             });
+
+            builder.Entity<PushedAuthorizationRequest>(entity =>
+            {
+                entity.Property(p => p.ParametersJson).HasColumnType("longtext");
+            });
         }
 
         // Provider-specific tuning: PostgreSQL -> use text for large strings
@@ -623,14 +643,9 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
                 entity.Property(s => s.SecretHash).HasColumnType("text");
             });
 
-            builder.Entity<KeyMaterial>(entity =>
+            builder.Entity<PushedAuthorizationRequest>(entity =>
             {
-                entity.Property(k => k.PrivateKeyPem).HasColumnType("text");
-            });
-
-            builder.Entity<Consent>(entity =>
-            {
-                entity.Property(c => c.GrantedScopesJson).HasColumnType("text");
+                entity.Property(p => p.ParametersJson).HasColumnType("text");
             });
         }
 
@@ -640,6 +655,11 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
             builder.Entity<AuditLog>(entity =>
             {
                 entity.Property(a => a.Changes).HasColumnType("nvarchar(max)");
+            });
+
+            builder.Entity<PushedAuthorizationRequest>(entity =>
+            {
+                entity.Property(p => p.ParametersJson).HasColumnType("nvarchar(max)");
             });
         }
     }
