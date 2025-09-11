@@ -138,9 +138,12 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ISecurityAuditWriter, SecurityAuditWriter>();
         services.AddScoped<IAuditQueryService, AuditQueryService>();
 
+        services.AddOptions<AuditRetentionOptions>().BindConfiguration(AuditRetentionOptions.SectionName).ValidateDataAnnotations();
+
         // PAR cleanup background service
         services.AddHostedService<ParCleanupHostedService>();
         services.AddHostedService<AuditChainVerifierHostedService>();
+        services.AddHostedService<AuditRetentionHostedService>();
 
         return services;
     }

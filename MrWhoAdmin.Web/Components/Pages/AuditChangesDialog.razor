@@ -1,0 +1,293 @@
+﻿@using MrWho.Shared.Models
+@using System.Text.Json
+@using System.Text.Json.Serialization
+@inject DialogService DialogService
+@inject NotificationService NotificationService
+@inject IJSRuntime JS
+
+@if (Item is null)
+{
+    <RadzenAlert AlertStyle="AlertStyle.Warning">
+        <RadzenText>Chybí data auditu.</RadzenText>
+    </RadzenAlert>
+}
+else
+{
+    <RadzenStack Gap="1rem" Style="min-height:480px;">
+        <RadzenStack Orientation="Orientation.Horizontal" Gap="2rem" Wrap="FlexWrap.Wrap">
+            <RadzenStack>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Čas</RadzenText>
+                <RadzenText>@Item.OccurredAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")</RadzenText>
+            </RadzenStack>
+            <RadzenStack>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Uživatel</RadzenText>
+                <RadzenText>@(Item.UserName ?? Item.UserId ?? "-")</RadzenText>
+            </RadzenStack>
+            <RadzenStack>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">IP</RadzenText>
+                <RadzenText>@(Item.IpAddress ?? "-")</RadzenText>
+            </RadzenStack>
+            <RadzenStack>
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Akce</RadzenText>
+                <RadzenBadge Text="@Item.Action" BadgeStyle="@GetActionStyle(Item.Action)" />
+            </RadzenStack>
+        </RadzenStack>
+
+        <RadzenRow>
+            <RadzenColumn Size="12" SizeMD="6">
+                <RadzenFormField Text="Entity" Variant="Variant.Outlined">
+                    <RadzenTextBox Value="@Item.EntityType" ReadOnly="true" Style="width:100%;" />
+                </RadzenFormField>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="6">
+                <RadzenFormField Text="Entity ID" Variant="Variant.Outlined">
+                    <RadzenTextBox Value="@Item.EntityId" ReadOnly="true" Style="width:100%;" />
+                </RadzenFormField>
+            </RadzenColumn>
+        </RadzenRow>
+
+        <RadzenRow>
+            <RadzenColumn Size="12" SizeMD="4">
+                <RadzenFormField Text="Client" Variant="Variant.Outlined">
+                    <RadzenTextBox Value="@(Item.ClientId ?? "")" ReadOnly="true" Style="width:100%;" />
+                </RadzenFormField>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="4">
+                <RadzenFormField Text="Realm" Variant="Variant.Outlined">
+                    <RadzenTextBox Value="@(Item.RealmId ?? "")" ReadOnly="true" Style="width:100%;" />
+                </RadzenFormField>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="4">
+                <RadzenFormField Text="Počet změn" Variant="Variant.Outlined">
+                    <RadzenTextBox Value="@VisibleEntries.Count.ToString()" ReadOnly="true" Style="width:100%;" />
+                </RadzenFormField>
+            </RadzenColumn>
+        </RadzenRow>
+
+        <RadzenCard Style="padding:0.75rem">
+            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.75rem" Wrap="FlexWrap.Wrap" AlignItems="AlignItems.End">
+                <RadzenFormField Text="Filtr" Variant="Variant.Outlined" Style="width:220px">
+                    <RadzenTextBox @bind-Value="_filter" Placeholder="Hledat atribut..." Style="width:100%;" />
+                </RadzenFormField>
+                <RadzenFormField Text="Typ změny" Variant="Variant.Outlined" Style="width:160px">
+                    <RadzenDropDown Data="@_changeTypes" @bind-Value="_filterChangeType" AllowClear="true" Placeholder="(vše)" Style="width:100%;" />
+                </RadzenFormField>
+                <RadzenFormField Text="Možnosti" Variant="Variant.Outlined">
+                    <Start>
+                        <RadzenCheckBox @bind-Value="_showUnchanged" Name="unchanged" />
+                    </Start>
+                    <ChildContent>
+                        <RadzenLabel Text="Zobrazit beze změny" Component="unchanged" />
+                    </ChildContent>
+                </RadzenFormField>
+                <RadzenFormField Text="Režim" Variant="Variant.Outlined">
+                    <Start>
+                        <RadzenCheckBox @bind-Value="_rawMode" Name="rawmode" />
+                    </Start>
+                    <ChildContent>
+                        <RadzenLabel Text="Raw JSON" Component="rawmode" />
+                    </ChildContent>
+                </RadzenFormField>
+                <RadzenButton Icon="filter_alt" Text="Použít" ButtonStyle="ButtonStyle.Secondary" Click="@(async ()=> await ApplyFilterAsync())" />
+                <RadzenButton Icon="restart_alt" Text="Reset" ButtonStyle="ButtonStyle.Light" Click="@(async ()=> { ResetFilter(); await ApplyFilterAsync(); })" />
+                <RadzenButton Icon="content_copy" Text="Kopírovat" ButtonStyle="ButtonStyle.Primary" Click="@(async ()=> await CopyRawAsync())" />
+                @if (!_rawMode && VisibleEntries.Count > 0)
+                {
+                    <RadzenBadge Text="@($"{VisibleEntries.Count}")" BadgeStyle="BadgeStyle.Info" Style="margin-left:4px" />
+                }
+            </RadzenStack>
+        </RadzenCard>
+
+        @if (_rawMode)
+        {
+            <RadzenFormField Text="Raw JSON" Variant="Variant.Outlined">
+                <RadzenTextArea Value="@RawJsonPretty" ReadOnly="true" Style="width:100%; min-height:360px; font-family:ui-monospace,Consolas,monospace;" />
+            </RadzenFormField>
+        }
+        else if (VisibleEntries.Count == 0)
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Info">
+                <RadzenText>Žádné záznamy (zkontrolujte filtr nebo režim zobrazení).</RadzenText>
+            </RadzenAlert>
+        }
+        else
+        {
+            <RadzenDataGrid TItem="ChangeEntry" Data="VisibleEntries" AllowPaging="true" PageSize="20" AllowSorting="true" Style="height:100%;">
+                <Columns>
+                    <RadzenDataGridColumn TItem="ChangeEntry" Property="Status" Title="Typ" Width="120px">
+                        <Template Context="row">
+                            <RadzenBadge Text="@row.Status" BadgeStyle="@GetStatusStyle(row.Status)" />
+                        </Template>
+                    </RadzenDataGridColumn>
+                    <RadzenDataGridColumn TItem="ChangeEntry" Property="Property" Title="Atribut" Width="220px" />
+                    <RadzenDataGridColumn TItem="ChangeEntry" Title="Původní" Width="280px">
+                        <Template Context="row">@FormatValue(row.Old)</Template>
+                    </RadzenDataGridColumn>
+                    <RadzenDataGridColumn TItem="ChangeEntry" Title="Nová" Width="280px">
+                        <Template Context="row">@FormatValue(row.New)</Template>
+                    </RadzenDataGridColumn>
+                </Columns>
+            </RadzenDataGrid>
+        }
+
+        <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
+            <RadzenButton Text="Zavřít" Icon="close" ButtonStyle="ButtonStyle.Light" Click="@(() => DialogService.Close())" />
+        </RadzenStack>
+    </RadzenStack>
+}
+
+@code {
+    [Parameter] public AuditLogDto Item { get; set; } = default!;
+
+    private readonly JsonDocumentOptions _jsonDocOptions = new()
+    {
+        CommentHandling = JsonCommentHandling.Skip,
+        AllowTrailingCommas = true
+    };
+
+    private List<ChangeEntry> _allEntries = new();
+    private List<ChangeEntry> VisibleEntries = new();
+
+    private string? _filter;
+    private string? _filterChangeType;
+    private bool _showUnchanged = false;
+    private bool _rawMode = false;
+
+    private readonly string[] _changeTypes = new[] { "Added", "Removed", "Modified", "Unchanged" };
+
+    private string RawJsonPretty => TryPretty(Item?.Changes);
+
+    protected override void OnParametersSet()
+    {
+        ParseChanges();
+        ApplyFilterInternal();
+    }
+
+    private void ParseChanges()
+    {
+        _allEntries.Clear();
+        var json = Item?.Changes;
+        if (string.IsNullOrWhiteSpace(json)) return;
+        try
+        {
+            using var doc = JsonDocument.Parse(json, _jsonDocOptions);
+            if (doc.RootElement.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var el in doc.RootElement.EnumerateArray())
+                {
+                    var prop = el.TryGetProperty("Property", out var pVal) ? pVal.GetString() ?? "" : "";
+                    var oldStr = el.TryGetProperty("Old", out var oVal) ? ValueToString(oVal) : null;
+                    var newStr = el.TryGetProperty("New", out var nVal) ? ValueToString(nVal) : null;
+                    var status = ComputeStatus(oldStr, newStr);
+                    _allEntries.Add(new ChangeEntry { Property = prop, Old = oldStr, New = newStr, Status = status });
+                }
+            }
+            else
+            {
+                _allEntries.Add(new ChangeEntry { Property = "(raw)", Old = null, New = json, Status = "Modified" });
+            }
+        }
+        catch
+        {
+            _allEntries.Add(new ChangeEntry { Property = "(unparsed)", Old = null, New = json, Status = "Modified" });
+        }
+    }
+
+    private static string ComputeStatus(string? oldVal, string? newVal)
+    {
+        if (oldVal is null && newVal is null) return "Unchanged";
+        if (oldVal is null && newVal is not null) return "Added";
+        if (oldVal is not null && newVal is null) return "Removed";
+        if (!string.Equals(oldVal, newVal, StringComparison.Ordinal)) return "Modified";
+        return "Unchanged";
+    }
+
+    private static string ValueToString(JsonElement el) => el.ValueKind switch
+    {
+        JsonValueKind.String => el.GetString() ?? "",
+        JsonValueKind.Number => el.ToString(),
+        JsonValueKind.True => "true",
+        JsonValueKind.False => "false",
+        JsonValueKind.Null => "(null)",
+        _ => el.GetRawText()
+    };
+
+    private string TryPretty(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return "";
+        try
+        {
+            using var doc = JsonDocument.Parse(raw, _jsonDocOptions);
+            return JsonSerializer.Serialize(doc.RootElement, new JsonSerializerOptions { WriteIndented = true });
+        }
+        catch { return raw; }
+    }
+
+    private async Task ApplyFilterAsync()
+    {
+        await Task.Yield();
+        ApplyFilterInternal();
+        StateHasChanged();
+    }
+
+    private void ApplyFilterInternal()
+    {
+        IEnumerable<ChangeEntry> q = _allEntries;
+        if (!_showUnchanged) q = q.Where(e => e.Status != "Unchanged");
+        if (!string.IsNullOrWhiteSpace(_filter))
+        {
+            var f = _filter.Trim();
+            q = q.Where(e => (e.Property?.Contains(f, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                             (e.Old?.Contains(f, StringComparison.OrdinalIgnoreCase) ?? false) ||
+                             (e.New?.Contains(f, StringComparison.OrdinalIgnoreCase) ?? false));
+        }
+        if (!string.IsNullOrWhiteSpace(_filterChangeType))
+            q = q.Where(e => string.Equals(e.Status, _filterChangeType, StringComparison.OrdinalIgnoreCase));
+        VisibleEntries = q.OrderBy(e => e.Property).ToList();
+    }
+
+    private void ResetFilter()
+    { _filter = null; _filterChangeType = null; _showUnchanged = false; }
+
+    private async Task CopyRawAsync()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", Item.Changes ?? "");
+            NotificationService.Notify(new NotificationMessage { Severity = NotificationSeverity.Success, Summary = "Zkopírováno", Detail = "Raw JSON byl zkopírován.", Duration = 2500 });
+        }
+        catch
+        {
+            NotificationService.Notify(new NotificationMessage { Severity = NotificationSeverity.Warning, Summary = "Chyba", Detail = "Kopírování selhalo.", Duration = 3000 });
+        }
+    }
+
+    private static object FormatValue(string? v) => string.IsNullOrEmpty(v)
+        ? (MarkupString)"<span style='color:var(--rz-text-tertiary-color)'>(empty)</span>"
+        : v;
+
+    private static BadgeStyle GetActionStyle(string? action) => action?.ToLowerInvariant() switch
+    {
+        "added" => BadgeStyle.Success,
+        "modified" => BadgeStyle.Info,
+        "deleted" => BadgeStyle.Danger,
+        _ => BadgeStyle.Secondary
+    };
+
+    private static BadgeStyle GetStatusStyle(string status) => status switch
+    {
+        "Added" => BadgeStyle.Success,
+        "Removed" => BadgeStyle.Danger,
+        "Modified" => BadgeStyle.Warning,
+        "Unchanged" => BadgeStyle.Secondary,
+        _ => BadgeStyle.Secondary
+    };
+
+    private sealed class ChangeEntry
+    {
+        public string Property { get; set; } = string.Empty;
+        public string? Old { get; set; }
+        public string? New { get; set; }
+        public string Status { get; set; } = "Modified";
+    }
+}

@@ -42,6 +42,7 @@ builder.Services.AddHttpServices();
 builder.Services.AddApiServices(builder.Configuration);
 builder.Services.AddAuthenticationServices(builder.Configuration);
 builder.Services.AddAuthorizationServices();
+builder.Services.AddScoped<AuditApiService>();
 
 // Add Blazor Server circuit event handling for better error handling
 builder.Services.AddSingleton<Microsoft.AspNetCore.Components.Server.Circuits.CircuitHandler, CircuitHandlerService>();

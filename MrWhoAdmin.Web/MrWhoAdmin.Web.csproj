@@ -25,11 +25,12 @@
 	</ItemGroup>
 
 	<ItemGroup>
+	  <Folder Include="Components\Dialogs\" />
 	  <Folder Include="Models\" />
 	</ItemGroup>
 
 	<ItemGroup>
-	  <Content Include="Components\Dialogs\AuditChangesDialog.razor" />
+	  <None Include="Components\Pages\AuditChangesDialog.razor" />
 	</ItemGroup>
 
 </Project>
