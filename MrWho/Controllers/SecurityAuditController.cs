@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MrWho.Data;
 using MrWho.Models;
+using MrWho.Services;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -15,9 +16,10 @@ public class SecurityAuditController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
     private readonly ILogger<SecurityAuditController> _logger;
+    private readonly IAuditQueryService _query;
 
-    public SecurityAuditController(ApplicationDbContext db, ILogger<SecurityAuditController> logger)
-    { _db = db; _logger = logger; }
+    public SecurityAuditController(ApplicationDbContext db, ILogger<SecurityAuditController> logger, IAuditQueryService query)
+    { _db = db; _logger = logger; _query = query; }
 
     [HttpGet]
     public async Task<IActionResult> Verify([FromQuery] long? startId = null, [FromQuery] long? endId = null)
@@ -54,6 +56,29 @@ public class SecurityAuditController : ControllerBase
             lastId = list.LastOrDefault()?.Id,
             verifiedAtUtc = DateTime.UtcNow
         });
+    }
+
+    [HttpGet("query")] // paging + filters
+    public async Task<IActionResult> Query(
+        [FromQuery] DateTime? fromUtc = null,
+        [FromQuery] DateTime? toUtc = null,
+        [FromQuery] string? category = null,
+        [FromQuery] string? eventType = null,
+        [FromQuery] string? actorUserId = null,
+        [FromQuery] string? actorClientId = null,
+        [FromQuery] string? level = null,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 100)
+    {
+        var (items, total) = await _query.QueryAsync(fromUtc, toUtc, category, eventType, actorUserId, actorClientId, level, page, pageSize);
+        return Ok(new { page, pageSize, total, items });
+    }
+
+    [HttpGet("latest")] // quick latest fetch
+    public async Task<IActionResult> Latest([FromQuery] int count = 50)
+    {
+        var items = await _query.GetLatestAsync(count);
+        return Ok(items);
     }
 
     private static string ComputeHash(SecurityAuditEvent e, string? prevHash)

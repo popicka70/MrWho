@@ -23,7 +23,8 @@ using MrWho.Handlers.Auth;
 using MrWho.Services.Mediator; // add mediator interfaces
 using Microsoft.AspNetCore.Mvc; // for IActionResult
 using MrWho.Services; // ensure JarJarm types
-using MrWho.Services; // contains JarOptions, IJarReplayCache, JarJarmServerEventHandlers
+using MrWho.Services;
+using MrWho.Services.Background; // contains JarOptions, IJarReplayCache, JarJarmServerEventHandlers
 
 namespace MrWho.Extensions;
 
@@ -135,9 +136,11 @@ public static class ServiceCollectionExtensions
 
         // register security audit writer
         services.AddScoped<ISecurityAuditWriter, SecurityAuditWriter>();
+        services.AddScoped<IAuditQueryService, AuditQueryService>();
 
         // PAR cleanup background service
         services.AddHostedService<ParCleanupHostedService>();
+        services.AddHostedService<AuditChainVerifierHostedService>();
 
         return services;
     }
