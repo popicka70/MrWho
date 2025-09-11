@@ -22,6 +22,8 @@ using Microsoft.AspNetCore.Hosting;
 using MrWho.Handlers.Auth;
 using MrWho.Services.Mediator; // add mediator interfaces
 using Microsoft.AspNetCore.Mvc; // for IActionResult
+using MrWho.Services; // ensure JarJarm types
+using MrWho.Services; // contains JarOptions, IJarReplayCache, JarJarmServerEventHandlers
 
 namespace MrWho.Extensions;
 
@@ -33,10 +35,15 @@ public static class ServiceCollectionExtensions
     {
         // Register shared accessors
         services.AddHttpContextAccessor();
+        // JAR/JARM support services
+        services.AddMemoryCache();
+        services.AddSingleton<IJarReplayCache, InMemoryJarReplayCache>();
+        services.AddOptions<JarOptions>().BindConfiguration(JarOptions.SectionName);
 
         // Register database access layer
         services.AddScoped<ISeedingService, SeedingService>();
-        services.AddScoped<IScopeSeederService, ScopeSeederService>();
+        services.AddScoped<IScopeSeederService, ScopeSeederService>
+        ();
         services.AddScoped<IApiResourceSeederService, ApiResourceSeederService>();
         services.AddScoped<IIdentityResourceSeederService, IdentityResourceSeederService>();
         services.AddScoped<IClaimTypeSeederService, ClaimTypeSeederService>();
@@ -327,14 +334,8 @@ public static class ServiceCollectionExtensions
                     .SetRevocationEndpointUris("/connect/revocation")
                     .SetIntrospectionEndpointUris("/connect/introspect");
 
-                // Advertise/enable PAR endpoint only when explicitly enabled in configuration
-                // This prevents clients using the default UseIfAvailable behavior from attempting PAR
-                // when specific clients are not allowed to use it (avoids ID2183 unauthorized_client).
-                var parEnabled = configuration.GetValue<bool?>("OpenIddict:EnablePar") ?? false;
-                if (parEnabled)
-                {
-                    options.SetPushedAuthorizationEndpointUris("/connect/par");
-                }
+                // NOTE: response_mode=jwt accepted via custom configuration/authorization response handlers (JarJarmServerEventHandlers)
+                // If additional normalization is required, implement inside those handlers instead of adding undefined event types here.
 
                 // Flows
                 options.AllowAuthorizationCodeFlow()
@@ -387,6 +388,12 @@ public static class ServiceCollectionExtensions
                        .EnableAuthorizationEndpointPassthrough()
                        .EnableTokenEndpointPassthrough()
                        .EnableEndSessionEndpointPassthrough();
+
+                // Register JAR/JARM custom handlers
+                options.AddEventHandler(JarJarmServerEventHandlers.ConfigurationHandlerDescriptor);
+                options.AddEventHandler(JarJarmServerEventHandlers.ExtractNormalizeJarmResponseModeDescriptor);
+                options.AddEventHandler(JarJarmServerEventHandlers.NormalizeJarmResponseModeDescriptor);
+                options.AddEventHandler(JarJarmServerEventHandlers.ApplyAuthorizationResponseDescriptor);
             })
             .AddValidation(options =>
             {
@@ -537,31 +544,9 @@ public static class ServiceCollectionExtensions
         // Add antiforgery services
         services.AddAntiforgery(options =>
         {
-            options.HeaderName = "X-CSRF-TOKEN";
-            options.SuppressXFrameOptionsHeader = false;
+            options.HeaderName = "X-XSRF-TOKEN"; // Custom header for Angular
         });
 
         return services;
     }
-}
-
-/// <summary>
-/// Configuration options for database initialization behavior
-/// </summary>
-public class DatabaseInitializationOptions
-{
-    /// <summary>
-    /// When true, forces the use of EnsureCreatedAsync regardless of environment
-    /// </summary>
-    public bool ForceUseEnsureCreated { get; set; } = false;
-
-    /// <summary>
-    /// When true, skips migration checks and application
-    /// </summary>
-    public bool SkipMigrations { get; set; } = false;
-
-    /// <summary>
-    /// When true, recreates the database on each initialization (useful for integration tests)
-    /// </summary>
-    public bool RecreateDatabase { get; set; } = false;
 }

@@ -100,6 +100,45 @@ else
             <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Disabled = no PAR. Enabled = client may use PAR. Required = client must use PAR (request_uri).</RadzenText>
         </Helper>
     </RadzenFormField>
+
+    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600 rz-mt-4">JAR (Signed Authorization Requests)</RadzenText>
+    <RadzenFormField Text="JAR Mode" Variant="Variant.Outlined">
+        <ChildContent>
+            <RadzenDropDown @bind-Value="model.JarMode" TValue="JarMode?" Data="@jarModes" TextProperty="Text" ValueProperty="Value" Style="width:100%;" />
+        </ChildContent>
+        <Helper>
+            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Optional = may send signed request (request=). Required = must use signed request object.</RadzenText>
+        </Helper>
+    </RadzenFormField>
+    <RadzenFormField Text="Require Signed Request Object" Variant="Variant.Outlined">
+        <Start>
+            <RadzenCheckBox @bind-Value="model.RequireSignedRequestObject" Name="reqSignedJar" TriState="true" />
+        </Start>
+        <ChildContent>
+            <RadzenLabel Text="Disallow unsigned (alg=none) request objects" Component="reqSignedJar" />
+        </ChildContent>
+    </RadzenFormField>
+    <RadzenFormField Text="Allowed Request Object Algs" Variant="Variant.Outlined">
+        <ChildContent>
+            <RadzenDropDown Multiple="true" AllowClear="true"
+                            @bind-Value="selectedJarAlgs"
+                            Data="allowedJarAlgs" TextProperty="Value" ValueProperty="Value" Style="width:100%;"
+                            Change="@(args => OnJarAlgsChanged())" />
+        </ChildContent>
+        <Helper>
+            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Select allowed signing algorithms for this client's request objects.</RadzenText>
+        </Helper>
+    </RadzenFormField>
+
+    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600 rz-mt-4">JARM (JWT Authorization Response Mode)</RadzenText>
+    <RadzenFormField Text="JARM Mode" Variant="Variant.Outlined">
+        <ChildContent>
+            <RadzenDropDown @bind-Value="model.JarmMode" TValue="JarmMode?" Data="@jarmModes" TextProperty="Text" ValueProperty="Value" Style="width:100%;" />
+        </ChildContent>
+        <Helper>
+            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Optional = response_mode=jwt triggers JWT response. Required = always JWT.</RadzenText>
+        </Helper>
+    </RadzenFormField>
 </RadzenStack>
 }
 
@@ -114,4 +153,39 @@ else
         new { Text = "Enabled",  Value = (PushedAuthorizationMode?)PushedAuthorizationMode.Enabled },
         new { Text = "Required", Value = (PushedAuthorizationMode?)PushedAuthorizationMode.Required }
     };
+
+    private IEnumerable<object> jarModes => new[]
+    {
+        new { Text = "Use realm default", Value = (JarMode?)null },
+        new { Text = "Disabled", Value = (JarMode?)JarMode.Disabled },
+        new { Text = "Optional", Value = (JarMode?)JarMode.Optional },
+        new { Text = "Required", Value = (JarMode?)JarMode.Required }
+    };
+
+    private IEnumerable<object> jarmModes => new[]
+    {
+        new { Text = "Use realm default", Value = (JarmMode?)null },
+        new { Text = "Disabled", Value = (JarmMode?)JarmMode.Disabled },
+        new { Text = "Optional", Value = (JarmMode?)JarmMode.Optional },
+        new { Text = "Required", Value = (JarmMode?)JarmMode.Required }
+    };
+
+    private class AlgItem { public string Value { get; set; } = string.Empty; }
+    private List<AlgItem> allowedJarAlgs = new() { new AlgItem{Value="RS256"}, new AlgItem{Value="HS256"} };
+    private IList<string> selectedJarAlgs = new List<string>();
+
+    protected override void OnParametersSet()
+    {
+        // Parse existing alg list into multi-select
+        selectedJarAlgs = string.IsNullOrWhiteSpace(model.AllowedRequestObjectAlgs)
+            ? new List<string>()
+            : model.AllowedRequestObjectAlgs.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+    }
+
+    private void OnJarAlgsChanged()
+    {
+        model.AllowedRequestObjectAlgs = selectedJarAlgs.Any() ? string.Join(',', selectedJarAlgs) : null;
+    }
 }

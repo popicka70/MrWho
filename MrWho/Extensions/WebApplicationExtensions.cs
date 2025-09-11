@@ -25,6 +25,7 @@ using Microsoft.AspNetCore.RateLimiting; // added for RequireRateLimiting
 using OpenIddict.Client.AspNetCore;
 using OpenIddict.Client; // added for OpenIddictClientOptions/Registration
 using MrWho.Shared.Authentication; // for CookieSchemeNaming
+using MrWho.Middleware;
 
 namespace MrWho.Extensions;
 
@@ -52,6 +53,10 @@ public static class WebApplicationExtensions
             app.UseHttpsRedirection();
         }
         app.UseStaticFiles();
+        
+        // Move JAR/JARM normalization BEFORE routing so OpenIddict never sees unsupported response_mode=jwt.
+        app.UseMiddleware<JarRequestExpansionMiddleware>();
+        
         app.UseRouting();
 
         // Enable ASP.NET Core rate limiting middleware
@@ -60,7 +65,7 @@ public static class WebApplicationExtensions
         // Enable session before custom middleware that uses it
         app.UseSession();
 
-        // Add client cookie middleware before authentication
+        // Client cookie middleware (requires session)
         app.UseMiddleware<ClientCookieMiddleware>();
 
         // Add antiforgery middleware
@@ -111,11 +116,12 @@ public static class WebApplicationExtensions
         }
 
         app.UseStaticFiles();
+        // Early JAR/JARM normalization
+        app.UseMiddleware<JarRequestExpansionMiddleware>();
         app.UseRouting();
 
         app.UseRateLimiter();
 
-        // Enable session before custom middleware that uses it
         app.UseSession();
 
         app.UseMiddleware<ClientCookieMiddleware>();
