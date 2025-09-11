@@ -12,7 +12,7 @@ namespace MrWhoAdmin.Tests;
 public class JarTests
 {
     private const string DemoClientId = "mrwho_demo1";
-    private const string DemoClientSecret = "FTZvvlIIFdmtBg7IdBql9EEXRDj1xwLmi1qW9fGbJBY"; // >=32 bytes
+    private const string DemoClientSecret = "FTZvvlIIFdmtBg7IdBql9EEXRDj1xwLmi1qW9fGbJBY"; // >=32 bytes (44 bytes currently)
     private const string RedirectUri = "https://localhost:7037/signin-oidc";
     private const string BaseScope = "openid profile email roles";
 
@@ -40,15 +40,31 @@ public class JarTests
     private static SigningCredentials CreateSymmetricCredentials(string clientSecret, string alg)
     {
         var keyBytes = Encoding.UTF8.GetBytes(clientSecret);
-        if (keyBytes.Length < 32)
+
+        // Determine required minimum length per HS* algorithm to avoid IDX10720 exceptions
+        int requiredLen = alg switch
         {
-            // pad to 32 bytes for HS* minimum
-            var padded = new byte[32];
-            Array.Copy(keyBytes, padded, Math.Min(keyBytes.Length, 32));
-            for (int i = keyBytes.Length; i < 32; i++) padded[i] = (byte)'!';
+            SecurityAlgorithms.HmacSha256 => 32,
+            SecurityAlgorithms.HmacSha384 => 48, // 384 bits
+            SecurityAlgorithms.HmacSha512 => 64, // 512 bits
+            _ when alg.Equals("HS256", StringComparison.OrdinalIgnoreCase) => 32,
+            _ when alg.Equals("HS384", StringComparison.OrdinalIgnoreCase) => 48,
+            _ when alg.Equals("HS512", StringComparison.OrdinalIgnoreCase) => 64,
+            _ => 32
+        };
+
+        if (keyBytes.Length < requiredLen)
+        {
+            var padded = new byte[requiredLen];
+            Array.Copy(keyBytes, padded, keyBytes.Length);
+            for (int i = keyBytes.Length; i < requiredLen; i++) padded[i] = (byte)'!';
             keyBytes = padded;
         }
-        var key = new SymmetricSecurityKey(keyBytes);
+
+        var key = new SymmetricSecurityKey(keyBytes)
+        {
+            KeyId = $"test:{alg}:{keyBytes.Length}"
+        };
         return new SigningCredentials(key, alg);
     }
 
@@ -197,6 +213,7 @@ public class JarTests
         using var disco = await GetDiscoveryAsync(http);
         var authz = disco.RootElement.GetProperty("authorization_endpoint").GetString()!;
 
+        // HS384 not listed in supported algs (server advertises only HS256/RS256) but we now ensure key length is sufficient for construction
         var jar = CreateJar(authz, DemoClientId, DemoClientSecret, RedirectUri, BaseScope, signingAlg: SecurityAlgorithms.HmacSha384);
         var resp = await SendAuthorizeAsync(http, jar, DemoClientId);
         Assert.IsTrue((int)resp.StatusCode >= 400 || !IsAcceptableAuthRedirect(resp), "Unsupported alg should be rejected");
