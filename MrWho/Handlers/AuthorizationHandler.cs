@@ -100,6 +100,7 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
                     }
                     if (par.ConsumedAt != null)
                     {
+                        await _audit.WriteAsync(SecurityAudit.ParReuseAttempt, new { clientId = par.ClientId, requestUri = par.RequestUri }, "warn", actorClientId: par.ClientId);
                         return Results.BadRequest(new { error = OpenIddictConstants.Errors.InvalidRequest, error_description = "request_uri already used" });
                     }
                     // Merge stored parameters into current request (original precedence maintained)

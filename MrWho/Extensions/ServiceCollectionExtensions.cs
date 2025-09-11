@@ -136,6 +136,9 @@ public static class ServiceCollectionExtensions
         // register security audit writer
         services.AddScoped<ISecurityAuditWriter, SecurityAuditWriter>();
 
+        // PAR cleanup background service
+        services.AddHostedService<ParCleanupHostedService>();
+
         return services;
     }
 

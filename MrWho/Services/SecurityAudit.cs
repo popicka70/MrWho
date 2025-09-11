@@ -28,6 +28,8 @@ public static class SecurityAudit
     public const string ParRequiredMissing = "par.required_missing";
     public const string ParExpired = "par.expired";
     public const string ParConsumed = "par.consumed";
+    public const string ParReuseAttempt = "par.reuse_attempt";
+    public const string ParPurged = "par.purged";
 
     public static Task WriteAsync(this ISecurityAuditWriter writer, string eventType, object? data = null, string? level = null, string? actorUserId = null, string? actorClientId = null, string? ip = null, CancellationToken ct = default)
         => writer.WriteAsync(CategoryAuthSecurity, eventType, data, level, actorUserId, actorClientId, ip, ct);
