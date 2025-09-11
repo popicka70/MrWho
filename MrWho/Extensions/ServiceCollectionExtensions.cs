@@ -42,7 +42,8 @@ public static class ServiceCollectionExtensions
 
         // Register database access layer
         services.AddScoped<ISeedingService, SeedingService>();
-        services.AddScoped<IScopeSeederService, ScopeSeederService>();
+        services.AddScoped<IScopeSeederService, ScopeSeederService>
+        ();
         services.AddScoped<IApiResourceSeederService, ApiResourceSeederService>();
         services.AddScoped<IIdentityResourceSeederService, IdentityResourceSeederService>();
         services.AddScoped<IClaimTypeSeederService, ClaimTypeSeederService>();
@@ -333,14 +334,8 @@ public static class ServiceCollectionExtensions
                     .SetRevocationEndpointUris("/connect/revocation")
                     .SetIntrospectionEndpointUris("/connect/introspect");
 
-                // Advertise/enable PAR endpoint only when explicitly enabled in configuration
-                // This prevents clients using the default UseIfAvailable behavior from attempting PAR
-                // when specific clients are not allowed to use it (avoids ID2183 unauthorized_client).
-                var parEnabled = configuration.GetValue<bool?>("OpenIddict:EnablePar") ?? false;
-                if (parEnabled)
-                {
-                    options.SetPushedAuthorizationEndpointUris("/connect/par");
-                }
+                // NOTE: response_mode=jwt accepted via custom configuration/authorization response handlers (JarJarmServerEventHandlers)
+                // If additional normalization is required, implement inside those handlers instead of adding undefined event types here.
 
                 // Flows
                 options.AllowAuthorizationCodeFlow()
@@ -396,6 +391,8 @@ public static class ServiceCollectionExtensions
 
                 // Register JAR/JARM custom handlers
                 options.AddEventHandler(JarJarmServerEventHandlers.ConfigurationHandlerDescriptor);
+                options.AddEventHandler(JarJarmServerEventHandlers.ExtractNormalizeJarmResponseModeDescriptor);
+                options.AddEventHandler(JarJarmServerEventHandlers.NormalizeJarmResponseModeDescriptor);
                 options.AddEventHandler(JarJarmServerEventHandlers.ApplyAuthorizationResponseDescriptor);
             })
             .AddValidation(options =>

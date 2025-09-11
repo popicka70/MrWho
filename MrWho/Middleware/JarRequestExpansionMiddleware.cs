@@ -24,11 +24,46 @@ public class JarRequestExpansionMiddleware
         _logger = logger;
     }
 
+    private static bool IsAuthorizePath(PathString path)
+        => path.HasValue && path.Value!.EndsWith("/connect/authorize", StringComparison.OrdinalIgnoreCase);
+
     public async Task InvokeAsync(HttpContext context, ApplicationDbContext db, IKeyManagementService keyService, IJarReplayCache replayCache, IOptions<JarOptions> jarOptions)
     {
         var req = context.Request;
+        var path = req.Path;
+
+        // ---------------------------------------------------------------------
+        // JARM response_mode=jwt normalization (run before OpenIddict extraction)
+        // ---------------------------------------------------------------------
+        if (HttpMethods.IsGet(req.Method) && IsAuthorizePath(path) && req.Query.ContainsKey("response_mode"))
+        {
+            var responseMode = req.Query["response_mode"].ToString();
+            if (string.Equals(responseMode, "jwt", StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    var dict = req.Query.ToDictionary(k => k.Key, v => v.Value.ToString(), StringComparer.OrdinalIgnoreCase);
+                    dict.Remove("response_mode");
+                    dict["mrwho_jarm"] = "1"; // custom flag consumed by JARM handlers
+                    var newQuery = string.Join('&', dict.Select(kvp => Uri.EscapeDataString(kvp.Key) + "=" + Uri.EscapeDataString(kvp.Value)));
+                    req.QueryString = new QueryString("?" + newQuery);
+                    _logger.LogInformation("[JARM] Normalized response_mode=jwt at middleware stage. Original path={Path} Keys={Keys}", path, string.Join(',', dict.Keys));
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "[JARM] Failed normalizing response_mode=jwt at middleware stage path={Path}", path);
+                }
+            }
+        }
+        else if (HttpMethods.IsGet(req.Method) && path.HasValue && path.Value!.Contains("/connect/authorize", StringComparison.OrdinalIgnoreCase) && !IsAuthorizePath(path))
+        {
+            // Path variant (maybe with trailing slash or base path) that we didn't match exactly
+            _logger.LogDebug("[JARM] Authorize path variant encountered: {Path} (query_mode={HasRm})", path, req.Query.ContainsKey("response_mode"));
+        }
+
+        // ...existing JAR expansion block unchanged below...
         if (HttpMethods.IsGet(req.Method)
-            && req.Path.Equals("/connect/authorize", StringComparison.OrdinalIgnoreCase)
+            && IsAuthorizePath(path)
             && req.Query.ContainsKey("request")
             && !req.Query.ContainsKey("_jar_expanded"))
         {

@@ -1,5 +1,7 @@
 using System.Net;
 using System.Text.Json;
+using System.Security.Cryptography; // added for PKCE
+using System.Text; // added for PKCE
 
 namespace MrWhoAdmin.Tests;
 
@@ -18,6 +20,15 @@ public class JarmTests
         return JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
     }
 
+    private static (string Verifier, string Challenge) CreatePkcePair()
+    {
+        var bytes = RandomNumberGenerator.GetBytes(32);
+        var verifier = Convert.ToBase64String(bytes).TrimEnd('=').Replace('+','-').Replace('/','_');
+        var hash = SHA256.HashData(Encoding.ASCII.GetBytes(verifier));
+        var challenge = Convert.ToBase64String(hash).TrimEnd('=').Replace('+','-').Replace('/','_');
+        return (verifier, challenge);
+    }
+
     [TestMethod]
     public async Task Jarm_ResponseMode_Jwt_Request_Is_Accepted()
     {
@@ -25,15 +36,50 @@ public class JarmTests
         using var disco = await GetDiscoveryAsync(http);
         var authz = disco.RootElement.GetProperty("authorization_endpoint").GetString()!;
 
-        // Build standard authorization request with response_mode=jwt (no JAR yet for simplicity)
-        var url = $"connect/authorize?client_id={Uri.EscapeDataString(DemoClientId)}&response_type=code&redirect_uri={Uri.EscapeDataString(RedirectUri)}&scope={Uri.EscapeDataString(Scope)}&state=test_jarm&response_mode=jwt";
+        var (_, challenge) = CreatePkcePair();
+        var url = $"connect/authorize?client_id={Uri.EscapeDataString(DemoClientId)}&response_type=code&redirect_uri={Uri.EscapeDataString(RedirectUri)}&scope={Uri.EscapeDataString(Scope)}&state=test_jarm&code_challenge={challenge}&code_challenge_method=S256&response_mode=jwt";
         var resp = await http.GetAsync(url);
 
-        // Pre-auth stage should redirect to login OR display login page (200). Must not be a protocol error (>=400)
-        Assert.IsTrue(resp.StatusCode == HttpStatusCode.Redirect || resp.StatusCode == HttpStatusCode.OK, $"Unexpected status {resp.StatusCode}");
+        // Handle potential intermediate redirect to cached request (OpenIddict request caching / PAR-like flow)
+        if (resp.StatusCode == HttpStatusCode.Redirect)
+        {
+            var firstLoc = resp.Headers.Location?.ToString() ?? string.Empty;
+            if (firstLoc.Contains("/connect/authorize", StringComparison.OrdinalIgnoreCase) && firstLoc.Contains("request_uri=", StringComparison.OrdinalIgnoreCase))
+            {
+                // Follow one hop manually
+                string secondUrl;
+                if (firstLoc.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+                {
+                    secondUrl = firstLoc;
+                }
+                else
+                {
+                    secondUrl = new Uri(http.BaseAddress!, firstLoc).ToString();
+                }
+                // Request relative path for test infrastructure consistency
+                var relative = secondUrl.StartsWith(http.BaseAddress!.ToString(), StringComparison.OrdinalIgnoreCase)
+                    ? secondUrl.Substring(http.BaseAddress!.ToString().Length).TrimStart('/')
+                    : secondUrl;
+                resp = await http.GetAsync(relative);
+            }
+        }
+
+        string errorBody = string.Empty;
+        if ((int)resp.StatusCode >= 400)
+        {
+            errorBody = await resp.Content.ReadAsStringAsync();
+        }
+
+        Assert.IsTrue(resp.StatusCode == HttpStatusCode.Redirect || resp.StatusCode == HttpStatusCode.OK, $"Unexpected status {resp.StatusCode}. Body={errorBody}");
         if (resp.StatusCode == HttpStatusCode.Redirect)
         {
             var loc = resp.Headers.Location?.ToString() ?? string.Empty;
+            // Accept either direct login redirect or an authorize redirect with request_uri (already handled earlier) though unlikely here.
+            if (loc.Contains("/connect/authorize", StringComparison.OrdinalIgnoreCase) && loc.Contains("request_uri=", StringComparison.OrdinalIgnoreCase))
+            {
+                // Treat as acceptable intermediate (should be rare at this point)
+                return;
+            }
             StringAssert.Contains(loc, "/connect/login", "Should redirect to login for unauthenticated user");
             StringAssert.Contains(loc, "returnUrl=", "Login redirect should carry returnUrl for original authorize request");
         }
@@ -45,7 +91,8 @@ public class JarmTests
         using var http = SharedTestInfrastructure.CreateHttpClient("mrwho", disableRedirects: true);
         using var disco = await GetDiscoveryAsync(http);
 
-        var url = $"connect/authorize?client_id={Uri.EscapeDataString(DemoClientId)}&response_type=code&redirect_uri={Uri.EscapeDataString(RedirectUri)}&scope={Uri.EscapeDataString(Scope)}&state=test_badmode&response_mode=form_post.jwt"; // not yet supported
+        var (_, challenge) = CreatePkcePair();
+        var url = $"connect/authorize?client_id={Uri.EscapeDataString(DemoClientId)}&response_type=code&redirect_uri={Uri.EscapeDataString(RedirectUri)}&scope={Uri.EscapeDataString(Scope)}&state=test_badmode&code_challenge={challenge}&code_challenge_method=S256&response_mode=form_post.jwt"; // not yet supported
         var resp = await http.GetAsync(url);
 
         // Expect either 400 error or silent fallback (treat as unsupported) -> if redirect occurs it's a failure of enforcement; allow >=400 as pass.

@@ -75,6 +75,23 @@ internal sealed class DiscoveryAugmentationHandler : IOpenIddictServerHandler<Ap
     }
 }
 
+// Normalization handler: allow response_mode=jwt even if core validation doesn't know it.
+// We preserve the intent via a custom parameter and clear ResponseMode so default processing continues.
+internal sealed class JarmResponseModeNormalizationHandler : IOpenIddictServerHandler<ValidateAuthorizationRequestContext>
+{
+    public ValueTask HandleAsync(ValidateAuthorizationRequestContext context)
+    {
+        var request = context.Transaction?.Request ?? context.Request;
+        if (request != null && string.Equals(request.ResponseMode, "jwt", StringComparison.OrdinalIgnoreCase))
+        {
+            request.SetParameter("mrwho_jarm", "1");
+            request.ResponseMode = null;
+            request.SetParameter(OpenIddictConstants.Parameters.ResponseMode, null);
+        }
+        return ValueTask.CompletedTask;
+    }
+}
+
 // JARM packaging handler: wraps authorization success or error into signed JWT when response_mode=jwt
 internal sealed class JarmAuthorizationResponseHandler : IOpenIddictServerHandler<ApplyAuthorizationResponseContext>
 {
@@ -89,7 +106,9 @@ internal sealed class JarmAuthorizationResponseHandler : IOpenIddictServerHandle
     {
         try
         {
-            if (!string.Equals(context.Request?.ResponseMode, "jwt", StringComparison.OrdinalIgnoreCase))
+            var jarmRequested = string.Equals(context.Request?.ResponseMode, "jwt", StringComparison.OrdinalIgnoreCase) ||
+                                 string.Equals(context.Request?.GetParameter("mrwho_jarm").ToString(), "1", StringComparison.Ordinal);
+            if (!jarmRequested)
             {
                 return; // not JARM
             }
@@ -165,10 +184,41 @@ internal sealed class JarmAuthorizationResponseHandler : IOpenIddictServerHandle
 
 public static class JarJarmServerEventHandlers
 {
+    // NEW: extraction phase handler to normalize response_mode before validation
+    private sealed class JarmResponseModeExtractHandler : IOpenIddictServerHandler<ExtractAuthorizationRequestContext>
+    {
+        public ValueTask HandleAsync(ExtractAuthorizationRequestContext context)
+        {
+            var request = context.Transaction?.Request ?? context.Request;
+            if (request != null && string.Equals(request.ResponseMode, "jwt", StringComparison.OrdinalIgnoreCase))
+            {
+                request.SetParameter("mrwho_jarm", "1");
+                request.ResponseMode = null;
+                request.SetParameter(OpenIddictConstants.Parameters.ResponseMode, null);
+            }
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    public static OpenIddictServerHandlerDescriptor ExtractNormalizeJarmResponseModeDescriptor { get; } =
+        OpenIddictServerHandlerDescriptor.CreateBuilder<ExtractAuthorizationRequestContext>()
+            .UseScopedHandler<JarmResponseModeExtractHandler>()
+            .SetOrder(int.MinValue) // earliest possible to rewrite before built-in extraction rejects
+            .SetType(OpenIddictServerHandlerType.Custom)
+            .Build();
+
     public static OpenIddictServerHandlerDescriptor ConfigurationHandlerDescriptor { get; } =
         OpenIddictServerHandlerDescriptor.CreateBuilder<ApplyConfigurationResponseContext>()
             .UseScopedHandler<DiscoveryAugmentationHandler>()
             .SetOrder(0)
+            .SetType(OpenIddictServerHandlerType.Custom)
+            .Build();
+
+    // Run early (before built-in validator) to normalize response_mode=jwt
+    public static OpenIddictServerHandlerDescriptor NormalizeJarmResponseModeDescriptor { get; } =
+        OpenIddictServerHandlerDescriptor.CreateBuilder<ValidateAuthorizationRequestContext>()
+            .UseScopedHandler<JarmResponseModeNormalizationHandler>()
+            .SetOrder(int.MinValue) // ensure we run before core validation
             .SetType(OpenIddictServerHandlerType.Custom)
             .Build();
 

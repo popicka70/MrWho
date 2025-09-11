@@ -53,6 +53,10 @@ public static class WebApplicationExtensions
             app.UseHttpsRedirection();
         }
         app.UseStaticFiles();
+        
+        // Move JAR/JARM normalization BEFORE routing so OpenIddict never sees unsupported response_mode=jwt.
+        app.UseMiddleware<JarRequestExpansionMiddleware>();
+        
         app.UseRouting();
 
         // Enable ASP.NET Core rate limiting middleware
@@ -61,9 +65,7 @@ public static class WebApplicationExtensions
         // Enable session before custom middleware that uses it
         app.UseSession();
 
-        // Add JAR expansion before OpenIddict/auth
-        app.UseMiddleware<JarRequestExpansionMiddleware>();
-        // Add client cookie middleware before authentication
+        // Client cookie middleware (requires session)
         app.UseMiddleware<ClientCookieMiddleware>();
 
         // Add antiforgery middleware
@@ -114,15 +116,14 @@ public static class WebApplicationExtensions
         }
 
         app.UseStaticFiles();
+        // Early JAR/JARM normalization
+        app.UseMiddleware<JarRequestExpansionMiddleware>();
         app.UseRouting();
 
         app.UseRateLimiter();
 
-        // Enable session before custom middleware that uses it
         app.UseSession();
 
-        // JAR expansion before OpenIddict
-        app.UseMiddleware<JarRequestExpansionMiddleware>();
         app.UseMiddleware<ClientCookieMiddleware>();
         app.UseAntiforgery();
 
