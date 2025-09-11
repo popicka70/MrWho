@@ -57,6 +57,7 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
 
     // Audit logging
     public DbSet<AuditLog> AuditLogs { get; set; }
+    public DbSet<SecurityAuditEvent> SecurityAuditEvents { get; set; } // NEW hash-chained security events
 
     // User profile
     public DbSet<UserProfile> UserProfiles { get; set; }
@@ -511,6 +512,14 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
         {
             b.HasKey(c => c.Id);
             b.HasIndex(c => new { c.UserId, c.ClientId }).IsUnique();
+        });
+
+        // Configure SecurityAuditEvent entity
+        builder.Entity<SecurityAuditEvent>(b =>
+        {
+            b.HasKey(e => e.Id);
+            b.HasIndex(e => new { e.TimestampUtc, e.Category });
+            b.Property(e => e.DataJson).HasColumnType("text");
         });
 
         // Provider-specific tuning: MySQL row size limits -> move large strings to longtext

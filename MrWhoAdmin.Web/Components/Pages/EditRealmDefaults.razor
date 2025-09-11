@@ -35,9 +35,9 @@
     else
     {
         <RadzenTemplateForm Data="@model" TItem="UpdateRealmDefaultsRequest" Submit="@OnSave">
-            <!-- Changed RenderMode to Server and wrapped items in <Tabs> to avoid blank content due to client tab rendering issue -->
             <RadzenTabs @bind-SelectedIndex="selectedTabIndex" TabPosition="TabPosition.Left" RenderMode="TabRenderMode.Server" Style="width:100%; min-height:600px;">
                 <Tabs>
+                    <!-- Token Lifetimes -->
                     <RadzenTabsItem Text="Token Lifetimes" Icon="token">
                         <div style="padding:1rem; max-height:550px; overflow-y:auto;">
                             <RadzenStack Gap="0.75rem" class="rz-mb-4">
@@ -86,6 +86,8 @@
                             </RadzenStack>
                         </div>
                     </RadzenTabsItem>
+
+                    <!-- Session & Cookies -->
                     <RadzenTabsItem Text="Session & Cookies" Icon="schedule">
                         <div style="padding:1rem; max-height:550px; overflow-y:auto;">
                             <RadzenStack Gap="0.75rem" class="rz-mb-4">
@@ -98,9 +100,7 @@
                                                     <RadzenNumeric @bind-Value="model.DefaultSessionTimeoutHours" Min="1" Max="168" Style="width: 100%;" />
                                                 </ChildContent>
                                                 <Helper>
-                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                        Default session duration for clients in this realm (1-168 hours)
-                                                    </RadzenText>
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Default session duration for clients in this realm (1-168 hours)</RadzenText>
                                                 </Helper>
                                             </RadzenFormField>
                                         </RadzenColumn>
@@ -110,14 +110,11 @@
                                                     <RadzenNumeric @bind-Value="model.DefaultRememberMeDurationDays" Min="1" Max="365" Style="width: 100%;" />
                                                 </ChildContent>
                                                 <Helper>
-                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                        Default "Remember Me" duration (1-365 days)
-                                                    </RadzenText>
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Default "Remember Me" duration (1-365 days)</RadzenText>
                                                 </Helper>
                                             </RadzenFormField>
                                         </RadzenColumn>
                                     </RadzenRow>
-
                                     <RadzenFormField Text="Default Session Behavior" Variant="Variant.Outlined">
                                         <Start>
                                             <RadzenCheckBox @bind-Value="model.DefaultUseSlidingSessionExpiration" Name="defaultUseSliding" />
@@ -126,14 +123,11 @@
                                             <RadzenLabel Text="Use sliding expiration by default (extend session on user activity)" Component="defaultUseSliding" />
                                         </ChildContent>
                                         <Helper>
-                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                When enabled, session timeout resets on user activity for all clients
-                                            </RadzenText>
+                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">When enabled, session timeout resets on user activity for all clients</RadzenText>
                                         </Helper>
                                     </RadzenFormField>
                                 </RadzenStack>
                             </RadzenStack>
-
                             <RadzenStack Gap="0.75rem" class="rz-mt-4 rz-mb-4">
                                 <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Default Cookie Configuration</RadzenText>
                                 <RadzenStack Gap="1rem">
@@ -142,7 +136,6 @@
                                             <RadzenDropDown @bind-Value="model.DefaultCookieSameSitePolicy" Data="@(sameSitePolicies ?? new List<DropdownItem<string>>())" TextProperty="Text" ValueProperty="Value" Style="width: 100%;" />
                                         </ChildContent>
                                     </RadzenFormField>
-
                                     <RadzenFormField Text="Default HTTPS Requirement" Variant="Variant.Outlined">
                                         <Start>
                                             <RadzenCheckBox @bind-Value="model.DefaultRequireHttpsForCookies" Name="defaultRequireHttpsCookies" />
@@ -155,6 +148,8 @@
                             </RadzenStack>
                         </div>
                     </RadzenTabsItem>
+
+                    <!-- Security Defaults -->
                     <RadzenTabsItem Text="Security Defaults" Icon="security">
                         <div style="padding:1rem; max-height:550px; overflow-y:auto;">
                             <RadzenStack Gap="0.75rem" class="rz-mb-4">
@@ -178,7 +173,6 @@
                                     </RadzenFormField>
                                 </RadzenStack>
                             </RadzenStack>
-
                             <RadzenStack Gap="0.75rem" class="rz-mt-4 rz-mb-4">
                                 <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Default Token Security</RadzenText>
                                 <RadzenStack Gap="1rem">
@@ -213,6 +207,8 @@
                             </RadzenStack>
                         </div>
                     </RadzenTabsItem>
+
+                    <!-- MFA Defaults -->
                     <RadzenTabsItem Text="MFA Defaults" Icon="verified_user">
                         <div style="padding:1rem; max-height:550px; overflow-y:auto;">
                             <RadzenStack Gap="0.75rem" class="rz-mb-4">
@@ -226,12 +222,9 @@
                                             <RadzenLabel Text="Require MFA by default for all clients" Component="defaultRequireMfa" />
                                         </ChildContent>
                                         <Helper>
-                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                When enabled, all clients in this realm will require MFA unless overridden
-                                            </RadzenText>
+                                            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">When enabled, all clients in this realm will require MFA unless overridden</RadzenText>
                                         </Helper>
                                     </RadzenFormField>
-
                                     <RadzenRow>
                                         <RadzenColumn Size="12" SizeMD="6">
                                             <RadzenFormField Text="MFA Grace Period (Minutes)" Variant="Variant.Outlined">
@@ -239,9 +232,7 @@
                                                     <RadzenNumeric @bind-Value="model.DefaultMfaGracePeriodMinutes" Min="0" Max="1440" Style="width:100%;" Placeholder="Leave empty for no grace period" />
                                                 </ChildContent>
                                                 <Helper>
-                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
-                                                        Default time before requiring MFA again (0-1440 minutes)
-                                                    </RadzenText>
+                                                    <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Default time before requiring MFA again (0-1440 minutes)</RadzenText>
                                                 </Helper>
                                             </RadzenFormField>
                                         </RadzenColumn>
@@ -256,7 +247,6 @@
                                             </RadzenFormField>
                                         </RadzenColumn>
                                     </RadzenRow>
-
                                     <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-font-weight-600">Default Allowed MFA Methods</RadzenText>
                                     @foreach (var method in availableMfaMethods)
                                     {
@@ -274,10 +264,15 @@
                             </RadzenStack>
                         </div>
                     </RadzenTabsItem>
+
+                    <!-- JAR / JARM -->
                     <RadzenTabsItem Text="JAR / JARM" Icon="gpp_maybe">
                         <div style="padding:1rem; max-height:550px; overflow-y:auto;">
                             <RadzenStack Gap="0.75rem" class="rz-mb-4">
                                 <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Request Object (JAR) Defaults</RadzenText>
+                                <RadzenAlert AlertStyle="AlertStyle.Info" ShowIcon="true">
+                                    <RadzenText TextStyle="TextStyle.Caption"><strong>Precedence:</strong> Client override &gt; Realm default &gt; System. HS256 &gt;=32B, HS384 &gt;=48B, HS512 &gt;=64B secrets recommended.</RadzenText>
+                                </RadzenAlert>
                                 <RadzenFormField Text="Default JAR Mode" Variant="Variant.Outlined">
                                     <ChildContent>
                                         <RadzenDropDown @bind-Value="model.DefaultJarMode" TValue="JarMode?" Data="jarModes" TextProperty="Text" ValueProperty="Value" Style="width:100%;" />
@@ -295,6 +290,9 @@
                                     <ChildContent>
                                         <RadzenDropDown Multiple="true" AllowClear="true" @bind-Value="defaultSelectedJarAlgs" Data="defaultAllowedJarAlgs" TextProperty="Value" ValueProperty="Value" Style="width:100%;" Change="@(args => OnDefaultJarAlgsChanged())" />
                                     </ChildContent>
+                                    <Helper>
+                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Leave empty for system defaults (RS256, HS256). Only add HS384/512 if secrets meet length guidance.</RadzenText>
+                                    </Helper>
                                 </RadzenFormField>
                             </RadzenStack>
                             <RadzenStack Gap="0.75rem" class="rz-mt-4 rz-mb-4">
@@ -303,6 +301,9 @@
                                     <ChildContent>
                                         <RadzenDropDown @bind-Value="model.DefaultJarmMode" TValue="JarmMode?" Data="jarmModes" TextProperty="Text" ValueProperty="Value" Style="width:100%;" />
                                     </ChildContent>
+                                    <Helper>
+                                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Optional = response_mode=jwt allowed; Required = always JWT; Disabled = no JWT packaging.</RadzenText>
+                                    </Helper>
                                 </RadzenFormField>
                             </RadzenStack>
                         </div>
@@ -338,7 +339,7 @@
     };
 
     private class AlgItem { public string Value { get; set; } = string.Empty; }
-    private List<AlgItem> defaultAllowedJarAlgs = new() { new() { Value = "RS256" }, new() { Value = "HS256" } };
+    private List<AlgItem> defaultAllowedJarAlgs = new() { new() { Value = "RS256" }, new() { Value = "HS256" }, new() { Value = "HS384" }, new() { Value = "HS512" } };
     private IList<string> defaultSelectedJarAlgs = new List<string>();
 
     protected override void OnParametersSet()
