@@ -79,18 +79,31 @@ Notes:
 - sid issued during dynamic client sign-in when absent.
 
 ## 4. Back-Channel Logout Dispatch Completion
-Status: TODO  Priority: P0  Labels: oidc,logout,security,reliability
+Status: IN PROGRESS  Priority: P0  Labels: oidc,logout,security,reliability,audit
 Depends On: 1
 Description:
 Send signed logout tokens to registered back-channel endpoints with retry policy.
 Tasks:
-- [ ] JWT logout token builder (iss, sub, aud?, events, sid, iat)
-- [ ] Endpoint registration metadata + UI
-- [ ] Background dispatch w/ retry (1m,5m,15m) + max attempts
-- [ ] Outcome audit logging (success/failure + status code)
-- [ ] Metrics hook placeholder
-Acceptance:
-- Failure after max retries audited; signature validated in tests
+- [x] JWT logout token builder (iss, sub, aud, events, sid, iat)
+- [x] Endpoint registration metadata + UI (BackChannelLogoutUri + session required field present in client edit page)
+- [x] Outcome audit logging (success/failure/timeout/error/skip, exhaustion placeholder)
+- [x] Background dispatch single-attempt path
+- [x] Retry scheduler (1m,5m,15m backoff) wiring + scheduling hooks
+- [ ] Retry attempt outcome audits (per-attempt success/failure) & terminal aggregated event
+- [ ] Max attempts exhaustion audit (currently basic exhausted event logged only on schedule prevention; aggregate summary still pending)
+- [ ] Metrics hook placeholder (counter: mrwho_logout_backchannel_attempts_total, mrwho_logout_backchannel_failures_total)
+- [ ] Unit tests: schedule on failure, no schedule on success, exhaustion path (mock scheduler)
+Acceptance (remaining):
+- Failure after max retries audited with aggregated summary; signature validated in tests
+
+---
+## Updated Next Step Proposal (Item 4 Ongoing)
+Immediate execution order:
+1. Add unit tests for BackChannelLogoutService (failure -> schedules retry, success -> no schedule).
+2. Extend retry scheduler to emit per-attempt audit (backchannel.retry.attempt) and final aggregate (backchannel.retry.result).
+3. Add metrics counters (attempts/failures) + placeholder registration (no exporter yet).
+4. Exhaustion test (simulate attempts reaching max) verifying aggregate audit event.
+5. Then begin Item 6 DTO + basic Blazor UI wiring.
 
 ## 5. Symmetric Secret Policy Enforcement (HS*)
 Status: DONE  Priority: P0  Labels: security,cryptography
@@ -241,30 +254,6 @@ Milestone: Phase1-Security-Core -> Issues 1-5,15
 Milestone: Phase1.5-UI-Hardening -> Issues 6-8,11,12
 Milestone: Governance-Observability -> Issues 9-10
 Milestone: Advanced-Design -> Issues 13-14
-
----
-## Creation Checklist (When Opening GitHub Issues)
-- Title = heading
-- Body = section (Description, Tasks, Acceptance, Depends On)
-- Apply labels
-- Link dependencies
-
----
-## Updated Next Step Proposal (Post Item 5 Completion)
-Immediate execution order:
-1. Implement Item 4 core: logout token builder + per-client dispatch skeleton + audit (success/failure) without retries first.
-2. Add retry/backoff & outcome aggregation + tests for Item 4.
-3. Begin DTO + minimal UI scaffolding for Item 6 (Jar/Jarm fields) in parallel once Item 4 core merged.
-
-Short-Term Deliverables:
-- D1: Back-channel logout token builder & dispatch (single attempt) + audit events + unit tests.
-- D2: Retry policy (1m,5m,15m) + max attempts + failure audit + metrics hook placeholder.
-- D3: Client DTO/JAR-JARM form controls + mapping (no enforcement yet) to unblock Items 7,8,11,12.
-
-Rationale:
-- Back-channel infrastructure unlocks unified logout audit integration (Item 15).
-- Early UI wiring for JAR/JARM shortens feedback loop for policy/algo changes.
-- Staged retries decouple correctness from reliability complexity.
 
 ---
 ## Creation Checklist (When Opening GitHub Issues)
