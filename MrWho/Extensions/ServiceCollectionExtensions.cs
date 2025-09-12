@@ -148,6 +148,9 @@ public static class ServiceCollectionExtensions
         services.AddHostedService<AuditChainVerifierHostedService>();
         services.AddHostedService<AuditRetentionHostedService>();
 
+        services.AddOptions<SymmetricSecretPolicyOptions>().BindConfiguration(SymmetricSecretPolicyOptions.SectionName);
+        services.AddScoped<ISymmetricSecretPolicy, SymmetricSecretPolicy>();
+
         return services;
     }
 

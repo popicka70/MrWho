@@ -10,6 +10,7 @@ using MrWho.Services;
 using MrWho.Shared;
 using OpenIddict.Abstractions;
 using Microsoft.IdentityModel.JsonWebTokens; // added for JsonWebTokenHandler
+using MrWho.Options; // ensure options namespace if needed
 
 namespace MrWho.Middleware;
 
@@ -27,7 +28,7 @@ public class JarRequestExpansionMiddleware
     private static bool IsAuthorizePath(PathString path)
         => path.HasValue && path.Value!.EndsWith("/connect/authorize", StringComparison.OrdinalIgnoreCase);
 
-    public async Task InvokeAsync(HttpContext context, ApplicationDbContext db, IKeyManagementService keyService, IJarReplayCache replayCache, IOptions<JarOptions> jarOptions, ISecurityAuditWriter auditWriter)
+    public async Task InvokeAsync(HttpContext context, ApplicationDbContext db, IKeyManagementService keyService, IJarReplayCache replayCache, IOptions<JarOptions> jarOptions, ISecurityAuditWriter auditWriter, ISymmetricSecretPolicy symmetricPolicy)
     {
         var req = context.Request;
         var path = req.Path;
@@ -196,21 +197,19 @@ public class JarRequestExpansionMiddleware
                         await auditWriter.WriteAsync("auth.security", "jar.rejected_missing_secret", new { clientId = effectiveClientId }, "warn", actorClientId: effectiveClientId, ip: context.Connection.RemoteIpAddress?.ToString());
                         return;
                     }
-                    var keyBytes = Encoding.UTF8.GetBytes(dbClient.ClientSecret);
-                    if (keyBytes.Length < 32)
+                    var res = symmetricPolicy.ValidateForAlgorithm(alg.ToUpperInvariant(), dbClient.ClientSecret);
+                    if (!res.Success)
                     {
-                        var padded = new byte[32];
-                        Array.Copy(keyBytes, padded, keyBytes.Length);
-                        for (int i = keyBytes.Length; i < 32; i++) padded[i] = (byte)'!';
-                        keyBytes = padded;
-                        _logger.LogDebug("Padded short client secret for HS256 JAR (client {ClientId}, originalLen={Len})", effectiveClientId, dbClient.ClientSecret.Length);
+                        await WriteErrorAsync(context, OpenIddictConstants.Errors.InvalidRequestObject, "client secret length below policy");
+                        await auditWriter.WriteAsync("auth.security", "jar.rejected_secret_policy", new { clientId = effectiveClientId, alg, required = res.RequiredBytes, actual = res.ActualBytes }, "warn", actorClientId: effectiveClientId, ip: context.Connection.RemoteIpAddress?.ToString());
+                        return;
                     }
-                    hsKey = new SymmetricSecurityKey(keyBytes)
+                    var keyBytes = Encoding.UTF8.GetBytes(dbClient.ClientSecret);
+                    var signingKey = new SymmetricSecurityKey(keyBytes)
                     {
-                        // Add a KeyId so if future multiple keys are present, kid based resolution works
                         KeyId = $"client:{effectiveClientId}:hs"
                     };
-                    tvp.IssuerSigningKey = hsKey;
+                    tvp.IssuerSigningKey = signingKey;
                 }
                 else if (alg.Equals(SecurityAlgorithms.RsaSha256, StringComparison.OrdinalIgnoreCase) || alg.Equals(SecurityAlgorithms.RsaSha384, StringComparison.OrdinalIgnoreCase) || alg.Equals(SecurityAlgorithms.RsaSha512, StringComparison.OrdinalIgnoreCase))
                 {
