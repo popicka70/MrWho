@@ -12,12 +12,14 @@ public sealed class SecurityAuditWriter : ISecurityAuditWriter
     private readonly ApplicationDbContext _db;
     private readonly ILogger<SecurityAuditWriter> _logger;
     private readonly IAuditIntegrityWriter _integrityWriter; // NEW
+    private readonly ICorrelationContextAccessor _correlation;
 
-    public SecurityAuditWriter(ApplicationDbContext db, ILogger<SecurityAuditWriter> logger, IAuditIntegrityWriter integrityWriter)
+    public SecurityAuditWriter(ApplicationDbContext db, ILogger<SecurityAuditWriter> logger, IAuditIntegrityWriter integrityWriter, ICorrelationContextAccessor correlation)
     {
         _db = db;
         _logger = logger;
         _integrityWriter = integrityWriter;
+        _correlation = correlation;
     }
 
     public async Task<SecurityAuditEvent> WriteAsync(string category, string eventType, object? data = null,
@@ -25,6 +27,10 @@ public sealed class SecurityAuditWriter : ISecurityAuditWriter
     {
         if (string.IsNullOrWhiteSpace(category)) category = "general";
         if (string.IsNullOrWhiteSpace(eventType)) eventType = "unknown";
+
+        var correlationId = _correlation.Current.CorrelationId;
+        var resolvedActorUserId = actorUserId ?? _correlation.Current.ActorUserId;
+        var resolvedActorClientId = actorClientId ?? _correlation.Current.ActorClientId;
 
         var last = await _db.SecurityAuditEvents
             .AsNoTracking()
@@ -47,8 +53,8 @@ public sealed class SecurityAuditWriter : ISecurityAuditWriter
             category,
             eventType,
             level ?? string.Empty,
-            actorUserId ?? string.Empty,
-            actorClientId ?? string.Empty,
+            resolvedActorUserId ?? string.Empty,
+            resolvedActorClientId ?? string.Empty,
             ip ?? string.Empty,
             dataJson ?? string.Empty,
             prevHash ?? string.Empty
@@ -61,8 +67,8 @@ public sealed class SecurityAuditWriter : ISecurityAuditWriter
             Category = category,
             EventType = eventType,
             Level = level,
-            ActorUserId = actorUserId,
-            ActorClientId = actorClientId,
+            ActorUserId = resolvedActorUserId,
+            ActorClientId = resolvedActorClientId,
             IpAddress = ip,
             DataJson = dataJson,
             PrevHash = prevHash,
@@ -71,21 +77,21 @@ public sealed class SecurityAuditWriter : ISecurityAuditWriter
 
         _db.SecurityAuditEvents.Add(entry);
         await _db.SaveChangesAsync(ct);
-        _logger.LogDebug("Audit event persisted: {Category}/{Type} id={Id}", category, eventType, entry.Id);
+        _logger.LogDebug("Audit event persisted: {Category}/{Type} id={Id} corr={CorrelationId}", category, eventType, entry.Id, correlationId);
 
-        // ALSO write integrity chain record (maps event -> action)
+        // ALSO write integrity chain record (maps event -> action) including correlation id
         try
         {
-            var actorType = actorUserId != null ? "user" : actorClientId != null ? "client" : "system";
+            var actorType = resolvedActorUserId != null ? "user" : resolvedActorClientId != null ? "client" : "system";
             await _integrityWriter.WriteAsync(new AuditIntegrityWriteRequest(
                 Category: category,
                 Action: eventType,
                 ActorType: actorType,
-                ActorId: actorUserId ?? actorClientId,
+                ActorId: resolvedActorUserId ?? resolvedActorClientId,
                 SubjectType: null,
                 SubjectId: null,
                 RealmId: null,
-                CorrelationId: null, // will populate when correlation middleware (Item 2) exists
+                CorrelationId: correlationId,
                 Data: data,
                 Version: 1
             ), ct);

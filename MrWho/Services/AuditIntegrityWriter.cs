@@ -14,10 +14,11 @@ public sealed class AuditIntegrityWriter : IAuditIntegrityWriter
 {
     private readonly ApplicationDbContext _db;
     private readonly ILogger<AuditIntegrityWriter> _logger;
+    private readonly ICorrelationContextAccessor _correlation;
     private static readonly JsonSerializerOptions _jsonOptions = new() { WriteIndented = false };
 
-    public AuditIntegrityWriter(ApplicationDbContext db, ILogger<AuditIntegrityWriter> logger)
-    { _db = db; _logger = logger; }
+    public AuditIntegrityWriter(ApplicationDbContext db, ILogger<AuditIntegrityWriter> logger, ICorrelationContextAccessor correlation)
+    { _db = db; _logger = logger; _correlation = correlation; }
 
     public async Task<AuditIntegrityRecord> WriteAsync(AuditIntegrityWriteRequest request, CancellationToken ct = default)
     {
@@ -37,16 +38,18 @@ public sealed class AuditIntegrityWriter : IAuditIntegrityWriter
             catch (Exception ex) { _logger.LogWarning(ex, "Failed to serialize audit integrity data"); }
         }
 
+        var correlationId = request.CorrelationId ?? _correlation.Current.CorrelationId;
+
         var record = new AuditIntegrityRecord
         {
             Category = request.Category,
             Action = request.Action,
-            ActorType = request.ActorType,
-            ActorId = request.ActorId,
+            ActorType = request.ActorType ?? _correlation.Current.ActorType,
+            ActorId = request.ActorId ?? _correlation.Current.ActorUserId ?? _correlation.Current.ActorClientId,
             SubjectType = request.SubjectType,
             SubjectId = request.SubjectId,
             RealmId = request.RealmId,
-            CorrelationId = request.CorrelationId,
+            CorrelationId = correlationId,
             DataJson = dataJson,
             PreviousHash = prev?.RecordHash,
             Version = request.Version,

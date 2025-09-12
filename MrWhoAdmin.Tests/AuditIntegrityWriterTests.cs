@@ -14,6 +14,7 @@ public class AuditIntegrityWriterTests
         var sc = new ServiceCollection();
         sc.AddLogging();
         sc.AddDbContext<ApplicationDbContext>(o => o.UseInMemoryDatabase(Guid.NewGuid().ToString()));
+        sc.AddSingleton<ICorrelationContextAccessor, CorrelationContextAccessor>(); // required by writer
         sc.AddScoped<IAuditIntegrityWriter, AuditIntegrityWriter>();
         sc.AddScoped<IAuditIntegrityVerificationService, AuditIntegrityVerificationService>();
         return sc.BuildServiceProvider();

@@ -46,7 +46,7 @@ public sealed class CorrelationMiddleware
         };
         CorrelationContextAccessor.Set(ctx);
 
-        using (_logger.BeginScope(new Dictionary<string, object>{{"CorrelationId", correlationId}}))
+        using (_logger.BeginScope(new Dictionary<string, object>{{"CorrelationId", correlationId},{"ActorType", actorType},{"ActorUserId", userId ?? string.Empty},{"ActorClientId", clientId ?? string.Empty}}))
         {
             await _next(context);
         }
