@@ -1,5 +1,3 @@
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using MrWho.Data;
@@ -15,10 +13,11 @@ public sealed class AuditIntegrityWriter : IAuditIntegrityWriter
     private readonly ApplicationDbContext _db;
     private readonly ILogger<AuditIntegrityWriter> _logger;
     private readonly ICorrelationContextAccessor _correlation;
+    private readonly IIntegrityHashService _hashService;
     private static readonly JsonSerializerOptions _jsonOptions = new() { WriteIndented = false };
 
-    public AuditIntegrityWriter(ApplicationDbContext db, ILogger<AuditIntegrityWriter> logger, ICorrelationContextAccessor correlation)
-    { _db = db; _logger = logger; _correlation = correlation; }
+    public AuditIntegrityWriter(ApplicationDbContext db, ILogger<AuditIntegrityWriter> logger, ICorrelationContextAccessor correlation, IIntegrityHashService hashService)
+    { _db = db; _logger = logger; _correlation = correlation; _hashService = hashService; }
 
     public async Task<AuditIntegrityRecord> WriteAsync(AuditIntegrityWriteRequest request, CancellationToken ct = default)
     {
@@ -58,7 +57,7 @@ public sealed class AuditIntegrityWriter : IAuditIntegrityWriter
 
         // Compute canonical representation (exclude RecordHash)
         var canonical = BuildCanonical(record);
-        record.RecordHash = ComputeHash(canonical + (record.PreviousHash ?? string.Empty) + record.Version.ToString());
+        record.RecordHash = _hashService.ComputeChainHash(canonical, record.PreviousHash, record.Version);
 
         _db.AuditIntegrityRecords.Add(record);
         await _db.SaveChangesAsync(ct);
@@ -82,10 +81,5 @@ public sealed class AuditIntegrityWriter : IAuditIntegrityWriter
             r.CorrelationId ?? string.Empty,
             r.DataJson ?? string.Empty
         });
-    }
-
-    private static string ComputeHash(string material)
-    {
-        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(material)));
     }
 }

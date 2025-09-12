@@ -1,6 +1,6 @@
 # OIDC Platform Implementation Backlog
 
-Generated: 2025-09-12
+Generated: 2025-09-12 (updated after Items 1 & 2 progress)
 Source: Enterprise Roadmap (Phase 1 & 1.5)
 
 Legend:
@@ -28,37 +28,38 @@ Legend:
 
 ---
 ## 1. Audit Log Writer & Integrity Chain
-Status: TODO  Priority: P0  Labels: security,audit,backend
+Status: IN PROGRESS  Priority: P0  Labels: security,audit,backend
 Depends On: —
 Description:
 Implement append-only audit persistence with cryptographic integrity chain.
 Data model columns: Id (ULID), TimestampUtc, Category, Action, ActorType, ActorId, SubjectType, SubjectId, RealmId (nullable), CorrelationId, DataJson, PreviousHash, RecordHash, Version.
 Integrity: RecordHash = SHA-256( canonical(JSON(ordered fields)) + PreviousHash + Version ).
 Tasks:
-- [ ] Confirm / create EF entity + migration (ULID or sequential GUID)
-- [ ] Implement canonical serializer (stable ordering; exclude RecordHash)
-- [ ] Hash service (IIntegrityHashService)
-- [ ] Scoped IAuditWriter with WriteAsync(dto)
-- [ ] Correlation/actor context integration hook
-- [ ] Verification service: full chain scan + latest head retrieval
-- [ ] Admin endpoint /health/audit-integrity (returns status summary)
-- [ ] Unit tests: hash link, tamper detection, performance (<3ms per write locally)
-Acceptance:
-- Tampering triggers verification failure
-- At least 3 categories written in tests without chain break
+- [x] Confirm / create EF entity (ULID)  (DB migration still to be generated/applied)
+- [x] Implement canonical serializer (stable ordering; exclude RecordHash)
+- [ ] Hash service abstraction (IIntegrityHashService) (currently inline SHA-256 implementation)
+- [x] Scoped IAuditWriter (AuditIntegrityWriter) with WriteAsync(dto)
+- [x] Correlation/actor context integration hook (via CorrelationMiddleware + accessor)
+- [x] Verification service: full chain scan + latest head retrieval
+- [x] Admin endpoint /health/audit-integrity (returns status summary)
+- [x] Unit tests: hash link, tamper detection (performance test still pending <3ms target)
+- [ ] Performance benchmark (<3ms per write locally)
+Acceptance (pending items):
+- Tampering triggers verification failure (DONE)
+- At least 3 categories written in tests without chain break (basic chain test DONE; add multi-category test optional)
 
 ## 2. Correlation & Actor Resolution Middleware
-Status: TODO  Priority: P0  Labels: infrastructure,audit
+Status: DONE  Priority: P0  Labels: infrastructure,audit
 Depends On: 1 (optional but recommended)
 Description:
-Middleware to resolve/generate CorrelationId (header X-Correlation-Id). Provide ICorrelationContextAccessor. Resolve Actor (system/user) for audit.
+Middleware to resolve/generate CorrelationId (header X-Correlation-Id). Provide ICorrelationContextAccessor. Resolve Actor (system/user/client) for audit.
 Tasks:
-- [ ] Middleware implement & register early in pipeline
-- [ ] Add response header echo
-- [ ] Accessor service injectable
-- [ ] Unit test: preserves inbound; generates new when absent
+- [x] Middleware implement & register early in pipeline
+- [x] Add response header echo
+- [x] Accessor service injectable (HttpContext.Items implementation)
+- [x] Unit tests: preserves inbound; generates new when absent; user & client actor resolution
 Acceptance:
-- Present for all controller/page requests
+- Present for all controller/page requests (implemented in Program pipeline)
 
 ## 3. Front-Channel Logout Implementation
 Status: TODO  Priority: P0  Labels: oidc,logout,security
@@ -269,4 +270,12 @@ For each issue:
 - Link dependency using issue numbers once created
 
 ---
+## Next Step Proposal (Post Items 1 & 2 Progress)
+Immediate priorities:
+1. Finish remaining Item 1 gaps (migration + IIntegrityHashService + performance benchmark) – small, high value for audit assurance.
+2. Begin Item 5 (Symmetric Secret Policy) – prerequisite for the large JAR/JARM & PAR feature chain (Items 6-8,11,12). Implement config + validator + enforcement + tests.
+3. In parallel, start Item 3 (Front-Channel Logout) after migration for new client metadata so logout sequence & later Item 15 can be unblocked.
+
+Rationale: Completing Item 5 early unlocks multiple P1 protocol hardening tasks; finishing Item 1 solidifies trust in subsequent audit events.
+
 End of backlog.

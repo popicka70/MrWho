@@ -137,6 +137,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IAuditQueryService, AuditQueryService>();
         services.AddScoped<IAuditIntegrityWriter, AuditIntegrityWriter>();
         services.AddScoped<IAuditIntegrityVerificationService, AuditIntegrityVerificationService>();
+        services.AddScoped<IIntegrityHashService, IntegrityHashService>();
         services.AddHttpContextAccessor();
         services.AddSingleton<ICorrelationContextAccessor, CorrelationContextAccessor>();
 

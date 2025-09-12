@@ -26,3 +26,15 @@ public sealed record AuditIntegrityWriteRequest(
     object? Data = null,
     int Version = 1
 );
+
+public interface IIntegrityHashService
+{
+    /// <summary>
+    /// Compute a deterministic hash for the audit integrity record.
+    /// </summary>
+    /// <param name="canonical">Canonical ordered representation excluding RecordHash.</param>
+    /// <param name="previousHash">Previous record hash in the chain (may be null/empty for first record).</param>
+    /// <param name="version">Schema/hash algorithm version integer.</param>
+    /// <returns>Hex (uppercase) SHA-256 hash string.</returns>
+    string ComputeChainHash(string canonical, string? previousHash, int version);
+}
