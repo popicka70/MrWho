@@ -67,8 +67,8 @@ public class CreateUserHandler : ICreateUserHandler
                 var userDto = new UserDto
                 {
                     Id = user.Id,
-                    UserName = user.UserName,
-                    Email = user.Email,
+                    UserName = user.UserName ?? string.Empty,
+                    Email = user.Email ?? string.Empty,
                     EmailConfirmed = user.EmailConfirmed,
                     PhoneNumber = user.PhoneNumber,
                     PhoneNumberConfirmed = user.PhoneNumberConfirmed,
