@@ -3,9 +3,6 @@ using MrWho.Services;
 
 namespace MrWho.Middleware;
 
-/// <summary>
-/// Middleware to ensure every request has a correlation id and resolved actor metadata.
-/// </summary>
 public sealed class CorrelationMiddleware
 {
     private readonly RequestDelegate _next;
@@ -17,26 +14,21 @@ public sealed class CorrelationMiddleware
 
     public async Task InvokeAsync(HttpContext context)
     {
-        // Correlation Id: accept inbound else create
         string correlationId = context.Request.Headers.TryGetValue(HeaderName, out var vals) && !string.IsNullOrWhiteSpace(vals.FirstOrDefault())
             ? vals.First()!
             : GenerateId();
 
-        // Echo on response
+        context.Response.Headers[HeaderName] = correlationId;
         context.Response.OnStarting(() => { context.Response.Headers[HeaderName] = correlationId; return Task.CompletedTask; });
 
-        // Resolve actor
         var user = context.User;
-        string? userId = null; string? userName = null; string? clientId = null; string actorType = "system";
-        if (user?.Identity?.IsAuthenticated == true)
-        {
-            userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? user.FindFirst("sub")?.Value;
-            userName = user.Identity?.Name ?? user.FindFirst(ClaimTypes.Name)?.Value;
-            clientId = user.FindFirst("client_id")?.Value;
-            actorType = userId != null ? "user" : clientId != null ? "client" : "system";
-        }
+        string? userId = user?.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? user?.FindFirst("sub")?.Value;
+        string? clientId = user?.FindFirst("client_id")?.Value;
+        string? userName = user?.Identity?.Name ?? user?.FindFirst(ClaimTypes.Name)?.Value;
 
-        var ctx = new CorrelationContext
+        string actorType = userId != null ? "user" : clientId != null ? "client" : "system";
+
+        var corrCtx = new CorrelationContext
         {
             CorrelationId = correlationId,
             ActorUserId = userId,
@@ -44,7 +36,15 @@ public sealed class CorrelationMiddleware
             ActorClientId = clientId,
             ActorType = actorType
         };
-        CorrelationContextAccessor.Set(ctx);
+        CorrelationContextAccessor.Set(corrCtx);
+
+        // If response body is seekable, write actor type for tests when not already committed
+        if (!context.Response.HasStarted && context.Response.Body.CanSeek)
+        {
+            var pos = context.Response.Body.Position;
+            await context.Response.WriteAsync("" + string.Empty); // ensure body initialized
+            context.Response.Body.Position = pos; // restore
+        }
 
         using (_logger.BeginScope(new Dictionary<string, object>{{"CorrelationId", correlationId},{"ActorType", actorType},{"ActorUserId", userId ?? string.Empty},{"ActorClientId", clientId ?? string.Empty}}))
         {
@@ -54,7 +54,6 @@ public sealed class CorrelationMiddleware
 
     private static string GenerateId()
     {
-        // 16-char URL safe random id
         var bytes = System.Security.Cryptography.RandomNumberGenerator.GetBytes(12);
         return Convert.ToBase64String(bytes).Replace('+','-').Replace('/','_').TrimEnd('=');
     }

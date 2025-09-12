@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using MrWho.Middleware;
 using MrWho.Services;
 using System.Security.Claims;
+using System.Text;
 
 namespace MrWhoAdmin.Tests;
 
@@ -21,7 +22,6 @@ public class CorrelationMiddlewareTests
         RequestDelegate terminal = async ctx =>
         {
             var accessor = ctx.RequestServices.GetRequiredService<ICorrelationContextAccessor>();
-            // Write correlation id into response body for assertion
             await ctx.Response.WriteAsync(accessor.Current.CorrelationId + "|" + accessor.Current.ActorType);
         };
         var logger = sp.GetRequiredService<ILogger<CorrelationMiddleware>>();
@@ -31,15 +31,23 @@ public class CorrelationMiddlewareTests
         return (app, sp);
     }
 
-    private static DefaultHttpContext CreateContext(ServiceProvider sp, bool withUser)
+    private static DefaultHttpContext CreateContext(ServiceProvider sp, bool withUser, bool clientOnly = false)
     {
-        var httpCtx = new DefaultHttpContext { RequestServices = sp };
+        var httpCtx = new DefaultHttpContext { RequestServices = sp, Response = { Body = new MemoryStream() } };
         if (withUser)
         {
             var identity = new ClaimsIdentity(new[]
             {
                 new Claim(ClaimTypes.NameIdentifier, "user-123"),
                 new Claim(ClaimTypes.Name, "alice")
+            }, "test");
+            httpCtx.User = new ClaimsPrincipal(identity);
+        }
+        else if (clientOnly)
+        {
+            var identity = new ClaimsIdentity(new[]
+            {
+                new Claim("client_id", "client-app-1")
             }, "test");
             httpCtx.User = new ClaimsPrincipal(identity);
         }
@@ -76,5 +84,17 @@ public class CorrelationMiddlewareTests
         var accessor = sp.GetRequiredService<ICorrelationContextAccessor>();
         Assert.AreEqual("user", accessor.Current.ActorType);
         Assert.AreEqual("user-123", accessor.Current.ActorUserId);
+    }
+
+    [TestMethod]
+    public async Task Sets_Actor_Info_For_Client_Id_Principal()
+    {
+        var (app, sp) = BuildApp(false);
+        var ctx = CreateContext(sp, false, clientOnly: true);
+        await app(ctx);
+        var accessor = sp.GetRequiredService<ICorrelationContextAccessor>();
+        Assert.AreEqual("client", accessor.Current.ActorType);
+        Assert.IsNull(accessor.Current.ActorUserId);
+        Assert.AreEqual("client-app-1", accessor.Current.ActorClientId);
     }
 }
