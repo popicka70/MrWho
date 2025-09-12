@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using MrWho.Data;
 using MrWho.Models;
@@ -49,9 +51,9 @@ public class ClientRoleServiceTests
             // Configure UserManager with in-memory store
             var store = new UserStore<IdentityUser>(Db);
             var userMgrLogger = new Mock<ILogger<UserManager<IdentityUser>>>();
-            UserManager = new UserManager<IdentityUser>(store, null, new PasswordHasher<IdentityUser>(),
+            UserManager = new UserManager<IdentityUser>(store, Options.Create(new IdentityOptions()), new PasswordHasher<IdentityUser>(),
                 Array.Empty<IUserValidator<IdentityUser>>(), Array.Empty<IPasswordValidator<IdentityUser>>(),
-                new UpperInvariantLookupNormalizer(), new IdentityErrorDescriber(), null, userMgrLogger.Object);
+                new UpperInvariantLookupNormalizer(), new IdentityErrorDescriber(), new ServiceCollection().BuildServiceProvider(), userMgrLogger.Object);
 
             // Create user
             var createResult = UserManager.CreateAsync(User, "Pass123$!").GetAwaiter().GetResult();
@@ -94,7 +96,7 @@ public class ClientRoleServiceTests
         Assert.IsFalse((await fx.Service.GetClientRolesAsync(fx.User.Id, fx.Client.ClientId)).Contains("viewer"));
     }
 
-    [DataTestMethod]
+    [TestMethod]
     [DataRow(RoleInclusion.GlobalOnly, true, false)]
     [DataRow(RoleInclusion.ClientOnly, false, true)]
     [DataRow(RoleInclusion.GlobalAndClient, true, true)]

@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Microsoft.Extensions.DependencyInjection;
 using MrWho.Data;
 using MrWho.Models;
 using MrWho.Services;
@@ -24,7 +26,7 @@ public class ClientRoleServiceAdditionalTests
         var client = new Client { ClientId = Guid.NewGuid().ToString("N"), Name = "C", Realm = realm, RealmId = realm.Id };
         db.Clients.Add(client); db.SaveChanges();
         var store = new UserStore<IdentityUser>(db);
-        var userMgr = new UserManager<IdentityUser>(store, null, new PasswordHasher<IdentityUser>(), Array.Empty<IUserValidator<IdentityUser>>(), Array.Empty<IPasswordValidator<IdentityUser>>(), new UpperInvariantLookupNormalizer(), new IdentityErrorDescriber(), null, LoggerFactory.Create(b => b.AddDebug()).CreateLogger<UserManager<IdentityUser>>());
+        var userMgr = new UserManager<IdentityUser>(store, Options.Create(new IdentityOptions()), new PasswordHasher<IdentityUser>(), Array.Empty<IUserValidator<IdentityUser>>(), Array.Empty<IPasswordValidator<IdentityUser>>(), new UpperInvariantLookupNormalizer(), new IdentityErrorDescriber(), new ServiceCollection().BuildServiceProvider(), LoggerFactory.Create(b => b.AddDebug()).CreateLogger<UserManager<IdentityUser>>());
         var user = new IdentityUser { UserName = "u@t", Email = "u@t" };
         userMgr.CreateAsync(user, "Pass123$!").GetAwaiter().GetResult();
         var service = new ClientRoleService(db, userMgr, new MemoryCache(new MemoryCacheOptions()), LoggerFactory.Create(b => b.AddDebug()).CreateLogger<ClientRoleService>());

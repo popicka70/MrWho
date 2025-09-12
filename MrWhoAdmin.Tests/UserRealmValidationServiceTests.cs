@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Microsoft.Extensions.DependencyInjection;
 using MrWho.Data;
 using MrWho.Models;
 using MrWho.Services;
@@ -43,9 +45,9 @@ public class UserRealmValidationServiceTests
             Db.SaveChanges();
 
             var store = new UserStore<IdentityUser>(Db);
-            UserManager = new UserManager<IdentityUser>(store, null, new PasswordHasher<IdentityUser>(),
+            UserManager = new UserManager<IdentityUser>(store, Options.Create(new IdentityOptions()), new PasswordHasher<IdentityUser>(),
                 Array.Empty<IUserValidator<IdentityUser>>(), Array.Empty<IPasswordValidator<IdentityUser>>(),
-                new UpperInvariantLookupNormalizer(), new IdentityErrorDescriber(), null, new LoggerFactory().CreateLogger<UserManager<IdentityUser>>());
+                new UpperInvariantLookupNormalizer(), new IdentityErrorDescriber(), new ServiceCollection().BuildServiceProvider(), new LoggerFactory().CreateLogger<UserManager<IdentityUser>>());
 
             var res = UserManager.CreateAsync(User, "Pass123$!").GetAwaiter().GetResult();
             if (!res.Succeeded)

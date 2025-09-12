@@ -9,12 +9,14 @@ public sealed class ClientSecretService : IClientSecretService
     private readonly ApplicationDbContext _db;
     private readonly IClientSecretHasher _hasher;
     private readonly ILogger<ClientSecretService> _logger;
+    private readonly ISecurityAuditWriter _audit;
 
-    public ClientSecretService(ApplicationDbContext db, IClientSecretHasher hasher, ILogger<ClientSecretService> logger)
+    public ClientSecretService(ApplicationDbContext db, IClientSecretHasher hasher, ILogger<ClientSecretService> logger, ISecurityAuditWriter audit)
     {
         _db = db;
         _hasher = hasher;
         _logger = logger;
+        _audit = audit;
     }
 
     public async Task<(ClientSecretHistory record, string? plainSecret)> SetNewSecretAsync(string clientId, string? providedPlaintext = null, DateTime? expiresAt = null, bool markOldAsRetired = true, CancellationToken ct = default)
@@ -76,6 +78,7 @@ public sealed class ClientSecretService : IClientSecretService
         }
 
         _logger.LogInformation("Created new secret for client {ClientId}", client.ClientId);
+        try { await _audit.WriteAsync(SecurityAudit.ClientSecretRotated, new { clientId = client.ClientId, recordId = rec.Id, rec.CreatedAt, rec.ExpiresAt, algo = rec.Algo }, "info", actorClientId: client.ClientId, ct: ct); } catch { }
         return (rec, providedPlaintext == null ? plain : null);
     }
 
@@ -98,6 +101,7 @@ public sealed class ClientSecretService : IClientSecretService
                 return true;
             }
         }
+        try { await _audit.WriteAsync(SecurityAudit.ClientSecretVerifyFailed, new { clientId = client.ClientId }, "warn", actorClientId: client.ClientId, ct: ct); } catch { }
         return false;
     }
 

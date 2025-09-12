@@ -133,21 +133,24 @@ internal sealed class MrWhoUserAccessTokenHandler : DelegatingHandler
             var json = await resp.Content.ReadAsStringAsync(ct);
             using var doc = JsonDocument.Parse(json);
             var newAccessToken = doc.RootElement.TryGetProperty("access_token", out var atEl) ? atEl.GetString() : null;
-            var newRefreshToken = doc.RootElement.TryGetProperty("refresh_token", out var rtEl) ? rtEl.GetString() : refreshToken;
-            var expiresIn = doc.RootElement.TryGetProperty("expires_in", out var expEl) ? expEl.GetInt32() : 3600;
-            if (string.IsNullOrEmpty(newAccessToken))
+            if (string.IsNullOrWhiteSpace(newAccessToken))
             {
                 _logger.LogWarning("Refresh response missing access_token.");
-                return accessToken;
+                return accessToken; // keep existing (may be null)
             }
-
+            var newRefreshToken = doc.RootElement.TryGetProperty("refresh_token", out var rtEl) ? rtEl.GetString() : refreshToken;
+            var expiresIn = doc.RootElement.TryGetProperty("expires_in", out var expEl) ? expEl.GetInt32() : 3600;
             var newExpiresAt = DateTimeOffset.UtcNow.AddSeconds(expiresIn);
 
             var authResult = await ctx.AuthenticateAsync(cookieScheme);
             if (authResult.Succeeded && authResult.Properties != null)
             {
+                // Only update tokens when we have non-null values (satisfies nullable annotations on UpdateTokenValue)
                 authResult.Properties.UpdateTokenValue("access_token", newAccessToken);
-                authResult.Properties.UpdateTokenValue("refresh_token", newRefreshToken);
+                if (!string.IsNullOrWhiteSpace(newRefreshToken))
+                {
+                    authResult.Properties.UpdateTokenValue("refresh_token", newRefreshToken);
+                }
                 authResult.Properties.UpdateTokenValue("expires_at", newExpiresAt.ToString("o"));
                 await ctx.SignInAsync(cookieScheme, authResult.Principal!, authResult.Properties);
                 _logger.LogDebug("Refreshed user access token; new expiry {Expiry}", newExpiresAt);

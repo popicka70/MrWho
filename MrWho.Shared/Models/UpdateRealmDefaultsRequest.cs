@@ -58,4 +58,11 @@ public class UpdateRealmDefaultsRequest
     public string? RealmPolicyUri { get; set; }
     [StringLength(2000)]
     public string? RealmTosUri { get; set; }
+
+    // Phase 1.5 JAR/JARM defaults
+    public JarMode? DefaultJarMode { get; set; }
+    public JarmMode? DefaultJarmMode { get; set; }
+    public bool? DefaultRequireSignedRequestObject { get; set; }
+    [StringLength(400)]
+    public string? DefaultAllowedRequestObjectAlgs { get; set; }
 }

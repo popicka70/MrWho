@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Components;
 using MrWho.Shared.Models;
 using Radzen;
 using MrWhoAdmin.Web.Services;
+using MrWho.Shared; // added for enums
 
 namespace MrWhoAdmin.Web.Components.Pages;
 
@@ -18,7 +19,7 @@ public partial class EditRealmDefaults
     internal UpdateRealmDefaultsRequest model = new();
     internal bool isLoading;
     internal int selectedTabIndex;
-    internal string? realmDisplayName; // new: holds realm name for UI
+    internal string? realmDisplayName; // holds realm name for UI
 
     // Numeric wrappers for TimeSpan lifetimes
     internal int accessTokenMinutes
@@ -86,6 +87,13 @@ public partial class EditRealmDefaults
         };
     }
 
+    // Added: maintain JAR alg multi-select state after load
+    private void SyncJarAlgSelections()
+    {
+        // handled in .razor partial (OnParametersSet) when model changes
+        StateHasChanged();
+    }
+
     private async Task LoadRealmDefaults()
     {
         isLoading = true;
@@ -95,15 +103,10 @@ public partial class EditRealmDefaults
             if (realm != null)
             {
                 model = MapRealmToDefaultsRequest(realm);
-                // Build display string: Prefer DisplayName; include technical name if different
-                if (!string.IsNullOrWhiteSpace(realm.DisplayName) && !string.Equals(realm.DisplayName, realm.Name, StringComparison.OrdinalIgnoreCase))
-                {
-                    realmDisplayName = $"{realm.DisplayName} ({realm.Name})";
-                }
-                else
-                {
-                    realmDisplayName = realm.Name;
-                }
+                realmDisplayName = !string.IsNullOrWhiteSpace(realm.DisplayName) && !string.Equals(realm.DisplayName, realm.Name, StringComparison.OrdinalIgnoreCase)
+                    ? $"{realm.DisplayName} ({realm.Name})"
+                    : realm.Name;
+                SyncJarAlgSelections();
             }
         }
         catch (Exception ex)
@@ -158,7 +161,13 @@ public partial class EditRealmDefaults
         RealmLogoUri = realm.RealmLogoUri,
         RealmUri = realm.RealmUri,
         RealmPolicyUri = realm.RealmPolicyUri,
-        RealmTosUri = realm.RealmTosUri
+        RealmTosUri = realm.RealmTosUri,
+
+        // NEW: JAR/JARM defaults
+        DefaultJarMode = realm.DefaultJarMode,
+        DefaultJarmMode = realm.DefaultJarmMode,
+        DefaultRequireSignedRequestObject = realm.DefaultRequireSignedRequestObject,
+        DefaultAllowedRequestObjectAlgs = realm.DefaultAllowedRequestObjectAlgs
     };
 
     internal bool IsMethodSelected(string method)

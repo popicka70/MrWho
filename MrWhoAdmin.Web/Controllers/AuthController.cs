@@ -80,7 +80,7 @@ public class AuthController : Controller
     /// <returns>SignOut result</returns>
     [HttpGet("/auth/logout")]
     [AllowAnonymous]
-    public async Task<IActionResult> Logout(string? returnUrl = null, bool clearAll = false)
+    public IActionResult Logout(string? returnUrl = null, bool clearAll = false)
     {
         try
         {

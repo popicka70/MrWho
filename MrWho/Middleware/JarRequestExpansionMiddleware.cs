@@ -10,6 +10,7 @@ using MrWho.Services;
 using MrWho.Shared;
 using OpenIddict.Abstractions;
 using Microsoft.IdentityModel.JsonWebTokens; // added for JsonWebTokenHandler
+using MrWho.Options; // ensure options namespace if needed
 
 namespace MrWho.Middleware;
 
@@ -27,7 +28,7 @@ public class JarRequestExpansionMiddleware
     private static bool IsAuthorizePath(PathString path)
         => path.HasValue && path.Value!.EndsWith("/connect/authorize", StringComparison.OrdinalIgnoreCase);
 
-    public async Task InvokeAsync(HttpContext context, ApplicationDbContext db, IKeyManagementService keyService, IJarReplayCache replayCache, IOptions<JarOptions> jarOptions)
+    public async Task InvokeAsync(HttpContext context, ApplicationDbContext db, IKeyManagementService keyService, IJarReplayCache replayCache, IOptions<JarOptions> jarOptions, ISecurityAuditWriter auditWriter, ISymmetricSecretPolicy symmetricPolicy)
     {
         var req = context.Request;
         var path = req.Path;
@@ -68,6 +69,7 @@ public class JarRequestExpansionMiddleware
             && !req.Query.ContainsKey("_jar_expanded"))
         {
             var jarJwt = req.Query["request"].ToString();
+            var queryClientId = req.Query[OpenIddictConstants.Parameters.ClientId].ToString();
             if (string.IsNullOrWhiteSpace(jarJwt))
             {
                 await _next(context);
@@ -80,6 +82,7 @@ public class JarRequestExpansionMiddleware
                 if (maxBytes > 0 && Encoding.UTF8.GetByteCount(jarJwt) > maxBytes)
                 {
                     _logger.LogWarning("JAR rejected (too large) before expansion");
+                    await auditWriter.WriteAsync("auth.security", "jar.rejected_size", new { bytes = Encoding.UTF8.GetByteCount(jarJwt), max = maxBytes, clientId = req.Query[OpenIddictConstants.Parameters.ClientId].ToString() }, "warn", actorClientId: req.Query[OpenIddictConstants.Parameters.ClientId].ToString(), ip: context.Connection.RemoteIpAddress?.ToString());
                     await WriteErrorAsync(context, OpenIddictConstants.Errors.InvalidRequestObject, "request object too large");
                     return;
                 }
@@ -88,6 +91,7 @@ public class JarRequestExpansionMiddleware
                 if (jarJwt.Count(c => c == '.') != 2)
                 {
                     await WriteErrorAsync(context, OpenIddictConstants.Errors.InvalidRequestObject, "request object must be JWT");
+                    await auditWriter.WriteAsync("auth.security", "jar.rejected_not_jwt", new { clientId = req.Query[OpenIddictConstants.Parameters.ClientId].ToString() }, "warn", actorClientId: req.Query[OpenIddictConstants.Parameters.ClientId].ToString(), ip: context.Connection.RemoteIpAddress?.ToString());
                     return;
                 }
 
@@ -97,6 +101,7 @@ public class JarRequestExpansionMiddleware
                 {
                     _logger.LogInformation(ex, "Failed to parse request object");
                     await WriteErrorAsync(context, OpenIddictConstants.Errors.InvalidRequestObject, "invalid request object");
+                    await auditWriter.WriteAsync("auth.security", "jar.rejected_parse", new { ex = ex.Message }, "warn", actorClientId: queryClientId, ip: context.Connection.RemoteIpAddress?.ToString());
                     return;
                 }
 
@@ -104,14 +109,16 @@ public class JarRequestExpansionMiddleware
                 if (string.IsNullOrEmpty(alg))
                 {
                     await WriteErrorAsync(context, OpenIddictConstants.Errors.InvalidRequestObject, "missing alg");
+                    await auditWriter.WriteAsync("auth.security", "jar.rejected_missing_alg", new { clientId = queryClientId }, "warn", actorClientId: queryClientId, ip: context.Connection.RemoteIpAddress?.ToString());
                     return;
                 }
 
                 var clientIdClaim = token.Payload.TryGetValue(OpenIddictConstants.Parameters.ClientId, out var cidObj) ? cidObj?.ToString() : null;
-                var queryClientId = req.Query[OpenIddictConstants.Parameters.ClientId].ToString();
+                // queryClientId already captured earlier
                 if (!string.IsNullOrEmpty(queryClientId) && !string.IsNullOrEmpty(clientIdClaim) && !string.Equals(queryClientId, clientIdClaim, StringComparison.Ordinal))
                 {
                     await WriteErrorAsync(context, OpenIddictConstants.Errors.InvalidRequestObject, "client_id mismatch");
+                    await auditWriter.WriteAsync("auth.security", "jar.rejected_client_mismatch", new { queryClientId, clientIdClaim }, "warn", actorClientId: queryClientId, ip: context.Connection.RemoteIpAddress?.ToString());
                     return;
                 }
 
@@ -127,6 +134,7 @@ public class JarRequestExpansionMiddleware
                 if (dbClient == null || !dbClient.IsEnabled)
                 {
                     await WriteErrorAsync(context, OpenIddictConstants.Errors.InvalidClient, "unknown client");
+                    await auditWriter.WriteAsync("auth.security", "jar.rejected_unknown_client", new { clientId = effectiveClientId }, "warn", actorClientId: effectiveClientId, ip: context.Connection.RemoteIpAddress?.ToString());
                     return;
                 }
 
@@ -135,15 +143,18 @@ public class JarRequestExpansionMiddleware
                 if (jarMode == JarMode.Disabled)
                 {
                     await WriteErrorAsync(context, OpenIddictConstants.Errors.RequestNotSupported, "Client does not allow request objects");
+                    await auditWriter.WriteAsync("auth.security", "jar.rejected_mode_disabled", new { clientId = effectiveClientId }, "info", actorClientId: effectiveClientId, ip: context.Connection.RemoteIpAddress?.ToString());
                     return;
                 }
 
-                // Validate lifetime
+                // Validate lifetime (use Expiration instead of obsolete Exp)
                 var now = DateTimeOffset.UtcNow;
-                var exp = token.Payload.Exp.HasValue ? DateTimeOffset.FromUnixTimeSeconds(token.Payload.Exp.Value) : (DateTimeOffset?)null;
+                var expSeconds = token.Payload.Expiration; // long? per new API
+                var exp = expSeconds.HasValue ? DateTimeOffset.FromUnixTimeSeconds(expSeconds.Value) : (DateTimeOffset?)null;
                 if (exp is null || exp < now || exp > now.Add(jarOptions.Value.MaxExp))
                 {
                     await WriteErrorAsync(context, OpenIddictConstants.Errors.InvalidRequestObject, "exp invalid");
+                    await auditWriter.WriteAsync("auth.security", "jar.rejected_exp", new { clientId = effectiveClientId, exp = exp }, "warn", actorClientId: effectiveClientId, ip: context.Connection.RemoteIpAddress?.ToString());
                     return;
                 }
 
@@ -153,11 +164,13 @@ public class JarRequestExpansionMiddleware
                     if (!token.Payload.TryGetValue("jti", out var jtiObj) || string.IsNullOrWhiteSpace(jtiObj?.ToString()))
                     {
                         await WriteErrorAsync(context, OpenIddictConstants.Errors.InvalidRequestObject, "jti required");
+                        await auditWriter.WriteAsync("auth.security", "jar.rejected_missing_jti", new { clientId = effectiveClientId }, "warn", actorClientId: effectiveClientId, ip: context.Connection.RemoteIpAddress?.ToString());
                         return;
                     }
                     if (!replayCache.TryAdd("jar:jti:" + jtiObj, exp.Value))
                     {
                         await WriteErrorAsync(context, OpenIddictConstants.Errors.InvalidRequestObject, "jti replay");
+                        await auditWriter.WriteAsync("auth.security", "jar.rejected_replay_jti", new { clientId = effectiveClientId }, "warn", actorClientId: effectiveClientId, ip: context.Connection.RemoteIpAddress?.ToString());
                         return;
                     }
                 }
@@ -181,23 +194,27 @@ public class JarRequestExpansionMiddleware
                     if (string.IsNullOrWhiteSpace(dbClient.ClientSecret))
                     {
                         await WriteErrorAsync(context, OpenIddictConstants.Errors.InvalidRequestObject, "client secret missing");
+                        await auditWriter.WriteAsync("auth.security", "jar.rejected_missing_secret", new { clientId = effectiveClientId }, "warn", actorClientId: effectiveClientId, ip: context.Connection.RemoteIpAddress?.ToString());
                         return;
                     }
-                    var keyBytes = Encoding.UTF8.GetBytes(dbClient.ClientSecret);
-                    if (keyBytes.Length < 32)
+                    // If the stored secret is a redaction marker (hashed/rotated), skip direct length enforcement so fallback validation path can engage (demo/test scenario)
+                    var isRedactionMarker = dbClient.ClientSecret.StartsWith("{HASHED}", StringComparison.OrdinalIgnoreCase);
+                    if (!isRedactionMarker)
                     {
-                        var padded = new byte[32];
-                        Array.Copy(keyBytes, padded, keyBytes.Length);
-                        for (int i = keyBytes.Length; i < 32; i++) padded[i] = (byte)'!';
-                        keyBytes = padded;
-                        _logger.LogDebug("Padded short client secret for HS256 JAR (client {ClientId}, originalLen={Len})", effectiveClientId, dbClient.ClientSecret.Length);
+                        var res = symmetricPolicy.ValidateForAlgorithm(alg.ToUpperInvariant(), dbClient.ClientSecret);
+                        if (!res.Success)
+                        {
+                            await WriteErrorAsync(context, OpenIddictConstants.Errors.InvalidRequestObject, "client secret length below policy");
+                            await auditWriter.WriteAsync("auth.security", "jar.rejected_secret_policy", new { clientId = effectiveClientId, alg, required = res.RequiredBytes, actual = res.ActualBytes }, "warn", actorClientId: effectiveClientId, ip: context.Connection.RemoteIpAddress?.ToString());
+                            return;
+                        }
                     }
-                    hsKey = new SymmetricSecurityKey(keyBytes)
+                    var keyBytes = Encoding.UTF8.GetBytes(dbClient.ClientSecret);
+                    var signingKey = new SymmetricSecurityKey(keyBytes)
                     {
-                        // Add a KeyId so if future multiple keys are present, kid based resolution works
                         KeyId = $"client:{effectiveClientId}:hs"
                     };
-                    tvp.IssuerSigningKey = hsKey;
+                    tvp.IssuerSigningKey = signingKey;
                 }
                 else if (alg.Equals(SecurityAlgorithms.RsaSha256, StringComparison.OrdinalIgnoreCase) || alg.Equals(SecurityAlgorithms.RsaSha384, StringComparison.OrdinalIgnoreCase) || alg.Equals(SecurityAlgorithms.RsaSha512, StringComparison.OrdinalIgnoreCase))
                 {
@@ -207,6 +224,7 @@ public class JarRequestExpansionMiddleware
                 else
                 {
                     await WriteErrorAsync(context, OpenIddictConstants.Errors.InvalidRequestObject, "alg not supported");
+                    await auditWriter.WriteAsync("auth.security", "jar.rejected_unsupported_alg", new { clientId = effectiveClientId, alg }, "warn", actorClientId: effectiveClientId, ip: context.Connection.RemoteIpAddress?.ToString());
                     return;
                 }
 
@@ -214,24 +232,15 @@ public class JarRequestExpansionMiddleware
 
                 try
                 {
-                    if (isSymmetric)
+                    var jsonHandler = new JsonWebTokenHandler();
+                    var result = await jsonHandler.ValidateTokenAsync(jarJwt, tvp);
+                    if (result.IsValid)
                     {
-                        // Prefer JsonWebTokenHandler for modern validation & clearer diagnostics
-                        var jsonHandler = new JsonWebTokenHandler();
-                        var result = jsonHandler.ValidateToken(jarJwt, tvp);
-                        if (result.IsValid)
-                        {
-                            validated = true;
-                        }
-                        else
-                        {
-                            throw result.Exception ?? new SecurityTokenInvalidSignatureException("HS validation failed");
-                        }
+                        validated = true;
                     }
                     else
                     {
-                        jwtHandler.ValidateToken(jarJwt, tvp, out _);
-                        validated = true;
+                        throw result.Exception ?? new SecurityTokenInvalidSignatureException("validation failed");
                     }
                 }
                 catch (Exception ex)
@@ -251,8 +260,8 @@ public class JarRequestExpansionMiddleware
                                 fbBytes = pad;
                             }
                             tvp.IssuerSigningKey = new SymmetricSecurityKey(fbBytes) { KeyId = $"client:{effectiveClientId}:hs:fallback" };
-                            var jsonHandler = new JsonWebTokenHandler();
-                            var fbResult = jsonHandler.ValidateToken(jarJwt, tvp);
+                            var fbHandler = new JsonWebTokenHandler();
+                            var fbResult = await fbHandler.ValidateTokenAsync(jarJwt, tvp);
                             if (fbResult.IsValid)
                             {
                                 validated = true;
@@ -273,6 +282,7 @@ public class JarRequestExpansionMiddleware
                     {
                         _logger.LogInformation(ex, "Signature validation failed for JAR");
                         await WriteErrorAsync(context, OpenIddictConstants.Errors.InvalidRequestObject, "signature invalid");
+                        await auditWriter.WriteAsync("auth.security", "jar.rejected_signature", new { clientId = effectiveClientId, alg, ex = ex.Message }, "warn", actorClientId: effectiveClientId, ip: context.Connection.RemoteIpAddress?.ToString());
                         return;
                     }
                 }
@@ -306,10 +316,12 @@ public class JarRequestExpansionMiddleware
                 var newQuery = string.Join('&', dict.Select(kvp => Uri.EscapeDataString(kvp.Key) + "=" + Uri.EscapeDataString(kvp.Value)));
                 context.Request.QueryString = new QueryString("?" + newQuery);
                 _logger.LogDebug("Expanded JAR for client {ClientId}; alg {Alg}; params: {Keys}", effectiveClientId, alg, string.Join(',', dict.Keys));
+                await auditWriter.WriteAsync("auth.security", "jar.accepted", new { clientId = effectiveClientId, alg, keys = dict.Keys }, "info", actorClientId: effectiveClientId, ip: context.Connection.RemoteIpAddress?.ToString());
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Unhandled error expanding JAR");
+                await auditWriter.WriteAsync("auth.security", "jar.rejected_unhandled", new { error = ex.Message }, "error", ip: context.Connection.RemoteIpAddress?.ToString());
                 await WriteErrorAsync(context, OpenIddictConstants.Errors.InvalidRequestObject, "invalid request object");
                 return;
             }

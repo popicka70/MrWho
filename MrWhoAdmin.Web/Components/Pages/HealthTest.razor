@@ -5,7 +5,7 @@
 
 @inject IServiceProvider ServiceProvider
 @inject Radzen.NotificationService NotificationService
-@inject ILogger<HealthTest> Logger
+@inject ILogger<HealthTest> PageLogger
 
 <PageTitle>Health Endpoints Test</PageTitle>
 
@@ -19,9 +19,9 @@
         <RadzenText TextStyle="TextStyle.Subtitle1">Direct Controller Test</RadzenText>
         <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
             <RadzenButton Text="Test Basic Health" Icon="health_and_safety" ButtonStyle="ButtonStyle.Primary" 
-                          Click="@(async () => await TestBasicHealthAsync())" IsBusy="@testingBasic" />
+                          Click="@(async () => { TestBasicHealth(); await Task.CompletedTask; })" IsBusy="@testingBasic" />
             <RadzenButton Text="Test Liveness" Icon="favorite" ButtonStyle="ButtonStyle.Success" 
-                          Click="@(async () => await TestLivenessAsync())" IsBusy="@testingLiveness" />
+                          Click="@(async () => { TestLiveness(); await Task.CompletedTask; })" IsBusy="@testingLiveness" />
             <RadzenButton Text="Test Readiness" Icon="check_circle" ButtonStyle="ButtonStyle.Info" 
                           Click="@(async () => await TestReadinessAsync())" IsBusy="@testingReadiness" />
         </RadzenStack>
@@ -42,25 +42,20 @@
     private bool testingReadiness = false;
     private string testResults = "";
 
-    private async Task TestBasicHealthAsync()
+    private void TestBasicHealth()
     {
         testingBasic = true;
         testResults = "";
         StateHasChanged();
-
         try
         {
-            Logger.LogInformation("Testing basic health endpoint directly");
-            
+            PageLogger.LogInformation("Testing basic health endpoint directly");
             using var scope = ServiceProvider.CreateScope();
             var healthController = scope.ServiceProvider.GetRequiredService<MrWhoAdmin.Web.Controllers.HealthController>();
-            
             var result = healthController.Get();
-            
             if (result is Microsoft.AspNetCore.Mvc.OkObjectResult okResult)
             {
-                var json = System.Text.Json.JsonSerializer.Serialize(okResult.Value, 
-                    new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+                var json = System.Text.Json.JsonSerializer.Serialize(okResult.Value, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
                 testResults = $"? Basic Health Test PASSED\n\n{json}";
                 NotificationService.Notify(NotificationSeverity.Success, "Success", "Basic health test passed", 3000);
             }
@@ -72,7 +67,7 @@
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Error testing basic health");
+            PageLogger.LogError(ex, "Error testing basic health");
             testResults = $"? Basic Health Test ERROR\n\n{ex.Message}\n\nStack Trace:\n{ex.StackTrace}";
             NotificationService.Notify(NotificationSeverity.Error, "Error", $"Basic health test error: {ex.Message}", 5000);
         }
@@ -83,25 +78,20 @@
         }
     }
 
-    private async Task TestLivenessAsync()
+    private void TestLiveness()
     {
         testingLiveness = true;
         testResults = "";
         StateHasChanged();
-
         try
         {
-            Logger.LogInformation("Testing liveness endpoint directly");
-            
+            PageLogger.LogInformation("Testing liveness endpoint directly");
             using var scope = ServiceProvider.CreateScope();
             var healthController = scope.ServiceProvider.GetRequiredService<MrWhoAdmin.Web.Controllers.HealthController>();
-            
             var result = healthController.GetLiveness();
-            
             if (result is Microsoft.AspNetCore.Mvc.OkObjectResult okResult)
             {
-                var json = System.Text.Json.JsonSerializer.Serialize(okResult.Value, 
-                    new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+                var json = System.Text.Json.JsonSerializer.Serialize(okResult.Value, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
                 testResults = $"? Liveness Test PASSED\n\n{json}";
                 NotificationService.Notify(NotificationSeverity.Success, "Success", "Liveness test passed", 3000);
             }
@@ -113,7 +103,7 @@
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Error testing liveness");
+            PageLogger.LogError(ex, "Error testing liveness");
             testResults = $"? Liveness Test ERROR\n\n{ex.Message}\n\nStack Trace:\n{ex.StackTrace}";
             NotificationService.Notify(NotificationSeverity.Error, "Error", $"Liveness test error: {ex.Message}", 5000);
         }
@@ -129,30 +119,23 @@
         testingReadiness = true;
         testResults = "";
         StateHasChanged();
-
         try
         {
-            Logger.LogInformation("Testing readiness endpoint directly");
-            
+            PageLogger.LogInformation("Testing readiness endpoint directly");
             using var scope = ServiceProvider.CreateScope();
             var healthController = scope.ServiceProvider.GetRequiredService<MrWhoAdmin.Web.Controllers.HealthController>();
-            
             var result = await healthController.GetReadiness();
-            
             if (result is Microsoft.AspNetCore.Mvc.OkObjectResult okResult)
             {
-                var json = System.Text.Json.JsonSerializer.Serialize(okResult.Value, 
-                    new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+                var json = System.Text.Json.JsonSerializer.Serialize(okResult.Value, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
                 testResults = $"? Readiness Test PASSED\n\n{json}";
                 NotificationService.Notify(NotificationSeverity.Success, "Success", "Readiness test passed", 3000);
             }
             else if (result is Microsoft.AspNetCore.Mvc.ObjectResult objResult)
             {
-                var json = System.Text.Json.JsonSerializer.Serialize(objResult.Value, 
-                    new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+                var json = System.Text.Json.JsonSerializer.Serialize(objResult.Value, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
                 testResults = $"?? Readiness Test RETURNED STATUS {objResult.StatusCode}\n\n{json}";
-                NotificationService.Notify(NotificationSeverity.Warning, "Warning", 
-                    $"Readiness test returned status {objResult.StatusCode}", 4000);
+                NotificationService.Notify(NotificationSeverity.Warning, "Warning", $"Readiness test returned status {objResult.StatusCode}", 4000);
             }
             else
             {
@@ -162,7 +145,7 @@
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Error testing readiness");
+            PageLogger.LogError(ex, "Error testing readiness");
             testResults = $"? Readiness Test ERROR\n\n{ex.Message}\n\nStack Trace:\n{ex.StackTrace}";
             NotificationService.Notify(NotificationSeverity.Error, "Error", $"Readiness test error: {ex.Message}", 5000);
         }

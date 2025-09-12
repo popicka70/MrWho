@@ -22,8 +22,7 @@ using Microsoft.AspNetCore.Hosting;
 using MrWho.Handlers.Auth;
 using MrWho.Services.Mediator; // add mediator interfaces
 using Microsoft.AspNetCore.Mvc; // for IActionResult
-using MrWho.Services; // ensure JarJarm types
-using MrWho.Services; // contains JarOptions, IJarReplayCache, JarJarmServerEventHandlers
+using MrWho.Services.Background; // contains JarOptions, IJarReplayCache, JarJarmServerEventHandlers
 
 namespace MrWho.Extensions;
 
@@ -91,7 +90,8 @@ public static class ServiceCollectionExtensions
         // Register back-channel logout service
         services.AddScoped<IBackChannelLogoutService, BackChannelLogoutService>();
         services.AddHttpClient(); // Required for back-channel logout HTTP calls
-
+        services.AddSingleton<IBackChannelLogoutRetryScheduler, BackChannelLogoutRetryScheduler>();
+        services.AddHostedService(sp => (BackChannelLogoutRetryScheduler)sp.GetRequiredService<IBackChannelLogoutRetryScheduler>());
         // ============================================================================
         // DEVICE MANAGEMENT SERVICES
         // ============================================================================
@@ -132,6 +132,25 @@ public static class ServiceCollectionExtensions
         // CONSENT SERVICE
         // ============================================================================
         services.AddScoped<IConsentService, ConsentService>();
+
+        // register security audit writer
+        services.AddScoped<ISecurityAuditWriter, SecurityAuditWriter>();
+        services.AddScoped<IAuditQueryService, AuditQueryService>();
+        services.AddScoped<IAuditIntegrityWriter, AuditIntegrityWriter>();
+        services.AddScoped<IAuditIntegrityVerificationService, AuditIntegrityVerificationService>();
+        services.AddScoped<IIntegrityHashService, IntegrityHashService>();
+        services.AddHttpContextAccessor();
+        services.AddSingleton<ICorrelationContextAccessor, CorrelationContextAccessor>();
+
+        services.AddOptions<AuditRetentionOptions>().BindConfiguration(AuditRetentionOptions.SectionName).ValidateDataAnnotations();
+
+        // PAR cleanup background service
+        services.AddHostedService<ParCleanupHostedService>();
+        services.AddHostedService<AuditChainVerifierHostedService>();
+        services.AddHostedService<AuditRetentionHostedService>();
+
+        services.AddOptions<SymmetricSecretPolicyOptions>().BindConfiguration(SymmetricSecretPolicyOptions.SectionName);
+        services.AddScoped<ISymmetricSecretPolicy, SymmetricSecretPolicy>();
 
         return services;
     }

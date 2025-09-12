@@ -1,6 +1,6 @@
 # MrWho OIDC Enterprise Readiness Roadmap
 
-Last updated: 2025-09-10 (Updated with JAR/JARM hardening progress)
+Last updated: 2025-09-12 (Assessment + near-term prioritization added)
 
 ## 1. Purpose
 Structured, phased plan to evolve the MrWho OpenID Connect / OAuth2 platform (OpenIddict-based) into an enterprise–grade identity and authorization service. Phases balance protocol completeness, security posture, governance, and operational excellence.
@@ -24,6 +24,7 @@ Structured, phased plan to evolve the MrWho OpenID Connect / OAuth2 platform (Op
 - PAR enablement framework (per-client mode flag) + authorization request caching.
 - JAR (JWT Secured Authorization Request) initial + hardening (HS256/RS256 validation, exp <= 5m, mismatch rejection, per-client alg allow-list, jti replay protection, size limit, configurable exp/clock skew) – Phase 1.5 baseline COMPLETE.
 - JARM (JWT Secured Authorization Response Mode) baseline packaging (response_mode=jwt, iss/aud/iat/exp, signed) – Phase 1.5 baseline COMPLETE.
+- Realm default configuration page now includes JAR/JARM defaults (JarMode, JarmMode, RequireSignedRequestObject, AllowedRequestObjectAlgs) – UI FIX COMPLETE.
 
 ## 3. Gap Summary (What Is Missing vs Enterprise Targets)
 | Category | Key Gaps |
@@ -49,23 +50,23 @@ Goal: Close critical protocol/security gaps blocking production adoption.
 - Front/back channel logout notifications – PARTIAL (back-channel helper + placeholder; full events pending)
 - Consent service baseline – COMPLETE
 - Structured audit log (append-only) – SCHEMA READY (writer pending)
-- NEW: Configurable symmetric client secret policy (minimum entropy/length per HS* algorithm, validation & admin warnings) – PLANNED
+- Configurable symmetric client secret policy (minimum entropy/length per HS* algorithm, validation & admin warnings) – PLANNED
 
 ### Phase 1.5 – Secure Authorization Request / Response Enhancements (NEW)
 Objective: Controlled, opt-in hardened authorization requests & responses.
 Deliverables (Status):
 - PAR baseline (per-client ParMode) – COMPLETE
 - JAR validation: HS256/RS256, precedence, mismatch rejection, short exp enforcement – COMPLETE
-- NEW HARDENING: jti replay protection, size limit, configurable exp max, clock skew – COMPLETE
-- JAR per-client alg allow-list & RequireSignedRequestObject – COMPLETE
+- HARDENING: jti replay protection, size limit, configurable exp max, clock skew – COMPLETE
+- JAR per-client alg allow-list & RequireSignedRequestObject – COMPLETE (UI pending at client level)
 - JARM: response_mode=jwt and per-client JarmMode; signed JWT (code, state, iss, aud, iat, exp) – COMPLETE
-- Discovery metadata extensions (request_parameter_supported, request_uri_parameter_supported=false, authorization_response_iss_parameter_supported, response_modes_supported+=jwt, request_object_signing_alg_values_supported dynamic) – COMPLETE
-- Admin surface (JarMode/JarmMode/algs) – IN PROGRESS (backend fields + migration exist; UI wiring pending)
+- Discovery metadata extensions – COMPLETE
+- Admin surface (JarMode/JarmMode/algs) – IN PROGRESS (client-level UI wiring pending; realm defaults done)
 - Tests (positive + tamper) – INITIAL (JarTests) – NEED expansion for replay & size limit
-- NEW: Add enforcement & configuration UI for client secret minimum length per allowed HS* alg (warn if HS384/512 selected but secret policy unmet) – PLANNED
+- Add enforcement & configuration UI for client secret minimum length per allowed HS* alg – PLANNED
 
 ### Phase 2 – Governance, Assurance & Observability (Next)
-(Unchanged – will start after audit + logout + UI tasks)
+Will start once: (a) audit writer + logout events + client JAR/JARM UI + minimum HS* secret policy are in place; (b) baseline metrics scaffold exists.
 
 ### Phase 3 – Advanced OAuth/OIDC & Access Control
 (No change)
@@ -74,19 +75,23 @@ Deliverables (Status):
 (No change)
 
 ## 5. Immediate Sprint Backlog (Updated)
+Re-ordered by urgency (security > correctness > governance > visibility):
 1. Audit log writer + integrity hash implementation (append-only) – NOT STARTED
 2. Full logout notifications (front + back channel event dispatch) – IN PROGRESS
-3. JAR/JARM admin UI surfacing (toggle & alg configuration) – IN PROGRESS
+3. Client-level JAR/JARM UI (JarMode/JarmMode/AllowedRequestObjectAlgs/RequireSignedRequestObject) – NEW / NOT STARTED
 4. Dynamic client registration approval workflow + tests – IN PROGRESS
-5. Metrics scaffolding (auth_requests_total, token_issuance_latency_seconds) – NOT STARTED
-6. JWE design spike (request object encryption strategy) – PENDING
-7. Consent expiration: include claim expansion invalidation – NOT STARTED
-8. Expand tests: JAR replay (jti), oversize rejection, unsupported alg, JARM packaging validation – NEW
-9. Audit events for JAR/JARM failures (auth.security) – PENDING
-10. Configurable symmetric client secret policy service (min lengths: HS256>=32B, HS384>=48B, HS512>=64B) + enforcement & discovery metadata alignment – NEW
+5. Symmetric client secret policy service (HS* min lengths + validation + admin warnings) – PLANNED
+6. Expand tests: JAR replay (jti), oversize rejection, unsupported alg, JARM packaging validation – NOT STARTED
+7. Metrics scaffolding (auth_requests_total, token_issuance_latency_seconds) – NOT STARTED
+8. Audit events for JAR/JARM failures (auth.security) – PENDING
+9. PAR enforcement logic for clients with Required mode – NOT STARTED
+10. Consent expiration: include claim expansion invalidation – NOT STARTED
+11. Discovery adaptation: dynamic request_object_signing_alg_values_supported (realm/system union with policy filtering) – PLANNED
+12. JWE design spike (request object encryption strategy) – PENDING
+13. UI regression test for Realm Defaults page (tabs render content) – NOT STARTED
 
 ## 6. Data Model Additions (Phase 1 & 1.5)
-(No change; JAR/JARM fields present.)
+(Updated: Added guarded migration for realm default JAR/JARM columns – `RealmJarJarmDefaults`.)
 
 ## 7. Security Controls (Phase 1 Target State)
 | Control | Minimum Implementation | Status |
@@ -97,43 +102,71 @@ Deliverables (Status):
 | Logout | Front/back channel notifications | PARTIAL |
 | Audit | Append-only table + integrity hash | PENDING |
 | Token Lifetimes | Realm + client overrides | COMPLETE |
-| JAR | Signed request object; exp<=5m; mismatch rejection; replay (jti); size limit; alg allow-list | COMPLETE (Phase 1.5) |
+| JAR | Signed request object; exp<=5m; mismatch rejection; replay (jti); size limit; alg allow-list | COMPLETE |
 | JARM | Signed JWT authorization response (code+state+iss+aud+iat+exp) | COMPLETE (baseline) |
 | Symmetric Secret Policy | Enforce algorithm-based minimum length (reject/ warn on HS384/512 if too short) | PLANNED |
+| Realm JAR/JARM Defaults UI | Realm-level defaults configurable | COMPLETE |
 
 ## 8. Open Issues to Clarify
-(Unchanged; add: Do we require distributed replay cache for multi-node before production?)
-- NEW: Decide whether to auto-downgrade requested HS384/512 to HS256 when secret length insufficient, or hard fail.
-- NEW: Should discovery dynamically suppress HS384/512 if any configured client fails policy (global) or always advertise and rely on per-client rejection?
+- Do we require distributed replay cache for multi-node before production? (Leaning: Phase 2 with Redis)
+- Decide whether to auto-downgrade requested HS384/512 to HS256 when secret length insufficient, or hard fail. (Recommendation: HARD FAIL to prevent silent weakening.)
+- Should discovery dynamically suppress HS384/512 if any configured client fails policy (global) or always advertise and rely on per-client rejection? (Recommendation: Advertise only algorithms globally enforced & policy-compliant to reduce negotiation confusion.)
+- Should realm default AllowedRequestObjectAlgs feed dynamic discovery list (union of enabled algs) – risk of enumeration vs clarity. (Recommendation: Use curated allow-list from global + any realm-default that passes policy; redact if count=0.)
 
 ## 9. Acceptance Criteria Examples (Phase 1 & 1.5 Highlights)
-(Updated JAR section to include replay + size limit.)
 - JAR: Oversized (> configured) rejected; missing jti when required rejected; replayed jti rejected.
 - JARM: JWT response validated by client test harness; payload claims present; normal flow unaffected when disabled.
-- Symmetric Secret Policy: Selecting HS384 requires client secret length >= 48 bytes; otherwise admin UI blocks save and server rejects request object with invalid_client_secret policy error. Same for HS512 (>=64 bytes). HS256 accepted with >=32 bytes. No silent padding in production mode.
+- Symmetric Secret Policy: Selecting HS384 requires client secret length >= 48 bytes; HS512 >= 64 bytes; HS256 >= 32 bytes. Rejections produce `invalid_client` or `invalid_request_object` with descriptive error.
+- Realm Defaults UI: Updating JAR/JARM defaults persists and influences new clients unless overridden; page renders all tabs without blank content.
 
 ## 10. Risks & Mitigations
-Additions:
 | Risk | Mitigation |
 |------|------------|
 | Replay cache not distributed | Introduce distributed cache (Redis) in Phase 2 before scale-out |
-| Admin UI lagging for JAR/JARM config | Prioritize UI wiring next sprint |
-| Weak symmetric secrets accepted for stronger HS* algs | Enforce length policy; optionally disallow enabling HS384/512 until secret rotated |
+| Admin UI lagging for JAR/JARM config | Realm defaults UI done; prioritize client-level wiring next sprint |
+| Weak symmetric secrets accepted for stronger HS* algs | Enforce length policy; block selection until rotated |
 | Padding used in tests could mask production weakness | Disable padding outside test helpers; add validation layer |
+| UI regression (empty tab content) due to RadzenTabs misconfiguration | Maintain `TabRenderMode.Server` + automated UI regression test |
 
 ## 11. Tracking & Metrics (Phase 2 Plan)
 Add planned metrics: jar_requests_total{mode,outcome,alg,replay}; jarm_responses_total{mode,outcome}; secret_policy_violations_total{alg,outcome}; client_secret_rotation_events_total.
 
-## 12. Next Steps (Actionable – Updated)
-1. Wire admin UI for JarMode/JarmMode + AllowedRequestObjectAlgs (multi-select) + RequireSignedRequestObject toggle.
-2. Add audit events (jar.validation_failed, jarm.issued, jarm.failure) with category=auth.security.
-3. Implement logout event dispatch + front-channel iframe/script integration.
-4. Build audit writer + integrity hash chain.
-5. Instrument basic metrics (authorization, token endpoints + jar/jarm counters).
-6. Expand JarTests to cover replay, oversize, alg not allowed, JARM success.
-7. PAR enforcement logic for clients with Required mode (reject non-PAR requests gracefully).
-8. Plan JWE encryption (alg/enc set, key distribution, client metadata) – design doc.
-9. Implement symmetric secret policy (config section + validation + discovery filtering + admin warnings + test coverage for HS384/512 rejection paths).
+## 12. Next Steps (Actionable – Updated & Sequenced)
+### A. Critical Path (Security + Integrity)
+1. Implement audit writer + integrity hash chain (unblocks security posture & compliance narrative).
+2. Complete logout notifications (front-channel frame + back-channel dispatch) with event audit entries.
+3. Ship symmetric secret policy enforcement (validation service + UI warnings + documentation).
+
+### B. Protocol Hardening Completion
+4. Finish client-level JAR/JARM UI (persist + validation + integration tests).
+5. Expand JAR/JARM negative/edge tests (replay, oversize, unsupported alg, JARM structure).
+6. PAR Required mode enforcement (reject non-PAR requests with spec-aligned error).
+
+### C. Observability Foundations
+7. Introduce minimal metrics middleware (counter + histogram) and register OpenTelemetry exporters (no traces yet).
+8. Emit audit events for JAR/JARM failures (category=auth.security, outcome codes).
+
+### D. Governance & UX
+9. Complete dynamic client registration approval workflow (state transitions + audit events).
+10. Discovery adaptation for request object alg values (policy-filtered list).
+
+### E. Forward-Looking Design
+11. JWE request object encryption design spike (key negotiation, alg/enc matrix, migration path, metadata fields).
+12. UI regression test harness addition for critical admin pages (Realm defaults + Client edit with JAR/JARM tabs).
+
+### Sequencing Justification
+- Audit + logout + secret policy close current Phase 1 risk items.
+- JAR/JARM UI + tests finalize Phase 1.5 deliverables before expanding protocol scope.
+- Metrics introduced early to measure adoption & error surfaces before Phase 2 scale-up.
+- Governance (client approval) naturally follows once audit is reliable, ensuring traceability.
+
+### Exit Criteria for Declaring Phase 1/1.5 COMPLETE
+- All Critical Path (A) + Protocol Hardening Completion (B) tasks DONE.
+- Metrics counters operational and visible (even if minimal) for JAR/JARM + auth/token endpoints.
+- Dynamic client registration flow enforced and audited.
+
+## 13. Assessment Summary (What To Do Next)
+Immediate focus must shift to: (1) persisting trustworthy audit records; (2) closing logout event gap; (3) enforcing cryptographic hygiene for symmetric secrets. These three items elevate baseline trustworthiness and reduce remediation cost later. Parallel low-risk effort can begin on client-level JAR/JARM UI. Testing debt on JAR/JARM should be resolved before adding JWE complexity to avoid compounding unknowns.
 
 ---
 Prepared for: MrWho Identity Platform

@@ -17,6 +17,7 @@ using System.IdentityModel.Tokens.Jwt;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.JsonWebTokens; // modern validation
 
 namespace MrWho.Handlers;
 
@@ -39,6 +40,7 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
     private readonly IKeyManagementService _keyService; // for RS256 validation
     private readonly IJarReplayCache _jarReplayCache;
     private readonly IOptions<JarOptions> _jarOptions;
+    private readonly ISecurityAuditWriter _audit;
     private const string MfaCookiePrefix = ".MrWho.Mfa.";
 
     private static readonly string[] MfaAmrValues = new[] { "mfa", "fido2" };
@@ -57,7 +59,8 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         IDataProtectionProvider dataProtectionProvider,
         IKeyManagementService keyService,
         IJarReplayCache jarReplayCache,
-        IOptions<JarOptions> jarOptions)
+        IOptions<JarOptions> jarOptions,
+        ISecurityAuditWriter audit)
     {
         _userManager = userManager;
         _signInManager = signInManager;
@@ -71,6 +74,7 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         _keyService = keyService;
         _jarReplayCache = jarReplayCache;
         _jarOptions = jarOptions;
+        _audit = audit;
     }
 
     public async Task<IResult> HandleAuthorizationRequestAsync(HttpContext context)
@@ -80,6 +84,66 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
 
         var clientId = request.ClientId ?? string.Empty;
         _logger.LogDebug("Authorization request received for client {ClientId}", clientId);
+
+        // Resolve pushed authorization request if request_uri present
+        if (!string.IsNullOrEmpty(request.RequestUri) && request.RequestUri.StartsWith("urn:ietf:params:oauth:request_uri:", StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                var parId = request.RequestUri.Split(':').Last();
+                var par = await _context.Set<PushedAuthorizationRequest>().FirstOrDefaultAsync(p => p.Id == parId);
+                if (par != null)
+                {
+                    if (par.ExpiresAt < DateTime.UtcNow)
+                    {
+                        await _audit.WriteAsync(SecurityAudit.ParExpired, new { clientId = par.ClientId, requestUri = par.RequestUri }, "warn", actorClientId: par.ClientId);
+                        return Results.BadRequest(new { error = OpenIddictConstants.Errors.InvalidRequest, error_description = "request_uri expired" });
+                    }
+                    if (par.ConsumedAt != null)
+                    {
+                        await _audit.WriteAsync(SecurityAudit.ParReuseAttempt, new { clientId = par.ClientId, requestUri = par.RequestUri }, "warn", actorClientId: par.ClientId);
+                        return Results.BadRequest(new { error = OpenIddictConstants.Errors.InvalidRequest, error_description = "request_uri already used" });
+                    }
+                    // Merge stored parameters into current request (original precedence maintained)
+                    var stored = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(par.ParametersJson) ?? new();
+                    foreach (var kv in stored)
+                    {
+                        // Only set if not already provided on query
+                        if (request.GetParameter(kv.Key) is null)
+                        {
+                            request.SetParameter(kv.Key, kv.Value);
+                        }
+                    }
+                    par.ConsumedAt = DateTime.UtcNow;
+                    await _context.SaveChangesAsync();
+                    await _audit.WriteAsync(SecurityAudit.ParConsumed, new { clientId = par.ClientId, requestUri = par.RequestUri }, "info", actorClientId: par.ClientId);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Failed to resolve PAR request_uri {RequestUri}", request.RequestUri);
+            }
+        }
+
+        // PAR required enforcement (if client requires but no request_uri present)
+        try
+        {
+            if (!string.IsNullOrEmpty(clientId))
+            {
+                var parClient = await _context.Clients.AsNoTracking().FirstOrDefaultAsync(c => c.ClientId == clientId);
+                var parMode = parClient?.ParMode ?? PushedAuthorizationMode.Disabled;
+                var hasRequestUri = !string.IsNullOrEmpty(request.RequestUri);
+                if (parMode == PushedAuthorizationMode.Required && !hasRequestUri)
+                {
+                    await _audit.WriteAsync(SecurityAudit.ParRequiredMissing, new { clientId, reason = "par_mode_required_no_request_uri" }, "warn", actorClientId: clientId);
+                    return Results.BadRequest(new { error = OpenIddictConstants.Errors.InvalidRequest, error_description = "PAR required: use request_uri from pushed authorization request" });
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "PAR enforcement check failed for {ClientId}", clientId);
+        }
 
         // ---------------------------------------------------------------------
         // JAR (JWT Secured Authorization Request) processing (preview Phase 1.5)
@@ -508,22 +572,27 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
             };
             if (alg.StartsWith("HS", StringComparison.OrdinalIgnoreCase))
             {
-                if (string.IsNullOrWhiteSpace(dbClient.ClientSecret) || dbClient.ClientSecret.Length < 32)
+                if (string.IsNullOrWhiteSpace(dbClient.ClientSecret) || Encoding.UTF8.GetByteCount(dbClient.ClientSecret) < 32)
                     return new { error = OpenIddictConstants.Errors.InvalidRequestObject, error_description = "client secret insufficient for HS signature" };
-                var keyBytes = Encoding.UTF8.GetBytes(dbClient.ClientSecret);
-                parameters.IssuerSigningKey = new SymmetricSecurityKey(keyBytes);
+                parameters.IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(dbClient.ClientSecret));
             }
             else if (alg.StartsWith("RS", StringComparison.OrdinalIgnoreCase))
             {
                 var (signing, _) = await _keyService.GetActiveKeysAsync();
-                parameters.IssuerSigningKeys = signing; // public validated
+                parameters.IssuerSigningKeys = signing;
             }
             else
             {
                 // Defer other algs to later phases
                 return new { error = OpenIddictConstants.Errors.InvalidRequestObject, error_description = "alg not supported" };
             }
-            handler.ValidateToken(requestJwt, parameters, out _);
+            var jsonHandler = new JsonWebTokenHandler();
+            var validateResult = await jsonHandler.ValidateTokenAsync(requestJwt, parameters);
+            if (!validateResult.IsValid)
+            {
+                _logger.LogInformation(validateResult.Exception, "Signature validation failed for JAR {ClientId}", dbClient.ClientId);
+                return new { error = OpenIddictConstants.Errors.InvalidRequestObject, error_description = "signature invalid" };
+            }
         }
         catch (Exception ex)
         {
@@ -532,15 +601,22 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         }
 
         var now = DateTimeOffset.UtcNow;
-        var exp = token.Payload.Exp.HasValue ? DateTimeOffset.FromUnixTimeSeconds(token.Payload.Exp.Value) : (DateTimeOffset?)null;
+        // exp claim (avoid obsolete Exp property)
+        DateTimeOffset? exp = null;
+        if (token.Payload.TryGetValue("exp", out var expObj) && long.TryParse(expObj.ToString(), out var expSec))
+        {
+            try { exp = DateTimeOffset.FromUnixTimeSeconds(expSec); } catch { exp = null; }
+        }
         if (exp is null || exp < now || exp > now.Add(opts.MaxExp))
             return new { error = OpenIddictConstants.Errors.InvalidRequestObject, error_description = "exp invalid" };
-        if (token.Payload.Iat.HasValue)
+
+        if (token.Payload.TryGetValue("iat", out var iatObj) && long.TryParse(iatObj.ToString(), out var iatSec))
         {
-            var iat = DateTimeOffset.FromUnixTimeSeconds(token.Payload.Iat.Value);
+            var iat = DateTimeOffset.FromUnixTimeSeconds(iatSec);
             if (iat < now.Add(-opts.MaxExp) || iat > now.Add(opts.ClockSkew))
                 return new { error = OpenIddictConstants.Errors.InvalidRequestObject, error_description = "iat invalid" };
         }
+
         // JTI replay protection
         if (opts.RequireJti)
         {
