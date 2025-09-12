@@ -10,41 +10,30 @@ using OpenIddict.Server;
 using System.Net;
 using System.Net.Http;
 using System.Text;
-using System.Linq; // added for LINQ on diagnostics
-using Microsoft.AspNetCore.Http; // added for IHttpContextAccessor
+using System.Linq;
+using Microsoft.AspNetCore.Http;
 
 namespace MrWhoAdmin.Tests;
 
 [TestClass]
 public class BackChannelLogoutServiceTests
 {
-    [TestInitialize]
-    public void Init() => BackChannelLogoutService.ClearDiagnostics();
-
-    private static string[] FetchDiagForClient(string clientId)
+    private sealed class TestDiagSink : IBackChannelLogoutDiagnostics
     {
-        var all = BackChannelLogoutService.GetRecentDiagnostics();
-        if (all.Length == 0) return new[] { "-- global diagnostics empty --" };
-        var filtered = all.Where(l => l.Contains($"client={clientId}")).ToArray();
-        if (filtered.Length == 0)
-        {
-            filtered = new[] { "-- no filtered lines --" }.Concat(all).ToArray();
-        }
-        return filtered;
+        public List<BackChannelLogoutDiagEvent> Events { get; } = new();
+        public void Emit(BackChannelLogoutDiagEvent evt) => Events.Add(evt);
+        public IEnumerable<BackChannelLogoutDiagEvent> ForClient(string clientId) => Events.Where(e => e.ClientId == clientId);
     }
 
     private sealed class TestHandler : HttpMessageHandler
     {
-        public HttpRequestMessage? LastRequest; 
+        public HttpRequestMessage? LastRequest;
         public HttpStatusCode Status = HttpStatusCode.OK;
         public bool SimulateTimeout;
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
+            if (SimulateTimeout) throw new TaskCanceledException("timeout");
             LastRequest = request;
-            if (SimulateTimeout)
-            {
-                throw new TaskCanceledException("timeout");
-            }
             return Task.FromResult(new HttpResponseMessage(Status) { Content = new StringContent("ok", Encoding.UTF8, "text/plain") });
         }
     }
@@ -60,23 +49,17 @@ public class BackChannelLogoutServiceTests
         public List<BackChannelLogoutRetryWork> Scheduled { get; } = new();
         public List<(string clientId,string sessionId,int attempt,bool success,string? status,string? error)> AttemptOutcomes { get; } = new();
         public List<(string clientId,string sessionId,int attempts)> Exhausted { get; } = new();
-        public void ScheduleRetry(BackChannelLogoutRetryWork work)
-        {
-            // mimic real scheduler increment behavior
-            var scheduled = work with { Attempt = work.Attempt + 1 };
-            Scheduled.Add(scheduled);
-        }
+        public void ScheduleRetry(BackChannelLogoutRetryWork work) => Scheduled.Add(work with { Attempt = work.Attempt + 1 });
         public void ReportAttemptOutcome(string clientId, string subject, string sessionId, int attempt, bool success, string? status, string? error)
             => AttemptOutcomes.Add((clientId, sessionId, attempt, success, status, error));
-        public void ReportExhausted(string clientId, string subject, string sessionId, int attempts)
-            => Exhausted.Add((clientId, sessionId, attempts));
+        public void ReportExhausted(string clientId, string subject, string sessionId, int attempts) => Exhausted.Add((clientId, sessionId, attempts));
     }
 
-    private (BackChannelLogoutService Service, TestHandler Handler, ApplicationDbContext Db, FakeScheduler Scheduler, string ClientId) Create(bool withClient = true, HttpStatusCode status = HttpStatusCode.OK, bool timeout = false, string clientIdOverride = "mrwho_demo1")
+    private (BackChannelLogoutService Service, TestHandler Handler, ApplicationDbContext Db, FakeScheduler Scheduler, TestDiagSink Diags, string ClientId) Create(bool withClient = true, HttpStatusCode status = HttpStatusCode.OK, bool timeout = false, string clientIdOverride = "mrwho_demo1")
     {
         var services = new ServiceCollection();
         services.AddLogging();
-        services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>(); // ensure available for any context filters
+        services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
         var handler = new TestHandler { Status = status, SimulateTimeout = timeout };
         services.AddHttpClient("backchannel").ConfigurePrimaryHttpMessageHandler(() => handler);
         var options = new OpenIddictServerOptions();
@@ -84,99 +67,77 @@ public class BackChannelLogoutServiceTests
         services.AddSingleton<IOptionsMonitor<OpenIddictServerOptions>>(new TestOptionsMonitor<OpenIddictServerOptions>(options));
         services.AddSingleton(new Mock<IOpenIddictAuthorizationManager>().Object);
         services.AddSingleton(new Mock<IOpenIddictApplicationManager>().Object);
-
-        // Deterministic database name per client id so scoped contexts share state
         var dbName = $"bcl_{clientIdOverride}";
         services.AddDbContext<ApplicationDbContext>(o => o.UseInMemoryDatabase(dbName));
-
         var scheduler = new FakeScheduler();
         services.AddSingleton<IBackChannelLogoutRetryScheduler>(scheduler);
+        var diagSink = new TestDiagSink();
+        services.AddSingleton<IBackChannelLogoutDiagnostics>(diagSink);
         var sp = services.BuildServiceProvider();
         var db = sp.GetRequiredService<ApplicationDbContext>();
         db.Database.EnsureCreated();
-        var clientId = clientIdOverride; // choose id
+        var clientId = clientIdOverride;
         if (withClient)
         {
             if (!db.Clients.Any(c => c.ClientId == clientId))
             {
-                db.Clients.Add(new Client
-                {
-                    Id = Guid.NewGuid().ToString(),
-                    ClientId = clientId,
-                    Name = clientId,
-                    IsEnabled = true,
-                    RealmId = Guid.NewGuid().ToString(),
-                    BackChannelLogoutUri = $"https://{clientId}.example.com/signout-backchannel"
-                });
+                db.Clients.Add(new Client { Id = Guid.NewGuid().ToString(), ClientId = clientId, Name = clientId, IsEnabled = true, RealmId = Guid.NewGuid().ToString(), BackChannelLogoutUri = $"https://{clientId}.example.com/signout-backchannel" });
                 db.SaveChanges();
             }
-            // Verify persistence immediately
-            if (!db.Clients.AsNoTracking().Any(c => c.ClientId == clientId))
-            {
-                Assert.Inconclusive($"Client '{clientId}' was not persisted to in-memory store (dbName={dbName}). Entries: {db.Clients.Count()}");
-            }
         }
-        var svc = new BackChannelLogoutService(sp.GetRequiredService<IHttpClientFactory>(), sp.GetRequiredService<ILogger<BackChannelLogoutService>>(), sp, sp.GetRequiredService<IOptionsMonitor<OpenIddictServerOptions>>(), null, scheduler);
-        return (svc, handler, db, scheduler, clientId);
+        var svc = new BackChannelLogoutService(sp.GetRequiredService<IHttpClientFactory>(), sp.GetRequiredService<ILogger<BackChannelLogoutService>>(), sp, sp.GetRequiredService<IOptionsMonitor<OpenIddictServerOptions>>(), null, scheduler, diagSink);
+        return (svc, handler, db, scheduler, diagSink, clientId);
     }
+
+    private static bool HasEvent(IEnumerable<BackChannelLogoutDiagEvent> events, BackChannelLogoutDiagEventType type) => events.Any(e => e.Type == type);
 
     [TestMethod]
     public async Task Success_Does_Not_Schedule_Retry()
     {
-        var (svc, handler, _, sched, clientId) = Create(status: HttpStatusCode.OK, clientIdOverride: "clienta");
-        await svc.NotifyClientLogoutAsync(clientId: clientId, subject: "subj", sessionId: "sess"); // use named args to pick client overload
-        var diag = FetchDiagForClient(clientId);
-        Assert.IsNotNull(handler.LastRequest, "HTTP request should be issued on success path");
-        Assert.AreEqual(0, sched.Scheduled.Count, "No retry should be scheduled on success");
-        Assert.IsTrue(sched.AttemptOutcomes.Any(o => o.success), "Attempt outcome success should be reported");
-        Assert.IsTrue(diag.Any(l => l.Contains("dispatch.success")), "Diagnostics should contain dispatch.success");
-        Assert.IsTrue(diag.Any(l => l.Contains("reported=success")), "Diagnostics should contain attempt success outcome. Diagnostics:\n" + string.Join("\n", diag));
+        var (svc, handler, _, sched, diags, clientId) = Create(status: HttpStatusCode.OK, clientIdOverride: "clienta");
+        await svc.NotifyClientLogoutAsync(clientId: clientId, subject: "subj", sessionId: "sess");
+        var ev = diags.ForClient(clientId).ToList();
+        Assert.IsNotNull(handler.LastRequest, "Expected HTTP request");
+        Assert.AreEqual(0, sched.Scheduled.Count, "No retry expected");
+        Assert.IsTrue(HasEvent(ev, BackChannelLogoutDiagEventType.DispatchSuccess), "Missing dispatch success event" + Dump(ev));
     }
 
     [TestMethod]
     public async Task Failure_Status_Triggers_Retry_And_Diagnostics()
     {
-        var (svc, handler, db, sched, clientId) = Create(status: HttpStatusCode.InternalServerError, clientIdOverride: "clientb");
-        // Safety check: ensure client present
-        Assert.IsTrue(db.Clients.AsNoTracking().Any(c => c.ClientId == clientId), "Precondition failed: client not in DB");
+        var (svc, handler, db, sched, diags, clientId) = Create(status: HttpStatusCode.InternalServerError, clientIdOverride: "clientb");
+        Assert.IsTrue(db.Clients.Any(c => c.ClientId == clientId), "Client not seeded");
         await svc.NotifyClientLogoutAsync(clientId: clientId, subject: "subj", sessionId: "sess");
-        var all = BackChannelLogoutService.GetRecentDiagnostics();
-        Assert.IsTrue(all.Length > 0, "Global diagnostics buffer is empty - Trace() not executing");
-        var diag = FetchDiagForClient(clientId);
-        bool hasPostBegin = diag.Any(l => l.Contains("http.post.begin"));
-        bool hasFailure = diag.Any(l => l.Contains("dispatch.failure"));
-        bool hasOutcome = diag.Any(l => l.Contains("attempt.outcome client="));
-        bool hasRetry = diag.Any(l => l.Contains("retry.scheduled"));
-        if (!hasPostBegin && !hasFailure)
-        {
-            Assert.Fail("Expected http.post.begin or dispatch.failure trace. FULL Diagnostics:\n" + string.Join("\n", diag));
-        }
-        Assert.IsTrue(hasOutcome, "Expected attempt outcome trace. FULL Diagnostics:\n" + string.Join("\n", diag));
-        Assert.IsTrue(hasRetry, "Expected retry scheduling trace. FULL Diagnostics:\n" + string.Join("\n", diag));
-        Assert.AreEqual(1, sched.Scheduled.Count, "Should schedule one retry for failure");
+        var ev = diags.ForClient(clientId).ToList();
+        Assert.IsTrue(HasEvent(ev, BackChannelLogoutDiagEventType.HttpPostBegin), "No HTTP begin" + Dump(ev));
+        Assert.IsTrue(HasEvent(ev, BackChannelLogoutDiagEventType.DispatchFailure), "No failure event" + Dump(ev));
+        Assert.IsTrue(HasEvent(ev, BackChannelLogoutDiagEventType.RetryScheduled), "No retry scheduled event" + Dump(ev));
+        Assert.AreEqual(1, sched.Scheduled.Count, "Retry should be scheduled");
     }
 
     [TestMethod]
     public async Task Timeout_Schedules_Retry_With_Diagnostics()
     {
-        var (svc, handler, _, sched, clientId) = Create(status: HttpStatusCode.OK, timeout: true, clientIdOverride: "clientc");
+        var (svc, handler, _, sched, diags, clientId) = Create(status: HttpStatusCode.OK, timeout: true, clientIdOverride: "clientc");
         await svc.NotifyClientLogoutAsync(clientId: clientId, subject: "subj", sessionId: "sess");
-        var diag = FetchDiagForClient(clientId);
-        Assert.IsTrue(diag.Any(l => l.Contains("dispatch.timeout")), "Expected timeout diagnostic");
-        Assert.IsTrue(diag.Any(l => l.Contains("reported=timeout")), "Expected timeout attempt outcome. Diagnostics:\n" + string.Join("\n", diag));
-        Assert.IsTrue(diag.Any(l => l.Contains("retry.scheduled")), "Expected retry scheduled after timeout");
-        Assert.AreEqual(1, sched.Scheduled.Count, "Timeout should schedule retry");
+        var ev = diags.ForClient(clientId).ToList();
+        Assert.IsTrue(HasEvent(ev, BackChannelLogoutDiagEventType.DispatchTimeout), "Missing timeout event" + Dump(ev));
+        Assert.IsTrue(HasEvent(ev, BackChannelLogoutDiagEventType.RetryScheduled), "Missing retry scheduled event" + Dump(ev));
+        Assert.AreEqual(1, sched.Scheduled.Count, "Retry should be scheduled on timeout");
     }
 
     [TestMethod]
-    public async Task Missing_Client_Diagnostics()
+    public async Task Missing_Client_Does_Not_Schedule()
     {
-        var (svc, handler, _, sched, clientId) = Create(withClient: false, clientIdOverride: "clientd");
+        var (svc, handler, _, sched, diags, clientId) = Create(withClient: false, clientIdOverride: "clientd");
         await svc.NotifyClientLogoutAsync(clientId: clientId, subject: "subj", sessionId: "sess");
-        var diag = FetchDiagForClient(clientId);
-        Assert.IsTrue(diag.Any(l => l.Contains("client.lookup.miss")), "Expected client lookup miss trace");
-        Assert.IsTrue(diag.Any(l => l.Contains("dispatch.skip.missing_client")), "Expected skip missing client trace");
-        Assert.IsTrue(diag.Any(l => l.Contains("reported=missing_client")), "Expected missing client attempt outcome trace. Diagnostics:\n" + string.Join("\n", diag));
-        Assert.AreEqual(0, sched.Scheduled.Count, "Missing client should not schedule retries");
+        var ev = diags.ForClient(clientId).ToList();
+        Assert.IsTrue(HasEvent(ev, BackChannelLogoutDiagEventType.ClientLookupMiss), "Expected lookup miss" + Dump(ev));
+        Assert.IsTrue(HasEvent(ev, BackChannelLogoutDiagEventType.SkipMissingClient), "Expected skip missing client" + Dump(ev));
+        Assert.AreEqual(0, sched.Scheduled.Count, "No retry expected for missing client");
+        Assert.IsNull(handler.LastRequest, "No HTTP request expected");
     }
+
+    private static string Dump(IEnumerable<BackChannelLogoutDiagEvent> ev)
+        => "\nEVENTS:\n" + string.Join("\n", ev.Select(e => $"{e.Type} success={e.Success} attempt={e.Attempt} status={e.Status} error={e.Error}"));
 }
