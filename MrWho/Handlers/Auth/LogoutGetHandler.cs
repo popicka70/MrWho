@@ -16,6 +16,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using MrWho.Data;
 using MrWho.Options;
+using Microsoft.AspNetCore.Http.Features; // added for session feature check
 
 namespace MrWho.Handlers.Auth;
 
@@ -41,6 +42,18 @@ public sealed class LogoutGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Logo
     public async Task<IActionResult> Handle(MrWho.Endpoints.Auth.LogoutGetRequest request, CancellationToken cancellationToken)
     {
         var http = request.HttpContext;
+        // helper local functions
+        static bool HasSession(HttpContext ctx) => ctx.Features.Get<ISessionFeature>()?.Session != null;
+        string? SafeSessionGet(HttpContext ctx, string key)
+        {
+            if (!HasSession(ctx)) return null;
+            try { return ctx.Session.GetString(key); } catch { return null; }
+        }
+        void SafeSessionSet(HttpContext ctx, string key, string value)
+        {
+            if (!HasSession(ctx)) return; try { ctx.Session.SetString(key, value); } catch { }
+        }
+
         var clientId = request.ClientId;
         var postUri = request.PostLogoutRedirectUri;
 
@@ -57,7 +70,7 @@ public sealed class LogoutGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Logo
         }
 
         // Try session first, then durable claim on principal for direct (non-OIDC) logout
-        var externalRegId = http.Session.GetString("ExternalRegistrationId");
+        var externalRegId = SafeSessionGet(http, "ExternalRegistrationId");
         if (string.IsNullOrWhiteSpace(externalRegId))
         {
             externalRegId = http.User?.FindFirst("ext_reg_id")?.Value;
@@ -68,7 +81,7 @@ public sealed class LogoutGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Logo
             var returnAfterExternal = http.Request.Scheme + "://" + http.Request.Host + "/connect/logout" + new QueryString()
                 .Add("clientId", clientId ?? string.Empty)
                 .Add("post_logout_redirect_uri", postUri ?? string.Empty).ToUriComponent();
-            http.Session.SetString("ExternalSignoutResumeUrl", returnAfterExternal ?? "/");
+            SafeSessionSet(http, "ExternalSignoutResumeUrl", returnAfterExternal ?? "/");
 
             var props = new AuthenticationProperties { RedirectUri = "/connect/external/signout-callback" };
             props.Items[OpenIddictClientAspNetCoreConstants.Properties.RegistrationId] = externalRegId;
@@ -168,6 +181,8 @@ public sealed class LogoutGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Logo
 
     private async Task<IActionResult> ProcessLogoutInternalAsync(HttpContext http, string? clientId, string? postLogoutUri, CancellationToken ct)
     {
+        static bool HasSession(HttpContext ctx) => ctx.Features.Get<ISessionFeature>()?.Session != null;
+        void SafeSessionSet(HttpContext ctx, string key, string value) { if (!HasSession(ctx)) return; try { ctx.Session.SetString(key, value); } catch { } }
         var request = http.GetOpenIddictServerRequest();
         string? detectedClientId = clientId ?? await _logoutHelper.TryGetClientIdFromRequestAsync(http);
         var audit = http.RequestServices.GetService<ISecurityAuditWriter>();
