@@ -94,7 +94,7 @@ public class ClientRoleServiceTests
         Assert.IsFalse((await fx.Service.GetClientRolesAsync(fx.User.Id, fx.Client.ClientId)).Contains("viewer"));
     }
 
-    [DataTestMethod]
+    [TestMethod]
     [DataRow(RoleInclusion.GlobalOnly, true, false)]
     [DataRow(RoleInclusion.ClientOnly, false, true)]
     [DataRow(RoleInclusion.GlobalAndClient, true, true)]

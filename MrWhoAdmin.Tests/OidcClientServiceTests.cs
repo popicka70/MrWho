@@ -24,12 +24,12 @@ public class OidcClientServiceTests
 
         var appMgr = new Mock<IOpenIddictApplicationManager>();
         appMgr.Setup(m => m.FindByClientIdAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync((object?)null);
-        appMgr.Setup(m => m.CreateAsync(It.IsAny<OpenIddictApplicationDescriptor>(), It.IsAny<CancellationToken>())).Returns(ValueTask.FromResult<object?>(null));
+        appMgr.Setup(m => m.CreateAsync(It.IsAny<OpenIddictApplicationDescriptor>(), It.IsAny<CancellationToken>())).Returns(ValueTask.FromResult<object>(new object()));
         appMgr.Setup(m => m.UpdateAsync(It.IsAny<object>(), It.IsAny<OpenIddictApplicationDescriptor>(), It.IsAny<CancellationToken>())).Returns(ValueTask.CompletedTask);
 
         var scopeMgr = new Mock<IOpenIddictScopeManager>();
         scopeMgr.Setup(s => s.FindByNameAsync(StandardScopes.MrWhoUse, It.IsAny<CancellationToken>())).ReturnsAsync((object?)null);
-        scopeMgr.Setup(s => s.CreateAsync(It.IsAny<OpenIddictScopeDescriptor>(), It.IsAny<CancellationToken>())).Returns(ValueTask.FromResult<object?>(null));
+        scopeMgr.Setup(s => s.CreateAsync(It.IsAny<OpenIddictScopeDescriptor>(), It.IsAny<CancellationToken>())).Returns(ValueTask.FromResult<object>(new object()));
 
         var store = new UserStore<IdentityUser>(db);
         var userMgr = new UserManager<IdentityUser>(store, null, new PasswordHasher<IdentityUser>(), Array.Empty<IUserValidator<IdentityUser>>(), Array.Empty<IPasswordValidator<IdentityUser>>(), new UpperInvariantLookupNormalizer(), new IdentityErrorDescriber(), null, new Mock<ILogger<UserManager<IdentityUser>>>().Object);
@@ -56,7 +56,7 @@ public class OidcClientServiceTests
         var (db, svc, appMgr, _, _) = Create();
         var realm = new Realm { Name = "r1", DisplayName = "R1", IsEnabled = true };
         db.Realms.Add(realm); db.SaveChanges();
-        var client = new Client { ClientId = "c1", Name = "C1", RealmId = realm.Id, Realm = realm, ClientType = ClientType.Confidential, RequireClientSecret = true, ClientSecret = null };
+        var client = new Client { ClientId = "c1", Name = "C1", RealmId = realm.Id, Realm = realm, ClientType = ClientType.Confidential, RequireClientSecret = true, ClientSecret = string.Empty };
         db.Clients.Add(client); db.SaveChanges();
         await svc.SyncClientWithOpenIddictAsync(client);
         appMgr.Verify(m => m.CreateAsync(It.IsAny<OpenIddictApplicationDescriptor>(), It.IsAny<CancellationToken>()), Times.Never());

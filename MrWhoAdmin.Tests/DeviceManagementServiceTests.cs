@@ -43,7 +43,7 @@ public class DeviceManagementServiceTests
     {
         var (db, svc, user) = Create();
         await svc.RegisterDeviceAsync(user.Id, new RegisterDeviceRequest { DeviceId = "dev1", DeviceName = "Tablet", DeviceType = DeviceType.Tablet, CanApproveLogins = true });
-        var session = await svc.CreateQrSessionAsync(new CreateQrSessionRequest { ClientId = "clientA", UserId = null });
+        var session = await svc.CreateQrSessionAsync(new CreateQrSessionRequest { ClientId = "clientA", UserId = string.Empty });
         var approve = await svc.ApproveQrSessionAsync(session.Token, user.Id, "dev1");
         Assert.IsTrue(approve, "Approval should succeed");
         var complete = await svc.CompleteQrSessionAsync(session.Token);
