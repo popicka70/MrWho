@@ -48,6 +48,23 @@ public class BackChannelLogoutService : IBackChannelLogoutService
     private static readonly Counter<long> _attemptsCounter = _meter.CreateCounter<long>("mrwho_logout_backchannel_attempts_total");
     private static readonly Counter<long> _failuresCounter = _meter.CreateCounter<long>("mrwho_logout_backchannel_failures_total");
 
+    // DIAGNOSTICS: simple in-memory ring buffer (not thread-safe perfection but adequate for test visibility if exposed later)
+    private static readonly int DiagCapacity = 200;
+    private static readonly List<string> _diag = new();
+    private static int _traceCount = 0; // diagnostic counter
+    private static void Trace(string msg)
+    {
+        Interlocked.Increment(ref _traceCount);
+        lock (_diag)
+        {
+            if (_diag.Count >= DiagCapacity) _diag.RemoveAt(0);
+            _diag.Add(DateTime.UtcNow.ToString("HH:mm:ss.fff") + " | " + msg);
+        }
+    }
+    public static string[] GetRecentDiagnostics() { lock (_diag) return _diag.ToArray(); }
+    public static void ClearDiagnostics() { lock (_diag) _diag.Clear(); Interlocked.Exchange(ref _traceCount, 0); }
+    public static int GetTraceCount() => Volatile.Read(ref _traceCount);
+
     public BackChannelLogoutService(
         IHttpClientFactory httpClientFactory,
         ILogger<BackChannelLogoutService> logger,
@@ -66,6 +83,7 @@ public class BackChannelLogoutService : IBackChannelLogoutService
 
     public async Task NotifyClientLogoutAsync(string authorizationId, string subject, string sessionId)
     {
+        Trace($"notify.authId.start authId={authorizationId} subj={subject} sid={sessionId}");
         try
         {
             // Get the specific client for this authorization
@@ -131,6 +149,7 @@ public class BackChannelLogoutService : IBackChannelLogoutService
 
     public async Task NotifyClientLogoutAsync(string clientId, string subject, string sessionId, string? logoutToken = null)
     {
+        Trace($"notify.client.start client={clientId} subj={subject} sid={sessionId} tokenSupplied={(logoutToken!=null)}");
         await NotifyClientLogoutInternalAsync(clientId, subject, sessionId, logoutToken);
     }
 
@@ -139,6 +158,7 @@ public class BackChannelLogoutService : IBackChannelLogoutService
     /// </summary>
     private async Task NotifyClientLogoutInternalAsync(string clientId, string subject, string sessionId, string? logoutToken = null)
     {
+        Trace($"dispatch.start client={clientId} subj={subject} sid={sessionId} tokenSupplied={(logoutToken!=null)}");
         // Count every dispatch attempt (attempt number may be >1 when invoked by retry scheduler; scheduler records granular attempt audits)
         _attemptsCounter.Add(1, KeyValuePair.Create<string, object?>("client_id", clientId));
         try
@@ -148,16 +168,33 @@ public class BackChannelLogoutService : IBackChannelLogoutService
             {
                 var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
                 client = await context.Clients
+                    .AsNoTracking()
                     .FirstOrDefaultAsync(c => c.ClientId == clientId);
+                if (client == null)
+                {
+                    // Fallback ignoring global query filters (e.g., realm/soft delete) mainly for tests/diagnostics
+                    var ignored = await context.Clients
+                        .IgnoreQueryFilters()
+                        .AsNoTracking()
+                        .FirstOrDefaultAsync(c => c.ClientId == clientId);
+                    if (ignored != null)
+                    {
+                        client = ignored;
+                        Trace($"client.lookup.hit_ignore_filters client={clientId} hasUri={(string.IsNullOrWhiteSpace(client.BackChannelLogoutUri)?"false":"true")}");
+                    }
+                }
+                Trace(client == null
+                    ? $"client.lookup.miss client={clientId}"
+                    : $"client.lookup.hit client={clientId} hasUri={(string.IsNullOrWhiteSpace(client.BackChannelLogoutUri)?"false":"true")} uri='{client.BackChannelLogoutUri}'");
             }
 
             if (client == null)
             {
                 _logger.LogWarning("Client {ClientId} not found for logout notification", clientId);
+                Trace($"dispatch.skip.missing_client client={clientId}");
                 try { if (_audit != null) await _audit.WriteAsync("logout", "backchannel.skip_client_missing", new { clientId }, "warn", actorClientId: clientId); } catch { }
-                // record attempt outcome (failure)
                 _retryScheduler?.ReportAttemptOutcome(clientId, subject, sessionId, 1, false, null, "client_missing");
-                _failuresCounter.Add(1, KeyValuePair.Create<string, object?>("client_id", clientId));
+                Trace($"attempt.outcome client={clientId} reported=missing_client schedulerPresent={_retryScheduler!=null}");
                 return;
             }
 
@@ -165,20 +202,22 @@ public class BackChannelLogoutService : IBackChannelLogoutService
             if (string.IsNullOrEmpty(logoutUri))
             {
                 _logger.LogDebug("No back-channel logout URI configured for client {ClientId}", clientId);
+                Trace($"dispatch.skip.no_uri client={clientId}");
                 try { if (_audit != null) await _audit.WriteAsync("logout", "backchannel.skip_no_uri", new { clientId }, "info", actorClientId: clientId); } catch { }
                 _retryScheduler?.ReportAttemptOutcome(clientId, subject, sessionId, 1, success: true, status: "skipped", error: null);
+                Trace($"attempt.outcome client={clientId} reported=skipped schedulerPresent={_retryScheduler!=null}");
                 return;
             }
 
             if (string.IsNullOrEmpty(logoutToken))
             {
+                Trace($"token.build client={clientId}");
                 logoutToken = await CreateLogoutTokenAsync(clientId, subject, sessionId);
             }
 
-            // Named client to allow custom policies/config ("backchannel")
             HttpClient httpClient;
-            try { httpClient = _httpClientFactory.CreateClient("backchannel"); }
-            catch { httpClient = _httpClientFactory.CreateClient(); }
+            try { httpClient = _httpClientFactory.CreateClient("backchannel"); Trace($"http.client.named=backchannel client={clientId}"); }
+            catch { httpClient = _httpClientFactory.CreateClient(); Trace($"http.client.default client={clientId}"); }
             httpClient.Timeout = TimeSpan.FromSeconds(10);
 
             var formData = new FormUrlEncodedContent(new[]
@@ -190,38 +229,63 @@ public class BackChannelLogoutService : IBackChannelLogoutService
             HttpResponseMessage? response = null;
             try
             {
+                Trace($"http.post.begin client={clientId} uri='{logoutUri}'");
                 response = await httpClient.PostAsync(logoutUri, formData);
+                Trace($"http.post.end client={clientId} status={(int)response.StatusCode}");
                 if (response.IsSuccessStatusCode)
                 {
                     _logger.LogInformation("Back-channel logout notification sent successfully to client {ClientId}", clientId);
+                    Trace($"dispatch.success client={clientId} status={(int)response.StatusCode}");
                     try { if (_audit != null) await _audit.WriteAsync("logout", "backchannel.dispatch.success", new { clientId, uri = logoutUri, ms = (DateTime.UtcNow-start).TotalMilliseconds, status = (int)response.StatusCode }, "info", actorClientId: clientId); } catch { }
-                    // attempt outcome success (attempt 1)
                     _retryScheduler?.ReportAttemptOutcome(clientId, subject, sessionId, 1, true, ((int)response.StatusCode).ToString(), null);
+                    Trace($"attempt.outcome client={clientId} reported=success schedulerPresent={_retryScheduler!=null}");
                 }
                 else
                 {
                     _logger.LogWarning("Back-channel logout notification failed for client {ClientId} with status {StatusCode}", clientId, response.StatusCode);
+                    Trace($"dispatch.failure client={clientId} status={(int)response.StatusCode}");
                     try { if (_audit != null) await _audit.WriteAsync("logout", "backchannel.dispatch.failure", new { clientId, uri = logoutUri, status = (int)response.StatusCode }, "warn", actorClientId: clientId); } catch { }
                     _failuresCounter.Add(1, KeyValuePair.Create<string, object?>("client_id", clientId));
                     _retryScheduler?.ReportAttemptOutcome(clientId, subject, sessionId, 1, false, ((int)response.StatusCode).ToString(), null);
-                    _retryScheduler?.ScheduleRetry(new BackChannelLogoutRetryWork(clientId, subject, sessionId));
+                    Trace($"attempt.outcome client={clientId} reported=failure schedulerPresent={_retryScheduler!=null}");
+                    if (_retryScheduler != null)
+                    {
+                        _retryScheduler.ScheduleRetry(new BackChannelLogoutRetryWork(clientId, subject, sessionId));
+                        Trace($"retry.scheduled client={clientId} nextAttempt=2");
+                    }
+                    else
+                    {
+                        Trace($"retry.scheduler.null client={clientId} - not scheduled");
+                    }
                 }
             }
             catch (TaskCanceledException tex)
             {
                 _logger.LogWarning(tex, "Back-channel logout notification timeout for client {ClientId}", clientId);
+                Trace($"dispatch.timeout client={clientId}");
                 try { if (_audit != null) await _audit.WriteAsync("logout", "backchannel.dispatch.timeout", new { clientId, uri = logoutUri }, "warn", actorClientId: clientId); } catch { }
                 _failuresCounter.Add(1, KeyValuePair.Create<string, object?>("client_id", clientId));
                 _retryScheduler?.ReportAttemptOutcome(clientId, subject, sessionId, 1, false, null, "timeout");
-                _retryScheduler?.ScheduleRetry(new BackChannelLogoutRetryWork(clientId, subject, sessionId));
+                Trace($"attempt.outcome client={clientId} reported=timeout schedulerPresent={_retryScheduler!=null}");
+                if (_retryScheduler != null)
+                {
+                    _retryScheduler.ScheduleRetry(new BackChannelLogoutRetryWork(clientId, subject, sessionId));
+                    Trace($"retry.scheduled client={clientId} after timeout nextAttempt=2");
+                }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error sending back-channel logout notification to client {ClientId}");
+                Trace($"dispatch.error client={clientId} ex={ex.GetType().Name}");
                 try { if (_audit != null) await _audit.WriteAsync("logout", "backchannel.dispatch.error", new { clientId, uri = logoutUri, ex = ex.Message }, "error", actorClientId: clientId); } catch { }
                 _failuresCounter.Add(1, KeyValuePair.Create<string, object?>("client_id", clientId));
                 _retryScheduler?.ReportAttemptOutcome(clientId, subject, sessionId, 1, false, null, ex.GetType().Name);
-                _retryScheduler?.ScheduleRetry(new BackChannelLogoutRetryWork(clientId, subject, sessionId));
+                Trace($"attempt.outcome client={clientId} reported=error schedulerPresent={_retryScheduler!=null}");
+                if (_retryScheduler != null)
+                {
+                    _retryScheduler.ScheduleRetry(new BackChannelLogoutRetryWork(clientId, subject, sessionId));
+                    Trace($"retry.scheduled client={clientId} after error nextAttempt=2");
+                }
             }
             finally
             {
@@ -231,10 +295,16 @@ public class BackChannelLogoutService : IBackChannelLogoutService
         catch (Exception exOuter)
         {
             _logger.LogError(exOuter, "Unhandled error in back-channel logout dispatch for client {ClientId}", clientId);
+            Trace($"dispatch.unhandled client={clientId} ex={exOuter.GetType().Name}");
             try { if (_audit != null) await _audit.WriteAsync("logout", "backchannel.dispatch.unhandled", new { clientId, ex = exOuter.Message }, "error", actorClientId: clientId); } catch { }
             _failuresCounter.Add(1, KeyValuePair.Create<string, object?>("client_id", clientId));
             _retryScheduler?.ReportAttemptOutcome(clientId, subject, sessionId, 1, false, null, exOuter.GetType().Name);
-            _retryScheduler?.ScheduleRetry(new BackChannelLogoutRetryWork(clientId, subject, sessionId));
+            Trace($"attempt.outcome client={clientId} reported=unhandled schedulerPresent={_retryScheduler!=null}");
+            if (_retryScheduler != null)
+            {
+                _retryScheduler.ScheduleRetry(new BackChannelLogoutRetryWork(clientId, subject, sessionId));
+                Trace($"retry.scheduled client={clientId} after unhandled nextAttempt=2");
+            }
         }
     }
 

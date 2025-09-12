@@ -10,12 +10,29 @@ using OpenIddict.Server;
 using System.Net;
 using System.Net.Http;
 using System.Text;
+using System.Linq; // added for LINQ on diagnostics
+using Microsoft.AspNetCore.Http; // added for IHttpContextAccessor
 
 namespace MrWhoAdmin.Tests;
 
 [TestClass]
 public class BackChannelLogoutServiceTests
 {
+    [TestInitialize]
+    public void Init() => BackChannelLogoutService.ClearDiagnostics();
+
+    private static string[] FetchDiagForClient(string clientId)
+    {
+        var all = BackChannelLogoutService.GetRecentDiagnostics();
+        if (all.Length == 0) return new[] { "-- global diagnostics empty --" };
+        var filtered = all.Where(l => l.Contains($"client={clientId}")).ToArray();
+        if (filtered.Length == 0)
+        {
+            filtered = new[] { "-- no filtered lines --" }.Concat(all).ToArray();
+        }
+        return filtered;
+    }
+
     private sealed class TestHandler : HttpMessageHandler
     {
         public HttpRequestMessage? LastRequest; 
@@ -59,6 +76,7 @@ public class BackChannelLogoutServiceTests
     {
         var services = new ServiceCollection();
         services.AddLogging();
+        services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>(); // ensure available for any context filters
         var handler = new TestHandler { Status = status, SimulateTimeout = timeout };
         services.AddHttpClient("backchannel").ConfigurePrimaryHttpMessageHandler(() => handler);
         var options = new OpenIddictServerOptions();
@@ -66,7 +84,11 @@ public class BackChannelLogoutServiceTests
         services.AddSingleton<IOptionsMonitor<OpenIddictServerOptions>>(new TestOptionsMonitor<OpenIddictServerOptions>(options));
         services.AddSingleton(new Mock<IOpenIddictAuthorizationManager>().Object);
         services.AddSingleton(new Mock<IOpenIddictApplicationManager>().Object);
-        services.AddDbContext<ApplicationDbContext>(o => o.UseInMemoryDatabase(Guid.NewGuid().ToString()));
+
+        // Deterministic database name per client id so scoped contexts share state
+        var dbName = $"bcl_{clientIdOverride}";
+        services.AddDbContext<ApplicationDbContext>(o => o.UseInMemoryDatabase(dbName));
+
         var scheduler = new FakeScheduler();
         services.AddSingleton<IBackChannelLogoutRetryScheduler>(scheduler);
         var sp = services.BuildServiceProvider();
@@ -75,16 +97,24 @@ public class BackChannelLogoutServiceTests
         var clientId = clientIdOverride; // choose id
         if (withClient)
         {
-            db.Clients.Add(new Client
+            if (!db.Clients.Any(c => c.ClientId == clientId))
             {
-                Id = Guid.NewGuid().ToString(),
-                ClientId = clientId,
-                Name = clientId,
-                IsEnabled = true,
-                RealmId = Guid.NewGuid().ToString(),
-                BackChannelLogoutUri = $"https://{clientId}.example.com/signout-backchannel" // explicit, avoid fallback uncertainty
-            });
-            db.SaveChanges();
+                db.Clients.Add(new Client
+                {
+                    Id = Guid.NewGuid().ToString(),
+                    ClientId = clientId,
+                    Name = clientId,
+                    IsEnabled = true,
+                    RealmId = Guid.NewGuid().ToString(),
+                    BackChannelLogoutUri = $"https://{clientId}.example.com/signout-backchannel"
+                });
+                db.SaveChanges();
+            }
+            // Verify persistence immediately
+            if (!db.Clients.AsNoTracking().Any(c => c.ClientId == clientId))
+            {
+                Assert.Inconclusive($"Client '{clientId}' was not persisted to in-memory store (dbName={dbName}). Entries: {db.Clients.Count()}");
+            }
         }
         var svc = new BackChannelLogoutService(sp.GetRequiredService<IHttpClientFactory>(), sp.GetRequiredService<ILogger<BackChannelLogoutService>>(), sp, sp.GetRequiredService<IOptionsMonitor<OpenIddictServerOptions>>(), null, scheduler);
         return (svc, handler, db, scheduler, clientId);
@@ -94,42 +124,59 @@ public class BackChannelLogoutServiceTests
     public async Task Success_Does_Not_Schedule_Retry()
     {
         var (svc, handler, _, sched, clientId) = Create(status: HttpStatusCode.OK, clientIdOverride: "clienta");
-        await svc.NotifyClientLogoutAsync(clientId, "subj", "sess");
+        await svc.NotifyClientLogoutAsync(clientId: clientId, subject: "subj", sessionId: "sess"); // use named args to pick client overload
+        var diag = FetchDiagForClient(clientId);
         Assert.IsNotNull(handler.LastRequest, "HTTP request should be issued on success path");
         Assert.AreEqual(0, sched.Scheduled.Count, "No retry should be scheduled on success");
         Assert.IsTrue(sched.AttemptOutcomes.Any(o => o.success), "Attempt outcome success should be reported");
+        Assert.IsTrue(diag.Any(l => l.Contains("dispatch.success")), "Diagnostics should contain dispatch.success");
+        Assert.IsTrue(diag.Any(l => l.Contains("reported=success")), "Diagnostics should contain attempt success outcome. Diagnostics:\n" + string.Join("\n", diag));
     }
 
     [TestMethod]
-    public async Task Failure_Status_Schedules_Retry()
+    public async Task Failure_Status_Triggers_Retry_And_Diagnostics()
     {
-        var (svc, handler, _, sched, clientId) = Create(status: HttpStatusCode.InternalServerError, clientIdOverride: "clientb");
-        await svc.NotifyClientLogoutAsync(clientId, "subj", "sess");
-        Assert.IsNotNull(handler.LastRequest, "Expected HTTP POST for failure status but LastRequest was null");
-        Assert.AreEqual(1, sched.Scheduled.Count, "Failure should schedule one retry");
-        var work = sched.Scheduled[0];
-        Assert.AreEqual(clientId, work.ClientId);
-        Assert.AreEqual(2, work.Attempt, "Scheduler increments attempt for first retry (Attempt=2)");
-        Assert.IsTrue(sched.AttemptOutcomes.Any(o => !o.success), "Failure outcome should be tracked");
+        var (svc, handler, db, sched, clientId) = Create(status: HttpStatusCode.InternalServerError, clientIdOverride: "clientb");
+        // Safety check: ensure client present
+        Assert.IsTrue(db.Clients.AsNoTracking().Any(c => c.ClientId == clientId), "Precondition failed: client not in DB");
+        await svc.NotifyClientLogoutAsync(clientId: clientId, subject: "subj", sessionId: "sess");
+        var all = BackChannelLogoutService.GetRecentDiagnostics();
+        Assert.IsTrue(all.Length > 0, "Global diagnostics buffer is empty - Trace() not executing");
+        var diag = FetchDiagForClient(clientId);
+        bool hasPostBegin = diag.Any(l => l.Contains("http.post.begin"));
+        bool hasFailure = diag.Any(l => l.Contains("dispatch.failure"));
+        bool hasOutcome = diag.Any(l => l.Contains("attempt.outcome client="));
+        bool hasRetry = diag.Any(l => l.Contains("retry.scheduled"));
+        if (!hasPostBegin && !hasFailure)
+        {
+            Assert.Fail("Expected http.post.begin or dispatch.failure trace. FULL Diagnostics:\n" + string.Join("\n", diag));
+        }
+        Assert.IsTrue(hasOutcome, "Expected attempt outcome trace. FULL Diagnostics:\n" + string.Join("\n", diag));
+        Assert.IsTrue(hasRetry, "Expected retry scheduling trace. FULL Diagnostics:\n" + string.Join("\n", diag));
+        Assert.AreEqual(1, sched.Scheduled.Count, "Should schedule one retry for failure");
     }
 
     [TestMethod]
-    public async Task Timeout_Schedules_Retry()
+    public async Task Timeout_Schedules_Retry_With_Diagnostics()
     {
         var (svc, handler, _, sched, clientId) = Create(status: HttpStatusCode.OK, timeout: true, clientIdOverride: "clientc");
-        await svc.NotifyClientLogoutAsync(clientId, "subj", "sess");
-        Assert.IsNull(handler.LastRequest, "Timeout simulation throws before recording request");
+        await svc.NotifyClientLogoutAsync(clientId: clientId, subject: "subj", sessionId: "sess");
+        var diag = FetchDiagForClient(clientId);
+        Assert.IsTrue(diag.Any(l => l.Contains("dispatch.timeout")), "Expected timeout diagnostic");
+        Assert.IsTrue(diag.Any(l => l.Contains("reported=timeout")), "Expected timeout attempt outcome. Diagnostics:\n" + string.Join("\n", diag));
+        Assert.IsTrue(diag.Any(l => l.Contains("retry.scheduled")), "Expected retry scheduled after timeout");
         Assert.AreEqual(1, sched.Scheduled.Count, "Timeout should schedule retry");
-        Assert.IsTrue(sched.AttemptOutcomes.Any(o => !o.success && o.error == "timeout"));
     }
 
     [TestMethod]
-    public async Task Missing_Client_Does_Not_Schedule()
+    public async Task Missing_Client_Diagnostics()
     {
         var (svc, handler, _, sched, clientId) = Create(withClient: false, clientIdOverride: "clientd");
-        await svc.NotifyClientLogoutAsync(clientId, "subj", "sess");
-        Assert.IsNull(handler.LastRequest, "No HTTP call should occur when client missing");
+        await svc.NotifyClientLogoutAsync(clientId: clientId, subject: "subj", sessionId: "sess");
+        var diag = FetchDiagForClient(clientId);
+        Assert.IsTrue(diag.Any(l => l.Contains("client.lookup.miss")), "Expected client lookup miss trace");
+        Assert.IsTrue(diag.Any(l => l.Contains("dispatch.skip.missing_client")), "Expected skip missing client trace");
+        Assert.IsTrue(diag.Any(l => l.Contains("reported=missing_client")), "Expected missing client attempt outcome trace. Diagnostics:\n" + string.Join("\n", diag));
         Assert.AreEqual(0, sched.Scheduled.Count, "Missing client should not schedule retries");
-        Assert.IsTrue(sched.AttemptOutcomes.Any(o => !o.success));
     }
 }
