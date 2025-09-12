@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore; // added for context queries
 using MrWho.Options; // for symmetric policy options
 using MrWho.Data; // for ApplicationDbContext
 using MrWho.Shared; // for JarMode enum
+using System.Security.Cryptography; // added for KeyId derivation
 
 namespace MrWho.Services;
 
@@ -147,6 +148,49 @@ internal sealed class JarmAuthorizationResponseHandler : IOpenIddictServerHandle
     public JarmAuthorizationResponseHandler(ILogger<JarmAuthorizationResponseHandler> logger, IKeyManagementService keyService, Microsoft.Extensions.Options.IOptions<JarOptions> jarOptions, ISecurityAuditWriter auditWriter)
     { _logger = logger; _keyService = keyService; _jarOptions = jarOptions.Value; _auditWriter = auditWriter; }
 
+    private static void EnsureKeyId(SecurityKey key, ILogger logger)
+    {
+        if (!string.IsNullOrEmpty(key.KeyId)) return; // already has kid
+        try
+        {
+            switch (key)
+            {
+                case RsaSecurityKey rsa when rsa.Rsa != null:
+                    var parameters = rsa.Rsa.ExportParameters(false);
+                    if (parameters.Modulus != null)
+                    {
+                        using var sha = SHA256.Create();
+                        var hash = sha.ComputeHash(parameters.Modulus);
+                        rsa.KeyId = Base64UrlEncoder.Encode(hash); // deterministic kid
+                    }
+                    break;
+                case RsaSecurityKey rsa2 when rsa2.Parameters.Modulus != null:
+                    using (var sha2 = SHA256.Create())
+                    {
+                        var hash = sha2.ComputeHash(rsa2.Parameters.Modulus);
+                        rsa2.KeyId = Base64UrlEncoder.Encode(hash);
+                    }
+                    break;
+                case X509SecurityKey x509:
+                    var thumb = x509.Certificate.GetCertHash(HashAlgorithmName.SHA256);
+                    x509.KeyId = Base64UrlEncoder.Encode(thumb);
+                    break;
+                case SymmetricSecurityKey sym:
+                    // For symmetric fallback (should not normally be used for JARM), derive from first 16 bytes
+                    using (var sha3 = SHA256.Create())
+                    {
+                        var hash = sha3.ComputeHash(sym.Key);
+                        sym.KeyId = Base64UrlEncoder.Encode(hash);
+                    }
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogDebug(ex, "Failed generating KeyId for JARM signing key; proceeding without kid");
+        }
+    }
+
     public async ValueTask HandleAsync(ApplyAuthorizationResponseContext context)
     {
         try
@@ -194,6 +238,7 @@ internal sealed class JarmAuthorizationResponseHandler : IOpenIddictServerHandle
                 _logger.LogWarning("No signing key available for JARM response");
                 return; // fail open
             }
+            EnsureKeyId(signingKey, _logger); // NEW: guarantee kid for downstream validators
             var creds = new SigningCredentials(signingKey, SecurityAlgorithms.RsaSha256);
             var handler = new JsonWebTokenHandler();
             var payloadClaims = claims.Where(kv => kv.Key is not ("iss" or "aud" or "exp" or "iat") && kv.Value is not null)
@@ -218,8 +263,8 @@ internal sealed class JarmAuthorizationResponseHandler : IOpenIddictServerHandle
                 response[OpenIddictConstants.Parameters.ErrorDescription] = null;
             }
             response["response"] = jwt;
-            _logger.LogDebug("Issued JARM JWT (iss={Issuer}, aud={Aud}, codePresent={HasCode}, errorPresent={HasError})", issuer, clientId, !string.IsNullOrEmpty(codeValue), !string.IsNullOrEmpty(errorValue));
-            try { await _auditWriter.WriteAsync("auth.security", errorValue==null?"jarm.issued":"jarm.error", new { clientId, hasCode = codeValue!=null, error = errorValue, state = stateValue }, "info", actorClientId: clientId); } catch { }
+            _logger.LogDebug("Issued JARM JWT (iss={Issuer}, aud={Aud}, codePresent={HasCode}, errorPresent={HasError}, kid={Kid})", issuer, clientId, !string.IsNullOrEmpty(codeValue), !string.IsNullOrEmpty(errorValue), signingKey.KeyId);
+            try { await _auditWriter.WriteAsync("auth.security", errorValue==null?"jarm.issued":"jarm.error", new { clientId, hasCode = codeValue!=null, error = errorValue, state = stateValue, kid = signingKey.KeyId }, "info", actorClientId: clientId); } catch { }
         }
         catch (Exception ex)
         {
