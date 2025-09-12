@@ -7,6 +7,8 @@ using Microsoft.Extensions.Options;
 using OpenIddict.Server;
 using System.IdentityModel.Tokens.Jwt;
 using Microsoft.IdentityModel.Tokens;
+using MrWho.Services; // add for ISecurityAuditWriter
+using MrWho.Services; // ensure retry scheduler interfaces
 
 namespace MrWho.Services;
 
@@ -37,17 +39,23 @@ public class BackChannelLogoutService : IBackChannelLogoutService
     private readonly ILogger<BackChannelLogoutService> _logger;
     private readonly IServiceProvider _serviceProvider; // Changed from direct DbContext injection
     private readonly IOptionsMonitor<OpenIddictServerOptions> _serverOptions;
+    private readonly ISecurityAuditWriter? _audit; // optional audit writer
+    private readonly IBackChannelLogoutRetryScheduler? _retryScheduler;
 
     public BackChannelLogoutService(
         IHttpClientFactory httpClientFactory,
         ILogger<BackChannelLogoutService> logger,
         IServiceProvider serviceProvider, // Use service provider to create scoped contexts
-        IOptionsMonitor<OpenIddictServerOptions> serverOptions)
+        IOptionsMonitor<OpenIddictServerOptions> serverOptions,
+        ISecurityAuditWriter? audit = null,
+        IBackChannelLogoutRetryScheduler? retryScheduler = null)
     {
         _httpClientFactory = httpClientFactory;
         _logger = logger;
         _serviceProvider = serviceProvider;
         _serverOptions = serverOptions;
+        _audit = audit;
+        _retryScheduler = retryScheduler;
     }
 
     public async Task NotifyClientLogoutAsync(string authorizationId, string subject, string sessionId)
@@ -128,8 +136,6 @@ public class BackChannelLogoutService : IBackChannelLogoutService
         try
         {
             Models.Client? client;
-            
-            // Create a new scope and context for this operation
             using (var scope = _serviceProvider.CreateScope())
             {
                 var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -140,47 +146,73 @@ public class BackChannelLogoutService : IBackChannelLogoutService
             if (client == null)
             {
                 _logger.LogWarning("Client {ClientId} not found for logout notification", clientId);
+                try { if (_audit != null) await _audit.WriteAsync("logout", "backchannel.skip_client_missing", new { clientId }, "warn", actorClientId: clientId); } catch { }
                 return;
             }
 
-            // Get the back-channel logout URI for this client from configuration
             var logoutUri = GetBackChannelLogoutUri(client);
             if (string.IsNullOrEmpty(logoutUri))
             {
                 _logger.LogDebug("No back-channel logout URI configured for client {ClientId}", clientId);
+                try { if (_audit != null) await _audit.WriteAsync("logout", "backchannel.skip_no_uri", new { clientId }, "info", actorClientId: clientId); } catch { }
                 return;
             }
 
-            // Create logout token if not provided
             if (string.IsNullOrEmpty(logoutToken))
             {
                 logoutToken = await CreateLogoutTokenAsync(clientId, subject, sessionId);
             }
 
-            // Send the logout notification
-            using var httpClient = _httpClientFactory.CreateClient();
-            httpClient.Timeout = TimeSpan.FromSeconds(10); // Quick timeout for logout notifications
+            // Named client to allow custom policies/config ("backchannel")
+            HttpClient httpClient;
+            try { httpClient = _httpClientFactory.CreateClient("backchannel"); }
+            catch { httpClient = _httpClientFactory.CreateClient(); }
+            httpClient.Timeout = TimeSpan.FromSeconds(10);
 
             var formData = new FormUrlEncodedContent(new[]
             {
-                new KeyValuePair<string, string>("logout_token", logoutToken)
+                new KeyValuePair<string, string>("logout_token", logoutToken!)
             });
 
-            var response = await httpClient.PostAsync(logoutUri, formData);
-
-            if (response.IsSuccessStatusCode)
+            var start = DateTime.UtcNow;
+            HttpResponseMessage? response = null;
+            try
             {
-                _logger.LogInformation("Back-channel logout notification sent successfully to client {ClientId}", clientId);
+                response = await httpClient.PostAsync(logoutUri, formData);
+                if (response.IsSuccessStatusCode)
+                {
+                    _logger.LogInformation("Back-channel logout notification sent successfully to client {ClientId}", clientId);
+                    try { if (_audit != null) await _audit.WriteAsync("logout", "backchannel.dispatch.success", new { clientId, uri = logoutUri, ms = (DateTime.UtcNow-start).TotalMilliseconds, status = (int)response.StatusCode }, "info", actorClientId: clientId); } catch { }
+                }
+                else
+                {
+                    _logger.LogWarning("Back-channel logout notification failed for client {ClientId} with status {StatusCode}", clientId, response.StatusCode);
+                    try { if (_audit != null) await _audit.WriteAsync("logout", "backchannel.dispatch.failure", new { clientId, uri = logoutUri, status = (int)response.StatusCode }, "warn", actorClientId: clientId); } catch { }
+                    _retryScheduler?.ScheduleRetry(new BackChannelLogoutRetryWork(clientId, subject, sessionId));
+                }
             }
-            else
+            catch (TaskCanceledException tex)
             {
-                _logger.LogWarning("Back-channel logout notification failed for client {ClientId} with status {StatusCode}", 
-                    clientId, response.StatusCode);
+                _logger.LogWarning(tex, "Back-channel logout notification timeout for client {ClientId}", clientId);
+                try { if (_audit != null) await _audit.WriteAsync("logout", "backchannel.dispatch.timeout", new { clientId, uri = logoutUri }, "warn", actorClientId: clientId); } catch { }
+                _retryScheduler?.ScheduleRetry(new BackChannelLogoutRetryWork(clientId, subject, sessionId));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error sending back-channel logout notification to client {ClientId}");
+                try { if (_audit != null) await _audit.WriteAsync("logout", "backchannel.dispatch.error", new { clientId, uri = logoutUri, ex = ex.Message }, "error", actorClientId: clientId); } catch { }
+                _retryScheduler?.ScheduleRetry(new BackChannelLogoutRetryWork(clientId, subject, sessionId));
+            }
+            finally
+            {
+                response?.Dispose();
             }
         }
-        catch (Exception ex)
+        catch (Exception exOuter)
         {
-            _logger.LogError(ex, "Error sending back-channel logout notification to client {ClientId}", clientId);
+            _logger.LogError(exOuter, "Unhandled error in back-channel logout dispatch for client {ClientId}", clientId);
+            try { if (_audit != null) await _audit.WriteAsync("logout", "backchannel.dispatch.unhandled", new { clientId, ex = exOuter.Message }, "error", actorClientId: clientId); } catch { }
+            _retryScheduler?.ScheduleRetry(new BackChannelLogoutRetryWork(clientId, subject, sessionId));
         }
     }
 

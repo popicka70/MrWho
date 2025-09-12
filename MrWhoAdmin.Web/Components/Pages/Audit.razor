@@ -1,8 +1,8 @@
-@page "/monitoring/audit"
 @attribute [Authorize]
-@rendermode InteractiveServer
+@page "/monitoring/audit"
 @using MrWho.Shared.Models
-@using MrWhoAdmin.Web.Components.Dialogs
+
+@rendermode InteractiveServer
 @inject IAuditLogsApiService AuditApi
 @inject NotificationService NotificationService
 @inject DialogService DialogService

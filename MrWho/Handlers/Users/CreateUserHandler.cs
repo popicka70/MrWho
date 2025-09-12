@@ -23,10 +23,12 @@ public class CreateUserHandler : ICreateUserHandler
     {
         try
         {
+            var resolvedUserName = request.UserName ?? request.Email ?? Guid.NewGuid().ToString("n");
+            var resolvedEmail = request.Email ?? request.UserName ?? ($"{Guid.NewGuid():n}@local.invalid");
             var user = new IdentityUser
             {
-                UserName = request.UserName,
-                Email = request.Email,
+                UserName = resolvedUserName,
+                Email = resolvedEmail,
                 PhoneNumber = request.PhoneNumber,
                 EmailConfirmed = request.EmailConfirmed,
                 PhoneNumberConfirmed = request.PhoneNumberConfirmed,
@@ -65,8 +67,8 @@ public class CreateUserHandler : ICreateUserHandler
                 var userDto = new UserDto
                 {
                     Id = user.Id,
-                    UserName = user.UserName,
-                    Email = user.Email,
+                    UserName = user.UserName ?? string.Empty,
+                    Email = user.Email ?? string.Empty,
                     EmailConfirmed = user.EmailConfirmed,
                     PhoneNumber = user.PhoneNumber,
                     PhoneNumberConfirmed = user.PhoneNumberConfirmed,

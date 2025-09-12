@@ -20,8 +20,8 @@ public class DynamicAuthorizationPolicyProviderTests
         private readonly Dictionary<string, Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationOptions> _map;
         public TestCookieOptionsMonitor(Dictionary<string, Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationOptions> map) => _map = map;
         public Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationOptions CurrentValue => Get("default");
-        public Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationOptions Get(string name)
-            => _map.TryGetValue(name, out var o) ? o : new Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationOptions { Cookie = { Name = name + "+cookie" } };
+        public Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationOptions Get(string? name)
+            => _map.TryGetValue(name ?? string.Empty, out var o) ? o : new Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationOptions { Cookie = { Name = (name ?? "default") + "+cookie" } };
         public IDisposable OnChange(Action<Microsoft.AspNetCore.Authentication.Cookies.CookieAuthenticationOptions, string> listener) => new Dummy();
         private sealed class Dummy : IDisposable { public void Dispose() { } }
     }

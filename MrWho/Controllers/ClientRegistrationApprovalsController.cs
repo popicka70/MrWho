@@ -167,7 +167,7 @@ public class ClientRegistrationApprovalsController : ControllerBase
         // Mark as approved
         rec.Status = ClientRegistrationStatus.Approved;
         rec.ReviewedAt = DateTime.UtcNow;
-        rec.ReviewedBy = User.Identity?.Name;
+        rec.ReviewedBy = User?.Identity?.Name;
         rec.CreatedClientDbId = client.Id;
         rec.CreatedClientPublicId = client.ClientId;
         await _db.SaveChangesAsync();

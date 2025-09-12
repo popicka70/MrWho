@@ -1,0 +1,126 @@
+@page "/audit/logs"
+@rendermode InteractiveServer
+@inject AuditApiService Audit
+@inject NotificationService Notifications
+@inject DialogService DialogService
+@using System.Text.Json
+@using Radzen
+
+<RadzenHeading Size="HeadingSize.H3" Text="Security Audit Logs" />
+<RadzenStack Orientation="Orientation.Vertical" Gap="1rem">
+    <RadzenFormField Text="Filters" Variant="Variant.Outlined">
+        <ChildContent>
+            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.75rem" Wrap="FlexWrap.Wrap">
+                <RadzenTextBox @bind-Value="_filterCategory" Placeholder="Category" Style="width:140px" />
+                <RadzenTextBox @bind-Value="_filterEventType" Placeholder="Event Type" Style="width:160px" />
+                <RadzenTextBox @bind-Value="_filterLevel" Placeholder="Level" Style="width:90px" />
+                <RadzenTextBox @bind-Value="_filterActorUser" Placeholder="Actor User" Style="width:140px" />
+                <RadzenTextBox @bind-Value="_filterActorClient" Placeholder="Actor Client" Style="width:140px" />
+                <RadzenDatePicker @bind-Value="_from" DateFormat="u" Style="width:210px" Placeholder="From (UTC)" />
+                <RadzenDatePicker @bind-Value="_to" DateFormat="u" Style="width:210px" Placeholder="To (UTC)" />
+                <RadzenButton Text="Apply" Click="@(async () => await LoadAsync(1))" Style="min-width:90px" />
+                <RadzenButton Text="Reset" ButtonStyle="ButtonStyle.Light" Click="@(async () => { ResetFilters(); await LoadAsync(1); })" />
+                <RadzenButton Text="Verify Chain" ButtonStyle="ButtonStyle.Secondary" Click="@(async () => await VerifyAsync())" />
+            </RadzenStack>
+        </ChildContent>
+    </RadzenFormField>
+
+    <RadzenDataGrid TItem="AuditEventDto" Data="_items" Count="_total" AllowPaging="true" PageSize="_pageSize" @bind-CurrentPage="_pageIndex" LoadData="LoadGrid" RowRender="OnRowRender">
+        <Columns>
+            <RadzenDataGridColumn TItem="AuditEventDto" Property="Id" Title="Id" Width="80px" />
+            <RadzenDataGridColumn TItem="AuditEventDto" Property="TimestampUtc" Title="UTC" Width="180px" />
+            <RadzenDataGridColumn TItem="AuditEventDto" Property="EventType" Title="Event" Width="180px" />
+            <RadzenDataGridColumn TItem="AuditEventDto" Property="Level" Title="Lvl" Width="70px" />
+            <RadzenDataGridColumn TItem="AuditEventDto" Property="ActorUserId" Title="User" Width="140px" />
+            <RadzenDataGridColumn TItem="AuditEventDto" Property="ActorClientId" Title="Client" Width="140px" />
+            <RadzenDataGridColumn TItem="AuditEventDto" Title="Data">
+                <Template Context="row">
+                    @if(!string.IsNullOrWhiteSpace(row.DataJson))
+                    {
+                        <RadzenButton Icon="info" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@(async () => await ShowDataAsync(row))" />
+                    }
+                </Template>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+</RadzenStack>
+
+@code {
+    private List<AuditEventDto> _items = new();
+    private int _total;
+    private int _pageIndex;
+    private int _pageSize = 50;
+    private string? _filterCategory;
+    private string? _filterEventType;
+    private string? _filterLevel;
+    private string? _filterActorUser;
+    private string? _filterActorClient;
+    private DateTime? _from;
+    private DateTime? _to;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync(1);
+
+    private async Task LoadGrid(LoadDataArgs args)
+    {
+        var page = args.Skip.HasValue && args.Top.HasValue ? (args.Skip.Value / args.Top.Value) + 1 : 1;
+        if (args.Top.HasValue) _pageSize = args.Top.Value;
+        await LoadAsync(page);
+    }
+
+    private async Task LoadAsync(int page)
+    {
+        var res = await Audit.QueryAsync(page, _pageSize, _filterCategory, _filterEventType, _filterLevel, _filterActorUser, _filterActorClient, _from, _to);
+        if (res != null)
+        {
+            _items = res.Items;
+            _total = res.Total;
+            _pageIndex = page - 1;
+        }
+        else
+        {
+            Notifications.Notify(NotificationSeverity.Error, "Error", "Failed to load audit logs");
+        }
+        StateHasChanged();
+    }
+
+    private void ResetFilters()
+    {
+        _filterCategory = _filterEventType = _filterLevel = _filterActorUser = _filterActorClient = null;
+        _from = _to = null;
+    }
+
+    private async Task VerifyAsync()
+    {
+        var result = await Audit.VerifyChainAsync();
+        if (result == null)
+        {
+            Notifications.Notify(NotificationSeverity.Error, "Verify", "Verification failed");
+            return;
+        }
+        if (result.Ok)
+            Notifications.Notify(NotificationSeverity.Success, "Verify", $"Chain OK (count {result.Count})");
+        else
+            Notifications.Notify(NotificationSeverity.Warning, "Verify", $"Issues: {result.Issues?.Count}");
+    }
+
+    private async Task ShowDataAsync(AuditEventDto row)
+    {
+        string content = row.DataJson ?? "{}";
+        try
+        {
+            using var doc = JsonDocument.Parse(row.DataJson!);
+            content = JsonSerializer.Serialize(doc.RootElement, new JsonSerializerOptions { WriteIndented = true });
+        }
+        catch { }
+        await DialogService.OpenAsync<JsonContentDialog>($"Event {row.Id} Data", new Dictionary<string, object?>
+        {
+            ["Content"] = content
+        }, new DialogOptions { Width = "700px", Resizable = true });
+    }
+
+    void OnRowRender(RowRenderEventArgs<AuditEventDto> args)
+    {
+        if (string.Equals(args.Data.Level, "error", StringComparison.OrdinalIgnoreCase)) args.Attributes["class"] = "rz-state-invalid";
+        else if (string.Equals(args.Data.Level, "warn", StringComparison.OrdinalIgnoreCase)) args.Attributes["class"] = "rz-color-warning";
+    }
+}

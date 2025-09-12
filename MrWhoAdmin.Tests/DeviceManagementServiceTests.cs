@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Microsoft.Extensions.DependencyInjection;
 using MrWho.Data;
 using MrWho.Models;
 using MrWho.Services;
@@ -18,7 +20,9 @@ public class DeviceManagementServiceTests
         var db = new ApplicationDbContext(options);
         db.Database.EnsureCreated();
         var store = new UserStore<IdentityUser>(db);
-        var userMgr = new UserManager<IdentityUser>(store, null, new PasswordHasher<IdentityUser>(), Array.Empty<IUserValidator<IdentityUser>>(), Array.Empty<IPasswordValidator<IdentityUser>>(), new UpperInvariantLookupNormalizer(), new IdentityErrorDescriber(), null, new LoggerFactory().CreateLogger<UserManager<IdentityUser>>());
+        var identityOptions = Options.Create(new IdentityOptions());
+        var sp = new ServiceCollection().BuildServiceProvider();
+        var userMgr = new UserManager<IdentityUser>(store, identityOptions, new PasswordHasher<IdentityUser>(), Array.Empty<IUserValidator<IdentityUser>>(), Array.Empty<IPasswordValidator<IdentityUser>>(), new UpperInvariantLookupNormalizer(), new IdentityErrorDescriber(), sp, new LoggerFactory().CreateLogger<UserManager<IdentityUser>>());
         var user = new IdentityUser { UserName = "user@test", Email = "user@test" };
         userMgr.CreateAsync(user, "Pass123$!").GetAwaiter().GetResult();
         var logger = LoggerFactory.Create(b => b.AddDebug()).CreateLogger<DeviceManagementService>();
@@ -43,7 +47,7 @@ public class DeviceManagementServiceTests
     {
         var (db, svc, user) = Create();
         await svc.RegisterDeviceAsync(user.Id, new RegisterDeviceRequest { DeviceId = "dev1", DeviceName = "Tablet", DeviceType = DeviceType.Tablet, CanApproveLogins = true });
-        var session = await svc.CreateQrSessionAsync(new CreateQrSessionRequest { ClientId = "clientA", UserId = null });
+        var session = await svc.CreateQrSessionAsync(new CreateQrSessionRequest { ClientId = "clientA", UserId = string.Empty });
         var approve = await svc.ApproveQrSessionAsync(session.Token, user.Id, "dev1");
         Assert.IsTrue(approve, "Approval should succeed");
         var complete = await svc.CompleteQrSessionAsync(session.Token);

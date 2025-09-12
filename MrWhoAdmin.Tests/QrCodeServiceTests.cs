@@ -17,6 +17,6 @@ public class QrCodeServiceTests
     public void GeneratePngDataUri_Throws_On_Empty()
     {
         var svc = new QrCodeService();
-        Assert.ThrowsException<ArgumentException>(() => svc.GeneratePngDataUri(""));
+        Assert.ThrowsExactly<ArgumentException>(() => svc.GeneratePngDataUri(""));
     }
 }

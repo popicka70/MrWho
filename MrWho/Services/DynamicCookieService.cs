@@ -47,6 +47,12 @@ public class DynamicCookieService : IDynamicCookieService
             identity.AddClaim(new Claim("client_id", clientId));
             _logger.LogDebug("🔧 Added client_id claim for dynamic client {ClientId}", clientId);
 
+            // Ensure a per-session sid claim (front-channel/back-channel logout correlation)
+            if (!identity.HasClaim(c => c.Type == "sid"))
+            {
+                identity.AddClaim(new Claim("sid", Guid.NewGuid().ToString("n")));
+            }
+
             var principal = new ClaimsPrincipal(identity);
             var properties = new AuthenticationProperties
             {

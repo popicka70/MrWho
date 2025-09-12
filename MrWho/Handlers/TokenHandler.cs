@@ -278,7 +278,6 @@ public class TokenHandler : ITokenHandler
                 .ToDictionary(g => g.Key, g => g.First().Value, StringComparer.OrdinalIgnoreCase);
             var existingTypes = identity.Claims.Select(c => c.Type).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-            string[] DefaultDestinations() => new[] { Destinations.AccessToken };
             static string[] ParseDestinations(string? json, ILogger logger, string apiName)
             {
                 if (string.IsNullOrWhiteSpace(json)) return new[] { Destinations.AccessToken };

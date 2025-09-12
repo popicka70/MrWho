@@ -88,6 +88,11 @@ else
     </RadzenFormField>
 
     <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600 rz-mt-2">Advanced</RadzenText>
+    <RadzenAlert AlertStyle="AlertStyle.Info" ShowIcon="true">
+        <RadzenText TextStyle="TextStyle.Body2">
+            <strong>Configuration Precedence:</strong> Client &gt; Realm Defaults &gt; System. Leaving a field empty/null uses the realm's default (if set), otherwise system baseline.
+        </RadzenText>
+    </RadzenAlert>
     <RadzenFormField Text="Pushed Authorization Requests (PAR)" Variant="Variant.Outlined">
         <ChildContent>
             <RadzenDropDown @bind-Value="model.ParMode"
@@ -98,6 +103,58 @@ else
         </ChildContent>
         <Helper>
             <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Disabled = no PAR. Enabled = client may use PAR. Required = client must use PAR (request_uri).</RadzenText>
+        </Helper>
+    </RadzenFormField>
+
+    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600 rz-mt-4">JAR (Signed Authorization Requests)</RadzenText>
+    <RadzenFormField Text="JAR Mode" Variant="Variant.Outlined">
+        <ChildContent>
+            <RadzenDropDown @bind-Value="model.JarMode" TValue="JarMode?" Data="@jarModes" TextProperty="Text" ValueProperty="Value" Style="width:100%;" />
+        </ChildContent>
+        <Helper>
+            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Optional = may send signed request (request=). Required = must use signed request object. Effective: @EffectiveJarModeText</RadzenText>
+        </Helper>
+    </RadzenFormField>
+    <RadzenFormField Text="Require Signed Request Object" Variant="Variant.Outlined">
+        <Start>
+            <RadzenCheckBox @bind-Value="model.RequireSignedRequestObject" Name="reqSignedJar" TriState="true" />
+        </Start>
+        <ChildContent>
+            <RadzenLabel Text="Disallow unsigned (alg=none) request objects" Component="reqSignedJar" />
+        </ChildContent>
+        <Helper>
+            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Effective: @EffectiveRequireSignedJarText</RadzenText>
+        </Helper>
+    </RadzenFormField>
+    <RadzenFormField Text="Allowed Request Object Algs" Variant="Variant.Outlined">
+        <ChildContent>
+            <RadzenDropDown Multiple="true" AllowClear="true"
+                            @bind-Value="selectedJarAlgs"
+                            Data="allowedJarAlgs" TextProperty="Value" ValueProperty="Value" Style="width:100%;"
+                            Disabled="@(model.JarMode == JarMode.Disabled)"
+                            Change="@(args => OnJarAlgsChanged())" />
+        </ChildContent>
+        <Helper>
+            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Select allowed signing algorithms. Empty = realm/system defaults (RS256, HS256). HS384/HS512 require longer secrets.</RadzenText>
+        </Helper>
+    </RadzenFormField>
+
+    @if (ShowWeakSecretWarning)
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Warning" ShowIcon="true">
+            <RadzenText TextStyle="TextStyle.Body2">
+                Selected algorithm requires a stronger client secret length. Provide/rotate a longer secret before using HS384/HS512.
+            </RadzenText>
+        </RadzenAlert>
+    }
+
+    <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600 rz-mt-4">JARM (JWT Authorization Response Mode)</RadzenText>
+    <RadzenFormField Text="JARM Mode" Variant="Variant.Outlined">
+        <ChildContent>
+            <RadzenDropDown @bind-Value="model.JarmMode" TValue="JarmMode?" Data="@jarmModes" TextProperty="Text" ValueProperty="Value" Style="width:100%;" />
+        </ChildContent>
+        <Helper>
+            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Optional = response_mode=jwt triggers JWT response. Required = always JWT. Effective: @EffectiveJarmModeText</RadzenText>
         </Helper>
     </RadzenFormField>
 </RadzenStack>
@@ -114,4 +171,58 @@ else
         new { Text = "Enabled",  Value = (PushedAuthorizationMode?)PushedAuthorizationMode.Enabled },
         new { Text = "Required", Value = (PushedAuthorizationMode?)PushedAuthorizationMode.Required }
     };
+
+    private IEnumerable<object> jarModes => new[]
+    {
+        new { Text = "Use realm default", Value = (JarMode?)null },
+        new { Text = "Disabled", Value = (JarMode?)JarMode.Disabled },
+        new { Text = "Optional", Value = (JarMode?)JarMode.Optional },
+        new { Text = "Required", Value = (JarMode?)JarMode.Required }
+    };
+
+    private IEnumerable<object> jarmModes => new[]
+    {
+        new { Text = "Use realm default", Value = (JarmMode?)null },
+        new { Text = "Disabled", Value = (JarmMode?)JarmMode.Disabled },
+        new { Text = "Optional", Value = (JarmMode?)JarmMode.Optional },
+        new { Text = "Required", Value = (JarmMode?)JarmMode.Required }
+    };
+
+    private class AlgItem { public string Value { get; set; } = string.Empty; }
+    private List<AlgItem> allowedJarAlgs = new() { new AlgItem{Value="RS256"}, new AlgItem{Value="HS256"}, new AlgItem{Value="HS384"}, new AlgItem{Value="HS512"} };
+    private IList<string> selectedJarAlgs = new List<string>();
+
+    private MrWho.Shared.Models.RealmDto? CurrentRealm => editClient.realms.FirstOrDefault(r => r.Id == model.RealmId);
+
+    private string EffectiveJarModeText => (model.JarMode?.ToString() ?? (CurrentRealm?.DefaultJarMode?.ToString() ?? "System"));
+    private string EffectiveJarmModeText => (model.JarmMode?.ToString() ?? (CurrentRealm?.DefaultJarmMode?.ToString() ?? "System"));
+    private string EffectiveRequireSignedJarText
+        => (model.RequireSignedRequestObject?.ToString() ?? (CurrentRealm?.DefaultRequireSignedRequestObject?.ToString() ?? "System"));
+
+    private bool ShowWeakSecretWarning
+        => selectedJarAlgs.Any(a => a.Equals("HS384", StringComparison.OrdinalIgnoreCase) || a.Equals("HS512", StringComparison.OrdinalIgnoreCase))
+           && (string.IsNullOrWhiteSpace(model.ClientSecret) || model.ClientSecret.Length < RequiredLengthForSelectedHsAlgs());
+
+    private int RequiredLengthForSelectedHsAlgs()
+    {
+        if (selectedJarAlgs.Contains("HS512", StringComparer.OrdinalIgnoreCase)) return 64;
+        if (selectedJarAlgs.Contains("HS384", StringComparer.OrdinalIgnoreCase)) return 48;
+        if (selectedJarAlgs.Contains("HS256", StringComparer.OrdinalIgnoreCase)) return 32;
+        return 0;
+    }
+
+    protected override void OnParametersSet()
+    {
+        // Parse existing alg list into multi-select
+        selectedJarAlgs = string.IsNullOrWhiteSpace(model.AllowedRequestObjectAlgs)
+            ? new List<string>()
+            : model.AllowedRequestObjectAlgs.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+    }
+
+    private void OnJarAlgsChanged()
+    {
+        model.AllowedRequestObjectAlgs = selectedJarAlgs.Any() ? string.Join(',', selectedJarAlgs) : null;
+    }
 }
