@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using MrWho.Data;
 using MrWho.Models;
@@ -32,7 +34,7 @@ public class OidcClientServiceTests
         scopeMgr.Setup(s => s.CreateAsync(It.IsAny<OpenIddictScopeDescriptor>(), It.IsAny<CancellationToken>())).Returns(ValueTask.FromResult<object>(new object()));
 
         var store = new UserStore<IdentityUser>(db);
-        var userMgr = new UserManager<IdentityUser>(store, null, new PasswordHasher<IdentityUser>(), Array.Empty<IUserValidator<IdentityUser>>(), Array.Empty<IPasswordValidator<IdentityUser>>(), new UpperInvariantLookupNormalizer(), new IdentityErrorDescriber(), null, new Mock<ILogger<UserManager<IdentityUser>>>().Object);
+        var userMgr = new UserManager<IdentityUser>(store, Options.Create(new IdentityOptions()), new PasswordHasher<IdentityUser>(), Array.Empty<IUserValidator<IdentityUser>>(), Array.Empty<IPasswordValidator<IdentityUser>>(), new UpperInvariantLookupNormalizer(), new IdentityErrorDescriber(), new ServiceCollection().BuildServiceProvider(), new Mock<ILogger<UserManager<IdentityUser>>>().Object);
 
         var logger = LoggerFactory.Create(b => b.AddDebug()).CreateLogger<OidcClientService>();
         var service = new OidcClientService(db, appMgr.Object, scopeMgr.Object, userMgr, logger);

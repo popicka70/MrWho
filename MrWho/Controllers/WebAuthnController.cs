@@ -177,15 +177,19 @@ public class WebAuthnController : Controller
         var cred = new WebAuthnCredential
         {
             UserId = user.Id,
-            CredentialId = WebEncoders.Base64UrlEncode(res.Result.CredentialId),
-            PublicKey = WebEncoders.Base64UrlEncode(res.Result.PublicKey),
-            UserHandle = WebEncoders.Base64UrlEncode(res.Result.User.Id),
+            CredentialId = res?.Result?.CredentialId is byte[] cid ? WebEncoders.Base64UrlEncode(cid) : string.Empty,
+            PublicKey = res?.Result?.PublicKey is byte[] pk ? WebEncoders.Base64UrlEncode(pk) : string.Empty,
+            UserHandle = res?.Result?.User?.Id is byte[] uid ? WebEncoders.Base64UrlEncode(uid) : string.Empty,
             SignCount = 0,
             AaGuid = aaGuid,
             AttestationFmt = fmt,
             IsDiscoverable = true,
             Nickname = null
         };
+        if (string.IsNullOrEmpty(cred.CredentialId) || string.IsNullOrEmpty(cred.PublicKey) || string.IsNullOrEmpty(cred.UserHandle))
+        {
+            return BadRequest(new { ok = false, error = "Invalid attestation result" });
+        }
         _db.WebAuthnCredentials.Add(cred);
         await _db.SaveChangesAsync();
 
