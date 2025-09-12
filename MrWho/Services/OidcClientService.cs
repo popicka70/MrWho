@@ -10,7 +10,7 @@ using MrWho.Options;
 
 namespace MrWho.Services;
 
-public class OidcClientService : IOidcClientService
+public partial class OidcClientService : IOidcClientService
 {
     private readonly ApplicationDbContext _context;
     private readonly IOpenIddictApplicationManager _applicationManager;
@@ -305,7 +305,8 @@ public class OidcClientService : IOidcClientService
                 AllowAccessToRevocationEndpoint = true,
                 AllowAccessToIntrospectionEndpoint = false,
                 // Enable PAR for admin web by default so the OIDC client can use PAR
-                ParMode = PushedAuthorizationMode.Enabled
+                ParMode = PushedAuthorizationMode.Enabled,
+                JarMode = JarMode.Optional // enable JAR for admin client
             };
 
             _context.Clients.Add(adminClient);
@@ -363,6 +364,14 @@ public class OidcClientService : IOidcClientService
                 adminClient.UpdatedBy = "Backfill";
                 await _context.SaveChangesAsync();
                 _logger.LogInformation("Backfilled ParMode=Enabled for admin client");
+            }
+            if (adminClient.JarMode == null)
+            {
+                adminClient.JarMode = JarMode.Optional; // backfill JAR support
+                adminClient.UpdatedAt = DateTime.UtcNow;
+                adminClient.UpdatedBy = "Backfill";
+                await _context.SaveChangesAsync();
+                _logger.LogInformation("Backfilled JarMode=Optional for admin client");
             }
 
             // Ensure configured redirect/post-logout URIs exist
@@ -445,7 +454,8 @@ public class OidcClientService : IOidcClientService
                 AllowAccessToUserInfoEndpoint = true,
                 AllowAccessToRevocationEndpoint = true,
                 AllowAccessToIntrospectionEndpoint = true,
-                ParMode = PushedAuthorizationMode.Enabled
+                ParMode = PushedAuthorizationMode.Enabled,
+                JarMode = JarMode.Optional // enable JAR for demo client used in tests
             };
             _context.Clients.Add(demo1Client);
             await _context.SaveChangesAsync();
@@ -469,6 +479,13 @@ public class OidcClientService : IOidcClientService
             if (demo1Client.ParMode == null)
             {
                 demo1Client.ParMode = PushedAuthorizationMode.Enabled;
+                demo1Client.UpdatedAt = DateTime.UtcNow;
+                demo1Client.UpdatedBy = "Backfill";
+                await _context.SaveChangesAsync();
+            }
+            if (demo1Client.JarMode == null)
+            {
+                demo1Client.JarMode = JarMode.Optional;
                 demo1Client.UpdatedAt = DateTime.UtcNow;
                 demo1Client.UpdatedBy = "Backfill";
                 await _context.SaveChangesAsync();
@@ -853,6 +870,13 @@ public class OidcClientService : IOidcClientService
             if (defaultClient.ParMode == null)
             {
                 defaultClient.ParMode = PushedAuthorizationMode.Enabled;
+                defaultClient.UpdatedAt = DateTime.UtcNow;
+                defaultClient.UpdatedBy = "Backfill";
+                await _context.SaveChangesAsync();
+            }
+            if (defaultClient.JarMode == null)
+            {
+                defaultClient.JarMode = JarMode.Optional;
                 defaultClient.UpdatedAt = DateTime.UtcNow;
                 defaultClient.UpdatedBy = "Backfill";
                 await _context.SaveChangesAsync();

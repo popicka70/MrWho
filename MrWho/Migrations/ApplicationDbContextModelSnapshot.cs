@@ -17,7 +17,7 @@ namespace MrWho.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "9.0.8")
+                .HasAnnotation("ProductVersion", "9.0.9")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -357,6 +357,73 @@ namespace MrWho.Migrations
                     b.ToTable("ApiResourceSecrets");
                 });
 
+            modelBuilder.Entity("MrWho.Models.AuditIntegrityRecord", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(26)
+                        .HasColumnType("character varying(26)");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<string>("ActorId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("ActorType")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("CorrelationId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("DataJson")
+                        .HasColumnType("text");
+
+                    b.Property<string>("PreviousHash")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("RealmId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("RecordHash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("SubjectId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("SubjectType")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime>("TimestampUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Version")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Category");
+
+                    b.HasIndex("TimestampUtc");
+
+                    b.ToTable("AuditIntegrityRecords");
+                });
+
             modelBuilder.Entity("MrWho.Models.AuditLog", b =>
                 {
                     b.Property<string>("Id")
@@ -528,6 +595,10 @@ namespace MrWho.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
+                    b.Property<string>("AllowedRequestObjectAlgs")
+                        .HasMaxLength(400)
+                        .HasColumnType("character varying(400)");
+
                     b.Property<bool?>("AlwaysIncludeUserClaimsInIdToken")
                         .HasColumnType("boolean");
 
@@ -635,6 +706,12 @@ namespace MrWho.Migrations
                     b.Property<bool>("IsEnabled")
                         .HasColumnType("boolean");
 
+                    b.Property<int?>("JarMode")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("JarmMode")
+                        .HasColumnType("integer");
+
                     b.Property<bool?>("LogSensitiveData")
                         .HasColumnType("boolean");
 
@@ -713,6 +790,9 @@ namespace MrWho.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<bool>("RequirePkce")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool?>("RequireSignedRequestObject")
                         .HasColumnType("boolean");
 
                     b.Property<int?>("RoleInclusionOverride")
@@ -1600,6 +1680,50 @@ namespace MrWho.Migrations
                     b.ToTable("PersistentQrSessions");
                 });
 
+            modelBuilder.Entity("MrWho.Models.PushedAuthorizationRequest", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ClientId")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime?>("ConsumedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ParametersHash")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("ParametersJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("RequestUri")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExpiresAt");
+
+                    b.HasIndex("RequestUri")
+                        .IsUnique();
+
+                    b.HasIndex("ClientId", "ExpiresAt");
+
+                    b.ToTable("PushedAuthorizationRequests");
+                });
+
             modelBuilder.Entity("MrWho.Models.Realm", b =>
                 {
                     b.Property<string>("Id")
@@ -1627,6 +1751,10 @@ namespace MrWho.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
+                    b.Property<string>("DefaultAllowedRequestObjectAlgs")
+                        .HasMaxLength(400)
+                        .HasColumnType("character varying(400)");
+
                     b.Property<string>("DefaultCookieSameSitePolicy")
                         .IsRequired()
                         .HasMaxLength(20)
@@ -1637,6 +1765,12 @@ namespace MrWho.Migrations
 
                     b.Property<bool>("DefaultIncludeJwtId")
                         .HasColumnType("boolean");
+
+                    b.Property<int?>("DefaultJarMode")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("DefaultJarmMode")
+                        .HasColumnType("integer");
 
                     b.Property<bool>("DefaultLogSensitiveData")
                         .HasColumnType("boolean");
@@ -1669,6 +1803,9 @@ namespace MrWho.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<bool>("DefaultRequireMfa")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool?>("DefaultRequireSignedRequestObject")
                         .HasColumnType("boolean");
 
                     b.Property<int>("DefaultSessionTimeoutHours")
@@ -1854,6 +1991,62 @@ namespace MrWho.Migrations
                         .IsUnique();
 
                     b.ToTable("ScopeClaims");
+                });
+
+            modelBuilder.Entity("MrWho.Models.SecurityAuditEvent", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("ActorClientId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("ActorUserId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Category")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("DataJson")
+                        .HasColumnType("text");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
+                    b.Property<string>("Hash")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("Level")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("PrevHash")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime>("TimestampUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TimestampUtc", "Category");
+
+                    b.ToTable("SecurityAuditEvents");
                 });
 
             modelBuilder.Entity("MrWho.Models.TokenStatisticsSnapshot", b =>

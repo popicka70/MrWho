@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MrWho.Data;
 using MrWho.Models;
-using MrWho.Services; // added
+using MrWho.Services; // added (already present but ensure)
 using MrWho.Shared;
 using MrWho.Shared.Models;
 using OpenIddict.Abstractions;
@@ -21,20 +21,23 @@ public class ClientsController : ControllerBase
     private readonly ILogger<ClientsController> _logger;
     private readonly IOpenIddictApplicationManager _applicationManager;
     private readonly UserManager<IdentityUser> _userManager;
-    private readonly IClientSecretService _clientSecretService; // added
+    private readonly IClientSecretService _clientSecretService;
+    private readonly ISymmetricSecretPolicy _symmetricPolicy; // added
 
     public ClientsController(
         ApplicationDbContext context, 
         ILogger<ClientsController> logger,
         IOpenIddictApplicationManager applicationManager,
         UserManager<IdentityUser> userManager,
-        IClientSecretService clientSecretService) // added
+        IClientSecretService clientSecretService,
+        ISymmetricSecretPolicy symmetricPolicy) // added
     {
         _context = context;
         _logger = logger;
         _applicationManager = applicationManager;
         _userManager = userManager;
         _clientSecretService = clientSecretService;
+        _symmetricPolicy = symmetricPolicy; // added
     }
 
     /// <summary>
@@ -194,8 +197,12 @@ public class ClientsController : ControllerBase
                 IncludeAudInIdToken = c.IncludeAudInIdToken,
                 RequireExplicitAudienceScope = c.RequireExplicitAudienceScope,
                 RoleInclusionOverride = c.RoleInclusionOverride,
-                // PAR
-                ParMode = c.ParMode
+                // PAR / JAR / JARM
+                ParMode = c.ParMode,
+                JarMode = c.JarMode,
+                JarmMode = c.JarmMode,
+                RequireSignedRequestObject = c.RequireSignedRequestObject,
+                AllowedRequestObjectAlgs = c.AllowedRequestObjectAlgs
             })
             .ToListAsync();
 
@@ -316,8 +323,12 @@ public class ClientsController : ControllerBase
             IncludeAudInIdToken = client.IncludeAudInIdToken,
             RequireExplicitAudienceScope = client.RequireExplicitAudienceScope,
             RoleInclusionOverride = client.RoleInclusionOverride,
-            // PAR
-            ParMode = client.ParMode
+            // PAR / JAR / JARM
+            ParMode = client.ParMode,
+            JarMode = client.JarMode,
+            JarmMode = client.JarmMode,
+            RequireSignedRequestObject = client.RequireSignedRequestObject,
+            AllowedRequestObjectAlgs = client.AllowedRequestObjectAlgs
         };
 
         return Ok(clientDto);
@@ -458,6 +469,7 @@ public class ClientsController : ControllerBase
             AllowClientCredentialsFlow = client.AllowClientCredentialsFlow,
             AllowPasswordFlow = client.AllowPasswordFlow,
             AllowRefreshTokenFlow = client.AllowRefreshTokenFlow,
+            AllowDeviceCodeFlow = client.AllowDeviceCodeFlow,
             RequirePkce = client.RequirePkce,
             RequireClientSecret = client.RequireClientSecret,
             AccessTokenLifetime = client.AccessTokenLifetime,
@@ -516,11 +528,13 @@ public class ClientsController : ControllerBase
             PrimaryAudience = client.PrimaryAudience,
             IncludeAudInIdToken = client.IncludeAudInIdToken,
             RequireExplicitAudienceScope = client.RequireExplicitAudienceScope,
-            ExportedBy = User?.Identity?.Name ?? "System",
-            ExportedAtUtc = DateTime.UtcNow,
-            FormatVersion = "1.2",
-            // PAR
-            ParMode = client.ParMode
+            RoleInclusionOverride = client.RoleInclusionOverride,
+            ParMode = client.ParMode,
+            // JAR/JARM
+            JarMode = client.JarMode,
+            JarmMode = client.JarmMode,
+            RequireSignedRequestObject = client.RequireSignedRequestObject,
+            AllowedRequestObjectAlgs = client.AllowedRequestObjectAlgs
         };
         // Assigned users (by username/email only)
         var assignedUsers = await _context.ClientUsers
@@ -602,6 +616,7 @@ public class ClientsController : ControllerBase
                 client.AllowClientCredentialsFlow = dto.AllowClientCredentialsFlow;
                 client.AllowPasswordFlow = dto.AllowPasswordFlow;
                 client.AllowRefreshTokenFlow = dto.AllowRefreshTokenFlow;
+                client.AllowDeviceCodeFlow = dto.AllowDeviceCodeFlow;
                 client.RequirePkce = dto.RequirePkce;
                 client.RequireClientSecret = dto.RequireClientSecret;
                 client.AccessTokenLifetime = dto.AccessTokenLifetime;
@@ -609,8 +624,12 @@ public class ClientsController : ControllerBase
                 client.AuthorizationCodeLifetime = dto.AuthorizationCodeLifetime;
                 client.IdTokenLifetimeMinutes = dto.IdTokenLifetimeMinutes;
                 client.DeviceCodeLifetimeMinutes = dto.DeviceCodeLifetimeMinutes;
-                // PAR
+                // PAR / JAR / JARM
                 client.ParMode = dto.ParMode;
+                client.JarMode = dto.JarMode;
+                client.JarmMode = dto.JarmMode;
+                client.RequireSignedRequestObject = dto.RequireSignedRequestObject;
+                client.AllowedRequestObjectAlgs = dto.AllowedRequestObjectAlgs;
 
                 client.SessionTimeoutHours = dto.SessionTimeoutHours;
                 client.UseSlidingSessionExpiration = dto.UseSlidingSessionExpiration;
@@ -731,6 +750,7 @@ public class ClientsController : ControllerBase
                     AllowClientCredentialsFlow = full.AllowClientCredentialsFlow,
                     AllowPasswordFlow = full.AllowPasswordFlow,
                     AllowRefreshTokenFlow = full.AllowRefreshTokenFlow,
+                    AllowDeviceCodeFlow = full.AllowDeviceCodeFlow,
                     RequirePkce = full.RequirePkce,
                     RequireClientSecret = full.RequireClientSecret,
                     AccessTokenLifetime = full.AccessTokenLifetime,
@@ -802,8 +822,12 @@ public class ClientsController : ControllerBase
                     AllowQrLoginQuick = full.AllowQrLoginQuick,
                     AllowQrLoginSecure = full.AllowQrLoginSecure,
                     AllowCodeLogin = full.AllowCodeLogin,
-                    // PAR
-                    ParMode = full.ParMode
+                    // PAR / JAR / JARM
+                    ParMode = full.ParMode,
+                    JarMode = full.JarMode,
+                    JarmMode = full.JarmMode,
+                    RequireSignedRequestObject = full.RequireSignedRequestObject,
+                    AllowedRequestObjectAlgs = full.AllowedRequestObjectAlgs
                 };
 
                 var result = new ClientImportResult
@@ -852,6 +876,22 @@ public class ClientsController : ControllerBase
             return ValidationProblem("ClientSecret is required for confidential or machine clients when RequireClientSecret is true.");
         }
 
+        // Validate symmetric secret policy if HS algorithms requested
+        if (!string.IsNullOrWhiteSpace(request.AllowedRequestObjectAlgs) && !string.IsNullOrWhiteSpace(request.ClientSecret))
+        {
+            foreach (var alg in request.AllowedRequestObjectAlgs.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                if (alg.StartsWith("HS", StringComparison.OrdinalIgnoreCase))
+                {
+                    var res = _symmetricPolicy.ValidateForAlgorithm(alg, request.ClientSecret);
+                    if (!res.Success)
+                    {
+                        return ValidationProblem($"Secret length below policy minimum for {alg}. Required >= {res.RequiredBytes} bytes.");
+                    }
+                }
+            }
+        }
+
         var strategy = _context.Database.CreateExecutionStrategy();
         var result = await strategy.ExecuteAsync(async () =>
         {
@@ -872,6 +912,7 @@ public class ClientsController : ControllerBase
                     AllowClientCredentialsFlow = request.AllowClientCredentialsFlow,
                     AllowPasswordFlow = request.AllowPasswordFlow,
                     AllowRefreshTokenFlow = request.AllowRefreshTokenFlow,
+                    AllowDeviceCodeFlow = request.AllowDeviceCodeFlow,
                     RequirePkce = request.RequirePkce,
                     RequireClientSecret = request.RequireClientSecret,
                     AccessTokenLifetime = request.AccessTokenLifetime ?? MrWhoConstants.TokenLifetimes.AccessToken,
@@ -892,8 +933,12 @@ public class ClientsController : ControllerBase
                     RequireExplicitAudienceScope = request.RequireExplicitAudienceScope,
                     RoleInclusionOverride = request.RoleInclusionOverride,
 
-                    // PAR
-                    ParMode = request.ParMode
+                    // PAR / JAR / JARM
+                    ParMode = request.ParMode,
+                    JarMode = request.JarMode,
+                    JarmMode = request.JarmMode,
+                    RequireSignedRequestObject = request.RequireSignedRequestObject,
+                    AllowedRequestObjectAlgs = request.AllowedRequestObjectAlgs
                 };
 
                 _context.Clients.Add(client);
@@ -983,6 +1028,7 @@ public class ClientsController : ControllerBase
                     AllowClientCredentialsFlow = client.AllowClientCredentialsFlow,
                     AllowPasswordFlow = client.AllowPasswordFlow,
                     AllowRefreshTokenFlow = client.AllowRefreshTokenFlow,
+                    AllowDeviceCodeFlow = client.AllowDeviceCodeFlow,
                     RequirePkce = client.RequirePkce,
                     RequireClientSecret = client.RequireClientSecret,
                     AccessTokenLifetime = client.AccessTokenLifetime,
@@ -1004,12 +1050,17 @@ public class ClientsController : ControllerBase
                     IncludeAudInIdToken = client.IncludeAudInIdToken,
                     RequireExplicitAudienceScope = client.RequireExplicitAudienceScope,
                     RoleInclusionOverride = client.RoleInclusionOverride,
+                    // login options
                     AllowPasskeyLogin = client.AllowPasskeyLogin,
                     AllowQrLoginQuick = client.AllowQrLoginQuick,
                     AllowQrLoginSecure = client.AllowQrLoginSecure,
                     AllowCodeLogin = client.AllowCodeLogin,
-                    // PAR
-                    ParMode = client.ParMode
+                    // PAR / JAR / JARM
+                    ParMode = client.ParMode,
+                    JarMode = client.JarMode,
+                    JarmMode = client.JarmMode,
+                    RequireSignedRequestObject = client.RequireSignedRequestObject,
+                    AllowedRequestObjectAlgs = client.AllowedRequestObjectAlgs
                 };
 
                 return CreatedAtAction(nameof(GetClient), new { id = client.Id }, clientDto);
@@ -1042,6 +1093,24 @@ public class ClientsController : ControllerBase
             return NotFound($"Client with ID '{id}' not found.");
         }
 
+        // Pre-validation: if updating AllowedRequestObjectAlgs or rotating secret, enforce policy when HS algs present
+        var prospectiveAlgs = request.AllowedRequestObjectAlgs ?? client.AllowedRequestObjectAlgs;
+        var newPlainSecret = request.ClientSecret; // only available if rotation requested
+        if (!string.IsNullOrWhiteSpace(prospectiveAlgs) && !string.IsNullOrWhiteSpace(newPlainSecret))
+        {
+            foreach (var alg in prospectiveAlgs.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                if (alg.StartsWith("HS", StringComparison.OrdinalIgnoreCase))
+                {
+                    var res = _symmetricPolicy.ValidateForAlgorithm(alg, newPlainSecret);
+                    if (!res.Success)
+                    {
+                        return ValidationProblem($"Secret length below policy minimum for {alg}. Required >= {res.RequiredBytes} bytes.");
+                    }
+                }
+            }
+        }
+
         // validate secret requirement before persisting/creating openiddict app
         var targetType = request.ClientType ?? client.ClientType;
         var requireSecret = (targetType == ClientType.Confidential || targetType == ClientType.Machine) && (request.RequireClientSecret ?? client.RequireClientSecret);
@@ -1062,6 +1131,8 @@ public class ClientsController : ControllerBase
             using var transaction = await _context.Database.BeginTransactionAsync();
             try
             {
+                var now = DateTime.UtcNow; // added for UpdatedAt
+                var userName = User?.Identity?.Name; // added for UpdatedBy
                 // Update basic properties
                 // Do NOT assign plaintext secret directly; handle rotation later
                 if (!string.IsNullOrEmpty(request.Name))
@@ -1079,6 +1150,8 @@ public class ClientsController : ControllerBase
                     client.AllowPasswordFlow = request.AllowPasswordFlow.Value;
                 if (request.AllowRefreshTokenFlow.HasValue)
                     client.AllowRefreshTokenFlow = request.AllowRefreshTokenFlow.Value;
+                if (request.AllowDeviceCodeFlow.HasValue)
+                    client.AllowDeviceCodeFlow = request.AllowDeviceCodeFlow.Value;
                 if (request.RequirePkce.HasValue)
                     client.RequirePkce = request.RequirePkce.Value;
                 if (request.RequireClientSecret.HasValue)
@@ -1138,86 +1211,60 @@ public class ClientsController : ControllerBase
 
                 client.AllowedCorsOrigins = request.AllowedCorsOrigins;
                 client.AllowedIdentityProviders = request.AllowedIdentityProviders;
-
                 client.ProtocolType = request.ProtocolType;
                 client.EnableDetailedErrors = request.EnableDetailedErrors;
                 client.LogSensitiveData = request.LogSensitiveData;
                 client.EnableLocalLogin = request.EnableLocalLogin;
-
                 client.CustomLoginPageUrl = request.CustomLoginPageUrl;
                 client.CustomLogoutPageUrl = request.CustomLogoutPageUrl;
                 client.CustomErrorPageUrl = request.CustomErrorPageUrl;
 
-                client.ParMode = request.ParMode;
+                // login options
+                client.AllowPasskeyLogin = request.AllowPasskeyLogin;
+                client.AllowQrLoginQuick = request.AllowQrLoginQuick;
+                client.AllowQrLoginSecure = request.AllowQrLoginSecure;
+                client.AllowCodeLogin = request.AllowCodeLogin;
 
-                // Update redirect URIs if provided
-                if (request.RedirectUris != null)
+                // Update audience configuration
+                client.AudienceMode = request.AudienceMode;
+                client.PrimaryAudience = request.PrimaryAudience;
+                client.IncludeAudInIdToken = request.IncludeAudInIdToken;
+                client.RequireExplicitAudienceScope = request.RequireExplicitAudienceScope;
+                client.RoleInclusionOverride = request.RoleInclusionOverride;
+
+                client.UpdatedAt = now;
+                client.UpdatedBy = userName;
+
+                // Update collections: replace existing
+                _context.ClientRedirectUris.RemoveRange(client.RedirectUris);
+                foreach (var uri in request.RedirectUris.Distinct())
                 {
-                    _context.ClientRedirectUris.RemoveRange(client.RedirectUris);
-                    foreach (var uri in request.RedirectUris)
-                    {
-                        _context.ClientRedirectUris.Add(new ClientRedirectUri
-                        {
-                            ClientId = client.Id,
-                            Uri = uri
-                        });
-                    }
+                    _context.ClientRedirectUris.Add(new ClientRedirectUri { ClientId = client.Id, Uri = uri });
                 }
 
-                // Update post-logout URIs if provided
-                if (request.PostLogoutUris != null)
+                _context.ClientPostLogoutUris.RemoveRange(client.PostLogoutUris);
+                foreach (var uri in request.PostLogoutUris.Distinct())
                 {
-                    _context.ClientPostLogoutUris.RemoveRange(client.PostLogoutUris);
-                    foreach (var uri in request.PostLogoutUris)
-                    {
-                        _context.ClientPostLogoutUris.Add(new ClientPostLogoutUri
-                        {
-                            ClientId = client.Id,
-                            Uri = uri
-                        });
-                    }
+                    _context.ClientPostLogoutUris.Add(new ClientPostLogoutUri { ClientId = client.Id, Uri = uri });
                 }
 
-                // Update scopes if provided
-                if (request.Scopes != null)
+                _context.ClientScopes.RemoveRange(client.Scopes);
+                foreach (var s in request.Scopes.Distinct())
                 {
-                    _context.ClientScopes.RemoveRange(client.Scopes);
-                    foreach (var scope in request.Scopes)
-                    {
-                        _context.ClientScopes.Add(new ClientScope
-                        {
-                            ClientId = client.Id,
-                            Scope = scope
-                        });
-                    }
+                    _context.ClientScopes.Add(new ClientScope { ClientId = client.Id, Scope = s });
                 }
 
-                // Update permissions if provided
-                if (request.Permissions != null)
+                _context.ClientPermissions.RemoveRange(client.Permissions);
+                foreach (var p in request.Permissions.Distinct())
                 {
-                    _context.ClientPermissions.RemoveRange(client.Permissions);
-                    foreach (var permission in request.Permissions)
-                    {
-                        _context.ClientPermissions.Add(new ClientPermission
-                        {
-                            ClientId = client.Id,
-                            Permission = permission
-                        });
-                    }
+                    _context.ClientPermissions.Add(new ClientPermission { ClientId = client.Id, Permission = p });
                 }
 
-                // Update audiences if provided
-                if (request.Audiences != null)
+                // Update audiences
+                _context.ClientAudiences.RemoveRange(client.Audiences);
+                foreach (var a in request.Audiences.Distinct())
                 {
-                    _context.ClientAudiences.RemoveRange(client.Audiences);
-                    foreach (var audience in request.Audiences)
-                    {
-                        _context.ClientAudiences.Add(new ClientAudience
-                        {
-                            ClientId = client.Id,
-                            Audience = audience
-                        });
-                    }
+                    _context.ClientAudiences.Add(new ClientAudience { ClientId = client.Id, Audience = a });
                 }
 
                 await _context.SaveChangesAsync();
@@ -1265,6 +1312,7 @@ public class ClientsController : ControllerBase
                     AllowClientCredentialsFlow = client.AllowClientCredentialsFlow,
                     AllowPasswordFlow = client.AllowPasswordFlow,
                     AllowRefreshTokenFlow = client.AllowRefreshTokenFlow,
+                    AllowDeviceCodeFlow = client.AllowDeviceCodeFlow,
                     RequirePkce = client.RequirePkce,
                     RequireClientSecret = client.RequireClientSecret,
                     AccessTokenLifetime = client.AccessTokenLifetime,
@@ -1332,15 +1380,12 @@ public class ClientsController : ControllerBase
                     CustomLoginPageUrl = client.CustomLoginPageUrl,
                     CustomLogoutPageUrl = client.CustomLogoutPageUrl,
                     CustomErrorPageUrl = client.CustomErrorPageUrl,
-
-                    // login options
-                    AllowPasskeyLogin = client.AllowPasskeyLogin,
-                    AllowQrLoginQuick = client.AllowQrLoginQuick,
-                    AllowQrLoginSecure = client.AllowQrLoginSecure,
-                    AllowCodeLogin = client.AllowCodeLogin,
-
-                    // PAR
-                    ParMode = client.ParMode
+                    // PAR / JAR / JARM
+                    ParMode = client.ParMode,
+                    JarMode = client.JarMode,
+                    JarmMode = client.JarmMode,
+                    RequireSignedRequestObject = client.RequireSignedRequestObject,
+                    AllowedRequestObjectAlgs = client.AllowedRequestObjectAlgs
                 };
 
                 return clientDto;

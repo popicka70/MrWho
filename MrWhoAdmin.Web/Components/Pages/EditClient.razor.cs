@@ -1,6 +1,7 @@
 ﻿using MrWho.Shared;
 using MrWho.Shared.Models;
 using Radzen;
+using System.Text; // added for UTF8 byte count
 
 namespace MrWhoAdmin.Web.Components.Pages
 {
@@ -247,7 +248,11 @@ namespace MrWhoAdmin.Web.Components.Pages
                 IncludeAudInIdToken = client.IncludeAudInIdToken,
                 RequireExplicitAudienceScope = client.RequireExplicitAudienceScope,
                 RoleInclusionOverride = client.RoleInclusionOverride, 
-                ParMode = client.ParMode
+                ParMode = client.ParMode,
+                JarMode = client.JarMode,
+                JarmMode = client.JarmMode,
+                RequireSignedRequestObject = client.RequireSignedRequestObject,
+                AllowedRequestObjectAlgs = client.AllowedRequestObjectAlgs
             };
         }
 
@@ -331,7 +336,11 @@ namespace MrWhoAdmin.Web.Components.Pages
                 IncludeAudInIdToken = model.IncludeAudInIdToken,
                 RequireExplicitAudienceScope = model.RequireExplicitAudienceScope,
                 RoleInclusionOverride = model.RoleInclusionOverride,
-                ParMode = model.ParMode
+                ParMode = model.ParMode,
+                JarMode = model.JarMode,
+                JarmMode = model.JarmMode,
+                RequireSignedRequestObject = model.RequireSignedRequestObject,
+                AllowedRequestObjectAlgs = model.AllowedRequestObjectAlgs
             };
             update.ClientSecret = string.IsNullOrWhiteSpace(model.ClientSecret) ? null : model.ClientSecret;
             return update;
@@ -420,7 +429,11 @@ namespace MrWhoAdmin.Web.Components.Pages
                 IncludeAudInIdToken = model.IncludeAudInIdToken,
                 RequireExplicitAudienceScope = model.RequireExplicitAudienceScope,
                 RoleInclusionOverride = model.RoleInclusionOverride,
-                ParMode = model.ParMode
+                ParMode = model.ParMode,
+                JarMode = model.JarMode,
+                JarmMode = model.JarmMode,
+                RequireSignedRequestObject = model.RequireSignedRequestObject,
+                AllowedRequestObjectAlgs = model.AllowedRequestObjectAlgs
             };
         }
 
@@ -581,8 +594,51 @@ namespace MrWhoAdmin.Web.Components.Pages
             model.AllowedMfaMethods = methods.Any() ? System.Text.Json.JsonSerializer.Serialize(methods.ToArray()) : null;
         }
 
+        private bool ValidateSymmetricSecretPolicy()
+        {
+            // Skip if JAR disabled explicitly
+            if (model.JarMode == JarMode.Disabled)
+                return true;
+
+            // Determine requested HS algorithms
+            var algCsv = model.AllowedRequestObjectAlgs;
+            var hsAlgs = new List<string>();
+            if (string.IsNullOrWhiteSpace(algCsv))
+            {
+                // Defaults include HS256 (with RS256) if list empty
+                hsAlgs.Add("HS256");
+            }
+            else
+            {
+                foreach (var a in algCsv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                {
+                    if (a.StartsWith("HS", StringComparison.OrdinalIgnoreCase))
+                        hsAlgs.Add(a.ToUpperInvariant());
+                }
+            }
+            if (hsAlgs.Count == 0) return true; // only asymmetric
+
+            // If secret not supplied during create, allow (server will validate requirement if needed)
+            if (IsEdit && string.IsNullOrWhiteSpace(model.ClientSecret)) return true; // updating without changing secret
+            if (string.IsNullOrWhiteSpace(model.ClientSecret))
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Secret Required", "Provide a client secret to use HMAC (HS*) algorithms.");
+                return false;
+            }
+            var secretBytes = Encoding.UTF8.GetByteCount(model.ClientSecret);
+            int required = 0;
+            if (hsAlgs.Contains("HS512")) required = 64; else if (hsAlgs.Contains("HS384")) required = 48; else if (hsAlgs.Contains("HS256")) required = 32;
+            if (secretBytes < required)
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Secret Too Short", $"Selected algorithms require >= {required} bytes secret (current {secretBytes}). Rotate or generate a longer secret.");
+                return false;
+            }
+            return true;
+        }
+
         private async Task OnSave(CreateClientRequest args)
         {
+            if (!ValidateSymmetricSecretPolicy()) return; // block
             ClientDto? result;
             if (IsEdit)
             {

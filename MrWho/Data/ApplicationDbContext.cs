@@ -57,6 +57,7 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
 
     // Audit logging
     public DbSet<AuditLog> AuditLogs { get; set; }
+    public DbSet<SecurityAuditEvent> SecurityAuditEvents { get; set; } // NEW hash-chained security events
 
     // User profile
     public DbSet<UserProfile> UserProfiles { get; set; }
@@ -91,6 +92,12 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
 
     // NEW: Consents
     public DbSet<Consent> Consents => Set<Consent>();
+
+    // NEW: Pushed Authorization Requests (PAR)
+    public DbSet<PushedAuthorizationRequest> PushedAuthorizationRequests => Set<PushedAuthorizationRequest>();
+
+    // NEW: Audit integrity records (for tamper-proofing audit logs)
+    public DbSet<AuditIntegrityRecord> AuditIntegrityRecords { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -513,6 +520,35 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
             b.HasIndex(c => new { c.UserId, c.ClientId }).IsUnique();
         });
 
+        // Configure SecurityAuditEvent entity
+        builder.Entity<SecurityAuditEvent>(b =>
+        {
+            b.HasKey(e => e.Id);
+            b.HasIndex(e => new { e.TimestampUtc, e.Category });
+            b.Property(e => e.DataJson).HasColumnType("text");
+        });
+
+        // Configure AuditIntegrityRecord entity
+        builder.Entity<AuditIntegrityRecord>(b =>
+        {
+            b.HasKey(a => a.Id);
+            b.HasIndex(a => a.TimestampUtc);
+            b.HasIndex(a => a.Category);
+            b.Property(a => a.DataJson).HasColumnType("text");
+        });
+
+        // Configure PushedAuthorizationRequest entity (PAR)
+        builder.Entity<PushedAuthorizationRequest>(b =>
+        {
+            b.HasKey(p => p.Id);
+            b.HasIndex(p => p.RequestUri).IsUnique();
+            b.HasIndex(p => p.ExpiresAt);
+            b.HasIndex(p => new { p.ClientId, p.ExpiresAt });
+            b.Property(p => p.RequestUri).HasMaxLength(300).IsRequired();
+            b.Property(p => p.ClientId).HasMaxLength(200).IsRequired();
+            b.Property(p => p.ParametersHash).HasMaxLength(128);
+        });
+
         // Provider-specific tuning: MySQL row size limits -> move large strings to longtext
         if (Database.ProviderName?.Contains("MySql", StringComparison.OrdinalIgnoreCase) == true)
         {
@@ -592,6 +628,11 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
             {
                 entity.Property(c => c.GrantedScopesJson).HasColumnType("longtext");
             });
+
+            builder.Entity<PushedAuthorizationRequest>(entity =>
+            {
+                entity.Property(p => p.ParametersJson).HasColumnType("longtext");
+            });
         }
 
         // Provider-specific tuning: PostgreSQL -> use text for large strings
@@ -614,14 +655,9 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
                 entity.Property(s => s.SecretHash).HasColumnType("text");
             });
 
-            builder.Entity<KeyMaterial>(entity =>
+            builder.Entity<PushedAuthorizationRequest>(entity =>
             {
-                entity.Property(k => k.PrivateKeyPem).HasColumnType("text");
-            });
-
-            builder.Entity<Consent>(entity =>
-            {
-                entity.Property(c => c.GrantedScopesJson).HasColumnType("text");
+                entity.Property(p => p.ParametersJson).HasColumnType("text");
             });
         }
 
@@ -631,6 +667,11 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
             builder.Entity<AuditLog>(entity =>
             {
                 entity.Property(a => a.Changes).HasColumnType("nvarchar(max)");
+            });
+
+            builder.Entity<PushedAuthorizationRequest>(entity =>
+            {
+                entity.Property(p => p.ParametersJson).HasColumnType("nvarchar(max)");
             });
         }
     }
@@ -660,6 +701,8 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
         var entries = ChangeTracker.Entries()
             .Where(e => e.State == EntityState.Added || e.State == EntityState.Modified || e.State == EntityState.Deleted)
             .ToList();
+
+        ValidateFrontChannelLogoutUris(entries);
 
         foreach (var entry in entries)
         {
@@ -769,5 +812,32 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
         if (key == null) return string.Empty;
         var values = key.Properties.Select(p => entry.CurrentValues[p] ?? entry.OriginalValues[p]).ToArray();
         return string.Join("|", values.Select(v => v?.ToString()));
+    }
+
+    private void ValidateFrontChannelLogoutUris(List<Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry> entries)
+    {
+        var env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "";
+        var relax = env.Equals("Development", StringComparison.OrdinalIgnoreCase) || env.Equals("Testing", StringComparison.OrdinalIgnoreCase);
+        foreach (var e in entries)
+        {
+            if (e.Entity is Client && (e.State == EntityState.Added || e.State == EntityState.Modified))
+            {
+                var uriObj = e.CurrentValues[nameof(Client.FrontChannelLogoutUri)];
+                if (uriObj is string s && !string.IsNullOrWhiteSpace(s))
+                {
+                    if (Uri.TryCreate(s, UriKind.Absolute, out var uri))
+                    {
+                        if (!relax && uri.Scheme != Uri.UriSchemeHttps)
+                        {
+                            throw new InvalidOperationException($"FrontChannelLogoutUri must use HTTPS in {env} environment.");
+                        }
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException("FrontChannelLogoutUri must be an absolute URI.");
+                    }
+                }
+            }
+        }
     }
 }

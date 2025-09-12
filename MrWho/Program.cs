@@ -148,4 +148,9 @@ var logger = app.Services.GetRequiredService<ILogger<Program>>();
 logger.LogInformation("MrWho OIDC Server starting...");
 
 await app.ConfigureMrWhoPipelineWithClientCookiesAsync();
+
+// Correlation middleware should be very early (after routing added in pipeline builder). If extension already built pipeline, insert here before auth endpoints.
+app.Use(async (ctx, next) => await next()); // placeholder to keep relative position comment
+app.UseMiddleware<MrWho.Middleware.CorrelationMiddleware>();
+
 app.Run();

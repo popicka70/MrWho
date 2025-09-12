@@ -27,7 +27,16 @@
     if (!string.IsNullOrEmpty(effectiveReturnUrl)) queryParts.Add("returnUrl=" + Uri.EscapeDataString(effectiveReturnUrl));
     if (!string.IsNullOrEmpty(effectiveClientId)) queryParts.Add("clientId=" + Uri.EscapeDataString(effectiveClientId));
     if (queryParts.Count > 0) signInAgainHref += "?" + string.Join("&", queryParts);
+
+    var frontChannelClients = Context.Items["FrontChannelLogoutIframes"] as List<string> ?? new List<string>();
 }
+
+<div class="d-none" aria-hidden="true">
+@foreach (var iframe in frontChannelClients)
+{
+    <iframe src="@iframe" style="display:none;width:0;height:0;" title="front-channel-logout"></iframe>
+}
+</div>
 
 <div class="container mt-4">
     <div class="row justify-content-center">

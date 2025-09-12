@@ -1,0 +1,14 @@
+﻿@using Radzen
+@using Radzen.Blazor
+@using Microsoft.AspNetCore.Components
+
+<RadzenStack Gap="0.5rem">
+    <pre style="max-width:620px;max-height:70vh;overflow:auto;white-space:pre-wrap;word-break:break-word;border:1px solid var(--rz-border-color);padding:0.75rem;border-radius:4px;">@Content</pre>
+    <RadzenButton Text="Close" Icon="close" ButtonStyle="ButtonStyle.Primary" Click="@(args => DialogService.Close())" />
+</RadzenStack>
+
+
+@code {
+    [Parameter] public string Content { get; set; } = string.Empty;
+    [Inject] public DialogService DialogService { get; set; } = default!;
+}

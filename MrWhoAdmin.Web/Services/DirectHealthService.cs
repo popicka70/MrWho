@@ -53,7 +53,7 @@ public class DirectHealthService : IDirectHealthService
         _httpContextAccessor = httpContextAccessor;
     }
 
-    public async Task<HealthStatus?> GetBasicHealthAsync()
+    public Task<HealthStatus?> GetBasicHealthAsync()
     {
         try
         {
@@ -63,15 +63,15 @@ public class DirectHealthService : IDirectHealthService
             var result = controller.Get();
             if (result is Microsoft.AspNetCore.Mvc.OkObjectResult okResult && okResult.Value != null)
             {
-                return ConvertToHealthStatus(okResult.Value);
+                return Task.FromResult(ConvertToHealthStatus(okResult.Value));
             }
             
-            return null;
+            return Task.FromResult<HealthStatus?>(null);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting basic health directly");
-            return null;
+            return Task.FromResult<HealthStatus?>(null);
         }
     }
 
@@ -106,7 +106,7 @@ public class DirectHealthService : IDirectHealthService
         }
     }
 
-    public async Task<LivenessStatus?> GetLivenessAsync()
+    public Task<LivenessStatus?> GetLivenessAsync()
     {
         try
         {
@@ -116,15 +116,15 @@ public class DirectHealthService : IDirectHealthService
             var result = controller.GetLiveness();
             if (result is Microsoft.AspNetCore.Mvc.OkObjectResult okResult && okResult.Value != null)
             {
-                return ConvertToLivenessStatus(okResult.Value);
+                return Task.FromResult(ConvertToLivenessStatus(okResult.Value));
             }
             
-            return null;
+            return Task.FromResult<LivenessStatus?>(null);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting liveness directly");
-            return null;
+            return Task.FromResult<LivenessStatus?>(null);
         }
     }
 
@@ -150,7 +150,7 @@ public class DirectHealthService : IDirectHealthService
         }
     }
 
-    public async Task<AuthSchemesInfo?> GetAuthSchemesAsync()
+    public Task<AuthSchemesInfo?> GetAuthSchemesAsync()
     {
         try
         {
@@ -169,7 +169,7 @@ public class DirectHealthService : IDirectHealthService
             {
                 // If no HttpContext available, return a placeholder response
                 _logger.LogWarning("No HttpContext available for authentication schemes check");
-                return new AuthSchemesInfo
+                return Task.FromResult<AuthSchemesInfo?>(new AuthSchemesInfo
                 {
                     Timestamp = DateTime.UtcNow,
                     Application = "MrWho Admin Web",
@@ -187,21 +187,21 @@ public class DirectHealthService : IDirectHealthService
                         ChallengeScheme = "AdminOIDC",
                         Note = "Admin app uses client-specific schemes for session isolation"
                     }
-                };
+                });
             }
             
             var result = controller.GetAuthenticationSchemes();
             if (result is Microsoft.AspNetCore.Mvc.OkObjectResult okResult && okResult.Value != null)
             {
-                return ConvertToAuthSchemesInfo(okResult.Value);
+                return Task.FromResult(ConvertToAuthSchemesInfo(okResult.Value));
             }
             
-            return null;
+            return Task.FromResult<AuthSchemesInfo?>(null);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting auth schemes directly");
-            return null;
+            return Task.FromResult<AuthSchemesInfo?>(null);
         }
     }
 

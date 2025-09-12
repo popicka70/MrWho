@@ -29,6 +29,10 @@ public class UpdateClientRequest
 
     // PAR mode
     public PushedAuthorizationMode? ParMode { get; set; }
+    public JarMode? JarMode { get; set; }
+    public JarmMode? JarmMode { get; set; }
+    public bool? RequireSignedRequestObject { get; set; }
+    public string? AllowedRequestObjectAlgs { get; set; }
 
     public TimeSpan? AccessTokenLifetime { get; set; }
     public TimeSpan? RefreshTokenLifetime { get; set; }

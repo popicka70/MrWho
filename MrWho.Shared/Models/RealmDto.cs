@@ -63,4 +63,10 @@ public class RealmDto
     public string? RealmUri { get; set; }
     public string? RealmPolicyUri { get; set; }
     public string? RealmTosUri { get; set; }
+
+    // === PHASE 1.5: JAR / JARM REALM DEFAULTS ===
+    public JarMode? DefaultJarMode { get; set; }
+    public JarmMode? DefaultJarmMode { get; set; }
+    public bool? DefaultRequireSignedRequestObject { get; set; }
+    public string? DefaultAllowedRequestObjectAlgs { get; set; }
 }

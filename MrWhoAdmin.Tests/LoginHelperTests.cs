@@ -92,16 +92,14 @@ public class LoginHelperTests
         }
     }
 
-    [DataTestMethod]
-    [DataRow("/home", true)]
-    [DataRow("//evil", false)]
-    [DataRow("/\\hack", false)]
-    [DataRow("http://external", false)]
-    public void IsLocalUrl_Works(string url, bool expected)
-    {
-        var helper = CreateHelper();
-        Assert.AreEqual(expected, helper.IsLocalUrl(url));
-    }
+    [TestMethod]
+    public void IsLocalUrl_Works_Case1() { var helper = CreateHelper(); Assert.AreEqual(true, helper.IsLocalUrl("/home")); }
+    [TestMethod]
+    public void IsLocalUrl_Works_Case2() { var helper = CreateHelper(); Assert.AreEqual(false, helper.IsLocalUrl("//evil")); }
+    [TestMethod]
+    public void IsLocalUrl_Works_Case3() { var helper = CreateHelper(); Assert.AreEqual(false, helper.IsLocalUrl("/\\hack")); }
+    [TestMethod]
+    public void IsLocalUrl_Works_Case4() { var helper = CreateHelper(); Assert.AreEqual(false, helper.IsLocalUrl("http://external")); }
 
     [TestMethod]
     public void TryExtractClientIdFromReturnUrl_Works_ForAbsolute()
