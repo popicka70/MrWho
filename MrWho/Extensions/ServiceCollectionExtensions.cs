@@ -137,6 +137,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IAuditQueryService, AuditQueryService>();
         services.AddScoped<IAuditIntegrityWriter, AuditIntegrityWriter>();
         services.AddScoped<IAuditIntegrityVerificationService, AuditIntegrityVerificationService>();
+        services.AddSingleton<ICorrelationContextAccessor, CorrelationContextAccessor>();
 
         services.AddOptions<AuditRetentionOptions>().BindConfiguration(AuditRetentionOptions.SectionName).ValidateDataAnnotations();
 
