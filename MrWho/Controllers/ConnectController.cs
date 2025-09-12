@@ -16,7 +16,6 @@ using MrWho.Services; // added for ISecurityAuditWriter & SecurityAudit
 
 namespace MrWho.Controllers;
 
-[AllowAnonymous]
 [Route("connect")] // base route
 public class ConnectController : Controller
 {
@@ -36,6 +35,7 @@ public class ConnectController : Controller
     }
 
     // GET /connect/external/login/{provider}
+    [AllowAnonymous]
     [HttpGet("external/login/{provider}")]
     public IActionResult ExternalLogin(string provider, [FromQuery] string? returnUrl = null, [FromQuery] string? clientId = null, [FromQuery] string? force = null)
     {
@@ -65,6 +65,7 @@ public class ConnectController : Controller
     }
 
     // GET /connect/external/signout
+    [AllowAnonymous]
     [HttpGet("external/signout")]
     public IActionResult ExternalSignOut()
     {
@@ -75,18 +76,21 @@ public class ConnectController : Controller
         return SignOut(props, OpenIddictClientAspNetCoreDefaults.AuthenticationScheme);
     }
 
-    // GET or POST /connect/authorize passthrough via mediator
+    // GET or POST /connect/authorize
+    [AllowAnonymous]
     [HttpGet("authorize")]
     [HttpPost("authorize")]
     public async Task<IActionResult> AuthorizeEndpoint()
         => Wrap(await _mediator.Send(new OidcAuthorizeRequest(HttpContext)));
 
-    // POST /connect/token passthrough via mediator
+    // POST /connect/token
+    [AllowAnonymous]
     [HttpPost("token")]
     public async Task<IActionResult> TokenEndpoint()
         => Wrap(await _mediator.Send(new OidcTokenRequest(HttpContext)));
 
     // GET /connect/invalid-scopes
+    [AllowAnonymous]
     [HttpGet("invalid-scopes")]
     public Task<IActionResult> InvalidScopes([FromQuery] string? returnUrl, [FromQuery] string? clientId, [FromQuery] string? missing, [FromQuery] string? requested)
         => _mediator.Send(new InvalidScopesGetRequest(HttpContext, returnUrl, clientId, missing, requested));
@@ -112,6 +116,7 @@ public class ConnectController : Controller
         => _mediator.Send(new MrWho.Handlers.Auth.ConsentForgetRequest(HttpContext, clientId));
 
     // POST /connect/par  (Pushed Authorization Request)
+    [AllowAnonymous]
     [HttpPost("par")]
     public async Task<IActionResult> PushedAuthorizationRequest()
     {
