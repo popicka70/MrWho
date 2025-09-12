@@ -109,7 +109,7 @@ else
     <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600 rz-mt-4">JAR (Signed Authorization Requests)</RadzenText>
     <RadzenFormField Text="JAR Mode" Variant="Variant.Outlined">
         <ChildContent>
-            <RadzenDropDown @bind-Value="model.JarMode" TValue="JarMode?" Data="@jarModes" TextProperty="Text" ValueProperty="Value" Style="width:100%;" />
+            <RadzenDropDown @bind-Value="model.JarMode" TValue="JarMode?" Data="@jarModes" TextProperty="Text" ValueProperty="Value" Style="width:100%;" Change="@(args => OnJarModeChanged())" />
         </ChildContent>
         <Helper>
             <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Optional = may send signed request (request=). Required = must use signed request object. Effective: @EffectiveJarModeText</RadzenText>
@@ -117,7 +117,7 @@ else
     </RadzenFormField>
     <RadzenFormField Text="Require Signed Request Object" Variant="Variant.Outlined">
         <Start>
-            <RadzenCheckBox @bind-Value="model.RequireSignedRequestObject" Name="reqSignedJar" TriState="true" />
+            <RadzenCheckBox @bind-Value="model.RequireSignedRequestObject" Name="reqSignedJar" TriState="true" Disabled="@(model.JarMode == JarMode.Required)" Change="@((bool? args) => OnRequireSignedChanged())" />
         </Start>
         <ChildContent>
             <RadzenLabel Text="Disallow unsigned (alg=none) request objects" Component="reqSignedJar" />
@@ -148,10 +148,17 @@ else
         </RadzenAlert>
     }
 
+    @if (!string.IsNullOrEmpty(jarValidationMessage))
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Danger" ShowIcon="true">
+            <RadzenText TextStyle="TextStyle.Body2">@jarValidationMessage</RadzenText>
+        </RadzenAlert>
+    }
+
     <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600 rz-mt-4">JARM (JWT Authorization Response Mode)</RadzenText>
     <RadzenFormField Text="JARM Mode" Variant="Variant.Outlined">
         <ChildContent>
-            <RadzenDropDown @bind-Value="model.JarmMode" TValue="JarmMode?" Data="@jarmModes" TextProperty="Text" ValueProperty="Value" Style="width:100%;" />
+            <RadzenDropDown @bind-Value="model.JarmMode" TValue="JarmMode?" Data="@jarmModes" TextProperty="Text" ValueProperty="Value" Style="width:100%;" Change="@(args => OnJarmModeChanged())" />
         </ChildContent>
         <Helper>
             <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Optional = response_mode=jwt triggers JWT response. Required = always JWT. Effective: @EffectiveJarmModeText</RadzenText>
@@ -203,6 +210,8 @@ else
         => selectedJarAlgs.Any(a => a.Equals("HS384", StringComparison.OrdinalIgnoreCase) || a.Equals("HS512", StringComparison.OrdinalIgnoreCase))
            && (string.IsNullOrWhiteSpace(model.ClientSecret) || model.ClientSecret.Length < RequiredLengthForSelectedHsAlgs());
 
+    private string? jarValidationMessage; // holds current UI validation error (client-side)
+
     private int RequiredLengthForSelectedHsAlgs()
     {
         if (selectedJarAlgs.Contains("HS512", StringComparer.OrdinalIgnoreCase)) return 64;
@@ -219,10 +228,50 @@ else
             : model.AllowedRequestObjectAlgs.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
+        EnforceJarUiRules();
     }
 
     private void OnJarAlgsChanged()
     {
         model.AllowedRequestObjectAlgs = selectedJarAlgs.Any() ? string.Join(',', selectedJarAlgs) : null;
+        EnforceJarUiRules();
     }
+
+    private void OnJarModeChanged()
+    {
+        EnforceJarUiRules();
+    }
+
+    private void OnRequireSignedChanged()
+    {
+        EnforceJarUiRules();
+    }
+
+    private void EnforceJarUiRules()
+    {
+        // If JAR Mode is Required, force signed objects
+        if (model.JarMode == JarMode.Required)
+        {
+            model.RequireSignedRequestObject = true; // enforce
+        }
+
+        // Clear previous message
+        jarValidationMessage = null;
+
+        // Guard: JarMode=Required & explicitly false (should not happen due to force) but double-check
+        if (model.JarMode == JarMode.Required && model.RequireSignedRequestObject == false)
+        {
+            jarValidationMessage = "Signed request objects are mandatory when JAR Mode is Required.";
+            return;
+        }
+
+        // Guard: RequireSignedRequestObject true but no algs selected
+        if (model.RequireSignedRequestObject == true && !selectedJarAlgs.Any())
+        {
+            jarValidationMessage = "Select at least one signing algorithm when signed request objects are required.";
+            return;
+        }
+    }
+
+    private void OnJarmModeChanged() { /* reserved for future JARM client-side validation */ }
 }
