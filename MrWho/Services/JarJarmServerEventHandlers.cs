@@ -5,6 +5,10 @@ using System.Text.Json; // for JSON array construction
 using OpenIddict.Abstractions;
 using Microsoft.IdentityModel.Tokens; // signing
 using Microsoft.IdentityModel.JsonWebTokens;
+using Microsoft.EntityFrameworkCore; // added for context queries
+using MrWho.Options; // for symmetric policy options
+using MrWho.Data; // for ApplicationDbContext
+using MrWho.Shared; // for JarMode enum
 
 namespace MrWho.Services;
 
@@ -31,7 +35,10 @@ public sealed class InMemoryJarReplayCache : IJarReplayCache
 internal sealed class DiscoveryAugmentationHandler : IOpenIddictServerHandler<ApplyConfigurationResponseContext>
 {
     private readonly ILogger<DiscoveryAugmentationHandler> _logger;
-    public DiscoveryAugmentationHandler(ILogger<DiscoveryAugmentationHandler> logger) => _logger = logger;
+    private readonly MrWho.Data.ApplicationDbContext _db; // fully qualified
+
+    public DiscoveryAugmentationHandler(ILogger<DiscoveryAugmentationHandler> logger, MrWho.Data.ApplicationDbContext db) // ctor updated
+    { _logger = logger; _db = db; }
 
     public ValueTask HandleAsync(ApplyConfigurationResponseContext context)
     {
@@ -63,9 +70,46 @@ internal sealed class DiscoveryAugmentationHandler : IOpenIddictServerHandler<Ap
                 using var modesDoc = JsonDocument.Parse("[\"query\",\"fragment\",\"form_post\",\"jwt\"]");
                 resp[OpenIddictConstants.Metadata.ResponseModesSupported] = modesDoc.RootElement.Clone();
             }
-            using var algsDoc = JsonDocument.Parse("[\"RS256\",\"HS256\"]");
+
+            // Dynamic request object signing alg values supported
+            var algs = new List<string> { "RS256" }; // always advertise RS256
+            try
+            {
+                var jarClients = _db.Clients.AsNoTracking()
+                    .Where(c => c.JarMode == null || c.JarMode != JarMode.Disabled)
+                    .Select(c => new { c.AllowedRequestObjectAlgs })
+                    .ToList();
+
+                bool hs256 = false, hs384 = false, hs512 = false;
+                foreach (var c in jarClients)
+                {
+                    var list = string.IsNullOrWhiteSpace(c.AllowedRequestObjectAlgs)
+                        ? Array.Empty<string>()
+                        : c.AllowedRequestObjectAlgs.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                    if (list.Length == 0)
+                    {
+                        // Defaults (RS256, HS256) assumed when empty
+                        hs256 = true;
+                        continue;
+                    }
+                    foreach (var a in list)
+                    {
+                        if (a.Equals("HS256", StringComparison.OrdinalIgnoreCase)) hs256 = true;
+                        else if (a.Equals("HS384", StringComparison.OrdinalIgnoreCase)) hs384 = true;
+                        else if (a.Equals("HS512", StringComparison.OrdinalIgnoreCase)) hs512 = true;
+                    }
+                }
+                if (hs256) algs.Add("HS256");
+                if (hs384) algs.Add("HS384");
+                if (hs512) algs.Add("HS512");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Failed building dynamic HS alg list for discovery; falling back to RS256 only");
+            }
+            using var algsDoc = JsonDocument.Parse("[" + string.Join(',', algs.Select(a => $"\"{a}\"")) + "]");
             resp[OpenIddictConstants.Metadata.RequestObjectSigningAlgValuesSupported] = algsDoc.RootElement.Clone();
-            _logger.LogDebug("Discovery metadata augmented with jwt response mode.");
+            _logger.LogDebug("Discovery metadata augmented (request_object_signing_alg_values_supported={Algs})", string.Join(',', algs));
         }
         catch (Exception ex)
         {

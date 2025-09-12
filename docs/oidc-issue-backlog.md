@@ -1,6 +1,6 @@
 # OIDC Platform Implementation Backlog
 
-Generated: 2025-09-12 (updated after Items 1 & 2 completion)
+Generated: 2025-09-12 (updated after Items 1 & 2 completion + Item 5 partial)
 Source: Enterprise Roadmap (Phase 1 & 1.5)
 
 Legend:
@@ -91,21 +91,27 @@ Acceptance:
 - Failure after max retries audited; signature validated in tests
 
 ## 5. Symmetric Secret Policy Enforcement (HS*)
-Status: TODO  Priority: P0  Labels: security,cryptography
+Status: IN PROGRESS  Priority: P0  Labels: security,cryptography
 Depends On: 2
 Description:
 Minimum lengths: HS256>=32B, HS384>=48B, HS512>=64B for client secrets & request object signing.
 Tasks:
-- [ ] Config object + defaults
-- [ ] Validation service (ISymmetricSecretPolicy)
-- [ ] Client create/update enforcement + friendly error
-- [ ] JAR validation integration
-- [ ] UI warnings + pre-save blocking
-- [ ] Discovery filter (remove disallowed algs)
-- [ ] Tests (boundaries + downgrade attempt)
-Acceptance:
-- HS512 with 48B rejected
-- Discovery omits HS512 when no compliant clients
+- [x] Config object + defaults (`SymmetricSecretPolicyOptions`)
+- [x] Validation service (ISymmetricSecretPolicy + implementation)
+- [x] Client create/update enforcement (API returns validation problem)
+- [x] JAR validation integration (middleware rejects below-policy secret; no padding fallback)
+- [x] UI warnings + pre-save blocking (Blazor client edit validation)
+- [x] Discovery filter (dynamic removal of HS* when not required by any JAR-capable client)
+- [ ] Tests: boundary lengths (31/32, 47/48, 63/64) & downgrade attempt (remove HS512 after shortening secret)
+- [ ] Discovery omission test (no HS* when no clients imply or list them)
+- [ ] Documentation snippet (admin guide) explaining secret rotation for HS upgrades
+Remaining Acceptance:
+- HS512 with 48B rejected (needs automated test)
+- Discovery omits HS512 when no compliant clients (needs test)
+Planned Next Slice:
+1. Add unit/integration tests for boundary + downgrade.
+2. Test discovery dynamic list (create client with HS512 then remove; verify omission).
+3. Add short admin docs note.
 
 ## 6. Client-Level JAR/JARM UI Wiring
 Status: TODO  Priority: P1  Labels: ui,oidc
@@ -247,20 +253,20 @@ Milestone: Advanced-Design -> Issues 13-14
 - Link dependencies
 
 ---
-## Next Step Proposal (Post Item 1 Completion)
+## Next Step Proposal (Post Item 5 Partial Progress)
 Immediate execution order:
-1. Item 5 (Symmetric Secret Policy) – foundational gate for Items 6,7,8,11,12. Deliver config + validator + server enforcement first; UI & discovery filter second; then tests.
-2. Item 3 (Front-Channel Logout) – add client metadata + migration early so UI & audit hooks follow; enables later Item 15.
-3. Parallel small task: optional multi-category audit chain test (low effort; strengthens confidence) – can be added while implementing Item 5.
+1. Finish Item 5 remaining tests + docs (move to DONE quickly).
+2. Start Item 3 (Front-Channel Logout) – add migration + UI + basic iframe render; then audit events.
+3. Begin groundwork for Item 6 data mapping (DTO prep) in parallel if capacity while Item 3 migration reviewed.
 
-Short-Term Deliverables (Sprint Slice):
-- D1: SymmetricSecretPolicyOptions + ISymmetricSecretPolicy + server-side length enforcement on client create/update.
-- D2: FrontChannelLogoutUri migration + validation + iframe emission skeleton (no audit yet).
-- D3: Tests: secret boundary failures; basic front-channel iframe generation with two clients.
+Short-Term Deliverables (Revised):
+- T1: Symmetric policy test suite (boundary + downgrade) + discovery omission test.
+- T2: FrontChannelLogout initial migration + client edit field + server validation.
+- T3: EndSession iframe emission + minimal audit (logout.initiated, logout.frontchannel.dispatch) + tests.
 
 Rationale:
-- Policy (Item 5) unlocks majority of queued protocol work.
-- Early metadata for logout prevents future migration churn.
-- Keeps audit trail already implemented leveraged immediately by logout events (later).
+- Completing Item 5 solidifies cryptographic guarantees before broader JAR/JARM edge tests.
+- Logout metadata early avoids later breaking schema changes.
+- Parallel DTO prep for Item 6 shortens lead time for UI feature cluster.
 
 End of backlog.
