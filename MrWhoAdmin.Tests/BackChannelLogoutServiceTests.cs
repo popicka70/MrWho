@@ -62,6 +62,7 @@ public class BackChannelLogoutServiceTests
         var handler = new TestHandler { Status = status, SimulateTimeout = timeout };
         services.AddHttpClient("backchannel").ConfigurePrimaryHttpMessageHandler(() => handler);
         var options = new OpenIddictServerOptions();
+        options.SigningCredentials.Add(new Microsoft.IdentityModel.Tokens.SigningCredentials(new Microsoft.IdentityModel.Tokens.SymmetricSecurityKey(new byte[32]), Microsoft.IdentityModel.Tokens.SecurityAlgorithms.HmacSha256));
         services.AddSingleton<IOptionsMonitor<OpenIddictServerOptions>>(new TestOptionsMonitor<OpenIddictServerOptions>(options));
         services.AddSingleton(new Mock<IOpenIddictAuthorizationManager>().Object);
         services.AddSingleton(new Mock<IOpenIddictApplicationManager>().Object);
@@ -92,45 +93,43 @@ public class BackChannelLogoutServiceTests
     [TestMethod]
     public async Task Success_Does_Not_Schedule_Retry()
     {
-        // TODO
-        // This test is currently disabled because the HttpClient mock does not trigger as expected.
-        //var (svc, handler, _, sched, clientId) = Create(status: HttpStatusCode.OK, clientIdOverride: "clienta");
-        //await svc.NotifyClientLogoutAsync(clientId, "subj", "sess");
-        //Assert.IsNotNull(handler.LastRequest, "HTTP request should be issued on success path");
-        //Assert.AreEqual(0, sched.Scheduled.Count, "No retry should be scheduled on success");
+        var (svc, handler, _, sched, clientId) = Create(status: HttpStatusCode.OK, clientIdOverride: "clienta");
+        await svc.NotifyClientLogoutAsync(clientId, "subj", "sess");
+        Assert.IsNotNull(handler.LastRequest, "HTTP request should be issued on success path");
+        Assert.AreEqual(0, sched.Scheduled.Count, "No retry should be scheduled on success");
+        Assert.IsTrue(sched.AttemptOutcomes.Any(o => o.success), "Attempt outcome success should be reported");
     }
 
     [TestMethod]
     public async Task Failure_Status_Schedules_Retry()
     {
-        // TODO
-        // This test is currently disabled because the HttpClient mock does not trigger as expected.
-        //var (svc, handler, _, sched, clientId) = Create(status: HttpStatusCode.InternalServerError, clientIdOverride: "clienta");
-        //await svc.NotifyClientLogoutAsync(clientId, "subj", "sess");
-        //Assert.IsNotNull(handler.LastRequest, "Expected HTTP POST for failure status but LastRequest was null (logout URI may not have been resolved)");
-        //Assert.AreEqual(1, sched.Scheduled.Count, "Failure should schedule one retry");
-        //var work = sched.Scheduled[0];
-        //Assert.AreEqual(clientId, work.ClientId);
-        //Assert.AreEqual(2, work.Attempt, "Scheduler increments attempt for first retry (Attempt=2)");
+        var (svc, handler, _, sched, clientId) = Create(status: HttpStatusCode.InternalServerError, clientIdOverride: "clientb");
+        await svc.NotifyClientLogoutAsync(clientId, "subj", "sess");
+        Assert.IsNotNull(handler.LastRequest, "Expected HTTP POST for failure status but LastRequest was null");
+        Assert.AreEqual(1, sched.Scheduled.Count, "Failure should schedule one retry");
+        var work = sched.Scheduled[0];
+        Assert.AreEqual(clientId, work.ClientId);
+        Assert.AreEqual(2, work.Attempt, "Scheduler increments attempt for first retry (Attempt=2)");
+        Assert.IsTrue(sched.AttemptOutcomes.Any(o => !o.success), "Failure outcome should be tracked");
     }
 
     [TestMethod]
     public async Task Timeout_Schedules_Retry()
     {
-        // TODO
-        // This test is currently disabled because the timeout simulation in TestHandler does not trigger as expected.
-        //var (svc, handler, _, sched, clientId) = Create(status: HttpStatusCode.OK, timeout: true, clientIdOverride: "clienta");
-        //await svc.NotifyClientLogoutAsync(clientId, "subj", "sess");
-        //Assert.IsNull(handler.LastRequest, "Timeout simulation throws before recording request");
-        //Assert.AreEqual(1, sched.Scheduled.Count, "Timeout should schedule retry");
+        var (svc, handler, _, sched, clientId) = Create(status: HttpStatusCode.OK, timeout: true, clientIdOverride: "clientc");
+        await svc.NotifyClientLogoutAsync(clientId, "subj", "sess");
+        Assert.IsNull(handler.LastRequest, "Timeout simulation throws before recording request");
+        Assert.AreEqual(1, sched.Scheduled.Count, "Timeout should schedule retry");
+        Assert.IsTrue(sched.AttemptOutcomes.Any(o => !o.success && o.error == "timeout"));
     }
 
     [TestMethod]
     public async Task Missing_Client_Does_Not_Schedule()
     {
-        var (svc, handler, _, sched, clientId) = Create(withClient: false, clientIdOverride: "clienta");
+        var (svc, handler, _, sched, clientId) = Create(withClient: false, clientIdOverride: "clientd");
         await svc.NotifyClientLogoutAsync(clientId, "subj", "sess");
         Assert.IsNull(handler.LastRequest, "No HTTP call should occur when client missing");
         Assert.AreEqual(0, sched.Scheduled.Count, "Missing client should not schedule retries");
+        Assert.IsTrue(sched.AttemptOutcomes.Any(o => !o.success));
     }
 }

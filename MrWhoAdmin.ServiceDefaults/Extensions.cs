@@ -67,7 +67,8 @@ public static class Extensions
                 metrics
                     .AddRuntimeInstrumentation()
                     .AddAspNetCoreInstrumentation()
-                    .AddHttpClientInstrumentation();
+                    .AddHttpClientInstrumentation()
+                    .AddMeter("MrWho.Logout"); // custom back-channel logout counters
             })
             .WithTracing(tracing =>
             {

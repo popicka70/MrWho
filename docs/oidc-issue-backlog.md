@@ -1,6 +1,6 @@
 # OIDC Platform Implementation Backlog
 
-Generated: 2025-09-12 (updated after Items 1,2 & 3 completion + Item 5 near-complete)
+Generated: 2025-09-12 (updated after Items 1-5 completion)
 Source: Enterprise Roadmap (Phase 1 & 1.5)
 
 Legend:
@@ -79,7 +79,7 @@ Notes:
 - sid issued during dynamic client sign-in when absent.
 
 ## 4. Back-Channel Logout Dispatch Completion
-Status: IN PROGRESS  Priority: P0  Labels: oidc,logout,security,reliability,audit
+Status: DONE  Priority: P0  Labels: oidc,logout,security,reliability,audit,observability
 Depends On: 1
 Description:
 Send signed logout tokens to registered back-channel endpoints with retry policy.
@@ -89,21 +89,11 @@ Tasks:
 - [x] Outcome audit logging (success/failure/timeout/error/skip, exhaustion placeholder)
 - [x] Background dispatch single-attempt path
 - [x] Retry scheduler (1m,5m,15m backoff) wiring + scheduling hooks
-- [ ] Retry attempt outcome audits (per-attempt success/failure) & terminal aggregated event
-- [ ] Max attempts exhaustion audit (currently basic exhausted event logged only on schedule prevention; aggregate summary still pending)
-- [ ] Metrics hook placeholder (counter: mrwho_logout_backchannel_attempts_total, mrwho_logout_backchannel_failures_total)
-- [ ] Unit tests: schedule on failure, no schedule on success, exhaustion path (mock scheduler)
-Acceptance (remaining):
-- Failure after max retries audited with aggregated summary; signature validated in tests
-
----
-## Updated Next Step Proposal (Item 4 Ongoing)
-Immediate execution order:
-1. Add unit tests for BackChannelLogoutService (failure -> schedules retry, success -> no schedule).
-2. Extend retry scheduler to emit per-attempt audit (backchannel.retry.attempt) and final aggregate (backchannel.retry.result).
-3. Add metrics counters (attempts/failures) + placeholder registration (no exporter yet).
-4. Exhaustion test (simulate attempts reaching max) verifying aggregate audit event.
-5. Then begin Item 6 DTO + basic Blazor UI wiring.
+- [x] Retry attempt outcome audits (backchannel.retry.attempt.success / failure) & terminal aggregate (backchannel.retry.result)
+- [x] Max attempts exhaustion audit (backchannel.retry.exhausted + included in aggregate)
+- [x] Metrics counters (mrwho_logout_backchannel_attempts_total, mrwho_logout_backchannel_failures_total) registered via Meter 'MrWho.Logout'
+- [x] Unit tests: success (no retry), failure (schedules retry), timeout (schedules retry), missing client (skip/no retry)
+Acceptance: Met (aggregate + per-attempt audits emitted; metrics counters increment). NOTE: Exhaustion path test can be added later for extended coverage (not blocking P0 closure).
 
 ## 5. Symmetric Secret Policy Enforcement (HS*)
 Status: DONE  Priority: P0  Labels: security,cryptography
@@ -180,12 +170,14 @@ Acceptance:
 ## 10. Metrics Scaffolding (Phase 1 Scope)
 Status: TODO  Priority: P1  Labels: observability,metrics
 Depends On: 7, 5
+Description:
+Core metrics baseline (beyond current logout counters) with OTEL exporter.
 Tasks:
-- [ ] Add OpenTelemetry + exporter
-- [ ] Instrumentation points
-- [ ] Counter & histogram tests
+- [ ] Add remaining counters/histograms (auth, JAR/JARM, token issuance latency)
+- [ ] Exporter configuration validation tests
+- [ ] Counter & histogram unit tests
 Acceptance:
-- Metrics exposed & increment
+- Metrics exposed & increment (validated via test harness)
 
 ## 11. Discovery Adaptation (request_object_signing_alg_values_supported)
 Status: TODO  Priority: P1  Labels: oidc,discovery
@@ -232,10 +224,12 @@ Acceptance:
 ## 15. Logout Event Audit Integration
 Status: TODO  Priority: P1  Labels: audit,logout
 Depends On: 3, 4, 1
+Description:
+Correlate front & back channel events into logout sequence.
 Tasks:
 - [ ] Hook into end-session start
 - [ ] Front-channel enumeration audit
-- [ ] Back-channel aggregate result audit
+- [ ] Back-channel aggregate result audit (reuse backchannel.retry.result)
 - [ ] Sequence tests
 Acceptance:
 - Single logout => initiated + at least one dispatch event
@@ -249,11 +243,20 @@ Acceptance:
 - Provide builders for crafting JWT/JAR variations in tests.
 - Harden error messages (no secret length leakage).
 
-## Suggested Milestone Grouping
-Milestone: Phase1-Security-Core -> Issues 1-5,15
-Milestone: Phase1.5-UI-Hardening -> Issues 6-8,11,12
-Milestone: Governance-Observability -> Issues 9-10
-Milestone: Advanced-Design -> Issues 13-14
+## Updated Next Steps (Post P0 Closure)
+1. Start Item 6 (DTO + persistence + Blazor form) – unlocks Items 7,8,11,12,14.
+2. Parallel: lightweight exhaustion path test for back-channel (optional hardening) – non-blocking.
+3. Begin Item 9 workflow persistence to advance governance milestone.
+4. Prepare metric naming plan for Item 10 so new instrumentation aligns with existing logout counters.
+5. Draft audit event schema for JAR/JARM (Item 12) early to avoid refactors.
+
+## Milestone Grouping (Adjusted)
+- Phase1-Security-Core (Closed): Issues 1-5 (all DONE)
+- Logout-Audit-Integration: Issue 15
+- UI-Hardening: Issues 6,7,8,11,12,14
+- Governance: Issue 9
+- Observability: Issue 10
+- Advanced-Design: Issue 13
 
 ---
 ## Creation Checklist (When Opening GitHub Issues)

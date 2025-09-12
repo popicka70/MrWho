@@ -9,6 +9,7 @@ using System.IdentityModel.Tokens.Jwt;
 using Microsoft.IdentityModel.Tokens;
 using MrWho.Services; // add for ISecurityAuditWriter
 using MrWho.Services; // ensure retry scheduler interfaces
+using System.Diagnostics.Metrics; // metrics
 
 namespace MrWho.Services;
 
@@ -41,6 +42,11 @@ public class BackChannelLogoutService : IBackChannelLogoutService
     private readonly IOptionsMonitor<OpenIddictServerOptions> _serverOptions;
     private readonly ISecurityAuditWriter? _audit; // optional audit writer
     private readonly IBackChannelLogoutRetryScheduler? _retryScheduler;
+
+    // Metrics (placeholder counters). These are lightweight and safe to be static singletons.
+    private static readonly Meter _meter = new("MrWho.Logout", "1.0.0");
+    private static readonly Counter<long> _attemptsCounter = _meter.CreateCounter<long>("mrwho_logout_backchannel_attempts_total");
+    private static readonly Counter<long> _failuresCounter = _meter.CreateCounter<long>("mrwho_logout_backchannel_failures_total");
 
     public BackChannelLogoutService(
         IHttpClientFactory httpClientFactory,
@@ -133,6 +139,8 @@ public class BackChannelLogoutService : IBackChannelLogoutService
     /// </summary>
     private async Task NotifyClientLogoutInternalAsync(string clientId, string subject, string sessionId, string? logoutToken = null)
     {
+        // Count every dispatch attempt (attempt number may be >1 when invoked by retry scheduler; scheduler records granular attempt audits)
+        _attemptsCounter.Add(1, KeyValuePair.Create<string, object?>("client_id", clientId));
         try
         {
             Models.Client? client;
@@ -147,6 +155,9 @@ public class BackChannelLogoutService : IBackChannelLogoutService
             {
                 _logger.LogWarning("Client {ClientId} not found for logout notification", clientId);
                 try { if (_audit != null) await _audit.WriteAsync("logout", "backchannel.skip_client_missing", new { clientId }, "warn", actorClientId: clientId); } catch { }
+                // record attempt outcome (failure)
+                _retryScheduler?.ReportAttemptOutcome(clientId, subject, sessionId, 1, false, null, "client_missing");
+                _failuresCounter.Add(1, KeyValuePair.Create<string, object?>("client_id", clientId));
                 return;
             }
 
@@ -155,6 +166,7 @@ public class BackChannelLogoutService : IBackChannelLogoutService
             {
                 _logger.LogDebug("No back-channel logout URI configured for client {ClientId}", clientId);
                 try { if (_audit != null) await _audit.WriteAsync("logout", "backchannel.skip_no_uri", new { clientId }, "info", actorClientId: clientId); } catch { }
+                _retryScheduler?.ReportAttemptOutcome(clientId, subject, sessionId, 1, success: true, status: "skipped", error: null);
                 return;
             }
 
@@ -183,11 +195,15 @@ public class BackChannelLogoutService : IBackChannelLogoutService
                 {
                     _logger.LogInformation("Back-channel logout notification sent successfully to client {ClientId}", clientId);
                     try { if (_audit != null) await _audit.WriteAsync("logout", "backchannel.dispatch.success", new { clientId, uri = logoutUri, ms = (DateTime.UtcNow-start).TotalMilliseconds, status = (int)response.StatusCode }, "info", actorClientId: clientId); } catch { }
+                    // attempt outcome success (attempt 1)
+                    _retryScheduler?.ReportAttemptOutcome(clientId, subject, sessionId, 1, true, ((int)response.StatusCode).ToString(), null);
                 }
                 else
                 {
                     _logger.LogWarning("Back-channel logout notification failed for client {ClientId} with status {StatusCode}", clientId, response.StatusCode);
                     try { if (_audit != null) await _audit.WriteAsync("logout", "backchannel.dispatch.failure", new { clientId, uri = logoutUri, status = (int)response.StatusCode }, "warn", actorClientId: clientId); } catch { }
+                    _failuresCounter.Add(1, KeyValuePair.Create<string, object?>("client_id", clientId));
+                    _retryScheduler?.ReportAttemptOutcome(clientId, subject, sessionId, 1, false, ((int)response.StatusCode).ToString(), null);
                     _retryScheduler?.ScheduleRetry(new BackChannelLogoutRetryWork(clientId, subject, sessionId));
                 }
             }
@@ -195,12 +211,16 @@ public class BackChannelLogoutService : IBackChannelLogoutService
             {
                 _logger.LogWarning(tex, "Back-channel logout notification timeout for client {ClientId}", clientId);
                 try { if (_audit != null) await _audit.WriteAsync("logout", "backchannel.dispatch.timeout", new { clientId, uri = logoutUri }, "warn", actorClientId: clientId); } catch { }
+                _failuresCounter.Add(1, KeyValuePair.Create<string, object?>("client_id", clientId));
+                _retryScheduler?.ReportAttemptOutcome(clientId, subject, sessionId, 1, false, null, "timeout");
                 _retryScheduler?.ScheduleRetry(new BackChannelLogoutRetryWork(clientId, subject, sessionId));
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error sending back-channel logout notification to client {ClientId}");
                 try { if (_audit != null) await _audit.WriteAsync("logout", "backchannel.dispatch.error", new { clientId, uri = logoutUri, ex = ex.Message }, "error", actorClientId: clientId); } catch { }
+                _failuresCounter.Add(1, KeyValuePair.Create<string, object?>("client_id", clientId));
+                _retryScheduler?.ReportAttemptOutcome(clientId, subject, sessionId, 1, false, null, ex.GetType().Name);
                 _retryScheduler?.ScheduleRetry(new BackChannelLogoutRetryWork(clientId, subject, sessionId));
             }
             finally
@@ -212,6 +232,8 @@ public class BackChannelLogoutService : IBackChannelLogoutService
         {
             _logger.LogError(exOuter, "Unhandled error in back-channel logout dispatch for client {ClientId}", clientId);
             try { if (_audit != null) await _audit.WriteAsync("logout", "backchannel.dispatch.unhandled", new { clientId, ex = exOuter.Message }, "error", actorClientId: clientId); } catch { }
+            _failuresCounter.Add(1, KeyValuePair.Create<string, object?>("client_id", clientId));
+            _retryScheduler?.ReportAttemptOutcome(clientId, subject, sessionId, 1, false, null, exOuter.GetType().Name);
             _retryScheduler?.ScheduleRetry(new BackChannelLogoutRetryWork(clientId, subject, sessionId));
         }
     }
