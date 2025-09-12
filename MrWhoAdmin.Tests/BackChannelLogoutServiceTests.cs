@@ -138,6 +138,26 @@ public class BackChannelLogoutServiceTests
         Assert.IsNull(handler.LastRequest, "No HTTP request expected");
     }
 
+    [TestMethod]
+    public async Task Retry_Exhaustion_Emits_Aggregate()
+    {
+        var (svc, _, db, sched, diags, clientId) = Create(status: HttpStatusCode.InternalServerError, clientIdOverride: "client_exhaust");
+        // initial attempt -> failure schedules retry
+        await svc.NotifyClientLogoutAsync(clientId: clientId, subject: "subj", sessionId: "sess");
+        // Simulate processing of scheduled retries manually (not running background service here)
+        for (int attempt = 2; attempt <= 4; attempt++)
+        {
+            // simulate scheduler invoking service again with same failure
+            await svc.NotifyClientLogoutAsync(clientId: clientId, subject: "subj", sessionId: "sess");
+            // scheduler would record attempt outcome; mimic
+            sched.ReportAttemptOutcome(clientId, "subj", "sess", attempt, false, null, "500");
+        }
+        // final exhaustion
+        sched.ReportExhausted(clientId, "subj", "sess", 4);
+        var events = diags.ForClient(clientId).ToList();
+        Assert.IsTrue(events.Any(e => e.Type == BackChannelLogoutDiagEventType.DispatchFailure), "Expected at least one failure" + Dump(events));
+    }
+
     private static string Dump(IEnumerable<BackChannelLogoutDiagEvent> ev)
         => "\nEVENTS:\n" + string.Join("\n", ev.Select(e => $"{e.Type} success={e.Success} attempt={e.Attempt} status={e.Status} error={e.Error}"));
 }

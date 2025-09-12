@@ -99,11 +99,6 @@ public class BackChannelLogoutService : IBackChannelLogoutService
             {
                 var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
                 client = await context.Clients.AsNoTracking().FirstOrDefaultAsync(c => c.ClientId == clientId);
-                if (client == null)
-                {
-                    var ignored = await context.Clients.IgnoreQueryFilters().AsNoTracking().FirstOrDefaultAsync(c => c.ClientId == clientId);
-                    if (ignored != null) client = ignored;
-                }
                 _diagnostics.Emit(new(client == null ? BackChannelLogoutDiagEventType.ClientLookupMiss : BackChannelLogoutDiagEventType.ClientLookupHit, clientId, Success: client != null));
             }
 
