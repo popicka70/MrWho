@@ -1,23 +1,59 @@
 @using Radzen
 @using Radzen.Blazor
 
-<RadzenStack Gap="0.5rem">
+<RadzenStack Gap="0.75rem">
     <RadzenText TextStyle="TextStyle.H4">@Details?.ClientName</RadzenText>
     <RadzenText>Submitted: @Details?.SubmittedAt (by @Details?.SubmittedByUserName)</RadzenText>
-    <RadzenDivider />
+    <hr class="rz-divider" />
     <RadzenText TextStyle="TextStyle.H5">Request</RadzenText>
 
     <RadzenFormField Text="Grant Types" Variant="Variant.Outlined">
-        <RadzenChips Value="@Details?.Request?.GrantTypes" ReadOnly="true" />
+        @if (Details?.Request?.GrantTypes != null && Details.Request.GrantTypes.Any())
+        {
+            <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" Style="flex-wrap:wrap;">
+                @foreach (var gt in Details.Request.GrantTypes)
+                {
+                    <RadzenBadge Text="@gt" Style="background: var(--rz-base-200); color: var(--rz-text-color);" />
+                }
+            </RadzenStack>
+        }
+        else
+        {
+            <RadzenText class="rz-color-secondary">None</RadzenText>
+        }
     </RadzenFormField>
+
     <RadzenFormField Text="Redirect URIs" Variant="Variant.Outlined">
-        <RadzenListBox Data="@Details?.Request?.RedirectUris" TValue="string" />
+        @if (Details?.Request?.RedirectUris != null && Details.Request.RedirectUris.Any())
+        {
+            <RadzenListBox Data="@Details.Request.RedirectUris" TValue="string" Style="width:100%; max-height:200px;" />
+        }
+        else
+        {
+            <RadzenText class="rz-color-secondary">None</RadzenText>
+        }
     </RadzenFormField>
+
     <RadzenFormField Text="Post Logout Redirect URIs" Variant="Variant.Outlined">
-        <RadzenListBox Data="@Details?.Request?.PostLogoutRedirectUris" TValue="string" />
+        @if (Details?.Request?.PostLogoutRedirectUris != null && Details.Request.PostLogoutRedirectUris.Any())
+        {
+            <RadzenListBox Data="@Details.Request.PostLogoutRedirectUris" TValue="string" Style="width:100%; max-height:200px;" />
+        }
+        else
+        {
+            <RadzenText class="rz-color-secondary">None</RadzenText>
+        }
     </RadzenFormField>
+
     <RadzenFormField Text="Scopes" Variant="Variant.Outlined">
-        <RadzenText>@Details?.Request?.Scope</RadzenText>
+        @if (!string.IsNullOrWhiteSpace(Details?.Request?.Scope))
+        {
+            <RadzenText>@Details.Request.Scope</RadzenText>
+        }
+        else
+        {
+            <RadzenText class="rz-color-secondary">None</RadzenText>
+        }
     </RadzenFormField>
 </RadzenStack>
 
