@@ -1,11 +1,12 @@
-using System.Diagnostics;
-using System.Security.Claims;
+using Microsoft.AspNetCore.Http;
 
 namespace MrWho.Services;
 
 public interface ICorrelationContextAccessor
 {
     CorrelationContext Current { get; }
+    // Internal use: middleware sets the context
+    void Set(CorrelationContext context);
 }
 
 public sealed class CorrelationContext
@@ -17,10 +18,32 @@ public sealed class CorrelationContext
     public string? ActorType { get; init; } // user|client|system
 }
 
-public sealed class CorrelationContextAccessor : ICorrelationContextAccessor // changed to public for test project
+public sealed class CorrelationContextAccessor : ICorrelationContextAccessor
 {
-    private static readonly AsyncLocal<CorrelationContext?> _holder = new();
-    public CorrelationContext Current => _holder.Value ?? _empty;
+    private readonly IHttpContextAccessor _http;
+    private const string ItemKey = "__CorrelationContext";
     private static readonly CorrelationContext _empty = new() { CorrelationId = string.Empty, ActorType = "system" };
-    internal static void Set(CorrelationContext ctx) => _holder.Value = ctx;
+
+    public CorrelationContextAccessor(IHttpContextAccessor http) => _http = http;
+
+    public CorrelationContext Current
+    {
+        get
+        {
+            var http = _http.HttpContext;
+            if (http == null) return _empty;
+            if (http.Items.TryGetValue(ItemKey, out var value) && value is CorrelationContext ctx)
+                return ctx;
+            return _empty;
+        }
+    }
+
+    public void Set(CorrelationContext context)
+    {
+        var http = _http.HttpContext;
+        if (http != null)
+        {
+            http.Items[ItemKey] = context;
+        }
+    }
 }

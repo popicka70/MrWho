@@ -5,7 +5,6 @@ using Microsoft.Extensions.Logging;
 using MrWho.Middleware;
 using MrWho.Services;
 using System.Security.Claims;
-using System.Text;
 
 namespace MrWhoAdmin.Tests;
 
@@ -16,6 +15,7 @@ public class CorrelationMiddlewareTests
     {
         var services = new ServiceCollection();
         services.AddLogging();
+        services.AddHttpContextAccessor();
         services.AddSingleton<ICorrelationContextAccessor, CorrelationContextAccessor>();
         var sp = services.BuildServiceProvider();
 
@@ -25,7 +25,8 @@ public class CorrelationMiddlewareTests
             await ctx.Response.WriteAsync(accessor.Current.CorrelationId + "|" + accessor.Current.ActorType);
         };
         var logger = sp.GetRequiredService<ILogger<CorrelationMiddleware>>();
-        var middleware = new CorrelationMiddleware(terminal, logger);
+        var accessorInstance = sp.GetRequiredService<ICorrelationContextAccessor>();
+        var middleware = new CorrelationMiddleware(terminal, logger, accessorInstance);
         RequestDelegate app = ctx => middleware.InvokeAsync(ctx);
 
         return (app, sp);
@@ -34,6 +35,8 @@ public class CorrelationMiddlewareTests
     private static DefaultHttpContext CreateContext(ServiceProvider sp, bool withUser, bool clientOnly = false)
     {
         var httpCtx = new DefaultHttpContext { RequestServices = sp, Response = { Body = new MemoryStream() } };
+        var httpAccessor = sp.GetRequiredService<IHttpContextAccessor>();
+        httpAccessor.HttpContext = httpCtx;
         if (withUser)
         {
             var identity = new ClaimsIdentity(new[]

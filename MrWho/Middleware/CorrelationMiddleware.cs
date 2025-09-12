@@ -7,10 +7,11 @@ public sealed class CorrelationMiddleware
 {
     private readonly RequestDelegate _next;
     private readonly ILogger<CorrelationMiddleware> _logger;
+    private readonly ICorrelationContextAccessor _accessor;
     private const string HeaderName = "X-Correlation-Id";
 
-    public CorrelationMiddleware(RequestDelegate next, ILogger<CorrelationMiddleware> logger)
-    { _next = next; _logger = logger; }
+    public CorrelationMiddleware(RequestDelegate next, ILogger<CorrelationMiddleware> logger, ICorrelationContextAccessor accessor)
+    { _next = next; _logger = logger; _accessor = accessor; }
 
     public async Task InvokeAsync(HttpContext context)
     {
@@ -21,10 +22,21 @@ public sealed class CorrelationMiddleware
         context.Response.Headers[HeaderName] = correlationId;
         context.Response.OnStarting(() => { context.Response.Headers[HeaderName] = correlationId; return Task.CompletedTask; });
 
-        var user = context.User;
-        string? userId = user?.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? user?.FindFirst("sub")?.Value;
-        string? clientId = user?.FindFirst("client_id")?.Value;
-        string? userName = user?.Identity?.Name ?? user?.FindFirst(ClaimTypes.Name)?.Value;
+        var principal = context.User;
+        string? userId = principal?.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? principal?.FindFirst("sub")?.Value;
+        string? clientId = principal?.FindFirst("client_id")?.Value;
+        string? userName = principal?.Identity?.Name ?? principal?.FindFirst(ClaimTypes.Name)?.Value;
+
+        // Fallback: some test identities might use different casing or alias claim types. Scan all claims if needed.
+        if (clientId == null && userId == null && principal?.Claims != null)
+        {
+            clientId = principal.Claims.FirstOrDefault(c => string.Equals(c.Type, "client_id", StringComparison.OrdinalIgnoreCase))?.Value;
+            if (clientId == null)
+            {
+                // Accept oidc standard parsed via prefix (rare) e.g., "clientid"
+                clientId = principal.Claims.FirstOrDefault(c => c.Type.Contains("client", StringComparison.OrdinalIgnoreCase) && c.Value.Length > 0)?.Value;
+            }
+        }
 
         string actorType = userId != null ? "user" : clientId != null ? "client" : "system";
 
@@ -36,7 +48,7 @@ public sealed class CorrelationMiddleware
             ActorClientId = clientId,
             ActorType = actorType
         };
-        CorrelationContextAccessor.Set(corrCtx);
+        _accessor.Set(corrCtx);
 
         // If response body is seekable, write actor type for tests when not already committed
         if (!context.Response.HasStarted && context.Response.Body.CanSeek)
