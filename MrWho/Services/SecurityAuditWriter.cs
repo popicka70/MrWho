@@ -11,11 +11,13 @@ public sealed class SecurityAuditWriter : ISecurityAuditWriter
 {
     private readonly ApplicationDbContext _db;
     private readonly ILogger<SecurityAuditWriter> _logger;
+    private readonly IAuditIntegrityWriter _integrityWriter; // NEW
 
-    public SecurityAuditWriter(ApplicationDbContext db, ILogger<SecurityAuditWriter> logger)
+    public SecurityAuditWriter(ApplicationDbContext db, ILogger<SecurityAuditWriter> logger, IAuditIntegrityWriter integrityWriter)
     {
         _db = db;
         _logger = logger;
+        _integrityWriter = integrityWriter;
     }
 
     public async Task<SecurityAuditEvent> WriteAsync(string category, string eventType, object? data = null,
@@ -70,6 +72,29 @@ public sealed class SecurityAuditWriter : ISecurityAuditWriter
         _db.SecurityAuditEvents.Add(entry);
         await _db.SaveChangesAsync(ct);
         _logger.LogDebug("Audit event persisted: {Category}/{Type} id={Id}", category, eventType, entry.Id);
+
+        // ALSO write integrity chain record (maps event -> action)
+        try
+        {
+            var actorType = actorUserId != null ? "user" : actorClientId != null ? "client" : "system";
+            await _integrityWriter.WriteAsync(new AuditIntegrityWriteRequest(
+                Category: category,
+                Action: eventType,
+                ActorType: actorType,
+                ActorId: actorUserId ?? actorClientId,
+                SubjectType: null,
+                SubjectId: null,
+                RealmId: null,
+                CorrelationId: null, // will populate when correlation middleware (Item 2) exists
+                Data: data,
+                Version: 1
+            ), ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to append audit integrity record for {Category}/{Type}", category, eventType);
+        }
+
         return entry;
     }
 

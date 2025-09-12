@@ -135,6 +135,8 @@ public static class ServiceCollectionExtensions
         // register security audit writer
         services.AddScoped<ISecurityAuditWriter, SecurityAuditWriter>();
         services.AddScoped<IAuditQueryService, AuditQueryService>();
+        services.AddScoped<IAuditIntegrityWriter, AuditIntegrityWriter>();
+        services.AddScoped<IAuditIntegrityVerificationService, AuditIntegrityVerificationService>();
 
         services.AddOptions<AuditRetentionOptions>().BindConfiguration(AuditRetentionOptions.SectionName).ValidateDataAnnotations();
 

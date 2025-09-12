@@ -96,6 +96,9 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
     // NEW: Pushed Authorization Requests (PAR)
     public DbSet<PushedAuthorizationRequest> PushedAuthorizationRequests => Set<PushedAuthorizationRequest>();
 
+    // NEW: Audit integrity records (for tamper-proofing audit logs)
+    public DbSet<AuditIntegrityRecord> AuditIntegrityRecords { get; set; } = null!;
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
@@ -523,6 +526,15 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
             b.HasKey(e => e.Id);
             b.HasIndex(e => new { e.TimestampUtc, e.Category });
             b.Property(e => e.DataJson).HasColumnType("text");
+        });
+
+        // Configure AuditIntegrityRecord entity
+        builder.Entity<AuditIntegrityRecord>(b =>
+        {
+            b.HasKey(a => a.Id);
+            b.HasIndex(a => a.TimestampUtc);
+            b.HasIndex(a => a.Category);
+            b.Property(a => a.DataJson).HasColumnType("text");
         });
 
         // Configure PushedAuthorizationRequest entity (PAR)
