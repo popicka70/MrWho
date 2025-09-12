@@ -44,6 +44,11 @@ public sealed class LogoutGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Logo
         var clientId = request.ClientId;
         var postUri = request.PostLogoutRedirectUri;
 
+        var audit = http.RequestServices.GetService<ISecurityAuditWriter>();
+        var sid = http.User?.FindFirst("sid")?.Value; // capture before sign-out
+        var issuer = (http.Request.Scheme + "://" + http.Request.Host).TrimEnd('/');
+        try { if (audit != null) await audit.WriteAsync("logout", "logout.initiated", new { clientId, postUri, sid }, "info", actorClientId: clientId, ip: http.Connection.RemoteIpAddress?.ToString()); } catch { }
+
         _logger.LogInformation("GET /connect/logout accessed directly. ClientId: {ClientId}, PostLogoutUri: {PostLogoutUri}", clientId, postUri);
         bool isOidcLogoutRequest = _logoutHelper.IsOidcLogoutRequest(http);
         if (isOidcLogoutRequest)
@@ -120,6 +125,43 @@ public sealed class LogoutGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Logo
             if (!string.IsNullOrWhiteSpace(clientName)) vd["ClientName"] = clientName;
         }
         catch { }
+
+        // after themed LoggedOut page ViewData assembled but before return, enumerate front-channel logout iframes
+        try
+        {
+            // Only emit if user principal had sid and we have any clients with FrontChannelLogoutUri
+            if (!string.IsNullOrEmpty(sid))
+            {
+                var iframeUrls = await _db.Clients.AsNoTracking()
+                    .Where(c => c.IsEnabled && c.FrontChannelLogoutUri != null && c.FrontChannelLogoutUri != "")
+                    .Select(c => new { c.ClientId, c.FrontChannelLogoutUri })
+                    .ToListAsync(cancellationToken);
+                var list = new List<string>();
+                foreach (var c in iframeUrls)
+                {
+                    // Build query: iss & sid & client_id
+                    try
+                    {
+                        var sep = c.FrontChannelLogoutUri!.Contains('?') ? '&' : '?';
+                        var url = $"{c.FrontChannelLogoutUri}{sep}iss={Uri.EscapeDataString(issuer)}&sid={Uri.EscapeDataString(sid)}&client_id={Uri.EscapeDataString(c.ClientId)}";
+                        list.Add(url);
+                        try { if (audit != null) await audit.WriteAsync("logout", "logout.frontchannel.dispatch", new { c.ClientId, url }, "info", actorClientId: c.ClientId, ip: http.Connection.RemoteIpAddress?.ToString()); } catch { }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogDebug(ex, "Failed to build front-channel logout iframe for client {ClientId}", c.ClientId);
+                    }
+                }
+                if (list.Count > 0)
+                {
+                    http.Items["FrontChannelLogoutIframes"] = list;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Error enumerating front-channel logout iframes");
+        }
 
         return new ViewResult { ViewName = "LoggedOut", ViewData = vd };
     }

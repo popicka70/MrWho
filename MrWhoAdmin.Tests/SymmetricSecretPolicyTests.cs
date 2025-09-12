@@ -19,7 +19,7 @@ public class SymmetricSecretPolicyTests
         return new string('A', bytes);
     }
 
-    [DataTestMethod]
+    [TestMethod]
     [DataRow("HS256", 31, false)]
     [DataRow("HS256", 32, true)]
     [DataRow("HS384", 47, false)]
