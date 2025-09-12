@@ -90,7 +90,8 @@ public static class ServiceCollectionExtensions
         // Register back-channel logout service
         services.AddScoped<IBackChannelLogoutService, BackChannelLogoutService>();
         services.AddHttpClient(); // Required for back-channel logout HTTP calls
-
+        services.AddSingleton<IBackChannelLogoutRetryScheduler, BackChannelLogoutRetryScheduler>();
+        services.AddHostedService(sp => (BackChannelLogoutRetryScheduler)sp.GetRequiredService<IBackChannelLogoutRetryScheduler>());
         // ============================================================================
         // DEVICE MANAGEMENT SERVICES
         // ============================================================================
