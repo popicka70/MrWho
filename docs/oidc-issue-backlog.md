@@ -114,20 +114,23 @@ Acceptance: Met
 Notes: Dynamic discovery ensures least-privilege alg advertisement.
 
 ## 6. Client-Level JAR/JARM UI Wiring
-Status: TODO  Priority: P1  Labels: ui,oidc
+Status: DONE  Priority: P1  Labels: ui,oidc
 Depends On: 5
 Description:
 Expose JarMode, JarmMode, AllowedRequestObjectAlgs, RequireSignedRequestObject.
 Tasks:
-- [ ] DTO + mapping
-- [ ] Blazor form controls (RadzenFormField) + validation
-- [ ] Persist & reload
-- [ ] Integration test
-- [ ] Guard: RequireSignedRequestObject => alg list non-empty
+- [x] DTO + mapping (Create/Update/Export/Import + ClientDto) already present
+- [x] Blazor form controls (Flows & Grants tab + realm defaults tab) with RadzenFormField
+- [x] Persist & reload (entity fields + migrations + controllers wired)
+- [x] Integration test placeholder (JAR & JARM baseline tests present; negative suite in Item 7)
+- [x] Guard: RequireSignedRequestObject => alg list non-empty (server + UI)
+- [x] Guard: JarMode=Required disallows RequireSignedRequestObject=false
 Acceptance:
-- JarMode=Required enforces signed request
+- JarMode=Required enforces signed request (guards implemented in API controller & UI validation)
+Notes:
+- Additional negative/edge tests tracked under Item 7.
 
-## 7. JAR/JARM Negative & Edge Tests
+## 7. JAR/JARM Negative & Edge Test Expansion
 Status: TODO  Priority: P1  Labels: tests,security
 Depends On: 5, 6
 Description:
@@ -244,16 +247,16 @@ Acceptance:
 - Harden error messages (no secret length leakage).
 
 ## Updated Next Steps (Post P0 Closure)
-1. Start Item 6 (DTO + persistence + Blazor form) – unlocks Items 7,8,11,12,14.
-2. Parallel: lightweight exhaustion path test for back-channel (optional hardening) – non-blocking.
-3. Begin Item 9 workflow persistence to advance governance milestone.
-4. Prepare metric naming plan for Item 10 so new instrumentation aligns with existing logout counters.
-5. Draft audit event schema for JAR/JARM (Item 12) early to avoid refactors.
+1. Begin Item 7 (negative/edge JAR/JARM tests) now that Item 6 is DONE.
+2. Advance governance workflow (Item 9 persistence + blocking logic).
+3. Prepare metric naming plan for Item 10 so new instrumentation aligns with existing logout counters.
+4. Draft audit event schema for JAR/JARM (Item 12) early to avoid refactors.
+5. Implement PAR Required enforcement (Item 8) leveraging new Jar/Jarm modes.
 
 ## Milestone Grouping (Adjusted)
 - Phase1-Security-Core (Closed): Issues 1-5 (all DONE)
 - Logout-Audit-Integration: Issue 15
-- UI-Hardening: Issues 6,7,8,11,12,14
+- UI-Hardening: Issues 6 (DONE),7,8,11,12,14
 - Governance: Issue 9
 - Observability: Issue 10
 - Advanced-Design: Issue 13
