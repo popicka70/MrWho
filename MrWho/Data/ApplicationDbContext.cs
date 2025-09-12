@@ -702,6 +702,8 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
             .Where(e => e.State == EntityState.Added || e.State == EntityState.Modified || e.State == EntityState.Deleted)
             .ToList();
 
+        ValidateFrontChannelLogoutUris(entries);
+
         foreach (var entry in entries)
         {
             // Set CreatedAt/UpdatedAt/CreatedBy/UpdatedBy if present on the entity
@@ -810,5 +812,32 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
         if (key == null) return string.Empty;
         var values = key.Properties.Select(p => entry.CurrentValues[p] ?? entry.OriginalValues[p]).ToArray();
         return string.Join("|", values.Select(v => v?.ToString()));
+    }
+
+    private void ValidateFrontChannelLogoutUris(List<Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry> entries)
+    {
+        var env = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "";
+        var relax = env.Equals("Development", StringComparison.OrdinalIgnoreCase) || env.Equals("Testing", StringComparison.OrdinalIgnoreCase);
+        foreach (var e in entries)
+        {
+            if (e.Entity is Client && (e.State == EntityState.Added || e.State == EntityState.Modified))
+            {
+                var uriObj = e.CurrentValues[nameof(Client.FrontChannelLogoutUri)];
+                if (uriObj is string s && !string.IsNullOrWhiteSpace(s))
+                {
+                    if (Uri.TryCreate(s, UriKind.Absolute, out var uri))
+                    {
+                        if (!relax && uri.Scheme != Uri.UriSchemeHttps)
+                        {
+                            throw new InvalidOperationException($"FrontChannelLogoutUri must use HTTPS in {env} environment.");
+                        }
+                    }
+                    else
+                    {
+                        throw new InvalidOperationException("FrontChannelLogoutUri must be an absolute URI.");
+                    }
+                }
+            }
+        }
     }
 }

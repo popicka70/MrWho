@@ -170,6 +170,11 @@ public sealed class LogoutGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Logo
     {
         var request = http.GetOpenIddictServerRequest();
         string? detectedClientId = clientId ?? await _logoutHelper.TryGetClientIdFromRequestAsync(http);
+        var audit = http.RequestServices.GetService<ISecurityAuditWriter>();
+        var sid = http.User?.FindFirst("sid")?.Value; // capture before sign-out
+        var issuer = (http.Request.Scheme + "://" + http.Request.Host).TrimEnd('/');
+        try { if (audit != null) await audit.WriteAsync("logout", "logout.initiated", new { clientId = detectedClientId, postLogoutUri, sid, oidc = true }, "info", actorClientId: detectedClientId, ip: http.Connection.RemoteIpAddress?.ToString()); } catch { }
+
         _logger.LogDebug("Processing OIDC logout. Method: {Method}, ClientId parameter: {ClientId}, Detected ClientId: {DetectedClientId}, Post logout URI: {PostLogoutUri}", http.Request.Method, clientId, detectedClientId, postLogoutUri ?? request?.PostLogoutRedirectUri);
 
         if (_logoutHelper.UseGlobalLogout(http))
@@ -182,8 +187,42 @@ public sealed class LogoutGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Logo
             await _logoutHelper.SignOutClientOnlyAsync(http, detectedClientId);
         }
 
+        // Enumerate front-channel logout iframes across all enabled clients having FrontChannelLogoutUri
+        try
+        {
+            if (!string.IsNullOrEmpty(sid))
+            {
+                var iframes = await _db.Clients.AsNoTracking()
+                    .Where(c => c.IsEnabled && c.FrontChannelLogoutUri != null && c.FrontChannelLogoutUri != "")
+                    .Select(c => new { c.ClientId, c.FrontChannelLogoutUri })
+                    .ToListAsync(ct);
+                var list = new List<string>();
+                foreach (var c in iframes)
+                {
+                    try
+                    {
+                        var sep = c.FrontChannelLogoutUri!.Contains('?') ? '&' : '?';
+                        var url = $"{c.FrontChannelLogoutUri}{sep}iss={Uri.EscapeDataString(issuer)}&sid={Uri.EscapeDataString(sid)}&client_id={Uri.EscapeDataString(c.ClientId)}";
+                        list.Add(url);
+                        try { if (audit != null) await audit.WriteAsync("logout", "logout.frontchannel.dispatch", new { c.ClientId, url, oidc = true }, "info", actorClientId: c.ClientId, ip: http.Connection.RemoteIpAddress?.ToString()); } catch { }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogDebug(ex, "Failed to build OIDC front-channel logout iframe for client {ClientId}", c.ClientId);
+                    }
+                }
+                if (list.Count > 0)
+                {
+                    http.Items["FrontChannelLogoutIframes"] = list; // downstream page/view can render hidden iframes
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Error enumerating OIDC front-channel logout iframes");
+        }
+
         // Delegate end-session redirect/sign-out to OpenIddict
-        // Clear the default Identity cookie
         _logoutHelper.DeleteCookieAcrossDomains(http, ".AspNetCore.Identity.Application");
         return new SignOutResult(new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
     }
