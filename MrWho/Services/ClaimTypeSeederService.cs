@@ -53,10 +53,10 @@ public class ClaimTypeSeederService : IClaimTypeSeederService
         // 2. Import distinct claim types referenced by identity resource claims, scope claims, api resource claims, user claims
         var referenced = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        referenced.UnionWith(await _context.IdentityResourceClaims.Select(c => c.ClaimType).Distinct().ToListAsync());
-        referenced.UnionWith(await _context.ScopeClaims.Select(c => c.ClaimType).Distinct().ToListAsync());
-        referenced.UnionWith(await _context.ApiResourceClaims.Select(c => c.ClaimType).Distinct().ToListAsync());
-        referenced.UnionWith(await _context.UserClaims.Select(c => c.ClaimType).Distinct().ToListAsync());
+        referenced.UnionWith((await _context.IdentityResourceClaims.Select(c => c.ClaimType).Distinct().ToListAsync()).Where(s => !string.IsNullOrWhiteSpace(s))!);
+        referenced.UnionWith((await _context.ScopeClaims.Select(c => c.ClaimType).Distinct().ToListAsync()).Where(s => !string.IsNullOrWhiteSpace(s))!);
+        referenced.UnionWith((await _context.ApiResourceClaims.Select(c => c.ClaimType).Distinct().ToListAsync()).Where(s => !string.IsNullOrWhiteSpace(s))!);
+        referenced.UnionWith((await _context.UserClaims.Select(c => c.ClaimType).Distinct().ToListAsync()).Where(s => !string.IsNullOrWhiteSpace(s))!);
 
         foreach (var type in referenced)
         {

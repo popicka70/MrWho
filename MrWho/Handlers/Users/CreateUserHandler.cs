@@ -25,8 +25,8 @@ public class CreateUserHandler : ICreateUserHandler
         {
             var user = new IdentityUser
             {
-                UserName = request.UserName,
-                Email = request.Email,
+                UserName = request.UserName ?? request.Email ?? Guid.NewGuid().ToString("n"),
+                Email = request.Email ?? request.UserName ?? string.Empty,
                 PhoneNumber = request.PhoneNumber,
                 EmailConfirmed = request.EmailConfirmed,
                 PhoneNumberConfirmed = request.PhoneNumberConfirmed,

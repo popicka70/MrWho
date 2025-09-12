@@ -25,7 +25,6 @@ using Microsoft.AspNetCore.RateLimiting; // added for RequireRateLimiting
 using OpenIddict.Client.AspNetCore;
 using OpenIddict.Client; // added for OpenIddictClientOptions/Registration
 using MrWho.Shared.Authentication; // for CookieSchemeNaming
-using MrWho.Middleware;
 
 namespace MrWho.Extensions;
 

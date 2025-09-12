@@ -105,9 +105,9 @@ public sealed class ConsentPostHandler : IRequestHandler<ConsentPostRequest, IAc
         {
             var uri = new Uri(returnUrl);
             var q = QueryHelpers.ParseQuery(uri.Query);
-            var dict = q.ToDictionary(k => k.Key, v => v.Value.ToString());
+            var dict = q.ToDictionary(k => k.Key, v => v.Value.ToString() ?? string.Empty);
             dict["mrwho_consent"] = "ok";
-            var newQuery = QueryString.Create(dict);
+            var newQuery = QueryString.Create(dict.Select(kvp => new KeyValuePair<string, string?>(kvp.Key, kvp.Value)));
             var ub = new UriBuilder(uri) { Query = newQuery.ToUriComponent().TrimStart('?') };
             returnUrl = ub.Uri.ToString();
         }

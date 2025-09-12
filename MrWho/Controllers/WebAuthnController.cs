@@ -161,12 +161,16 @@ public class WebAuthnController : Controller
         string? fmt = null;
         try
         {
-            aaGuid = (res?.Result?.Aaguid is Guid g) ? g.ToString() : res?.Result?.Aaguid?.ToString();
-        }
-        catch { }
-        try
-        {
-            fmt = res?.Result?.Fmt?.ToString();
+            var resResult = res?.Result;
+            if (resResult != null)
+            {
+                try
+                {
+                    aaGuid = (resResult.Aaguid is Guid g) ? g.ToString() : resResult.Aaguid?.ToString();
+                }
+                catch { }
+                try { fmt = resResult.Fmt?.ToString(); } catch { }
+            }
         }
         catch { }
 
