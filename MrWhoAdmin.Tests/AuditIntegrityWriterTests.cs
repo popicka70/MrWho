@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using MrWho.Data;
 using MrWho.Services;
 using MrWho.Models;
+using Microsoft.AspNetCore.Http;
 
 namespace MrWhoAdmin.Tests;
 
@@ -13,8 +14,10 @@ public class AuditIntegrityWriterTests
     {
         var sc = new ServiceCollection();
         sc.AddLogging();
+        sc.AddHttpContextAccessor(); // required for CorrelationContextAccessor
         sc.AddDbContext<ApplicationDbContext>(o => o.UseInMemoryDatabase(Guid.NewGuid().ToString()));
         sc.AddSingleton<ICorrelationContextAccessor, CorrelationContextAccessor>(); // required by writer
+        sc.AddScoped<IIntegrityHashService, IntegrityHashService>(); // hash service
         sc.AddScoped<IAuditIntegrityWriter, AuditIntegrityWriter>();
         sc.AddScoped<IAuditIntegrityVerificationService, AuditIntegrityVerificationService>();
         return sc.BuildServiceProvider();
@@ -24,6 +27,8 @@ public class AuditIntegrityWriterTests
     public async Task Writes_Chain_With_No_Breaks()
     {
         var sp = BuildServices();
+        // seed HttpContext for accessor
+        sp.GetRequiredService<IHttpContextAccessor>().HttpContext = new DefaultHttpContext();
         var writer = sp.GetRequiredService<IAuditIntegrityWriter>();
         var verifier = sp.GetRequiredService<IAuditIntegrityVerificationService>();
         for (int i = 0; i < 3; i++)
@@ -39,6 +44,7 @@ public class AuditIntegrityWriterTests
     public async Task Detects_Tampering()
     {
         var sp = BuildServices();
+        sp.GetRequiredService<IHttpContextAccessor>().HttpContext = new DefaultHttpContext();
         var writer = sp.GetRequiredService<IAuditIntegrityWriter>();
         var verifier = sp.GetRequiredService<IAuditIntegrityVerificationService>();
         var db = sp.GetRequiredService<ApplicationDbContext>();
