@@ -22,8 +22,6 @@ using Microsoft.AspNetCore.Hosting;
 using MrWho.Handlers.Auth;
 using MrWho.Services.Mediator; // add mediator interfaces
 using Microsoft.AspNetCore.Mvc; // for IActionResult
-using MrWho.Services; // ensure JarJarm types
-using MrWho.Services;
 using MrWho.Services.Background; // contains JarOptions, IJarReplayCache, JarJarmServerEventHandlers
 
 namespace MrWho.Extensions;

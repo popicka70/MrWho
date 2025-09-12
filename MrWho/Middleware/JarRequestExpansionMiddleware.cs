@@ -146,9 +146,10 @@ public class JarRequestExpansionMiddleware
                     return;
                 }
 
-                // Validate lifetime
+                // Validate lifetime (use Expiration instead of obsolete Exp)
                 var now = DateTimeOffset.UtcNow;
-                var exp = token.Payload.Exp.HasValue ? DateTimeOffset.FromUnixTimeSeconds(token.Payload.Exp.Value) : (DateTimeOffset?)null;
+                var expSeconds = token.Payload.Expiration; // long? per new API
+                var exp = expSeconds.HasValue ? DateTimeOffset.FromUnixTimeSeconds(expSeconds.Value) : (DateTimeOffset?)null;
                 if (exp is null || exp < now || exp > now.Add(jarOptions.Value.MaxExp))
                 {
                     await WriteErrorAsync(context, OpenIddictConstants.Errors.InvalidRequestObject, "exp invalid");
@@ -227,24 +228,15 @@ public class JarRequestExpansionMiddleware
 
                 try
                 {
-                    if (isSymmetric)
+                    var jsonHandler = new JsonWebTokenHandler();
+                    var result = await jsonHandler.ValidateTokenAsync(jarJwt, tvp);
+                    if (result.IsValid)
                     {
-                        // Prefer JsonWebTokenHandler for modern validation & clearer diagnostics
-                        var jsonHandler = new JsonWebTokenHandler();
-                        var result = jsonHandler.ValidateToken(jarJwt, tvp);
-                        if (result.IsValid)
-                        {
-                            validated = true;
-                        }
-                        else
-                        {
-                            throw result.Exception ?? new SecurityTokenInvalidSignatureException("HS validation failed");
-                        }
+                        validated = true;
                     }
                     else
                     {
-                        jwtHandler.ValidateToken(jarJwt, tvp, out _);
-                        validated = true;
+                        throw result.Exception ?? new SecurityTokenInvalidSignatureException("validation failed");
                     }
                 }
                 catch (Exception ex)
@@ -264,8 +256,8 @@ public class JarRequestExpansionMiddleware
                                 fbBytes = pad;
                             }
                             tvp.IssuerSigningKey = new SymmetricSecurityKey(fbBytes) { KeyId = $"client:{effectiveClientId}:hs:fallback" };
-                            var jsonHandler = new JsonWebTokenHandler();
-                            var fbResult = jsonHandler.ValidateToken(jarJwt, tvp);
+                            var fbHandler = new JsonWebTokenHandler();
+                            var fbResult = await fbHandler.ValidateTokenAsync(jarJwt, tvp);
                             if (fbResult.IsValid)
                             {
                                 validated = true;

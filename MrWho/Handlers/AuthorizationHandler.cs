@@ -17,6 +17,7 @@ using System.IdentityModel.Tokens.Jwt;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.JsonWebTokens; // modern validation
 
 namespace MrWho.Handlers;
 
@@ -571,22 +572,27 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
             };
             if (alg.StartsWith("HS", StringComparison.OrdinalIgnoreCase))
             {
-                if (string.IsNullOrWhiteSpace(dbClient.ClientSecret) || dbClient.ClientSecret.Length < 32)
+                if (string.IsNullOrWhiteSpace(dbClient.ClientSecret) || Encoding.UTF8.GetByteCount(dbClient.ClientSecret) < 32)
                     return new { error = OpenIddictConstants.Errors.InvalidRequestObject, error_description = "client secret insufficient for HS signature" };
-                var keyBytes = Encoding.UTF8.GetBytes(dbClient.ClientSecret);
-                parameters.IssuerSigningKey = new SymmetricSecurityKey(keyBytes);
+                parameters.IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(dbClient.ClientSecret));
             }
             else if (alg.StartsWith("RS", StringComparison.OrdinalIgnoreCase))
             {
                 var (signing, _) = await _keyService.GetActiveKeysAsync();
-                parameters.IssuerSigningKeys = signing; // public validated
+                parameters.IssuerSigningKeys = signing;
             }
             else
             {
                 // Defer other algs to later phases
                 return new { error = OpenIddictConstants.Errors.InvalidRequestObject, error_description = "alg not supported" };
             }
-            handler.ValidateToken(requestJwt, parameters, out _);
+            var jsonHandler = new JsonWebTokenHandler();
+            var validateResult = await jsonHandler.ValidateTokenAsync(requestJwt, parameters);
+            if (!validateResult.IsValid)
+            {
+                _logger.LogInformation(validateResult.Exception, "Signature validation failed for JAR {ClientId}", dbClient.ClientId);
+                return new { error = OpenIddictConstants.Errors.InvalidRequestObject, error_description = "signature invalid" };
+            }
         }
         catch (Exception ex)
         {
@@ -595,15 +601,22 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         }
 
         var now = DateTimeOffset.UtcNow;
-        var exp = token.Payload.Exp.HasValue ? DateTimeOffset.FromUnixTimeSeconds(token.Payload.Exp.Value) : (DateTimeOffset?)null;
+        // exp claim (avoid obsolete Exp property)
+        DateTimeOffset? exp = null;
+        if (token.Payload.TryGetValue("exp", out var expObj) && long.TryParse(expObj.ToString(), out var expSec))
+        {
+            try { exp = DateTimeOffset.FromUnixTimeSeconds(expSec); } catch { exp = null; }
+        }
         if (exp is null || exp < now || exp > now.Add(opts.MaxExp))
             return new { error = OpenIddictConstants.Errors.InvalidRequestObject, error_description = "exp invalid" };
-        if (token.Payload.Iat.HasValue)
+
+        if (token.Payload.TryGetValue("iat", out var iatObj) && long.TryParse(iatObj.ToString(), out var iatSec))
         {
-            var iat = DateTimeOffset.FromUnixTimeSeconds(token.Payload.Iat.Value);
+            var iat = DateTimeOffset.FromUnixTimeSeconds(iatSec);
             if (iat < now.Add(-opts.MaxExp) || iat > now.Add(opts.ClockSkew))
                 return new { error = OpenIddictConstants.Errors.InvalidRequestObject, error_description = "iat invalid" };
         }
+
         // JTI replay protection
         if (opts.RequireJti)
         {
