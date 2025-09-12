@@ -1,6 +1,6 @@
 # OIDC Platform Implementation Backlog
 
-Generated: 2025-09-12 (updated after Items 1 & 2 completion + Item 5 partial)
+Generated: 2025-09-12 (updated after Items 1,2 & 3 completion + Item 5 near-complete)
 Source: Enterprise Roadmap (Phase 1 & 1.5)
 
 Legend:
@@ -62,19 +62,21 @@ Tasks:
 Acceptance: Met
 
 ## 3. Front-Channel Logout Implementation
-Status: TODO  Priority: P0  Labels: oidc,logout,security
+Status: DONE  Priority: P0  Labels: oidc,logout,security,audit,tests
 Depends On: 1
 Description:
-Implement OIDC front-channel logout (iframe/script).
+OIDC front-channel logout (iframe) enumeration with audit + tests.
 Tasks:
-- [ ] Client metadata field + migration (FrontChannelLogoutUri)
-- [ ] UI field (client edit) + validation (HTTPS required outside dev)
-- [ ] EndSession page emits hidden iframes for each participating client (same user session)
-- [ ] Include sid + iss (+ optional client_id) query params
-- [ ] Audit events (logout.initiated, logout.frontchannel.dispatch)
-- [ ] Tests (bUnit / integration) verifying iframe generation
-Acceptance:
-- Multiple clients => multiple iframes; missing URL skipped
+- [x] Client metadata field + migration (FrontChannelLogoutUri)
+- [x] UI field (client edit) + validation (HTTPS required outside dev)
+- [x] EndSession/LoggedOut page emits hidden iframes for each participating client (same user session)
+- [x] Include sid + iss + client_id query params
+- [x] Audit events (logout.initiated, logout.frontchannel.dispatch)
+- [x] Tests verifying iframe generation (direct + OIDC end-session path)
+Acceptance: Met
+Notes:
+- Session-safe access guards added (no session configured scenario).
+- sid issued during dynamic client sign-in when absent.
 
 ## 4. Back-Channel Logout Dispatch Completion
 Status: TODO  Priority: P0  Labels: oidc,logout,security,reliability
@@ -91,7 +93,7 @@ Acceptance:
 - Failure after max retries audited; signature validated in tests
 
 ## 5. Symmetric Secret Policy Enforcement (HS*)
-Status: IN PROGRESS  Priority: P0  Labels: security,cryptography
+Status: DONE  Priority: P0  Labels: security,cryptography
 Depends On: 2
 Description:
 Minimum lengths: HS256>=32B, HS384>=48B, HS512>=64B for client secrets & request object signing.
@@ -99,19 +101,14 @@ Tasks:
 - [x] Config object + defaults (`SymmetricSecretPolicyOptions`)
 - [x] Validation service (ISymmetricSecretPolicy + implementation)
 - [x] Client create/update enforcement (API returns validation problem)
-- [x] JAR validation integration (middleware rejects below-policy secret; no padding fallback)
+- [x] JAR validation integration (middleware rejects below-policy secret; redaction marker skip path)
 - [x] UI warnings + pre-save blocking (Blazor client edit validation)
 - [x] Discovery filter (dynamic removal of HS* when not required by any JAR-capable client)
-- [ ] Tests: boundary lengths (31/32, 47/48, 63/64) & downgrade attempt (remove HS512 after shortening secret)
-- [ ] Discovery omission test (no HS* when no clients imply or list them)
-- [ ] Documentation snippet (admin guide) explaining secret rotation for HS upgrades
-Remaining Acceptance:
-- HS512 with 48B rejected (needs automated test)
-- Discovery omits HS512 when no compliant clients (needs test)
-Planned Next Slice:
-1. Add unit/integration tests for boundary + downgrade.
-2. Test discovery dynamic list (create client with HS512 then remove; verify omission).
-3. Add short admin docs note.
+- [x] Tests: boundary lengths (31/32, 47/48, 63/64) & downgrade attempt
+- [x] Discovery omission test (no HS384/HS512 when no clients imply them)
+- [x] Documentation snippet (admin guide) explaining secret rotation & required lengths (`docs/admin-symmetric-secret-policy.md`)
+Acceptance: Met
+Notes: Dynamic discovery ensures least-privilege alg advertisement.
 
 ## 6. Client-Level JAR/JARM UI Wiring
 Status: TODO  Priority: P1  Labels: ui,oidc
@@ -253,20 +250,27 @@ Milestone: Advanced-Design -> Issues 13-14
 - Link dependencies
 
 ---
-## Next Step Proposal (Post Item 5 Partial Progress)
+## Updated Next Step Proposal (Post Item 5 Completion)
 Immediate execution order:
-1. Finish Item 5 remaining tests + docs (move to DONE quickly).
-2. Start Item 3 (Front-Channel Logout) – add migration + UI + basic iframe render; then audit events.
-3. Begin groundwork for Item 6 data mapping (DTO prep) in parallel if capacity while Item 3 migration reviewed.
+1. Implement Item 4 core: logout token builder + per-client dispatch skeleton + audit (success/failure) without retries first.
+2. Add retry/backoff & outcome aggregation + tests for Item 4.
+3. Begin DTO + minimal UI scaffolding for Item 6 (Jar/Jarm fields) in parallel once Item 4 core merged.
 
-Short-Term Deliverables (Revised):
-- T1: Symmetric policy test suite (boundary + downgrade) + discovery omission test.
-- T2: FrontChannelLogout initial migration + client edit field + server validation.
-- T3: EndSession iframe emission + minimal audit (logout.initiated, logout.frontchannel.dispatch) + tests.
+Short-Term Deliverables:
+- D1: Back-channel logout token builder & dispatch (single attempt) + audit events + unit tests.
+- D2: Retry policy (1m,5m,15m) + max attempts + failure audit + metrics hook placeholder.
+- D3: Client DTO/JAR-JARM form controls + mapping (no enforcement yet) to unblock Items 7,8,11,12.
 
 Rationale:
-- Completing Item 5 solidifies cryptographic guarantees before broader JAR/JARM edge tests.
-- Logout metadata early avoids later breaking schema changes.
-- Parallel DTO prep for Item 6 shortens lead time for UI feature cluster.
+- Back-channel infrastructure unlocks unified logout audit integration (Item 15).
+- Early UI wiring for JAR/JARM shortens feedback loop for policy/algo changes.
+- Staged retries decouple correctness from reliability complexity.
 
-End of backlog.
+---
+## Creation Checklist (When Opening GitHub Issues)
+- Title = heading
+- Body = section (Description, Tasks, Acceptance, Depends On)
+- Apply labels
+- Link dependencies
+
+---
