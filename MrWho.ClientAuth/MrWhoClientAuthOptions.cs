@@ -96,6 +96,12 @@ public sealed class MrWhoClientAuthOptions
     /// </summary>
     public Action<OpenIdConnectOptions>? ConfigureOpenIdConnect { get; set; }
 
+    /// <summary>
+    /// Enables automatic PAR push (and fallback) during OnRedirectToIdentityProvider when an IPushedAuthorizationService is registered.
+    /// Default: true.
+    /// </summary>
+    public bool AutoParPush { get; set; } = true;
+
     internal string ResolveMetadataAddress()
     {
         if (!string.IsNullOrWhiteSpace(MetadataAddress))

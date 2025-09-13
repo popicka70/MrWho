@@ -40,6 +40,12 @@ internal sealed class PushedAuthorizationService : IPushedAuthorizationService
             request.RequestObjectJwt = await _jarSigner.CreateRequestObjectAsync(jarReq, ct);
         }
 
+        string? secretForBasic = null;
+        if (request.Extra.TryGetValue("client_secret_for_par_auth", out var tmpSecret) && !string.IsNullOrWhiteSpace(tmpSecret))
+        {
+            secretForBasic = tmpSecret;
+        }
+
         var form = new List<KeyValuePair<string?, string?>>
         {
             new("client_id", request.ClientId),
@@ -56,13 +62,27 @@ internal sealed class PushedAuthorizationService : IPushedAuthorizationService
         if (!string.IsNullOrWhiteSpace(request.RequestObjectJwt)) form.Add(new("request", request.RequestObjectJwt));
         foreach (var kv in request.Extra)
         {
-            if (string.Equals(kv.Key, "client_secret", StringComparison.OrdinalIgnoreCase)) continue; // never send secret here
+            if (kv.Key == "client_secret_for_par_auth") continue; // handled via basic auth header
             form.Add(new(kv.Key, kv.Value));
         }
+        // Optional inline secret (if caller prefers body instead of Basic)
+        if (secretForBasic == null && request.Extra.TryGetValue("client_secret", out var inlineSecret) && !string.IsNullOrWhiteSpace(inlineSecret))
+        {
+            form.Add(new("client_secret", inlineSecret));
+        }
 
-        using var content = new FormUrlEncodedContent(form!);
+        var httpRequest = new HttpRequestMessage(HttpMethod.Post, _options.ParEndpoint)
+        {
+            Content = new FormUrlEncodedContent(form)
+        };
+        if (secretForBasic != null)
+        {
+            var raw = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{request.ClientId}:{secretForBasic}"));
+            httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Basic", raw);
+        }
+
         HttpResponseMessage resp;
-        try { resp = await _http.PostAsync(_options.ParEndpoint, content, ct); }
+        try { resp = await _http.SendAsync(httpRequest, ct); }
         catch (Exception ex)
         {
             return (null, new ParError { Error = "network_error", ErrorDescription = ex.Message, StatusCode = 0 });
@@ -105,7 +125,6 @@ internal sealed class PushedAuthorizationService : IPushedAuthorizationService
     public async Task<Uri> BuildAuthorizeUrlAsync(AuthorizationRequest request, CancellationToken ct = default)
     {
         var authorizeEndpoint = _options.AuthorizeEndpoint ?? new Uri(_options.ParEndpoint.GetLeftPart(UriPartial.Authority) + "/connect/authorize");
-
         if (request.Extra.TryGetValue("request_uri", out var existing))
         {
             var qb = HttpUtility.ParseQueryString(string.Empty);
@@ -113,19 +132,13 @@ internal sealed class PushedAuthorizationService : IPushedAuthorizationService
             qb["request_uri"] = existing;
             return new Uri(authorizeEndpoint + "?" + qb.ToString());
         }
-
-        // same conditions as earlier
         var directQuery = BuildDirectQuery(request);
         bool mustPush = _options.AutoPushQueryLengthThreshold > 0 && directQuery.Length > _options.AutoPushQueryLengthThreshold;
         if (request.Extra.TryGetValue("use_par", out var flag) && (flag == "1" || flag.Equals("true", StringComparison.OrdinalIgnoreCase))) mustPush = true;
-
         if (!mustPush && _options.AutoJar && _jarSigner != null && string.IsNullOrEmpty(request.RequestObjectJwt))
         {
-            // If JAR is enabled we prefer pushing (to hide query params) but only if auto flag present
-            if (request.Extra.TryGetValue("auto_jar", out var v) && (v == "1" || v.Equals("true", StringComparison.OrdinalIgnoreCase)))
-                mustPush = true;
+            if (request.Extra.TryGetValue("auto_jar", out var v) && (v == "1" || v.Equals("true", StringComparison.OrdinalIgnoreCase))) mustPush = true;
         }
-
         if (mustPush)
         {
             var (result, error) = await PushAsync(request, ct);
@@ -142,8 +155,6 @@ internal sealed class PushedAuthorizationService : IPushedAuthorizationService
             }
             throw new InvalidOperationException($"PAR push failed: {error?.Error} {error?.ErrorDescription}");
         }
-
-        // If still no JAR and AutoJar true, embed JAR directly (non-PAR path) if signer present
         if (_options.AutoJar && _jarSigner != null && string.IsNullOrEmpty(request.RequestObjectJwt))
         {
             var jarReq = new JarRequest
@@ -158,9 +169,8 @@ internal sealed class PushedAuthorizationService : IPushedAuthorizationService
             };
             foreach (var kv in request.Extra) jarReq.Extra[kv.Key] = kv.Value;
             request.RequestObjectJwt = await _jarSigner.CreateRequestObjectAsync(jarReq, ct);
-            directQuery = BuildDirectQuery(request); // rebuild including request
+            directQuery = BuildDirectQuery(request);
         }
-
         return new Uri(authorizeEndpoint + "?" + directQuery);
     }
 
@@ -177,7 +187,7 @@ internal sealed class PushedAuthorizationService : IPushedAuthorizationService
             qb["code_challenge"] = req.CodeChallenge;
             qb["code_challenge_method"] = req.CodeChallengeMethod ?? "S256";
         }
-        if (!string.IsNullOrWhiteSpace(req.RequestObjectJwt)) qb["request"] = req.RequestObjectJwt; // JAR direct (if allowed)
+        if (!string.IsNullOrWhiteSpace(req.RequestObjectJwt)) qb["request"] = req.RequestObjectJwt;
         foreach (var kv in req.Extra)
         {
             if (qb[kv.Key] != null) continue;

@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using System.Security.Claims;
@@ -13,10 +12,6 @@ namespace MrWho.ClientAuth;
 
 public static class MrWhoClientAuthBuilderExtensions
 {
-    /// <summary>
-    /// Adds cookie + OpenIdConnect authentication configured for the MrWho OIDC server.
-    /// Supports per-clientId scheme names so apps can maintain isolated sessions per client.
-    /// </summary>
     public static AuthenticationBuilder AddMrWhoAuthentication(
         this IServiceCollection services,
         Action<MrWhoClientAuthOptions> configure)
@@ -28,20 +23,15 @@ public static class MrWhoClientAuthBuilderExtensions
         var cookieScheme = !string.IsNullOrWhiteSpace(options.CookieScheme)
             ? options.CookieScheme!
             : (string.IsNullOrWhiteSpace(key) ? MrWhoClientAuthDefaults.CookieScheme : MrWhoClientAuthDefaults.BuildCookieScheme(key));
+        var oidcScheme = string.IsNullOrWhiteSpace(key) ? MrWhoClientAuthDefaults.OpenIdConnectScheme : MrWhoClientAuthDefaults.BuildOidcScheme(key);
 
-        var oidcScheme = string.IsNullOrWhiteSpace(key)
-            ? MrWhoClientAuthDefaults.OpenIdConnectScheme
-            : MrWhoClientAuthDefaults.BuildOidcScheme(key);
-
-        // Decide default require-https if not set
         bool requireHttps = options.RequireHttpsMetadata ?? options.Authority.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
 
-        // Configure authentication with a local cookie scheme and OIDC challenge + sign-out scheme
         var builder = services.AddAuthentication(auth =>
         {
             auth.DefaultScheme = cookieScheme;
             auth.DefaultChallengeScheme = oidcScheme;
-            auth.DefaultSignOutScheme = oidcScheme; // ensure SignOutAsync() triggers OIDC end-session
+            auth.DefaultSignOutScheme = oidcScheme;
         })
         .AddCookie(cookieScheme, cookie =>
         {
@@ -54,7 +44,8 @@ public static class MrWhoClientAuthBuilderExtensions
             cookie.SlidingExpiration = true;
         });
 
-        // OpenIdConnect resides in AspNetCore shared framework. Register via extension method from package ref.
+        var externalConfigure = options.ConfigureOpenIdConnect;
+
         OpenIdConnectExtensions.AddOpenIdConnect(builder, oidcScheme, oidc =>
         {
             oidc.SignInScheme = cookieScheme;
@@ -70,134 +61,68 @@ public static class MrWhoClientAuthBuilderExtensions
             oidc.CallbackPath = options.CallbackPath;
             oidc.SignedOutCallbackPath = options.SignedOutCallbackPath;
             oidc.RemoteSignOutPath = options.RemoteSignOutPath;
-            if (!string.IsNullOrWhiteSpace(options.SignedOutRedirectUri))
-            {
-                oidc.SignedOutRedirectUri = options.SignedOutRedirectUri;
-            }
+            if (!string.IsNullOrWhiteSpace(options.SignedOutRedirectUri)) oidc.SignedOutRedirectUri = options.SignedOutRedirectUri;
 
-            // Ensure Identity.Name and roles resolve using standard OIDC claims by default
-            oidc.TokenValidationParameters = new TokenValidationParameters
-            {
-                NameClaimType = "name",
-                RoleClaimType = "role"
-            };
+            oidc.TokenValidationParameters = new TokenValidationParameters { NameClaimType = "name", RoleClaimType = "role" };
+            oidc.Scope.Clear(); foreach (var s in options.Scopes) oidc.Scope.Add(s);
 
-            // Scopes
-            oidc.Scope.Clear();
-            foreach (var s in options.Scopes)
-                oidc.Scope.Add(s);
-
-            // Discovery: allow override of MetadataAddress while still using Authority for browser redirects
             var metadata = options.ResolveMetadataAddress();
             var httpRetriever = new HttpDocumentRetriever { RequireHttps = requireHttps };
-
             if (options.AllowSelfSignedCertificates)
             {
-                var handler = new HttpClientHandler
-                {
-                    ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
-                };
+                var handler = new HttpClientHandler { ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator };
                 var httpClient = new HttpClient(handler, disposeHandler: true);
                 httpRetriever = new HttpDocumentRetriever(httpClient) { RequireHttps = requireHttps };
                 oidc.BackchannelHttpHandler = handler;
             }
-
             oidc.MetadataAddress = metadata;
-            oidc.ConfigurationManager = new ConfigurationManager<OpenIdConnectConfiguration>(
-                metadata,
-                new OpenIdConnectConfigurationRetriever(),
-                httpRetriever);
+            oidc.ConfigurationManager = new ConfigurationManager<OpenIdConnectConfiguration>(metadata, new OpenIdConnectConfigurationRetriever(), httpRetriever);
 
-            // Claims: keep ID token claims only by default (UserInfo often locked down)
             oidc.ClaimActions.Clear();
-            oidc.ClaimActions.DeleteClaim("iss");
-            oidc.ClaimActions.DeleteClaim("aud");
-            oidc.ClaimActions.DeleteClaim("exp");
-            oidc.ClaimActions.DeleteClaim("iat");
-            oidc.ClaimActions.DeleteClaim("nonce");
-            oidc.ClaimActions.DeleteClaim("at_hash");
-            oidc.ClaimActions.DeleteClaim("azp");
-            oidc.ClaimActions.DeleteClaim("oi_au_id");
-            oidc.ClaimActions.DeleteClaim("oi_tbn_id");
+            foreach (var claim in new[] { "iss","aud","exp","iat","nonce","at_hash","azp","oi_au_id","oi_tbn_id" }) oidc.ClaimActions.DeleteClaim(claim);
+            oidc.ClaimActions.MapJsonKey("sub","sub");
+            oidc.ClaimActions.MapJsonKey("name","name");
+            oidc.ClaimActions.MapJsonKey("given_name","given_name");
+            oidc.ClaimActions.MapJsonKey("family_name","family_name");
+            oidc.ClaimActions.MapJsonKey("email","email");
+            oidc.ClaimActions.MapJsonKey("email_verified","email_verified");
+            oidc.ClaimActions.MapJsonKey("preferred_username","preferred_username");
+            oidc.ClaimActions.MapJsonKey("phone_number","phone_number");
+            oidc.ClaimActions.MapJsonKey("phone_number_verified","phone_number_verified");
+            oidc.ClaimActions.MapJsonKey("role","role");
 
-            oidc.ClaimActions.MapJsonKey("sub", "sub");
-            oidc.ClaimActions.MapJsonKey("name", "name");
-            oidc.ClaimActions.MapJsonKey("given_name", "given_name");
-            oidc.ClaimActions.MapJsonKey("family_name", "family_name");
-            oidc.ClaimActions.MapJsonKey("email", "email");
-            oidc.ClaimActions.MapJsonKey("email_verified", "email_verified");
-            oidc.ClaimActions.MapJsonKey("preferred_username", "preferred_username");
-            oidc.ClaimActions.MapJsonKey("phone_number", "phone_number");
-            oidc.ClaimActions.MapJsonKey("phone_number_verified", "phone_number_verified");
-            oidc.ClaimActions.MapJsonKey("role", "role");
-
-            // Events: ensure correct authorize endpoint override for the public Authority
             oidc.Events = new OpenIdConnectEvents
             {
                 OnRedirectToIdentityProvider = ctx =>
                 {
-                    var logger = ctx.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>()
-                        .CreateLogger("MrWho.ClientAuth.OIDC");
-                    logger.LogInformation("Redirecting to identity provider: client_id={ClientId}", ctx.ProtocolMessage.ClientId);
-
+                    // Only ensure correct authorize endpoint, no custom PAR logic
                     var authority = ctx.Options.Authority?.TrimEnd('/') ?? string.Empty;
                     if (!string.IsNullOrEmpty(authority))
                     {
                         var desiredAuthorize = $"{authority}/connect/authorize";
                         if (!string.Equals(ctx.ProtocolMessage.IssuerAddress, desiredAuthorize, StringComparison.OrdinalIgnoreCase))
                         {
-                            logger.LogDebug("Overriding IssuerAddress from {From} to {To}", ctx.ProtocolMessage.IssuerAddress, desiredAuthorize);
                             ctx.ProtocolMessage.IssuerAddress = desiredAuthorize;
                         }
                     }
+                    externalConfigure?.Invoke(ctx.Options);
                     return Task.CompletedTask;
                 },
-                OnRedirectToIdentityProviderForSignOut = ctx =>
-                {
-                    var logger = ctx.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>()
-                        .CreateLogger("MrWho.ClientAuth.OIDC");
-                    logger.LogInformation("Initiating OIDC end-session for client_id={ClientId}. IdTokenHint? {HasHint}", ctx.Options.ClientId, !string.IsNullOrEmpty(ctx.ProtocolMessage.IdTokenHint));
-                    return Task.CompletedTask;
-                },
-                OnTokenResponseReceived = ctx =>
-                {
-                    var logger = ctx.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>()
-                        .CreateLogger("MrWho.ClientAuth.OIDC");
-                    logger.LogInformation("Token response received. HasAccessToken={HasAT}, HasRefreshToken={HasRT}",
-                        !string.IsNullOrEmpty(ctx.TokenEndpointResponse.AccessToken),
-                        !string.IsNullOrEmpty(ctx.TokenEndpointResponse.RefreshToken));
-                    return Task.CompletedTask;
-                },
+                OnRedirectToIdentityProviderForSignOut = ctx => Task.CompletedTask,
+                OnTokenResponseReceived = ctx => Task.CompletedTask,
                 OnTokenValidated = ctx =>
                 {
-                    // Ensure a usable display name so HttpContext.User.Identity.Name is never null
                     var identity = ctx.Principal?.Identities?.FirstOrDefault();
-                    if (identity != null)
+                    if (identity != null && !identity.HasClaim(c => c.Type == "name"))
                     {
-                        bool hasName = identity.HasClaim(c => c.Type == "name");
-                        if (!hasName)
-                        {
-                            var value = identity.FindFirst("preferred_username")?.Value
-                                        ?? identity.FindFirst("email")?.Value
-                                        ?? identity.FindFirst("sub")?.Value;
-                            if (!string.IsNullOrWhiteSpace(value))
-                            {
-                                identity.AddClaim(new Claim("name", value));
-                            }
-                        }
+                        var value = identity.FindFirst("preferred_username")?.Value ?? identity.FindFirst("email")?.Value ?? identity.FindFirst("sub")?.Value;
+                        if (!string.IsNullOrWhiteSpace(value)) identity.AddClaim(new Claim("name", value));
                     }
                     return Task.CompletedTask;
                 },
-                OnAuthenticationFailed = ctx =>
-                {
-                    var logger = ctx.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>()
-                        .CreateLogger("MrWho.ClientAuth.OIDC");
-                    logger.LogError(ctx.Exception, "Authentication failed");
-                    return Task.CompletedTask;
-                }
+                OnAuthenticationFailed = ctx => Task.CompletedTask
             };
 
-            // Allow consumer customization
             options.ConfigureOpenIdConnect?.Invoke(oidc);
         });
 

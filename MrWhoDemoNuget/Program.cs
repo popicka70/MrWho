@@ -1,11 +1,10 @@
 using MrWho.ClientAuth;
-using MrWho.ClientAuth.M2M; // M2M helpers
-using MrWho.ClientAuth.Par; // PAR support
-using Microsoft.IdentityModel.Tokens; // algorithms (kept for potential future use)
+using MrWho.ClientAuth.M2M;
+using MrWho.ClientAuth.Par;
+using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
 builder.Services.AddRazorPages();
 
 var authority = builder.Configuration["Authentication:Authority"] ?? "https://localhost:7113";
@@ -15,7 +14,7 @@ var clientSecret = builder.Configuration["Authentication:ClientSecret"];
 builder.Services.AddMrWhoParClient(o =>
 {
     o.ParEndpoint = new Uri(authority.TrimEnd('/') + "/connect/par");
-    o.AutoPushQueryLengthThreshold = 400; 
+    o.AutoPushQueryLengthThreshold = 400; // lower for demo
 });
 
 var apiBase = new Uri(builder.Configuration["DemoApi:BaseUrl"] ?? "https://localhost:7162/");
@@ -43,6 +42,7 @@ builder.Services.AddMrWhoAuthentication(options =>
     options.ClientSecret = clientSecret; // null for public
     options.SaveTokens = true;
     options.SignedOutCallbackPath = "/signout-callback-oidc";
+    options.AutoParPush = true; // enabled by default but explicit for clarity
 
     options.Scopes.Clear();
     options.Scopes.Add("openid");
@@ -56,60 +56,6 @@ builder.Services.AddMrWhoAuthentication(options =>
     {
         options.AllowSelfSignedCertificates = true;
     }
-
-    options.ConfigureOpenIdConnect = oidc =>
-    {
-        var existing = oidc.Events.OnRedirectToIdentityProvider;
-        oidc.Events.OnRedirectToIdentityProvider = async ctx =>
-        {
-            if (string.Equals(ctx.ProtocolMessage.ResponseType, "code", StringComparison.OrdinalIgnoreCase))
-            {
-                try
-                {
-                    var par = ctx.HttpContext.RequestServices.GetService(typeof(IPushedAuthorizationService)) as IPushedAuthorizationService;
-                    if (par != null)
-                    {
-                        string? codeChallenge = ctx.ProtocolMessage.GetParameter("code_challenge");
-                        string? codeChallengeMethod = ctx.ProtocolMessage.GetParameter("code_challenge_method");
-
-                        var authReq = new AuthorizationRequest
-                        {
-                            ClientId = ctx.ProtocolMessage.ClientId!,
-                            RedirectUri = ctx.ProtocolMessage.RedirectUri!,
-                            Scope = ctx.ProtocolMessage.Scope,
-                            ResponseType = ctx.ProtocolMessage.ResponseType!,
-                            State = ctx.ProtocolMessage.State,
-                            CodeChallenge = codeChallenge,
-                            CodeChallengeMethod = codeChallengeMethod
-                            // JAR request object intentionally omitted
-                        };
-                        var (result, error) = await par.PushAsync(authReq, ctx.HttpContext.RequestAborted);
-                        if (result != null)
-                        {
-                            var state = ctx.ProtocolMessage.State;
-                            var nonce = ctx.ProtocolMessage.Nonce;
-                            var clientIdLocal = ctx.ProtocolMessage.ClientId;
-                            ctx.ProtocolMessage.Parameters.Clear();
-                            ctx.ProtocolMessage.ClientId = clientIdLocal;
-                            if (!string.IsNullOrEmpty(state)) ctx.ProtocolMessage.State = state;
-                            if (!string.IsNullOrEmpty(nonce)) ctx.ProtocolMessage.Nonce = nonce;
-                            ctx.ProtocolMessage.SetParameter("request_uri", result.RequestUri);
-                        }
-                        else if (error != null && error.ErrorDescription?.Contains("PAR disabled", StringComparison.OrdinalIgnoreCase) == true)
-                        {
-                            // fallback
-                        }
-                        else if (error != null)
-                        {
-                            throw new InvalidOperationException($"PAR push failed: {error.Error} {error.ErrorDescription}");
-                        }
-                    }
-                }
-                catch { }
-            }
-            if (existing != null) await existing(ctx);
-        };
-    };
 });
 
 var app = builder.Build();
