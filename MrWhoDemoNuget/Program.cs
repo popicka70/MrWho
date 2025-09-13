@@ -1,6 +1,7 @@
 using MrWho.ClientAuth;
 using MrWho.ClientAuth.M2M;
 using MrWho.ClientAuth.Jar; // JAR signer
+using MrWho.ClientAuth.Par; // PAR client
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -21,6 +22,14 @@ if (!string.IsNullOrWhiteSpace(clientSecret))
         o.Audience = "mrwho";                      // server-side expected audience
     });
 }
+
+// Re-enable PAR client (Tasks 9/10). Auto threshold low so we always push quickly for demo clarity.
+builder.Services.AddMrWhoParClient(o =>
+{
+    o.ParEndpoint = new Uri(authority.TrimEnd('/') + "/connect/par");
+    o.AutoPushQueryLengthThreshold = 200; // force PAR even for short requests
+    o.AutoJar = true; // ensure JAR built before push
+});
 
 var apiBase = new Uri(builder.Configuration["DemoApi:BaseUrl"] ?? "https://localhost:7162/");
 
@@ -48,12 +57,12 @@ builder.Services.AddMrWhoAuthentication(options =>
     options.SaveTokens = true;
     options.SignedOutCallbackPath = "/signout-callback-oidc";
 
-    // Disable custom PAR logic (Option A)
-    options.AutoParPush = false;
+    // Allow auto PAR push now that endpoint is advertised
+    options.AutoParPush = true;
 
     // Enable JAR/JARM
     options.EnableJar = true;
-    options.JarOnlyWhenLarge = false; // always send request=
+    options.JarOnlyWhenLarge = false; // always create request object; PAR will carry it
     options.EnableJarm = true;
 
     options.Scopes.Clear();

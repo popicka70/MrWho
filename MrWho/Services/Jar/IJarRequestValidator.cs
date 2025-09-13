@@ -1,4 +1,5 @@
 using System.IdentityModel.Tokens.Jwt;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
@@ -103,8 +104,27 @@ internal sealed class JarRequestValidator : IJarRequestValidator
         }
         else if (alg.StartsWith("RS", StringComparison.OrdinalIgnoreCase))
         {
-            var (signing, _) = await _keys.GetActiveKeysAsync();
-            tvp.IssuerSigningKeys = signing;
+            // Prefer client-specific public key when provided; fallback to server signing keys (legacy behavior)
+            if (!string.IsNullOrWhiteSpace(client.JarRsaPublicKeyPem))
+            {
+                try
+                {
+                    using var rsa = RSA.Create();
+                    rsa.ImportFromPem(client.JarRsaPublicKeyPem.AsSpan());
+                    var pub = rsa.ExportParameters(false);
+                    tvp.IssuerSigningKey = new RsaSecurityKey(pub) { KeyId = $"client:{effectiveClientId}:rs" };
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "Invalid client JAR RSA public key for {ClientId}", effectiveClientId);
+                    return new(false, OpenIddict.Abstractions.OpenIddictConstants.Errors.InvalidRequestObject, "invalid client JAR public key", effectiveClientId, alg, null);
+                }
+            }
+            else
+            {
+                var (signing, _) = await _keys.GetActiveKeysAsync();
+                tvp.IssuerSigningKeys = signing; // fallback
+            }
         }
         else
         {

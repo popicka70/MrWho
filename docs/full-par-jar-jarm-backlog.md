@@ -14,6 +14,9 @@ _Status: in progress_
 | 2 | Refactor `JarRequestExpansionMiddleware` to use validator | Middleware now uses validator & simplified | [x] |
 | 3 | Accept `request` (JAR) in PAR POST | Custom `/connect/par` controller added (validates & stores) | [x] |
 | 4 | Resolve `request_uri` at `/connect/authorize` | Implemented in middleware (`_par_resolved` marker) | [x] |
+| 4a | Per-client RSA public key property | `JarRsaPublicKeyPem` added to `Client` entity | [x] |
+| 4b | Validator uses client RSA key | Fallback to server keys if none provided | [x] |
+| 4c | Migration for `JarRsaPublicKeyPem` | Added EF migration & snapshot updated | [x] |
 
 ## Tier 2 – Policy Enforcement
 | ID | Item | Notes | Status |
@@ -26,50 +29,44 @@ _Status: in progress_
 ## Tier 3 – Client Adjustments
 | ID | Item | Notes | Status |
 |----|------|-------|--------|
-| 9 | Re?enable PAR on demo client | Next | [ ] |
-|10 | Ensure JAR built before challenge (PAR push) | After 9 | [ ] |
+| 9 | Re?enable PAR on demo client | PAR client + AutoParPush re-enabled | [x] |
+|10 | Ensure JAR built before challenge (PAR push) | JAR always built (JarOnlyWhenLarge=false, AutoJar=true) | [x] |
 |11 | Fallback retry logic (optional) | Pending | [ ] |
+|12 | Admin UI input for RSA JAR public key | Field added to client edit (Flows & Grants) | [x] |
 
 ## Tier 4 – Testing
 | ID | Item | Notes | Status |
 |----|------|-------|--------|
-|12 | Add test: PAR + JAR + JARM happy path | Pending | [ ] |
-|13 | Negative: `ParMode=Required` without PAR | Pending | [ ] |
-|14 | Negative: `JarMode=Required` missing JAR | Pending | [ ] |
-|15 | Negative: `JarmMode=Required` w/out response_mode | Pending | [ ] |
-|16 | Replay test (same JAR via PAR twice) | Pending | [ ] |
-|17 | Alg policy test (HS512 + short secret) | Pending | [ ] |
+|13 | Test: PAR + JAR + JARM happy path (HS) | Pending | [ ] |
+|14 | Test: PAR + JAR + JARM happy path (RS) | Requires client RSA key setup | [ ] |
+|15 | Negative: `ParMode=Required` without PAR | Pending | [ ] |
+|16 | Negative: `JarMode=Required` missing JAR | Pending | [ ] |
+|17 | Negative: `JarmMode=Required` w/out response_mode | Pending | [ ] |
+|18 | Replay test (same JAR via PAR twice) | Pending | [ ] |
+|19 | Alg policy test (HS512 + short secret) | Pending | [ ] |
+|20 | Invalid RSA public key rejected | Pending | [ ] |
 
 ## Tier 5 – Hardening & Ops
 | ID | Item | Notes | Status |
-|----|------|-------|--------|
-|18 | Hash & store `ParametersHash` for PAR | Pending | [ ] |
-|19 | Optimize PAR cleanup background service | Pending | [ ] |
-|20 | OpenTelemetry spans for JAR/JARM/PAR | Pending | [ ] |
-|21 | Security audit enrichment | Pending | [ ] |
+|21 | Hash & store `ParametersHash` for PAR | Pending | [ ] |
+|22 | Optimize PAR cleanup background service | Pending | [ ] |
+|23 | OpenTelemetry spans for JAR/JARM/PAR | Pending | [ ] |
+|24 | Security audit enrichment | Pending | [ ] |
 
 ## Tier 6 – Docs & UX
 | ID | Item | Notes | Status |
 |----|------|-------|--------|
-|22 | Update client configuration docs | Pending | [ ] |
-|23 | Admin UI: surface effective enforcement | Pending | [ ] |
-|24 | Admin diagnostics: recent PAR entries | Pending | [ ] |
-|25 | README / high-level architecture section | Pending | [ ] |
+|25 | Update client configuration docs (RSA JAR) | Pending | [ ] |
+|26 | Admin UI: surface effective enforcement | Pending | [ ] |
+|27 | Admin diagnostics: recent PAR entries | Pending | [ ] |
+|28 | README / high-level architecture section | Pending | [ ] |
 
 ## Technical Details / Design Notes
-- **Single Source Validation**: `IJarRequestValidator` ensures identical logic across front-channel and PAR POST.
-- **PAR+JAR**: When JAR present in PAR POST, only `client_id` + `request_uri` appear in authorization URL; JAR stays back-channel.
-- **Mode Enforcement Order**: PAR (ensures transport), then JAR (integrity), then JARM (response packaging).
-- **Fallback Rules**: Only permissible when corresponding `*Mode != Required`.
-- **Security**: Replay prevention via `jti` + replay cache; secret length policy enforced before HS* signature validation.
-
-## Open Questions (To Clarify Before Implementation)
-1. Should PAR store raw JAR JWT or expanded param map (or both)? (Current plan: store raw + normalized JSON for flexibility.)
-2. Should `request_uri` resolution re-validate signature or trust cached success? (Favor trust + optional hash compare.)
-3. JARM encryption (future) needed or signing only is sufficient short-term? (Current scope: signing only.)
+- **Per-client RSA JAR**: Client stores PEM public key; validator uses it when alg starts with RS; server keys remain fallback for legacy clients.
+- **Security**: Still enforces jti replay prevention + exp window; symmetric secret length policy unchanged.
 
 ## Next Immediate Actions
-- Re-enable PAR for demo client (Tasks 9/10) and add combined flow tests.
+- Implement RS256 happy path test (Task 14) using a generated RSA key + setting JarRsaPublicKeyPem.
 
 ---
 Generated automatically. Update status markers as tasks progress.

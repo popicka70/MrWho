@@ -287,6 +287,8 @@ public partial class Client
     /// <summary>Allow authenticator code (TOTP) login mode toggle</summary>
     public bool? AllowCodeLogin { get; set; }
 
+    /// <summary>public key (PEM) for validating RS* JAR request objects</summary>
+    public string? JarRsaPublicKeyPem { get; set; } // NEW: public key (PEM) for validating RS* JAR request objects
     // Audit fields
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
