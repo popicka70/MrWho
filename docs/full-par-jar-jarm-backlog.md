@@ -37,17 +37,18 @@ _Status: in progress_
 ## Tier 4 – Testing
 | ID | Item | Notes | Status |
 |----|------|-------|--------|
-|13 | Test: PAR + JAR + JARM happy path (HS) | Pending | [ ] |
-|14 | Test: PAR + JAR + JARM happy path (RS) | Requires client RSA key setup | [ ] |
-|15 | Negative: `ParMode=Required` without PAR | Pending | [ ] |
-|16 | Negative: `JarMode=Required` missing JAR | Pending | [ ] |
-|17 | Negative: `JarmMode=Required` w/out response_mode | Pending | [ ] |
-|18 | Replay test (same JAR via PAR twice) | Pending | [ ] |
-|19 | Alg policy test (HS512 + short secret) | Pending | [ ] |
-|20 | Invalid RSA public key rejected | Pending | [ ] |
+|13 | Test: PAR + JAR + JARM happy path (HS) | Implemented (JarParJarmAdditionalTests#Par_Jar_Hs256_Jarm_Happy_Path_Works) | [x] |
+|14 | Test: PAR + JAR + JARM happy path (RS) | Implemented (JarRsParJarmHappyPathTests) | [x] |
+|15 | Negative: `ParMode=Required` without PAR | Implemented (JarParJarmAdditionalTests#ParMode_Required_Without_Par_Fails) | [x] |
+|16 | Negative: `JarMode=Required` missing JAR | Implemented (JarParJarmAdditionalTests#JarMode_Required_Missing_Jar_Fails) | [x] |
+|17 | Negative: `JarmMode=Required` w/out response_mode | Implemented (JarmModeEnforcementTests#JarmMode_Required_Without_ResponseMode_Query_Is_Enforced) | [x] |
+|18 | Replay test (same JAR via PAR twice) | Implemented (JarParJarmAdditionalTests#Par_Jar_Replay_Jti_Fails_On_Second_Push) | [x] |
+|19 | Alg policy test (HS512 + short secret) | Implemented (JarParJarmAdditionalTests#CreateClient_HS512_ShortSecret_Rejected) | [x] |
+|20 | Invalid RSA public key rejected | Implemented (JarParJarmAdditionalTests#Par_With_Invalid_Rsa_Public_Key_Fails) | [x] |
 
 ## Tier 5 – Hardening & Ops
 | ID | Item | Notes | Status |
+|----|------|-------|--------|
 |21 | Hash & store `ParametersHash` for PAR | Pending | [ ] |
 |22 | Optimize PAR cleanup background service | Pending | [ ] |
 |23 | OpenTelemetry spans for JAR/JARM/PAR | Pending | [ ] |
@@ -66,7 +67,7 @@ _Status: in progress_
 - **Security**: Still enforces jti replay prevention + exp window; symmetric secret length policy unchanged.
 
 ## Next Immediate Actions
-- Implement RS256 happy path test (Task 14) using a generated RSA key + setting JarRsaPublicKeyPem.
+- Implement PAR request ParametersHash storage (Task 21) + background cleanup (Task 22).
 
 ---
 Generated automatically. Update status markers as tasks progress.
