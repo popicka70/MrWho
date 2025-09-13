@@ -34,7 +34,7 @@ public class OidcClientService : IOidcClientService
         // PAR mode handling
         if (client.ParMode is PushedAuthorizationMode.Enabled or PushedAuthorizationMode.Required)
         {
-            descriptor.Permissions.Add(PushedAuthorizationEndpointPermission);
+            descriptor.Permissions.Add(OpenIddictConstants.Permissions.Endpoints.PushedAuthorization);
         }
         if (client.ParMode is PushedAuthorizationMode.Required)
         {
