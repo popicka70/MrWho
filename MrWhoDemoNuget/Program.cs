@@ -43,6 +43,8 @@ builder.Services.AddMrWhoAuthentication(options =>
     options.SaveTokens = true;
     options.SignedOutCallbackPath = "/signout-callback-oidc";
     options.AutoParPush = true; // enabled by default but explicit for clarity
+    options.EnableJar = true; // enabled by default but explicit for clarity
+    options.EnableJarm = true; // enabled by default but explicit for clarity
 
     options.Scopes.Clear();
     options.Scopes.Add("openid");

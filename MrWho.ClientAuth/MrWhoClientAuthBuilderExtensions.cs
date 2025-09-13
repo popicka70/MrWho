@@ -7,24 +7,20 @@ using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using System.Security.Claims;
 using Microsoft.IdentityModel.Tokens;
+using MrWho.ClientAuth.Jar;
 
 namespace MrWho.ClientAuth;
 
 public static class MrWhoClientAuthBuilderExtensions
 {
-    public static AuthenticationBuilder AddMrWhoAuthentication(
-        this IServiceCollection services,
-        Action<MrWhoClientAuthOptions> configure)
+    public static AuthenticationBuilder AddMrWhoAuthentication(this IServiceCollection services, Action<MrWhoClientAuthOptions> configure)
     {
         var options = new MrWhoClientAuthOptions();
         configure(options);
 
         var key = options.ClientId;
-        var cookieScheme = !string.IsNullOrWhiteSpace(options.CookieScheme)
-            ? options.CookieScheme!
-            : (string.IsNullOrWhiteSpace(key) ? MrWhoClientAuthDefaults.CookieScheme : MrWhoClientAuthDefaults.BuildCookieScheme(key));
+        var cookieScheme = !string.IsNullOrWhiteSpace(options.CookieScheme) ? options.CookieScheme! : (string.IsNullOrWhiteSpace(key) ? MrWhoClientAuthDefaults.CookieScheme : MrWhoClientAuthDefaults.BuildCookieScheme(key));
         var oidcScheme = string.IsNullOrWhiteSpace(key) ? MrWhoClientAuthDefaults.OpenIdConnectScheme : MrWhoClientAuthDefaults.BuildOidcScheme(key);
-
         bool requireHttps = options.RequireHttpsMetadata ?? options.Authority.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
 
         var builder = services.AddAuthentication(auth =>
@@ -93,23 +89,69 @@ public static class MrWhoClientAuthBuilderExtensions
 
             oidc.Events = new OpenIdConnectEvents
             {
-                OnRedirectToIdentityProvider = ctx =>
+                OnRedirectToIdentityProvider = async ctx =>
                 {
-                    // Only ensure correct authorize endpoint, no custom PAR logic
+                    // Ensure authorize endpoint normalized
                     var authority = ctx.Options.Authority?.TrimEnd('/') ?? string.Empty;
                     if (!string.IsNullOrEmpty(authority))
                     {
                         var desiredAuthorize = $"{authority}/connect/authorize";
                         if (!string.Equals(ctx.ProtocolMessage.IssuerAddress, desiredAuthorize, StringComparison.OrdinalIgnoreCase))
-                        {
                             ctx.ProtocolMessage.IssuerAddress = desiredAuthorize;
-                        }
                     }
+
+                    // JARM: set response_mode=jwt if requested
+                    if (options.EnableJarm && (options.ForceJarm || string.IsNullOrEmpty(ctx.ProtocolMessage.ResponseMode)))
+                    {
+                        ctx.ProtocolMessage.ResponseMode = "jwt";
+                    }
+
+                    // JAR: produce request object if signer registered and conditions satisfied
+                    if (options.EnableJar)
+                    {
+                        try
+                        {
+                            var signer = ctx.HttpContext.RequestServices.GetService<IJarRequestObjectSigner>();
+                            if (signer != null)
+                            {
+                                bool needJar = true;
+                                if (options.JarOnlyWhenLarge)
+                                {
+                                    // approximate current query length if we didn't use JAR yet
+                                    var scope = ctx.ProtocolMessage.Scope ?? string.Join(' ', ctx.Options.Scope);
+                                    var approx = $"client_id={ctx.ProtocolMessage.ClientId}&redirect_uri={ctx.ProtocolMessage.RedirectUri}&response_type={ctx.ProtocolMessage.ResponseType}&scope={scope}&state={ctx.ProtocolMessage.State}";
+                                    needJar = approx.Length > options.JarQueryLengthThreshold;
+                                }
+                                if (needJar)
+                                {
+                                    var jarReq = new JarRequest
+                                    {
+                                        ClientId = ctx.ProtocolMessage.ClientId!,
+                                        RedirectUri = ctx.ProtocolMessage.RedirectUri!,
+                                        Scope = ctx.ProtocolMessage.Scope,
+                                        ResponseType = ctx.ProtocolMessage.ResponseType!,
+                                        State = ctx.ProtocolMessage.State,
+                                        CodeChallenge = ctx.ProtocolMessage.GetParameter("code_challenge"),
+                                        CodeChallengeMethod = ctx.ProtocolMessage.GetParameter("code_challenge_method")
+                                    };
+                                    var jwt = await signer.CreateRequestObjectAsync(jarReq, ctx.HttpContext.RequestAborted);
+                                    // Replace parameters with single request object (keep state)
+                                    var state = ctx.ProtocolMessage.State;
+                                    ctx.ProtocolMessage.Parameters.Clear();
+                                    ctx.ProtocolMessage.ClientId = jarReq.ClientId;
+                                    ctx.ProtocolMessage.RedirectUri = jarReq.RedirectUri;
+                                    ctx.ProtocolMessage.ResponseType = jarReq.ResponseType;
+                                    if (!string.IsNullOrEmpty(state)) ctx.ProtocolMessage.State = state;
+                                    if (!string.IsNullOrEmpty(jarReq.Scope)) ctx.ProtocolMessage.Scope = jarReq.Scope;
+                                    ctx.ProtocolMessage.SetParameter("request", jwt);
+                                }
+                            }
+                        }
+                        catch { /* fail open (fallback to normal authorize) */ }
+                    }
+
                     externalConfigure?.Invoke(ctx.Options);
-                    return Task.CompletedTask;
                 },
-                OnRedirectToIdentityProviderForSignOut = ctx => Task.CompletedTask,
-                OnTokenResponseReceived = ctx => Task.CompletedTask,
                 OnTokenValidated = ctx =>
                 {
                     var identity = ctx.Principal?.Identities?.FirstOrDefault();
@@ -119,10 +161,8 @@ public static class MrWhoClientAuthBuilderExtensions
                         if (!string.IsNullOrWhiteSpace(value)) identity.AddClaim(new Claim("name", value));
                     }
                     return Task.CompletedTask;
-                },
-                OnAuthenticationFailed = ctx => Task.CompletedTask
+                }
             };
-
             options.ConfigureOpenIdConnect?.Invoke(oidc);
         });
 
