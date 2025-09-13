@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using MrWho.Data;
 using MrWho.Models;
+using Microsoft.AspNetCore.DataProtection; // added for encryption
+using System.Text; // potential future use
 
 namespace MrWho.Services;
 
@@ -10,13 +12,15 @@ public sealed class ClientSecretService : IClientSecretService
     private readonly IClientSecretHasher _hasher;
     private readonly ILogger<ClientSecretService> _logger;
     private readonly ISecurityAuditWriter _audit;
+    private readonly IDataProtector _protector; // new
 
-    public ClientSecretService(ApplicationDbContext db, IClientSecretHasher hasher, ILogger<ClientSecretService> logger, ISecurityAuditWriter audit)
+    public ClientSecretService(ApplicationDbContext db, IClientSecretHasher hasher, ILogger<ClientSecretService> logger, ISecurityAuditWriter audit, IDataProtectionProvider dp)
     {
         _db = db;
         _hasher = hasher;
         _logger = logger;
         _audit = audit;
+        _protector = dp.CreateProtector("MrWho.ClientSecret.V1");
     }
 
     public async Task<(ClientSecretHistory record, string? plainSecret)> SetNewSecretAsync(string clientId, string? providedPlaintext = null, DateTime? expiresAt = null, bool markOldAsRetired = true, CancellationToken ct = default)
@@ -39,6 +43,9 @@ public sealed class ClientSecretService : IClientSecretService
 
         var plain = providedPlaintext ?? GenerateHighEntropySecret();
         var hash = _hasher.HashSecret(plain);
+        string encrypted;
+        try { encrypted = _protector.Protect(plain); }
+        catch (Exception ex) { _logger.LogError(ex, "Failed to protect client secret; aborting rotation"); throw; }
 
         var rec = new ClientSecretHistory
         {
@@ -48,11 +55,12 @@ public sealed class ClientSecretService : IClientSecretService
             CreatedAt = DateTime.UtcNow,
             ExpiresAt = expiresAt,
             Status = ClientSecretStatus.Active,
-            IsCompromised = false
+            IsCompromised = false,
+            EncryptedSecret = encrypted
         };
         _db.Add(rec);
 
-        // Store a redaction marker in Client.ClientSecret to avoid breaking existing flows that expect a value
+        // Maintain redaction marker (do NOT store plaintext). Leave existing behaviour.
         client.ClientSecret = "{HASHED}";
         await _db.SaveChangesAsync(ct);
 
@@ -103,6 +111,19 @@ public sealed class ClientSecretService : IClientSecretService
         }
         try { await _audit.WriteAsync(SecurityAudit.ClientSecretVerifyFailed, new { clientId = client.ClientId }, "warn", actorClientId: client.ClientId, ct: ct); } catch { }
         return false;
+    }
+
+    public async Task<string?> GetActivePlaintextAsync(string clientPublicIdOrDbId, CancellationToken ct = default)
+    {
+        var client = await _db.Clients.FirstOrDefaultAsync(c => c.Id == clientPublicIdOrDbId || c.ClientId == clientPublicIdOrDbId, ct);
+        if (client is null) return null;
+        var rec = await _db.ClientSecretHistories
+            .Where(s => s.ClientId == client.Id && s.Status == ClientSecretStatus.Active && (!s.ExpiresAt.HasValue || s.ExpiresAt > DateTime.UtcNow))
+            .OrderByDescending(s => s.CreatedAt)
+            .FirstOrDefaultAsync(ct);
+        if (rec?.EncryptedSecret == null) return null; // legacy or none
+        try { return _protector.Unprotect(rec.EncryptedSecret); }
+        catch (Exception ex) { _logger.LogWarning(ex, "Failed to unprotect secret for client {ClientId}", client.ClientId); return null; }
     }
 
     private static string GenerateHighEntropySecret()

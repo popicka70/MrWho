@@ -275,12 +275,12 @@
                                 </RadzenAlert>
                                 <RadzenFormField Text="Default JAR Mode" Variant="Variant.Outlined">
                                     <ChildContent>
-                                        <RadzenDropDown @bind-Value="model.DefaultJarMode" TValue="JarMode?" Data="jarModes" TextProperty="Text" ValueProperty="Value" Style="width:100%;" />
+                                        <RadzenDropDown @bind-Value="model.DefaultJarMode" TValue="JarMode?" Data="jarModes" TextProperty="Text" ValueProperty="Value" Style="width:100%;" Change="@(args => OnDefaultJarModeChanged())" />
                                     </ChildContent>
                                 </RadzenFormField>
                                 <RadzenFormField Text="Require Signed Request Objects (Default)" Variant="Variant.Outlined">
                                     <Start>
-                                        <RadzenCheckBox @bind-Value="model.DefaultRequireSignedRequestObject" TriState="true" Name="defReqSignedJar" />
+                                        <RadzenCheckBox @bind-Value="model.DefaultRequireSignedRequestObject" TriState="true" Name="defReqSignedJar" Disabled="@(model.DefaultJarMode == JarMode.Required)" Change="@((bool? args) => OnDefaultRequireSignedChanged())" />
                                     </Start>
                                     <ChildContent>
                                         <RadzenLabel Text="Disallow unsigned (alg=none) request objects by default" Component="defReqSignedJar" />
@@ -294,6 +294,12 @@
                                         <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Leave empty for system defaults (RS256, HS256). Only add HS384/512 if secrets meet length guidance.</RadzenText>
                                     </Helper>
                                 </RadzenFormField>
+                                @if (!string.IsNullOrEmpty(defaultJarValidationMessage))
+                                {
+                                    <RadzenAlert AlertStyle="AlertStyle.Danger" ShowIcon="true">
+                                        <RadzenText TextStyle="TextStyle.Body2">@defaultJarValidationMessage</RadzenText>
+                                    </RadzenAlert>
+                                }
                             </RadzenStack>
                             <RadzenStack Gap="0.75rem" class="rz-mt-4 rz-mb-4">
                                 <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Authorization Response (JARM) Defaults</RadzenText>
@@ -315,7 +321,7 @@
                 <RadzenButton Text="Back to Realms" Icon="arrow_back" ButtonStyle="ButtonStyle.Light" Click="@BackToRealm" />
                 <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
                     <RadzenButton Text="Reset to System Defaults" Icon="restore" ButtonStyle="ButtonStyle.Warning" Click="@(async () => await ResetToSystemDefaults())" />
-                    <RadzenButton Text="Save Default Configuration" Icon="save" ButtonStyle="ButtonStyle.Primary" ButtonType="ButtonType.Submit" />
+                    <RadzenButton Text="Save Default Configuration" Icon="save" ButtonStyle="ButtonStyle.Primary" ButtonType="ButtonType.Submit" Disabled="@(!string.IsNullOrEmpty(defaultJarValidationMessage))" />
                 </RadzenStack>
             </RadzenStack>
         </RadzenTemplateForm>
@@ -341,6 +347,7 @@
     private class AlgItem { public string Value { get; set; } = string.Empty; }
     private List<AlgItem> defaultAllowedJarAlgs = new() { new() { Value = "RS256" }, new() { Value = "HS256" }, new() { Value = "HS384" }, new() { Value = "HS512" } };
     private IList<string> defaultSelectedJarAlgs = new List<string>();
+    private string? defaultJarValidationMessage;
 
     protected override void OnParametersSet()
     {
@@ -349,10 +356,34 @@
             : model.DefaultAllowedRequestObjectAlgs.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
+        EnforceDefaultJarUiRules();
     }
 
     private void OnDefaultJarAlgsChanged()
     {
         model.DefaultAllowedRequestObjectAlgs = defaultSelectedJarAlgs.Any() ? string.Join(',', defaultSelectedJarAlgs) : null;
+        EnforceDefaultJarUiRules();
+    }
+
+    private void OnDefaultJarModeChanged() => EnforceDefaultJarUiRules();
+    private void OnDefaultRequireSignedChanged() => EnforceDefaultJarUiRules();
+
+    private void EnforceDefaultJarUiRules()
+    {
+        if (model.DefaultJarMode == JarMode.Required)
+        {
+            model.DefaultRequireSignedRequestObject = true; // forced
+        }
+        defaultJarValidationMessage = null;
+        if (model.DefaultJarMode == JarMode.Required && model.DefaultRequireSignedRequestObject == false)
+        {
+            defaultJarValidationMessage = "Signed request objects are mandatory when Default JAR Mode is Required.";
+            return;
+        }
+        if (model.DefaultRequireSignedRequestObject == true && !defaultSelectedJarAlgs.Any())
+        {
+            defaultJarValidationMessage = "Select at least one signing algorithm when signed request objects are required by default.";
+            return;
+        }
     }
 }

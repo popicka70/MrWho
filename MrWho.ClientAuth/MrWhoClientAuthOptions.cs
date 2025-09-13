@@ -96,6 +96,27 @@ public sealed class MrWhoClientAuthOptions
     /// </summary>
     public Action<OpenIdConnectOptions>? ConfigureOpenIdConnect { get; set; }
 
+    /// <summary>
+    /// Enables automatic PAR push (and fallback) during OnRedirectToIdentityProvider when an IPushedAuthorizationService is registered.
+    /// Default: true.
+    /// </summary>
+    public bool AutoParPush { get; set; } = true;
+
+    // === JAR (Request Object) Options ===
+    // Enable automatic creation of a JAR request object (request=...) when a signer is registered.
+    public bool EnableJar { get; set; } = false;
+    // If true, only create JAR when total query length would exceed threshold (PAR-friendly). If false and EnableJar true, always create.
+    public bool JarOnlyWhenLarge { get; set; } = true;
+    // Character threshold for JarOnlyWhenLarge.
+    public int JarQueryLengthThreshold { get; set; } = 1400;
+
+    // === JARM (JWT Authorization Response Mode) Options ===
+    // If true, client sets response_mode=jwt automatically (if server supports JARM).
+    public bool EnableJarm { get; set; } = false;
+    // If true, always request JARM (response_mode=jwt) even if user supplied their own response_mode.
+    public bool ForceJarm { get; set; } = false;
+
+    // Internal helper to resolve metadata address.
     internal string ResolveMetadataAddress()
     {
         if (!string.IsNullOrWhiteSpace(MetadataAddress))

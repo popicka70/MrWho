@@ -32,6 +32,7 @@ public class ClientExportDto
     public JarmMode? JarmMode { get; set; }
     public bool? RequireSignedRequestObject { get; set; }
     public string? AllowedRequestObjectAlgs { get; set; }
+    public string? JarRsaPublicKeyPem { get; set; } // NEW: exported client RSA JAR public key
 
     // Token lifetimes
     public TimeSpan? AccessTokenLifetime { get; set; }

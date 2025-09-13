@@ -7,7 +7,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace MrWho.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialCreate : Migration
+    public partial class Initial : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -25,7 +25,8 @@ namespace MrWho.Migrations
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     CreatedBy = table.Column<string>(type: "text", nullable: true),
-                    UpdatedBy = table.Column<string>(type: "text", nullable: true)
+                    UpdatedBy = table.Column<string>(type: "text", nullable: true),
+                    ClaimDestinationsJson = table.Column<string>(type: "text", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -72,6 +73,30 @@ namespace MrWho.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "AuditIntegrityRecords",
+                columns: table => new
+                {
+                    Id = table.Column<string>(type: "character varying(26)", maxLength: 26, nullable: false),
+                    TimestampUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    Category = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    Action = table.Column<string>(type: "character varying(150)", maxLength: 150, nullable: false),
+                    ActorType = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: true),
+                    ActorId = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
+                    SubjectType = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: true),
+                    SubjectId = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
+                    RealmId = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
+                    CorrelationId = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
+                    DataJson = table.Column<string>(type: "text", nullable: true),
+                    PreviousHash = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
+                    RecordHash = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    Version = table.Column<int>(type: "integer", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_AuditIntegrityRecords", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "AuditLogs",
                 columns: table => new
                 {
@@ -83,13 +108,53 @@ namespace MrWho.Migrations
                     EntityType = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
                     EntityId = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: false),
                     Action = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
-                    Changes = table.Column<string>(type: "character varying(8000)", maxLength: 8000, nullable: true),
+                    Changes = table.Column<string>(type: "text", nullable: true),
                     RealmId = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
                     ClientId = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_AuditLogs", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "ClaimTypes",
+                columns: table => new
+                {
+                    Id = table.Column<string>(type: "text", nullable: false),
+                    Type = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                    DisplayName = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                    Description = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
+                    Category = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
+                    IsStandard = table.Column<bool>(type: "boolean", nullable: false),
+                    IsEnabled = table.Column<bool>(type: "boolean", nullable: false),
+                    IsObsolete = table.Column<bool>(type: "boolean", nullable: false),
+                    SortOrder = table.Column<int>(type: "integer", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    CreatedBy = table.Column<string>(type: "text", nullable: true),
+                    UpdatedBy = table.Column<string>(type: "text", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ClaimTypes", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "Consents",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    UserId = table.Column<string>(type: "text", nullable: false),
+                    ClientId = table.Column<string>(type: "text", nullable: false),
+                    GrantedScopesJson = table.Column<string>(type: "text", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    Version = table.Column<int>(type: "integer", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_Consents", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -104,6 +169,33 @@ namespace MrWho.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_DataProtectionKeys", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "DeviceAuthorizations",
+                columns: table => new
+                {
+                    Id = table.Column<string>(type: "text", nullable: false),
+                    DeviceCode = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false),
+                    UserCode = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
+                    ClientId = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    Scope = table.Column<string>(type: "character varying(4000)", maxLength: 4000, nullable: true),
+                    Subject = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
+                    Status = table.Column<string>(type: "character varying(32)", maxLength: 32, nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    ExpiresAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    ApprovedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    DeniedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    ConsumedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    PollingIntervalSeconds = table.Column<int>(type: "integer", nullable: false),
+                    LastPolledAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    VerificationIp = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
+                    VerificationUserAgent = table.Column<string>(type: "character varying(512)", maxLength: 512, nullable: true),
+                    MetadataJson = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_DeviceAuthorizations", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -127,6 +219,29 @@ namespace MrWho.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_IdentityResources", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "KeyMaterials",
+                columns: table => new
+                {
+                    Id = table.Column<string>(type: "text", nullable: false),
+                    Use = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
+                    Kid = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    Algorithm = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    KeyType = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    KeySize = table.Column<int>(type: "integer", nullable: false),
+                    PrivateKeyPem = table.Column<string>(type: "text", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    ActivateAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    RetireAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    RevokedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    IsPrimary = table.Column<bool>(type: "boolean", nullable: false),
+                    Status = table.Column<int>(type: "integer", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_KeyMaterials", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -175,6 +290,49 @@ namespace MrWho.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "PendingClientRegistrations",
+                columns: table => new
+                {
+                    Id = table.Column<string>(type: "text", nullable: false),
+                    SubmittedByUserId = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
+                    SubmittedByUserName = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                    SubmittedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    Status = table.Column<int>(type: "integer", nullable: false),
+                    ReviewedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    ReviewedBy = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true),
+                    ReviewReason = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
+                    ClientName = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
+                    TokenEndpointAuthMethod = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
+                    Scope = table.Column<string>(type: "text", maxLength: 2000, nullable: true),
+                    RedirectUrisCsv = table.Column<string>(type: "text", maxLength: 4000, nullable: true),
+                    RawRequestJson = table.Column<string>(type: "text", nullable: false),
+                    CreatedClientDbId = table.Column<string>(type: "text", nullable: true),
+                    CreatedClientPublicId = table.Column<string>(type: "text", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_PendingClientRegistrations", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "PushedAuthorizationRequests",
+                columns: table => new
+                {
+                    Id = table.Column<string>(type: "text", nullable: false),
+                    RequestUri = table.Column<string>(type: "character varying(300)", maxLength: 300, nullable: false),
+                    ClientId = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    ParametersJson = table.Column<string>(type: "text", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    ExpiresAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    ConsumedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    ParametersHash = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_PushedAuthorizationRequests", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Realms",
                 columns: table => new
                 {
@@ -213,6 +371,14 @@ namespace MrWho.Migrations
                     RealmPolicyUri = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
                     RealmTosUri = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
                     RealmCustomCssUrl = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
+                    AudienceMode = table.Column<int>(type: "integer", nullable: true),
+                    PrimaryAudience = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
+                    IncludeAudInIdToken = table.Column<bool>(type: "boolean", nullable: true),
+                    RequireExplicitAudienceScope = table.Column<bool>(type: "boolean", nullable: true),
+                    DefaultJarMode = table.Column<int>(type: "integer", nullable: true),
+                    DefaultJarmMode = table.Column<int>(type: "integer", nullable: true),
+                    DefaultRequireSignedRequestObject = table.Column<bool>(type: "boolean", nullable: true),
+                    DefaultAllowedRequestObjectAlgs = table.Column<string>(type: "character varying(400)", maxLength: 400, nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     CreatedBy = table.Column<string>(type: "text", nullable: true),
@@ -221,6 +387,21 @@ namespace MrWho.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Realms", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "ReturnUrlEntries",
+                columns: table => new
+                {
+                    Id = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: false),
+                    Url = table.Column<string>(type: "character varying(4000)", maxLength: 4000, nullable: false),
+                    ClientId = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    ExpiresAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ReturnUrlEntries", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -244,6 +425,28 @@ namespace MrWho.Migrations
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Scopes", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "SecurityAuditEvents",
+                columns: table => new
+                {
+                    Id = table.Column<long>(type: "bigint", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    TimestampUtc = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    Category = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    EventType = table.Column<string>(type: "character varying(150)", maxLength: 150, nullable: false),
+                    Level = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: true),
+                    ActorUserId = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
+                    ActorClientId = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
+                    IpAddress = table.Column<string>(type: "character varying(64)", maxLength: 64, nullable: true),
+                    DataJson = table.Column<string>(type: "text", nullable: true),
+                    PrevHash = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: true),
+                    Hash = table.Column<string>(type: "character varying(128)", maxLength: 128, nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_SecurityAuditEvents", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -593,8 +796,10 @@ namespace MrWho.Migrations
                     AllowClientCredentialsFlow = table.Column<bool>(type: "boolean", nullable: false),
                     AllowPasswordFlow = table.Column<bool>(type: "boolean", nullable: false),
                     AllowRefreshTokenFlow = table.Column<bool>(type: "boolean", nullable: false),
+                    AllowDeviceCodeFlow = table.Column<bool>(type: "boolean", nullable: false),
                     RequirePkce = table.Column<bool>(type: "boolean", nullable: false),
                     RequireClientSecret = table.Column<bool>(type: "boolean", nullable: false),
+                    ParMode = table.Column<int>(type: "integer", nullable: true),
                     AccessTokenLifetime = table.Column<double>(type: "double precision", nullable: true),
                     RefreshTokenLifetime = table.Column<double>(type: "double precision", nullable: true),
                     AuthorizationCodeLifetime = table.Column<double>(type: "double precision", nullable: true),
@@ -651,21 +856,77 @@ namespace MrWho.Migrations
                     CustomJavaScriptUrl = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
                     ThemeName = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
                     PageTitlePrefix = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
+                    AllowPasskeyLogin = table.Column<bool>(type: "boolean", nullable: true),
+                    AllowQrLoginQuick = table.Column<bool>(type: "boolean", nullable: true),
+                    AllowQrLoginSecure = table.Column<bool>(type: "boolean", nullable: true),
+                    AllowCodeLogin = table.Column<bool>(type: "boolean", nullable: true),
+                    JarRsaPublicKeyPem = table.Column<string>(type: "text", nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     CreatedBy = table.Column<string>(type: "text", nullable: true),
                     UpdatedBy = table.Column<string>(type: "text", nullable: true),
-                    RealmId = table.Column<string>(type: "text", nullable: false)
+                    RealmId = table.Column<string>(type: "text", nullable: false),
+                    AudienceMode = table.Column<int>(type: "integer", nullable: true),
+                    PrimaryAudience = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
+                    IncludeAudInIdToken = table.Column<bool>(type: "boolean", nullable: true),
+                    RequireExplicitAudienceScope = table.Column<bool>(type: "boolean", nullable: true),
+                    RoleInclusionOverride = table.Column<int>(type: "integer", nullable: true),
+                    JarMode = table.Column<int>(type: "integer", nullable: true),
+                    JarmMode = table.Column<int>(type: "integer", nullable: true),
+                    RequireSignedRequestObject = table.Column<bool>(type: "boolean", nullable: true),
+                    AllowedRequestObjectAlgs = table.Column<string>(type: "character varying(400)", maxLength: 400, nullable: true)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_Clients", x => x.Id);
+                    table.UniqueConstraint("AK_Clients_ClientId", x => x.ClientId);
                     table.ForeignKey(
                         name: "FK_Clients_Realms_RealmId",
                         column: x => x.RealmId,
                         principalTable: "Realms",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "IdentityProviders",
+                columns: table => new
+                {
+                    Id = table.Column<string>(type: "text", nullable: false),
+                    Name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    DisplayName = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
+                    Type = table.Column<int>(type: "integer", nullable: false),
+                    IsEnabled = table.Column<bool>(type: "boolean", nullable: false),
+                    RealmId = table.Column<string>(type: "text", nullable: true),
+                    IconUri = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
+                    Order = table.Column<int>(type: "integer", nullable: false),
+                    Authority = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
+                    MetadataAddress = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
+                    ClientId = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
+                    ClientSecret = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
+                    Scopes = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
+                    ResponseType = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: true),
+                    UsePkce = table.Column<bool>(type: "boolean", nullable: true),
+                    GetClaimsFromUserInfoEndpoint = table.Column<bool>(type: "boolean", nullable: true),
+                    ClaimMappingsJson = table.Column<string>(type: "character varying(4000)", maxLength: 4000, nullable: true),
+                    SamlEntityId = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
+                    SamlSingleSignOnUrl = table.Column<string>(type: "character varying(2000)", maxLength: 2000, nullable: true),
+                    SamlCertificate = table.Column<string>(type: "character varying(4000)", maxLength: 4000, nullable: true),
+                    SamlWantAssertionsSigned = table.Column<bool>(type: "boolean", nullable: true),
+                    SamlValidateIssuer = table.Column<bool>(type: "boolean", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    CreatedBy = table.Column<string>(type: "text", nullable: true),
+                    UpdatedBy = table.Column<string>(type: "text", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_IdentityProviders", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_IdentityProviders_Realms_RealmId",
+                        column: x => x.RealmId,
+                        principalTable: "Realms",
+                        principalColumn: "Id");
                 });
 
             migrationBuilder.CreateTable(
@@ -790,6 +1051,27 @@ namespace MrWho.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "ClientAudiences",
+                columns: table => new
+                {
+                    Id = table.Column<string>(type: "text", nullable: false),
+                    ClientId = table.Column<string>(type: "text", nullable: false),
+                    Audience = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    CreatedBy = table.Column<string>(type: "text", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ClientAudiences", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_ClientAudiences_Clients_ClientId",
+                        column: x => x.ClientId,
+                        principalTable: "Clients",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "ClientPermissions",
                 columns: table => new
                 {
@@ -847,6 +1129,27 @@ namespace MrWho.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "ClientRoles",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    Name = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                    NormalizedName = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: false),
+                    ClientId = table.Column<string>(type: "character varying(200)", nullable: false),
+                    ConcurrencyStamp = table.Column<string>(type: "character varying(40)", maxLength: 40, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ClientRoles", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_ClientRoles_Clients_ClientId",
+                        column: x => x.ClientId,
+                        principalTable: "Clients",
+                        principalColumn: "ClientId",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "ClientScopes",
                 columns: table => new
                 {
@@ -859,6 +1162,32 @@ namespace MrWho.Migrations
                     table.PrimaryKey("PK_ClientScopes", x => x.Id);
                     table.ForeignKey(
                         name: "FK_ClientScopes_Clients_ClientId",
+                        column: x => x.ClientId,
+                        principalTable: "Clients",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "ClientSecretHistories",
+                columns: table => new
+                {
+                    Id = table.Column<string>(type: "text", nullable: false),
+                    ClientId = table.Column<string>(type: "text", nullable: false),
+                    SecretHash = table.Column<string>(type: "text", maxLength: 2000, nullable: false),
+                    Algo = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    LastUsedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    ExpiresAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    Status = table.Column<int>(type: "integer", nullable: false),
+                    IsCompromised = table.Column<bool>(type: "boolean", nullable: false),
+                    EncryptedSecret = table.Column<string>(type: "character varying(4000)", maxLength: 4000, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ClientSecretHistories", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_ClientSecretHistories_Clients_ClientId",
                         column: x => x.ClientId,
                         principalTable: "Clients",
                         principalColumn: "Id",
@@ -888,6 +1217,58 @@ namespace MrWho.Migrations
                         name: "FK_ClientUsers_Clients_ClientId",
                         column: x => x.ClientId,
                         principalTable: "Clients",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "ClientIdentityProviders",
+                columns: table => new
+                {
+                    Id = table.Column<string>(type: "text", nullable: false),
+                    ClientId = table.Column<string>(type: "text", nullable: false),
+                    IdentityProviderId = table.Column<string>(type: "text", nullable: false),
+                    DisplayNameOverride = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
+                    IsEnabled = table.Column<bool>(type: "boolean", nullable: true),
+                    Order = table.Column<int>(type: "integer", nullable: true),
+                    OptionsJson = table.Column<string>(type: "character varying(4000)", maxLength: 4000, nullable: true),
+                    ClaimMappingsJson = table.Column<string>(type: "character varying(4000)", maxLength: 4000, nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    CreatedBy = table.Column<string>(type: "text", nullable: true),
+                    UpdatedBy = table.Column<string>(type: "text", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_ClientIdentityProviders", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_ClientIdentityProviders_Clients_ClientId",
+                        column: x => x.ClientId,
+                        principalTable: "Clients",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                    table.ForeignKey(
+                        name: "FK_ClientIdentityProviders_IdentityProviders_IdentityProviderId",
+                        column: x => x.IdentityProviderId,
+                        principalTable: "IdentityProviders",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "UserClientRoles",
+                columns: table => new
+                {
+                    UserId = table.Column<string>(type: "text", nullable: false),
+                    ClientRoleId = table.Column<Guid>(type: "uuid", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_UserClientRoles", x => new { x.UserId, x.ClientRoleId });
+                    table.ForeignKey(
+                        name: "FK_UserClientRoles_ClientRoles_ClientRoleId",
+                        column: x => x.ClientRoleId,
+                        principalTable: "ClientRoles",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
@@ -953,9 +1334,42 @@ namespace MrWho.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_AuditIntegrityRecords_Category",
+                table: "AuditIntegrityRecords",
+                column: "Category");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_AuditIntegrityRecords_TimestampUtc",
+                table: "AuditIntegrityRecords",
+                column: "TimestampUtc");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_AuditLogs_EntityType_EntityId_OccurredAt",
                 table: "AuditLogs",
                 columns: new[] { "EntityType", "EntityId", "OccurredAt" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ClaimTypes_Type",
+                table: "ClaimTypes",
+                column: "Type",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ClientAudiences_ClientId_Audience",
+                table: "ClientAudiences",
+                columns: new[] { "ClientId", "Audience" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ClientIdentityProviders_ClientId_IdentityProviderId",
+                table: "ClientIdentityProviders",
+                columns: new[] { "ClientId", "IdentityProviderId" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ClientIdentityProviders_IdentityProviderId",
+                table: "ClientIdentityProviders",
+                column: "IdentityProviderId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_ClientPermissions_ClientId_Permission",
@@ -976,6 +1390,12 @@ namespace MrWho.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_ClientRoles_ClientId_NormalizedName",
+                table: "ClientRoles",
+                columns: new[] { "ClientId", "NormalizedName" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Clients_ClientId",
                 table: "Clients",
                 column: "ClientId",
@@ -993,6 +1413,16 @@ namespace MrWho.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_ClientSecretHistories_ClientId_CreatedAt",
+                table: "ClientSecretHistories",
+                columns: new[] { "ClientId", "CreatedAt" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ClientSecretHistories_ClientId_Status",
+                table: "ClientSecretHistories",
+                columns: new[] { "ClientId", "Status" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_ClientUsers_ClientId_UserId",
                 table: "ClientUsers",
                 columns: new[] { "ClientId", "UserId" },
@@ -1002,6 +1432,12 @@ namespace MrWho.Migrations
                 name: "IX_ClientUsers_UserId",
                 table: "ClientUsers",
                 column: "UserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Consents_UserId_ClientId",
+                table: "Consents",
+                columns: new[] { "UserId", "ClientId" },
+                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_DeviceAuthenticationLogs_ActivityType_OccurredAt",
@@ -1024,6 +1460,33 @@ namespace MrWho.Migrations
                 columns: new[] { "UserId", "OccurredAt" });
 
             migrationBuilder.CreateIndex(
+                name: "IX_DeviceAuthorizations_ClientId_Status",
+                table: "DeviceAuthorizations",
+                columns: new[] { "ClientId", "Status" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_DeviceAuthorizations_DeviceCode",
+                table: "DeviceAuthorizations",
+                column: "DeviceCode",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_DeviceAuthorizations_Status_ExpiresAt",
+                table: "DeviceAuthorizations",
+                columns: new[] { "Status", "ExpiresAt" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_DeviceAuthorizations_UserCode",
+                table: "DeviceAuthorizations",
+                column: "UserCode");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_IdentityProviders_RealmId_Name",
+                table: "IdentityProviders",
+                columns: new[] { "RealmId", "Name" },
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_IdentityResourceClaims_IdentityResourceId_ClaimType",
                 table: "IdentityResourceClaims",
                 columns: new[] { "IdentityResourceId", "ClaimType" },
@@ -1040,6 +1503,22 @@ namespace MrWho.Migrations
                 table: "IdentityResources",
                 column: "Name",
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_KeyMaterials_Kid",
+                table: "KeyMaterials",
+                column: "Kid",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_KeyMaterials_Use_IsPrimary",
+                table: "KeyMaterials",
+                columns: new[] { "Use", "IsPrimary" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_KeyMaterials_Use_Status_ActivateAt",
+                table: "KeyMaterials",
+                columns: new[] { "Use", "Status", "ActivateAt" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_OpenIddictApplications_ClientId",
@@ -1075,6 +1554,11 @@ namespace MrWho.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_PendingClientRegistrations_Status_SubmittedAt",
+                table: "PendingClientRegistrations",
+                columns: new[] { "Status", "SubmittedAt" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_PersistentQrSessions_ApprovedByDeviceId",
                 table: "PersistentQrSessions",
                 column: "ApprovedByDeviceId");
@@ -1101,10 +1585,31 @@ namespace MrWho.Migrations
                 columns: new[] { "UserId", "Status" });
 
             migrationBuilder.CreateIndex(
+                name: "IX_PushedAuthorizationRequests_ClientId_ExpiresAt",
+                table: "PushedAuthorizationRequests",
+                columns: new[] { "ClientId", "ExpiresAt" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_PushedAuthorizationRequests_ExpiresAt",
+                table: "PushedAuthorizationRequests",
+                column: "ExpiresAt");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_PushedAuthorizationRequests_RequestUri",
+                table: "PushedAuthorizationRequests",
+                column: "RequestUri",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "IX_Realms_Name",
                 table: "Realms",
                 column: "Name",
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_ReturnUrlEntries_ExpiresAt",
+                table: "ReturnUrlEntries",
+                column: "ExpiresAt");
 
             migrationBuilder.CreateIndex(
                 name: "IX_ScopeClaims_ScopeId_ClaimType",
@@ -1119,10 +1624,20 @@ namespace MrWho.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_SecurityAuditEvents_TimestampUtc_Category",
+                table: "SecurityAuditEvents",
+                columns: new[] { "TimestampUtc", "Category" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_TokenStatisticsSnapshots_Granularity_PeriodStartUtc",
                 table: "TokenStatisticsSnapshots",
                 columns: new[] { "Granularity", "PeriodStartUtc" },
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_UserClientRoles_ClientRoleId_UserId",
+                table: "UserClientRoles",
+                columns: new[] { "ClientRoleId", "UserId" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_UserDevices_DeviceId",
@@ -1180,7 +1695,19 @@ namespace MrWho.Migrations
                 name: "AspNetUserTokens");
 
             migrationBuilder.DropTable(
+                name: "AuditIntegrityRecords");
+
+            migrationBuilder.DropTable(
                 name: "AuditLogs");
+
+            migrationBuilder.DropTable(
+                name: "ClaimTypes");
+
+            migrationBuilder.DropTable(
+                name: "ClientAudiences");
+
+            migrationBuilder.DropTable(
+                name: "ClientIdentityProviders");
 
             migrationBuilder.DropTable(
                 name: "ClientPermissions");
@@ -1195,7 +1722,13 @@ namespace MrWho.Migrations
                 name: "ClientScopes");
 
             migrationBuilder.DropTable(
+                name: "ClientSecretHistories");
+
+            migrationBuilder.DropTable(
                 name: "ClientUsers");
+
+            migrationBuilder.DropTable(
+                name: "Consents");
 
             migrationBuilder.DropTable(
                 name: "DataProtectionKeys");
@@ -1204,10 +1737,16 @@ namespace MrWho.Migrations
                 name: "DeviceAuthenticationLogs");
 
             migrationBuilder.DropTable(
+                name: "DeviceAuthorizations");
+
+            migrationBuilder.DropTable(
                 name: "IdentityResourceClaims");
 
             migrationBuilder.DropTable(
                 name: "IdentityResourceProperties");
+
+            migrationBuilder.DropTable(
+                name: "KeyMaterials");
 
             migrationBuilder.DropTable(
                 name: "OpenIddictScopes");
@@ -1216,13 +1755,28 @@ namespace MrWho.Migrations
                 name: "OpenIddictTokens");
 
             migrationBuilder.DropTable(
+                name: "PendingClientRegistrations");
+
+            migrationBuilder.DropTable(
                 name: "PersistentQrSessions");
+
+            migrationBuilder.DropTable(
+                name: "PushedAuthorizationRequests");
+
+            migrationBuilder.DropTable(
+                name: "ReturnUrlEntries");
 
             migrationBuilder.DropTable(
                 name: "ScopeClaims");
 
             migrationBuilder.DropTable(
+                name: "SecurityAuditEvents");
+
+            migrationBuilder.DropTable(
                 name: "TokenStatisticsSnapshots");
+
+            migrationBuilder.DropTable(
+                name: "UserClientRoles");
 
             migrationBuilder.DropTable(
                 name: "UserProfiles");
@@ -1237,7 +1791,7 @@ namespace MrWho.Migrations
                 name: "AspNetRoles");
 
             migrationBuilder.DropTable(
-                name: "Clients");
+                name: "IdentityProviders");
 
             migrationBuilder.DropTable(
                 name: "IdentityResources");
@@ -1252,13 +1806,19 @@ namespace MrWho.Migrations
                 name: "Scopes");
 
             migrationBuilder.DropTable(
-                name: "Realms");
+                name: "ClientRoles");
 
             migrationBuilder.DropTable(
                 name: "OpenIddictApplications");
 
             migrationBuilder.DropTable(
                 name: "AspNetUsers");
+
+            migrationBuilder.DropTable(
+                name: "Clients");
+
+            migrationBuilder.DropTable(
+                name: "Realms");
         }
     }
 }

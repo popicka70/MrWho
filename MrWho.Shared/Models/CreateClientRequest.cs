@@ -41,6 +41,8 @@ public class CreateClientRequest
     public JarmMode? JarmMode { get; set; }
     public bool? RequireSignedRequestObject { get; set; }
     public string? AllowedRequestObjectAlgs { get; set; }
+    
+    [StringLength(8000)] public string? JarRsaPublicKeyPem { get; set; } // NEW: optional RSA public key (PEM, public only) for RS* JAR
 
     public TimeSpan? AccessTokenLifetime { get; set; }
     public TimeSpan? RefreshTokenLifetime { get; set; }
