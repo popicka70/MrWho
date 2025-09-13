@@ -107,7 +107,7 @@ builder.Services.AddAuthentication(options =>
     options.SignInScheme = demo1CookieScheme;
     options.Authority = "https://localhost:7113"; // Identity Server
     options.ClientId = "mrwho_demo1";
-    options.ClientSecret = "FTZvvlIIFdmtBg7IdBql9EEXRDj1xwLmi1qW9fGbJBY";
+    options.ClientSecret = "PyfrZln6d2ifAbdL_2gr316CERUMyzfpgmxJ1J3xJsWUnfHGakcvjWenB_OwQqnv";
     options.ResponseType = OpenIdConnectResponseType.Code;
     
     // Scopes

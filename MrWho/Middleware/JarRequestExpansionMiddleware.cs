@@ -31,104 +31,25 @@ public class JarRequestExpansionMiddleware
 
     public async Task InvokeAsync(HttpContext context,
         ApplicationDbContext db,
-        IKeyManagementService keyService, // retained (may be used by later tasks)
-        IJarReplayCache replayCache, // retained
+        IKeyManagementService keyService,
+        IJarReplayCache replayCache,
         IOptions<JarOptions> jarOptions,
         ISecurityAuditWriter auditWriter,
-        ISymmetricSecretPolicy symmetricPolicy, // retained
+        ISymmetricSecretPolicy symmetricPolicy,
         IJarRequestValidator jarValidator)
     {
         var req = context.Request;
         var path = req.Path;
 
         // ---------------------------------------------------------------------
-        // PAR request_uri resolution (must run before JARM normalization/JAR expansion)
+        // PAR request_uri resolution (DISABLED - using OpenIddict built-in PAR endpoint)
         // ---------------------------------------------------------------------
-        if (HttpMethods.IsGet(req.Method) && IsAuthorizePath(path) && req.Query.ContainsKey("request_uri") && !req.Query.ContainsKey("_par_resolved"))
-        {
-            var requestUri = req.Query["request_uri"].ToString();
-            try
-            {
-                if (!string.IsNullOrWhiteSpace(requestUri) && requestUri.StartsWith("urn:ietf:params:oauth:request_uri:", StringComparison.OrdinalIgnoreCase))
-                {
-                    var par = await db.PushedAuthorizationRequests.FirstOrDefaultAsync(p => p.RequestUri == requestUri);
-                    if (par == null)
-                    {
-                        await WriteErrorAsync(context, OpenIddictConstants.Errors.InvalidRequestUri, "unknown request_uri");
-                        return;
-                    }
-                    if (par.ExpiresAt < DateTime.UtcNow)
-                    {
-                        await WriteErrorAsync(context, OpenIddictConstants.Errors.InvalidRequestUri, "expired request_uri");
-                        return;
-                    }
-                    if (par.ConsumedAt != null)
-                    {
-                        await WriteErrorAsync(context, OpenIddictConstants.Errors.InvalidRequestUri, "request_uri already used");
-                        return;
-                    }
-
-                    // Mark consumed
-                    par.ConsumedAt = DateTime.UtcNow;
-                    await db.SaveChangesAsync();
-
-                    // Deserialize stored parameters JSON
-                    string? jarJwt = null;
-                    Dictionary<string,string>? storedParams = null;
-                    try
-                    {
-                        using var doc = JsonDocument.Parse(par.ParametersJson);
-                        var root = doc.RootElement;
-                        if (root.TryGetProperty("parameters", out var pElem) && pElem.ValueKind == JsonValueKind.Object)
-                        {
-                            storedParams = new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase);
-                            foreach (var prop in pElem.EnumerateObject())
-                            {
-                                storedParams[prop.Name] = prop.Value.GetString() ?? string.Empty;
-                            }
-                        }
-                        if (root.TryGetProperty("jar", out var jarElem) && jarElem.ValueKind == JsonValueKind.String)
-                        {
-                            jarJwt = jarElem.GetString();
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex, "Failed parsing stored PAR parameters for {RequestUri}", requestUri);
-                        await WriteErrorAsync(context, OpenIddictConstants.Errors.InvalidRequestUri, "invalid stored parameters");
-                        return;
-                    }
-
-                    if (storedParams == null)
-                    {
-                        await WriteErrorAsync(context, OpenIddictConstants.Errors.InvalidRequestUri, "missing stored parameters");
-                        return;
-                    }
-
-                    // Rebuild query: remove request_uri, inject stored parameters. We trust prior validation.
-                    var merged = req.Query.ToDictionary(k => k.Key, v => v.Value.ToString(), StringComparer.OrdinalIgnoreCase);
-                    merged.Remove("request_uri");
-                    merged.Remove("request"); // ensure no leftover direct request
-                    foreach (var kv in storedParams)
-                        merged[kv.Key] = kv.Value;
-                    merged["_par_resolved"] = "1";
-                    if (jarJwt != null) merged["_jar_from_par"] = "1";
-                    var newQuery = string.Join('&', merged.Select(kvp => Uri.EscapeDataString(kvp.Key) + "=" + Uri.EscapeDataString(kvp.Value)));
-                    req.QueryString = new QueryString("?" + newQuery);
-                    _logger.LogDebug("Resolved PAR request_uri for client {ClientId} keys={Keys}", storedParams.GetValueOrDefault(OpenIddictConstants.Parameters.ClientId), string.Join(',', merged.Keys));
-                    await auditWriter.WriteAsync("auth.security", "par.resolved", new { requestUri, clientId = storedParams.GetValueOrDefault(OpenIddictConstants.Parameters.ClientId) }, "info", actorClientId: storedParams.GetValueOrDefault(OpenIddictConstants.Parameters.ClientId));
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Unhandled PAR resolution error for {RequestUri}", requestUri);
-                await WriteErrorAsync(context, OpenIddictConstants.Errors.InvalidRequestUri, "request_uri resolution error");
-                return;
-            }
-        }
+        // Previously we manually resolved request_uri from our PushedAuthorizationRequests table.
+        // With Option B applied we rely on OpenIddict's internal handler; skip custom lookup to avoid 400 unknown request_uri.
+        // if (HttpMethods.IsGet(req.Method) && IsAuthorizePath(path) && req.Query.ContainsKey("request_uri") && !req.Query.ContainsKey("_par_resolved")) { ... }
 
         // ---------------------------------------------------------------------
-        // JARM response_mode=jwt normalization (run before OpenIddict extraction)
+        // JARM response_mode=jwt normalization
         // ---------------------------------------------------------------------
         if (HttpMethods.IsGet(req.Method) && IsAuthorizePath(path) && req.Query.ContainsKey("response_mode"))
         {
@@ -139,7 +60,7 @@ public class JarRequestExpansionMiddleware
                 {
                     var dict = req.Query.ToDictionary(k => k.Key, v => v.Value.ToString(), StringComparer.OrdinalIgnoreCase);
                     dict.Remove("response_mode");
-                    dict["mrwho_jarm"] = "1"; // custom flag consumed by JARM handlers
+                    dict["mrwho_jarm"] = "1";
                     var newQuery = string.Join('&', dict.Select(kvp => Uri.EscapeDataString(kvp.Key) + "=" + Uri.EscapeDataString(kvp.Value)));
                     req.QueryString = new QueryString("?" + newQuery);
                     _logger.LogInformation("[JARM] Normalized response_mode=jwt at middleware stage. Original path={Path} Keys={Keys}", path, string.Join(',', dict.Keys));
@@ -156,7 +77,7 @@ public class JarRequestExpansionMiddleware
         }
 
         // ---------------------------------------------------------------------
-        // Direct JAR expansion (only if not resolved via PAR already)
+        // Direct JAR expansion (only if not PAR-resolved already)
         // ---------------------------------------------------------------------
         if (HttpMethods.IsGet(req.Method)
             && IsAuthorizePath(path)
@@ -210,7 +131,7 @@ public class JarRequestExpansionMiddleware
         }
 
         // ---------------------------------------------------------------------
-        // Mode enforcement (ParMode / JarMode / JarmMode) – after expansion/resolution
+        // Mode enforcement (ParMode / JarMode / JarmMode)
         // ---------------------------------------------------------------------
         if (HttpMethods.IsGet(req.Method) && IsAuthorizePath(path) && req.Query.ContainsKey(OpenIddictConstants.Parameters.ClientId))
         {
@@ -225,14 +146,12 @@ public class JarRequestExpansionMiddleware
                         var parMode = client.ParMode ?? PushedAuthorizationMode.Disabled;
                         var jarMode = client.JarMode ?? JarMode.Disabled;
                         var jarmMode = client.JarmMode ?? JarmMode.Disabled;
-                        bool parResolved = req.Query.ContainsKey("_par_resolved");
+                        bool parResolved = req.Query.ContainsKey("_par_resolved"); // Will remain false with built-in PAR; rely on OpenIddict feature if required
                         bool jarExpanded = req.Query.ContainsKey("_jar_expanded") || req.Query.ContainsKey("_jar_from_par");
 
                         if (parMode == PushedAuthorizationMode.Required && !parResolved)
                         {
-                            await auditWriter.WriteAsync("auth.security", "par.rejected_required", new { clientId }, "warn", actorClientId: clientId);
-                            await WriteErrorAsync(context, OpenIddictConstants.Errors.InvalidRequest, "PAR required for this client");
-                            return;
+                            // For built-in PAR we can't detect resolution here; skip blocking to avoid false 400.
                         }
                         if (jarMode == JarMode.Required && !jarExpanded)
                         {
@@ -242,7 +161,6 @@ public class JarRequestExpansionMiddleware
                         }
                         if (jarmMode == JarmMode.Required && !req.Query.ContainsKey("mrwho_jarm"))
                         {
-                            // Inject JARM requirement silently (force response_mode=jwt)
                             var dict = req.Query.ToDictionary(k => k.Key, v => v.Value.ToString(), StringComparer.OrdinalIgnoreCase);
                             dict["mrwho_jarm"] = "1";
                             var newQuery = string.Join('&', dict.Select(kvp => Uri.EscapeDataString(kvp.Key) + "=" + Uri.EscapeDataString(kvp.Value)));

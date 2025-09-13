@@ -41,6 +41,7 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
     private readonly IJarReplayCache _jarReplayCache;
     private readonly IOptions<JarOptions> _jarOptions;
     private readonly ISecurityAuditWriter _audit;
+    private readonly IClientSecretService _clientSecretService; // new
     private const string MfaCookiePrefix = ".MrWho.Mfa.";
 
     private static readonly string[] MfaAmrValues = new[] { "mfa", "fido2" };
@@ -60,7 +61,8 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         IKeyManagementService keyService,
         IJarReplayCache jarReplayCache,
         IOptions<JarOptions> jarOptions,
-        ISecurityAuditWriter audit)
+        ISecurityAuditWriter audit,
+        IClientSecretService clientSecretService) // inject
     {
         _userManager = userManager;
         _signInManager = signInManager;
@@ -75,6 +77,7 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         _jarReplayCache = jarReplayCache;
         _jarOptions = jarOptions;
         _audit = audit;
+        _clientSecretService = clientSecretService; // assign
     }
 
     public async Task<IResult> HandleAuthorizationRequestAsync(HttpContext context)
@@ -493,9 +496,10 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
             };
             if (alg.StartsWith("HS", StringComparison.OrdinalIgnoreCase))
             {
-                if (string.IsNullOrWhiteSpace(dbClient.ClientSecret) || Encoding.UTF8.GetByteCount(dbClient.ClientSecret) < 32)
-                    return new { error = OpenIddictConstants.Errors.InvalidRequestObject, error_description = "client secret insufficient for HS signature" };
-                parameters.IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(dbClient.ClientSecret));
+                var plainSecret = await _clientSecretService.GetActivePlaintextAsync(dbClient.ClientId, httpContext.RequestAborted);
+                if (string.IsNullOrWhiteSpace(plainSecret) || Encoding.UTF8.GetByteCount(plainSecret) < 32)
+                    return new { error = OpenIddictConstants.Errors.InvalidRequestObject, error_description = "client secret length below policy" };
+                parameters.IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(plainSecret));
             }
             else if (alg.StartsWith("RS", StringComparison.OrdinalIgnoreCase))
             {
@@ -504,7 +508,6 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
             }
             else
             {
-                // Defer other algs to later phases
                 return new { error = OpenIddictConstants.Errors.InvalidRequestObject, error_description = "alg not supported" };
             }
             var jsonHandler = new JsonWebTokenHandler();
