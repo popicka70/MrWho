@@ -209,6 +209,55 @@ public class JarRequestExpansionMiddleware
             }
         }
 
+        // ---------------------------------------------------------------------
+        // Mode enforcement (ParMode / JarMode / JarmMode) – after expansion/resolution
+        // ---------------------------------------------------------------------
+        if (HttpMethods.IsGet(req.Method) && IsAuthorizePath(path) && req.Query.ContainsKey(OpenIddictConstants.Parameters.ClientId))
+        {
+            try
+            {
+                var clientId = req.Query[OpenIddictConstants.Parameters.ClientId].ToString();
+                if (!string.IsNullOrWhiteSpace(clientId))
+                {
+                    var client = await db.Clients.AsNoTracking().FirstOrDefaultAsync(c => c.ClientId == clientId);
+                    if (client != null)
+                    {
+                        var parMode = client.ParMode ?? PushedAuthorizationMode.Disabled;
+                        var jarMode = client.JarMode ?? JarMode.Disabled;
+                        var jarmMode = client.JarmMode ?? JarmMode.Disabled;
+                        bool parResolved = req.Query.ContainsKey("_par_resolved");
+                        bool jarExpanded = req.Query.ContainsKey("_jar_expanded") || req.Query.ContainsKey("_jar_from_par");
+
+                        if (parMode == PushedAuthorizationMode.Required && !parResolved)
+                        {
+                            await auditWriter.WriteAsync("auth.security", "par.rejected_required", new { clientId }, "warn", actorClientId: clientId);
+                            await WriteErrorAsync(context, OpenIddictConstants.Errors.InvalidRequest, "PAR required for this client");
+                            return;
+                        }
+                        if (jarMode == JarMode.Required && !jarExpanded)
+                        {
+                            await auditWriter.WriteAsync("auth.security", "jar.rejected_required", new { clientId }, "warn", actorClientId: clientId);
+                            await WriteErrorAsync(context, OpenIddictConstants.Errors.InvalidRequest, "request object required for this client");
+                            return;
+                        }
+                        if (jarmMode == JarmMode.Required && !req.Query.ContainsKey("mrwho_jarm"))
+                        {
+                            // Inject JARM requirement silently (force response_mode=jwt)
+                            var dict = req.Query.ToDictionary(k => k.Key, v => v.Value.ToString(), StringComparer.OrdinalIgnoreCase);
+                            dict["mrwho_jarm"] = "1";
+                            var newQuery = string.Join('&', dict.Select(kvp => Uri.EscapeDataString(kvp.Key) + "=" + Uri.EscapeDataString(kvp.Value)));
+                            req.QueryString = new QueryString("?" + newQuery);
+                            _logger.LogDebug("Enforced JARM for client {ClientId}", clientId);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Mode enforcement skipped due to error");
+            }
+        }
+
         await _next(context);
     }
 

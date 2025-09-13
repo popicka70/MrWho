@@ -18,9 +18,9 @@ _Status: in progress_
 ## Tier 2 – Policy Enforcement
 | ID | Item | Notes | Status |
 |----|------|-------|--------|
-| 5 | Enforce `ParMode` (Required) | Pending | [ ] |
-| 6 | Enforce `JarMode` (Required) | Pending | [ ] |
-| 7 | Enforce `JarmMode` (Required) | Pending | [ ] |
+| 5 | Enforce `ParMode` (Required) | Implemented in middleware (par.resolved check) | [x] |
+| 6 | Enforce `JarMode` (Required) | Implemented in middleware (jar_expanded/from_par) | [x] |
+| 7 | Enforce `JarmMode` (Required) | Middleware forces `mrwho_jarm` when required | [x] |
 | 8 | Conditional discovery augmentation | Pending refinement | [ ] |
 
 ## Tier 3 – Client Adjustments
@@ -69,7 +69,7 @@ _Status: in progress_
 3. JARM encryption (future) needed or signing only is sufficient short-term? (Current scope: signing only.)
 
 ## Next Immediate Actions
-- Implement Tier 2 policy enforcement (ParMode/JarMode/JarmMode) and re-enable demo client PAR.
+- Re-enable PAR for demo client (Tasks 9/10) and add combined flow tests.
 
 ---
 Generated automatically. Update status markers as tasks progress.
