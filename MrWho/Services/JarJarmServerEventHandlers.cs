@@ -121,18 +121,50 @@ internal sealed class DiscoveryAugmentationHandler : IOpenIddictServerHandler<Ap
     }
 }
 
-// Normalization handler: allow response_mode=jwt even if core validation doesn't know it.
-// We preserve the intent via a custom parameter and clear ResponseMode so default processing continues.
+// Normalization & enforcement handler: allow response_mode=jwt even if core validation doesn't know it.
+// Also enforce JarmMode=Required (client setting) by injecting mrwho_jarm=1 when response_mode not supplied.
 internal sealed class JarmResponseModeNormalizationHandler : IOpenIddictServerHandler<ValidateAuthorizationRequestContext>
 {
+    private readonly ApplicationDbContext _db;
+    private readonly ILogger<JarmResponseModeNormalizationHandler> _logger;
+    public JarmResponseModeNormalizationHandler(ApplicationDbContext db, ILogger<JarmResponseModeNormalizationHandler> logger)
+    { _db = db; _logger = logger; }
+
     public ValueTask HandleAsync(ValidateAuthorizationRequestContext context)
     {
         var request = context.Transaction?.Request ?? context.Request;
-        if (request != null && string.Equals(request.ResponseMode, "jwt", StringComparison.OrdinalIgnoreCase))
+        if (request == null) return ValueTask.CompletedTask;
+
+        // Explicit response_mode=jwt request -> normalize
+        if (string.Equals(request.ResponseMode, "jwt", StringComparison.OrdinalIgnoreCase))
         {
             request.SetParameter("mrwho_jarm", "1");
-            request.ResponseMode = null;
+            request.ResponseMode = null; // clear so OpenIddict doesn't reject unknown mode
             request.SetParameter(OpenIddictConstants.Parameters.ResponseMode, null);
+            return ValueTask.CompletedTask;
+        }
+
+        // Implicit enforcement when client has JarmMode=Required and caller omitted response_mode
+        // (don't overwrite if mrwho_jarm already present)
+        if (request.GetParameter("mrwho_jarm") is not null) return ValueTask.CompletedTask;
+        if (!string.IsNullOrEmpty(request.ClientId))
+        {
+            try
+            {
+                var required = _db.Clients.AsNoTracking()
+                    .Where(c => c.ClientId == request.ClientId)
+                    .Select(c => c.JarmMode)
+                    .FirstOrDefault();
+                if (required == JarmMode.Required)
+                {
+                    request.SetParameter("mrwho_jarm", "1");
+                    _logger.LogDebug("Enforced JARM (Required) for client {ClientId} by injecting mrwho_jarm=1", request.ClientId);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Failed to evaluate JarmMode enforcement for client {ClientId}", request.ClientId);
+            }
         }
         return ValueTask.CompletedTask;
     }
@@ -307,7 +339,7 @@ public static class JarJarmServerEventHandlers
             .SetType(OpenIddictServerHandlerType.Custom)
             .Build();
 
-    // Run early (before built-in validator) to normalize response_mode=jwt
+    // Run early (before built-in validator) to normalize and enforce JARM when required
     public static OpenIddictServerHandlerDescriptor NormalizeJarmResponseModeDescriptor { get; } =
         OpenIddictServerHandlerDescriptor.CreateBuilder<ValidateAuthorizationRequestContext>()
             .UseScopedHandler<JarmResponseModeNormalizationHandler>()
