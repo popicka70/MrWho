@@ -25,6 +25,7 @@ internal sealed class JarRequestValidator : IJarRequestValidator
     private readonly IKeyManagementService _keys;
     private readonly IJarReplayCache _replay;
     private readonly ISymmetricSecretPolicy _symPolicy;
+    private readonly IClientSecretService _secretService; // NEW: resolve plaintext via history
     private readonly JarOptions _options;
     private readonly ILogger<JarRequestValidator> _logger;
 
@@ -40,8 +41,17 @@ internal sealed class JarRequestValidator : IJarRequestValidator
         OpenIddict.Abstractions.OpenIddictConstants.Parameters.CodeChallengeMethod
     };
 
-    public JarRequestValidator(ApplicationDbContext db, IKeyManagementService keys, IJarReplayCache replay, ISymmetricSecretPolicy symPolicy, IOptions<JarOptions> options, ILogger<JarRequestValidator> logger)
-    { _db=db; _keys=keys; _replay=replay; _symPolicy=symPolicy; _options=options.Value; _logger=logger; }
+    public JarRequestValidator(
+        ApplicationDbContext db,
+        IKeyManagementService keys,
+        IJarReplayCache replay,
+        ISymmetricSecretPolicy symPolicy,
+        IClientSecretService secretService,
+        IOptions<JarOptions> options,
+        ILogger<JarRequestValidator> logger)
+    {
+        _db = db; _keys = keys; _replay = replay; _symPolicy = symPolicy; _secretService = secretService; _options = options.Value; _logger = logger;
+    }
 
     public async Task<JarValidationResult> ValidateAsync(string jwt, string? queryClientId, CancellationToken ct = default)
     {
@@ -95,11 +105,20 @@ internal sealed class JarRequestValidator : IJarRequestValidator
         bool isSymmetric = alg.StartsWith("HS", StringComparison.OrdinalIgnoreCase);
         if (isSymmetric)
         {
-            if (string.IsNullOrWhiteSpace(client.ClientSecret))
+            // Retrieve plaintext via secret history (client.ClientSecret is redaction placeholder)
+            string? plainSecret = await _secretService.GetActivePlaintextAsync(effectiveClientId, ct);
+            if (string.IsNullOrWhiteSpace(plainSecret))
+            {
+                _logger.LogDebug("HS* JAR validation failed: no active plaintext secret for client {ClientId}", effectiveClientId);
                 return new(false, OpenIddict.Abstractions.OpenIddictConstants.Errors.InvalidRequestObject, "client secret missing", effectiveClientId, alg, null);
-            var res = _symPolicy.ValidateForAlgorithm(alg.ToUpperInvariant(), client.ClientSecret);
-            if (!res.Success) return new(false, OpenIddict.Abstractions.OpenIddictConstants.Errors.InvalidRequestObject, "client secret length below policy", effectiveClientId, alg, null);
-            var keyBytes = Encoding.UTF8.GetBytes(client.ClientSecret);
+            }
+            var res = _symPolicy.ValidateForAlgorithm(alg.ToUpperInvariant(), plainSecret);
+            if (!res.Success)
+            {
+                _logger.LogDebug("HS* secret below policy for {ClientId} alg {Alg}: have {Have} need {Need}", effectiveClientId, alg, res.ActualBytes, res.RequiredBytes);
+                return new(false, OpenIddict.Abstractions.OpenIddictConstants.Errors.InvalidRequestObject, "client secret length below policy", effectiveClientId, alg, null);
+            }
+            var keyBytes = Encoding.UTF8.GetBytes(plainSecret);
             tvp.IssuerSigningKey = new SymmetricSecurityKey(keyBytes) { KeyId = $"client:{effectiveClientId}:hs" };
         }
         else if (alg.StartsWith("RS", StringComparison.OrdinalIgnoreCase))
