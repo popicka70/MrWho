@@ -41,6 +41,7 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
     private readonly IJarReplayCache _jarReplayCache;
     private readonly IOptions<JarOptions> _jarOptions;
     private readonly ISecurityAuditWriter _audit;
+    private readonly IClientSecretService _clientSecretService; // new
     private const string MfaCookiePrefix = ".MrWho.Mfa.";
 
     private static readonly string[] MfaAmrValues = new[] { "mfa", "fido2" };
@@ -60,7 +61,8 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         IKeyManagementService keyService,
         IJarReplayCache jarReplayCache,
         IOptions<JarOptions> jarOptions,
-        ISecurityAuditWriter audit)
+        ISecurityAuditWriter audit,
+        IClientSecretService clientSecretService) // inject
     {
         _userManager = userManager;
         _signInManager = signInManager;
@@ -75,6 +77,7 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         _jarReplayCache = jarReplayCache;
         _jarOptions = jarOptions;
         _audit = audit;
+        _clientSecretService = clientSecretService; // assign
     }
 
     public async Task<IResult> HandleAuthorizationRequestAsync(HttpContext context)
@@ -84,6 +87,13 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
 
         var clientId = request.ClientId ?? string.Empty;
         _logger.LogDebug("Authorization request received for client {ClientId}", clientId);
+
+        // Ensure nonce from raw query (in case JAR omitted it but client handler still sent it separately)
+        if (string.IsNullOrWhiteSpace(request.Nonce) && context.Request.Query.TryGetValue("nonce", out var rawNonce) && !string.IsNullOrWhiteSpace(rawNonce))
+        {
+            request.Nonce = rawNonce.ToString();
+            _logger.LogDebug("Applied nonce from query string: {Nonce}", request.Nonce);
+        }
 
         // JAR processing
         if (!string.IsNullOrEmpty(clientId))
@@ -403,6 +413,15 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         preferredUsernameClaim.SetDestinations(OpenIddictConstants.Destinations.AccessToken, OpenIddictConstants.Destinations.IdentityToken);
         claimsIdentity.AddClaim(preferredUsernameClaim);
 
+        // NEW: ensure nonce claim is emitted in ID token when a nonce was supplied on the authorization request (URL or JAR)
+        if (!string.IsNullOrWhiteSpace(request.Nonce))
+        {
+            var nonceClaim = new Claim(OpenIddictConstants.Claims.Nonce, request.Nonce!);
+            nonceClaim.SetDestinations(OpenIddictConstants.Destinations.IdentityToken);
+            // Do NOT add to access token (not needed there)
+            claimsIdentity.AddClaim(nonceClaim);
+        }
+
         await AddProfileClaimsAsync(claimsIdentity, authUser, request.GetScopes());
         var roles = await _userManager.GetRolesAsync(authUser);
         foreach (var role in roles)
@@ -493,9 +512,10 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
             };
             if (alg.StartsWith("HS", StringComparison.OrdinalIgnoreCase))
             {
-                if (string.IsNullOrWhiteSpace(dbClient.ClientSecret) || Encoding.UTF8.GetByteCount(dbClient.ClientSecret) < 32)
-                    return new { error = OpenIddictConstants.Errors.InvalidRequestObject, error_description = "client secret insufficient for HS signature" };
-                parameters.IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(dbClient.ClientSecret));
+                var plainSecret = await _clientSecretService.GetActivePlaintextAsync(dbClient.ClientId, httpContext.RequestAborted);
+                if (string.IsNullOrWhiteSpace(plainSecret) || Encoding.UTF8.GetByteCount(plainSecret) < 32)
+                    return new { error = OpenIddictConstants.Errors.InvalidRequestObject, error_description = "client secret length below policy" };
+                parameters.IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(plainSecret));
             }
             else if (alg.StartsWith("RS", StringComparison.OrdinalIgnoreCase))
             {
@@ -504,7 +524,6 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
             }
             else
             {
-                // Defer other algs to later phases
                 return new { error = OpenIddictConstants.Errors.InvalidRequestObject, error_description = "alg not supported" };
             }
             var jsonHandler = new JsonWebTokenHandler();
@@ -565,6 +584,7 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
             CheckMismatch("redirect_uri", Get(OpenIddictConstants.Parameters.RedirectUri), request.RedirectUri);
             CheckMismatch("response_type", Get(OpenIddictConstants.Parameters.ResponseType), request.ResponseType);
             CheckMismatch("state", Get(OpenIddictConstants.Parameters.State), request.State);
+            CheckMismatch("nonce", Get(OpenIddictConstants.Parameters.Nonce), request.Nonce); // NEW: ensure nonce consistency
         }
         catch (InvalidOperationException mis)
         {
@@ -580,6 +600,8 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         if (!string.IsNullOrEmpty(respTypeJwt)) request.ResponseType = respTypeJwt;
         var stateJwt = Get(OpenIddictConstants.Parameters.State);
         if (!string.IsNullOrEmpty(stateJwt)) request.State = stateJwt;
+        var nonceJwt = Get(OpenIddictConstants.Parameters.Nonce); // NEW
+        if (!string.IsNullOrEmpty(nonceJwt)) request.Nonce = nonceJwt; // NEW preserve nonce for ID token
 
         return null; // success
     }

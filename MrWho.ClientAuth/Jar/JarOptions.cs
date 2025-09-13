@@ -48,6 +48,7 @@ public sealed class JarRequest
     public string? State { get; set; }
     public string? CodeChallenge { get; set; }
     public string? CodeChallengeMethod { get; set; } = "S256";
+    public string? Nonce { get; set; } // NEW
     public Dictionary<string,string> Extra { get; } = new(StringComparer.OrdinalIgnoreCase);
 }
 
@@ -86,6 +87,7 @@ internal sealed class JarRequestObjectSigner : IJarRequestObjectSigner
             claims["code_challenge"] = request.CodeChallenge;
             claims["code_challenge_method"] = request.CodeChallengeMethod ?? "S256";
         }
+        if (!string.IsNullOrWhiteSpace(request.Nonce)) claims["nonce"] = request.Nonce!; // NEW
         foreach (var kv in request.Extra)
             claims[kv.Key] = kv.Value;
         foreach (var s in _options.StaticClaims)

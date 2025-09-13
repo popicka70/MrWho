@@ -155,6 +155,15 @@ else
         </RadzenAlert>
     }
 
+    <RadzenFormField Text="RSA JAR Public Key (PEM)" Variant="Variant.Outlined">
+        <ChildContent>
+            <RadzenTextArea @bind-Value="model.JarRsaPublicKeyPem" Rows="6" Style="width:100%; font-family: monospace;" Placeholder="-----BEGIN PUBLIC KEY-----\nMIIBIjANBgkq...\n-----END PUBLIC KEY-----" />
+        </ChildContent>
+        <Helper>
+            <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Optional: Provide an RSA public key (PEM) to allow RS256 signed request objects. Leave empty to use server key fallback.</RadzenText>
+        </Helper>
+    </RadzenFormField>
+
     <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600 rz-mt-4">JARM (JWT Authorization Response Mode)</RadzenText>
     <RadzenFormField Text="JARM Mode" Variant="Variant.Outlined">
         <ChildContent>

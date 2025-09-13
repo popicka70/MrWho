@@ -14,6 +14,7 @@ public sealed class AuthorizationRequest
     public string? CodeChallenge { get; set; }
     public string? CodeChallengeMethod { get; set; } = "S256";
     public string? RequestObjectJwt { get; set; } // optional JAR value ("request" param)
+    public string? Nonce { get; set; } // NEW
     public Dictionary<string,string> Extra { get; } = new(StringComparer.OrdinalIgnoreCase);
     // Helper to copy from JAR model
     public static AuthorizationRequest FromJar(Jar.JarRequest jar)
@@ -26,7 +27,8 @@ public sealed class AuthorizationRequest
             ResponseType = jar.ResponseType,
             State = jar.State,
             CodeChallenge = jar.CodeChallenge,
-            CodeChallengeMethod = jar.CodeChallengeMethod
+            CodeChallengeMethod = jar.CodeChallengeMethod,
+            Nonce = jar.Nonce // NEW
         };
         foreach (var kv in jar.Extra) ar.Extra[kv.Key] = kv.Value;
         return ar;

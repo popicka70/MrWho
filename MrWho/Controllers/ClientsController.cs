@@ -202,7 +202,8 @@ public class ClientsController : ControllerBase
                 JarMode = c.JarMode,
                 JarmMode = c.JarmMode,
                 RequireSignedRequestObject = c.RequireSignedRequestObject,
-                AllowedRequestObjectAlgs = c.AllowedRequestObjectAlgs
+                AllowedRequestObjectAlgs = c.AllowedRequestObjectAlgs,
+                JarRsaPublicKeyPem = c.JarRsaPublicKeyPem
             })
             .ToListAsync();
 
@@ -328,7 +329,8 @@ public class ClientsController : ControllerBase
             JarMode = client.JarMode,
             JarmMode = client.JarmMode,
             RequireSignedRequestObject = client.RequireSignedRequestObject,
-            AllowedRequestObjectAlgs = client.AllowedRequestObjectAlgs
+            AllowedRequestObjectAlgs = client.AllowedRequestObjectAlgs,
+            JarRsaPublicKeyPem = client.JarRsaPublicKeyPem
         };
 
         return Ok(clientDto);
@@ -534,7 +536,8 @@ public class ClientsController : ControllerBase
             JarMode = client.JarMode,
             JarmMode = client.JarmMode,
             RequireSignedRequestObject = client.RequireSignedRequestObject,
-            AllowedRequestObjectAlgs = client.AllowedRequestObjectAlgs
+            AllowedRequestObjectAlgs = client.AllowedRequestObjectAlgs,
+            JarRsaPublicKeyPem = client.JarRsaPublicKeyPem
         };
         // Assigned users (by username/email only)
         var assignedUsers = await _context.ClientUsers
@@ -716,6 +719,18 @@ public class ClientsController : ControllerBase
                 foreach (var a in dto.Audiences.Distinct())
                 {
                     _context.ClientAudiences.Add(new ClientAudience { ClientId = client.Id, Audience = a });
+                }
+
+                // JARM key handling (import)
+                if (dto.JarRsaPublicKeyPem != null)
+                {
+                    // If provided, set directly (overrides any existing key)
+                    client.JarRsaPublicKeyPem = dto.JarRsaPublicKeyPem;
+                }
+                else if (client.JarRsaPublicKeyPem != null)
+                {
+                    // If not provided but existing, ensure it remains (reapply on update)
+                    dto.JarRsaPublicKeyPem = client.JarRsaPublicKeyPem;
                 }
 
                 await _context.SaveChangesAsync();
@@ -942,7 +957,8 @@ public class ClientsController : ControllerBase
                     JarMode = request.JarMode,
                     JarmMode = request.JarmMode,
                     RequireSignedRequestObject = request.RequireSignedRequestObject,
-                    AllowedRequestObjectAlgs = request.AllowedRequestObjectAlgs
+                    AllowedRequestObjectAlgs = request.AllowedRequestObjectAlgs,
+                    JarRsaPublicKeyPem = request.JarRsaPublicKeyPem
                 };
 
                 _context.Clients.Add(client);
@@ -1064,7 +1080,8 @@ public class ClientsController : ControllerBase
                     JarMode = client.JarMode,
                     JarmMode = client.JarmMode,
                     RequireSignedRequestObject = client.RequireSignedRequestObject,
-                    AllowedRequestObjectAlgs = client.AllowedRequestObjectAlgs
+                    AllowedRequestObjectAlgs = client.AllowedRequestObjectAlgs,
+                    JarRsaPublicKeyPem = client.JarRsaPublicKeyPem
                 };
 
                 return CreatedAtAction(nameof(GetClient), new { id = client.Id }, clientDto);
@@ -1211,6 +1228,7 @@ public class ClientsController : ControllerBase
                 if (request.JarmMode.HasValue) client.JarmMode = request.JarmMode;
                 if (request.RequireSignedRequestObject.HasValue) client.RequireSignedRequestObject = request.RequireSignedRequestObject;
                 if (request.AllowedRequestObjectAlgs != null) client.AllowedRequestObjectAlgs = request.AllowedRequestObjectAlgs; // allow explicit clearing via empty string handled by guard above
+                if (request.JarRsaPublicKeyPem != null) client.JarRsaPublicKeyPem = request.JarRsaPublicKeyPem;
 
                 client.UpdatedAt = now;
                 client.UpdatedBy = userName;

@@ -33,6 +33,7 @@ public class UpdateClientRequest
     public JarmMode? JarmMode { get; set; }
     public bool? RequireSignedRequestObject { get; set; }
     public string? AllowedRequestObjectAlgs { get; set; }
+    public string? JarRsaPublicKeyPem { get; set; } // NEW
 
     public TimeSpan? AccessTokenLifetime { get; set; }
     public TimeSpan? RefreshTokenLifetime { get; set; }

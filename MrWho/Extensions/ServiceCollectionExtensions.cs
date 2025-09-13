@@ -38,6 +38,7 @@ public static class ServiceCollectionExtensions
         services.AddMemoryCache();
         services.AddSingleton<IJarReplayCache, InMemoryJarReplayCache>();
         services.AddOptions<JarOptions>().BindConfiguration(JarOptions.SectionName);
+        services.AddScoped<IJarRequestValidator, JarRequestValidator>();
 
         // Register database access layer
         services.AddScoped<ISeedingService, SeedingService>();
@@ -343,15 +344,14 @@ public static class ServiceCollectionExtensions
                 // Custom UserInfo handler descriptor (uses IUserInfoHandler)
                 options.AddEventHandler(CustomUserInfoHandler.Descriptor);
 
-                // Endpoints (enable built-in PAR)
+                // Endpoints (custom PAR implemented in ParController)
                 options
                     .SetAuthorizationEndpointUris("/connect/authorize")
                     .SetTokenEndpointUris("/connect/token")
                     .SetEndSessionEndpointUris("/connect/logout")
                     .SetUserInfoEndpointUris("/connect/userinfo")
                     .SetRevocationEndpointUris("/connect/revocation")
-                    .SetIntrospectionEndpointUris("/connect/introspect")
-                    .SetPushedAuthorizationEndpointUris("/connect/par");
+                    .SetIntrospectionEndpointUris("/connect/introspect"); // removed SetPushedAuthorizationEndpointUris - custom controller will implement PAR
 
                 // Flows
                 options.AllowAuthorizationCodeFlow()
