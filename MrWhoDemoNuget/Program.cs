@@ -1,6 +1,6 @@
 using MrWho.ClientAuth;
 using MrWho.ClientAuth.M2M;
-using MrWho.ClientAuth.Par;
+using MrWho.ClientAuth.Jar; // JAR signer
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -10,12 +10,17 @@ builder.Services.AddRazorPages();
 var authority = builder.Configuration["Authentication:Authority"] ?? "https://localhost:7113";
 var clientSecret = builder.Configuration["Authentication:ClientSecret"];
 
-// PAR client
-builder.Services.AddMrWhoParClient(o =>
+// Register JAR signer (HS256 with client secret for demo). For RS256 supply RsaPrivateKeyPem / certificate instead.
+if (!string.IsNullOrWhiteSpace(clientSecret))
 {
-    o.ParEndpoint = new Uri(authority.TrimEnd('/') + "/connect/par");
-    o.AutoPushQueryLengthThreshold = 400; // lower for demo
-});
+    builder.Services.AddMrWhoJarSigner(o =>
+    {
+        o.Algorithm = SecurityAlgorithms.HmacSha256; // matches default allowed list (RS256,HS256)
+        o.ClientSecret = clientSecret;              // must be >=32 bytes for HS256 (demo secret should satisfy)
+        o.Issuer = null;                            // defaults to client_id
+        o.Audience = "mrwho";                      // server-side expected audience
+    });
+}
 
 var apiBase = new Uri(builder.Configuration["DemoApi:BaseUrl"] ?? "https://localhost:7162/");
 
@@ -42,9 +47,14 @@ builder.Services.AddMrWhoAuthentication(options =>
     options.ClientSecret = clientSecret; // null for public
     options.SaveTokens = true;
     options.SignedOutCallbackPath = "/signout-callback-oidc";
-    options.AutoParPush = true; // enabled by default but explicit for clarity
-    options.EnableJar = true; // enabled by default but explicit for clarity
-    options.EnableJarm = true; // enabled by default but explicit for clarity
+
+    // Disable custom PAR logic (Option A)
+    options.AutoParPush = false;
+
+    // Enable JAR/JARM
+    options.EnableJar = true;
+    options.JarOnlyWhenLarge = false; // always send request=
+    options.EnableJarm = true;
 
     options.Scopes.Clear();
     options.Scopes.Add("openid");
