@@ -56,7 +56,7 @@ public class PasswordGrantAndRefreshFlowTests
         {
             ["grant_type"] = "password",
             ["client_id"] = "mrwho_demo1",
-            ["client_secret"] = "FTZvvlIIFdmtBg7IdBql9EEXRDj1xwLmi1qW9fGbJBY",
+            ["client_secret"] = "PyfrZln6d2ifAbdL_2gr316CERUMyzfpgmxJ1J3xJsWUnfHGakcvjWenB_OwQqnv",
             ["username"] = "demo1@example.com",
             ["password"] = "Dem0!User#2025",
             ["scope"] = "openid profile email offline_access"
