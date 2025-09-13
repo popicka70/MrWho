@@ -20,9 +20,9 @@ using OpenIddict.Client.SystemNetHttp;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Hosting;
 using MrWho.Handlers.Auth;
-using MrWho.Services.Mediator; // add mediator interfaces
-using Microsoft.AspNetCore.Mvc; // for IActionResult
-using MrWho.Services.Background; // contains JarOptions, IJarReplayCache, JarJarmServerEventHandlers
+using MrWho.Services.Mediator;
+using Microsoft.AspNetCore.Mvc;
+using MrWho.Services.Background;
 
 namespace MrWho.Extensions;
 
@@ -38,6 +38,7 @@ public static class ServiceCollectionExtensions
         services.AddMemoryCache();
         services.AddSingleton<IJarReplayCache, InMemoryJarReplayCache>();
         services.AddOptions<JarOptions>().BindConfiguration(JarOptions.SectionName);
+        services.AddScoped<IJarRequestValidator, JarRequestValidator>();
 
         // Register database access layer
         services.AddScoped<ISeedingService, SeedingService>();
@@ -325,7 +326,6 @@ public static class ServiceCollectionExtensions
 
     public static IServiceCollection AddMrWhoOpenIddict(this IServiceCollection services, IConfiguration configuration, IWebHostEnvironment environment)
     {
-        // Configure OpenIddict (core + server + validation)
         services.AddOpenIddict()
             .AddCore(options =>
             {
@@ -344,17 +344,14 @@ public static class ServiceCollectionExtensions
                 // Custom UserInfo handler descriptor (uses IUserInfoHandler)
                 options.AddEventHandler(CustomUserInfoHandler.Descriptor);
 
-                // Endpoints
+                // Endpoints (custom PAR implemented in ParController)
                 options
                     .SetAuthorizationEndpointUris("/connect/authorize")
                     .SetTokenEndpointUris("/connect/token")
                     .SetEndSessionEndpointUris("/connect/logout")
                     .SetUserInfoEndpointUris("/connect/userinfo")
                     .SetRevocationEndpointUris("/connect/revocation")
-                    .SetIntrospectionEndpointUris("/connect/introspect");
-
-                // NOTE: response_mode=jwt accepted via custom configuration/authorization response handlers (JarJarmServerEventHandlers)
-                // If additional normalization is required, implement inside those handlers instead of adding undefined event types here.
+                    .SetIntrospectionEndpointUris("/connect/introspect"); // removed SetPushedAuthorizationEndpointUris - custom controller will implement PAR
 
                 // Flows
                 options.AllowAuthorizationCodeFlow()
@@ -395,11 +392,7 @@ public static class ServiceCollectionExtensions
                     "roles.client",
                     "roles.all");
 
-                // Credentials: now provided by OpenIddictServerCredentialsConfigurator using persisted keys
-                // Access token format for demo
-                // Encryption toggle handled in post-configure as well
-
-                // JAR/JARM/PAR related: enable authorization request caching so large/signed requests (JAR) can be flowed safely
+                // JAR/JARM/PAR related: enable authorization request caching so large/signed requests can be handled
                 options.EnableAuthorizationRequestCaching();
 
                 // ASP.NET Core integration

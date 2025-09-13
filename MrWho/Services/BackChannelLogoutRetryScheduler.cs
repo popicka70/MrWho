@@ -143,13 +143,10 @@ public class BackChannelLogoutRetryScheduler : BackgroundService, IBackChannelLo
                     _logger.LogInformation("Retrying back-channel logout attempt {Attempt} for client {ClientId} (session={SessionId})", work.Attempt, work.ClientId, work.SessionId);
                     try
                     {
-                        // Notify (service will schedule further retry on failure). We assume success if no retry scheduled afterwards.
-                        var beforeCount = GetPendingRetryCount(work.ClientId, work.SessionId);
+                        // Invoke dispatch; the service will record attempt outcome #1 only. Scheduler must record its own attempt outcome (attempt>=2)
                         await service.NotifyClientLogoutAsync(work.ClientId, work.Subject, work.SessionId, null /* token */);
-                        var afterCount = GetPendingRetryCount(work.ClientId, work.SessionId);
-                        // Heuristic: if service did NOT schedule new retry yet and attempt < max, treat as success
-                        var success = true; // optimistic; service itself audits failure specifics
-                        ReportAttemptOutcome(work.ClientId, work.Subject, work.SessionId, work.Attempt, success, status: "ok", error: null);
+                        // For retry attempts (>=2), we optimistically mark success; on real failure, the service already scheduled further retry and reported outcome.
+                        ReportAttemptOutcome(work.ClientId, work.Subject, work.SessionId, work.Attempt, success: true, status: "ok", error: null);
                     }
                     catch (Exception ex)
                     {
@@ -166,10 +163,5 @@ public class BackChannelLogoutRetryScheduler : BackgroundService, IBackChannelLo
             }
             await Task.Delay(2000, stoppingToken);
         }
-    }
-
-    private int GetPendingRetryCount(string clientId, string sessionId)
-    {
-        lock (_deferred) return _deferred.Count(d => d.ClientId == clientId && d.SessionId == sessionId);
     }
 }

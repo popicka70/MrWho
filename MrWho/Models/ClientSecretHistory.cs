@@ -29,4 +29,12 @@ public class ClientSecretHistory
     public ClientSecretStatus Status { get; set; } = ClientSecretStatus.Active;
 
     public bool IsCompromised { get; set; }
+
+    /// <summary>
+    /// Encrypted (reversible) copy of the plaintext secret for HMAC (HS*) JAR validation.
+    /// Null for legacy records created before introduction of reversible storage.
+    /// Protected with ASP.NET Data Protection (purpose: MrWho.ClientSecret.V1).
+    /// </summary>
+    [StringLength(4000)]
+    public string? EncryptedSecret { get; set; }
 }

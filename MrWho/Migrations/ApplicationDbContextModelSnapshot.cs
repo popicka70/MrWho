@@ -709,6 +709,9 @@ namespace MrWho.Migrations
                     b.Property<int?>("JarMode")
                         .HasColumnType("integer");
 
+                    b.Property<string>("JarRsaPublicKeyPem")
+                        .HasColumnType("text");
+
                     b.Property<int?>("JarmMode")
                         .HasColumnType("integer");
 
@@ -1058,6 +1061,10 @@ namespace MrWho.Migrations
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EncryptedSecret")
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
 
                     b.Property<DateTime?>("ExpiresAt")
                         .HasColumnType("timestamp with time zone");
