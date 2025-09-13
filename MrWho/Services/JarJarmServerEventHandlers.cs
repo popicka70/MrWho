@@ -47,8 +47,9 @@ internal sealed class DiscoveryAugmentationHandler : IOpenIddictServerHandler<Ap
         if (resp is null) return ValueTask.CompletedTask;
         try
         {
+            // Advertise support for both request and request_uri parameters since custom PAR/JAR are implemented.
             resp[OpenIddictConstants.Metadata.RequestParameterSupported] = true;
-            resp[OpenIddictConstants.Metadata.RequestUriParameterSupported] = false;
+            resp[OpenIddictConstants.Metadata.RequestUriParameterSupported] = true; // CHANGED from false -> true (PAR front-channel uses request_uri)
             resp["authorization_response_iss_parameter_supported"] = true;
             // Merge/ensure jwt response mode
             var current = resp[OpenIddictConstants.Metadata.ResponseModesSupported];
@@ -110,7 +111,7 @@ internal sealed class DiscoveryAugmentationHandler : IOpenIddictServerHandler<Ap
             }
             using var algsDoc = JsonDocument.Parse("[" + string.Join(',', algs.Select(a => $"\"{a}\"")) + "]");
             resp[OpenIddictConstants.Metadata.RequestObjectSigningAlgValuesSupported] = algsDoc.RootElement.Clone();
-            _logger.LogDebug("Discovery metadata augmented (request_object_signing_alg_values_supported={Algs})", string.Join(',', algs));
+            _logger.LogDebug("Discovery metadata augmented (request_object_signing_alg_values_supported={Algs}, request_uri_supported=true)", string.Join(',', algs));
         }
         catch (Exception ex)
         {
