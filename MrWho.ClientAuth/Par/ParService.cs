@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Web;
 using MrWho.ClientAuth.Jar;
+using System.Security.Cryptography; // NEW for nonce
 
 namespace MrWho.ClientAuth.Par;
 
@@ -21,8 +22,19 @@ internal sealed class PushedAuthorizationService : IPushedAuthorizationService
         _jarSigner = services.GetService(typeof(IJarRequestObjectSigner)) as IJarRequestObjectSigner;
     }
 
+    private static string GenerateNonce(int bytes = 16)
+    {
+        var data = RandomNumberGenerator.GetBytes(bytes);
+        var b64 = Convert.ToBase64String(data).Replace('+','-').Replace('/','_').TrimEnd('=');
+        return b64;
+    }
+
     public async Task<(ParResult? Result, ParError? Error)> PushAsync(AuthorizationRequest request, CancellationToken ct = default)
     {
+        // Ensure nonce exists (OIDC best practice) prior to JAR/PAR
+        if (string.IsNullOrWhiteSpace(request.Nonce))
+            request.Nonce = GenerateNonce();
+
         // Auto-create JAR if requested and not already set
         if (_options.AutoJar && _jarSigner != null && string.IsNullOrEmpty(request.RequestObjectJwt))
         {
@@ -34,7 +46,8 @@ internal sealed class PushedAuthorizationService : IPushedAuthorizationService
                 ResponseType = request.ResponseType,
                 State = request.State,
                 CodeChallenge = request.CodeChallenge,
-                CodeChallengeMethod = request.CodeChallengeMethod ?? "S256"
+                CodeChallengeMethod = request.CodeChallengeMethod ?? "S256",
+                Nonce = request.Nonce
             };
             foreach (var kv in request.Extra) jarReq.Extra[kv.Key] = kv.Value;
             request.RequestObjectJwt = await _jarSigner.CreateRequestObjectAsync(jarReq, ct);
@@ -54,6 +67,7 @@ internal sealed class PushedAuthorizationService : IPushedAuthorizationService
         };
         if (!string.IsNullOrWhiteSpace(request.Scope)) form.Add(new("scope", request.Scope));
         if (!string.IsNullOrWhiteSpace(request.State)) form.Add(new("state", request.State));
+        if (!string.IsNullOrWhiteSpace(request.Nonce)) form.Add(new("nonce", request.Nonce)); // add nonce to PAR payload
         if (!string.IsNullOrWhiteSpace(request.CodeChallenge))
         {
             form.Add(new("code_challenge", request.CodeChallenge));
@@ -107,23 +121,35 @@ internal sealed class PushedAuthorizationService : IPushedAuthorizationService
         }
         else
         {
+            (ParResult? Result, ParError? Error) emptyErr = (null, new ParError { Error = "http_" + (int)resp.StatusCode, ErrorDescription = body, StatusCode = (int)resp.StatusCode });
             try
             {
-                using var doc = JsonDocument.Parse(body);
-                var root = doc.RootElement;
-                var err = root.TryGetProperty("error", out var errEl) ? errEl.GetString() ?? "invalid_request" : "invalid_request";
-                var desc = root.TryGetProperty("error_description", out var dEl) ? dEl.GetString() : null;
-                return (null, new ParError { Error = err, ErrorDescription = desc, StatusCode = (int)resp.StatusCode });
+                if (string.IsNullOrWhiteSpace(body))
+                {
+                    return emptyErr;
+                }
+                else
+                {
+                    using var doc = JsonDocument.Parse(body);
+                    var root = doc.RootElement;
+                    var err = root.TryGetProperty("error", out var errEl) ? errEl.GetString() ?? "invalid_request" : "invalid_request";
+                    var desc = root.TryGetProperty("error_description", out var dEl) ? dEl.GetString() : null;
+                    return (null, new ParError { Error = err, ErrorDescription = desc, StatusCode = (int)resp.StatusCode });
+                }
             }
             catch
             {
-                return (null, new ParError { Error = "http_" + (int)resp.StatusCode, ErrorDescription = body, StatusCode = (int)resp.StatusCode });
+                return emptyErr;
             }
         }
     }
 
     public async Task<Uri> BuildAuthorizeUrlAsync(AuthorizationRequest request, CancellationToken ct = default)
     {
+        // Ensure nonce pre-populated for front-channel fallback
+        if (string.IsNullOrWhiteSpace(request.Nonce))
+            request.Nonce = GenerateNonce();
+
         var authorizeEndpoint = _options.AuthorizeEndpoint ?? new Uri(_options.ParEndpoint.GetLeftPart(UriPartial.Authority) + "/connect/authorize");
         if (request.Extra.TryGetValue("request_uri", out var existing))
         {
@@ -165,7 +191,8 @@ internal sealed class PushedAuthorizationService : IPushedAuthorizationService
                 ResponseType = request.ResponseType,
                 State = request.State,
                 CodeChallenge = request.CodeChallenge,
-                CodeChallengeMethod = request.CodeChallengeMethod ?? "S256"
+                CodeChallengeMethod = request.CodeChallengeMethod ?? "S256",
+                Nonce = request.Nonce
             };
             foreach (var kv in request.Extra) jarReq.Extra[kv.Key] = kv.Value;
             request.RequestObjectJwt = await _jarSigner.CreateRequestObjectAsync(jarReq, ct);
@@ -182,6 +209,7 @@ internal sealed class PushedAuthorizationService : IPushedAuthorizationService
         qb["response_type"] = req.ResponseType;
         if (!string.IsNullOrWhiteSpace(req.Scope)) qb["scope"] = req.Scope;
         if (!string.IsNullOrWhiteSpace(req.State)) qb["state"] = req.State;
+        if (!string.IsNullOrWhiteSpace(req.Nonce)) qb["nonce"] = req.Nonce; // ensure nonce appears in direct authorization URL
         if (!string.IsNullOrWhiteSpace(req.CodeChallenge))
         {
             qb["code_challenge"] = req.CodeChallenge;

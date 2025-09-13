@@ -8,6 +8,8 @@ using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 using System.Security.Claims;
 using Microsoft.IdentityModel.Tokens;
 using MrWho.ClientAuth.Jar;
+using MrWho.ClientAuth.Par; // NEW PAR
+using Microsoft.Extensions.Logging; // add logging extensions
 
 namespace MrWho.ClientAuth;
 
@@ -91,7 +93,8 @@ public static class MrWhoClientAuthBuilderExtensions
             {
                 OnRedirectToIdentityProvider = async ctx =>
                 {
-                    // Ensure authorize endpoint normalized
+                    var logger = ctx.HttpContext.RequestServices.GetService<Microsoft.Extensions.Logging.ILoggerFactory>()?.CreateLogger("MrWho.ClientAuth.Redirect");
+                    // Normalize authorize endpoint
                     var authority = ctx.Options.Authority?.TrimEnd('/') ?? string.Empty;
                     if (!string.IsNullOrEmpty(authority))
                     {
@@ -100,14 +103,66 @@ public static class MrWhoClientAuthBuilderExtensions
                             ctx.ProtocolMessage.IssuerAddress = desiredAuthorize;
                     }
 
-                    // JARM: set response_mode=jwt if requested
+                    // JARM
                     if (options.EnableJarm && (options.ForceJarm || string.IsNullOrEmpty(ctx.ProtocolMessage.ResponseMode)))
                     {
                         ctx.ProtocolMessage.ResponseMode = "jwt";
                     }
 
-                    // JAR: produce request object if signer registered and conditions satisfied
-                    if (options.EnableJar)
+                    bool parAttempted = false;
+                    if (options.AutoParPush)
+                    {
+                        try
+                        {
+                            var parService = ctx.HttpContext.RequestServices.GetService<IPushedAuthorizationService>();
+                            if (parService != null)
+                            {
+                                parAttempted = true;
+                                var authReq = new Par.AuthorizationRequest
+                                {
+                                    ClientId = ctx.ProtocolMessage.ClientId!,
+                                    RedirectUri = ctx.ProtocolMessage.RedirectUri!,
+                                    Scope = ctx.ProtocolMessage.Scope,
+                                    ResponseType = ctx.ProtocolMessage.ResponseType!,
+                                    State = ctx.ProtocolMessage.State,
+                                    CodeChallenge = ctx.ProtocolMessage.GetParameter("code_challenge"),
+                                    CodeChallengeMethod = ctx.ProtocolMessage.GetParameter("code_challenge_method"),
+                                    Nonce = ctx.ProtocolMessage.Nonce
+                                };
+                                // Preserve response_mode (e.g. jwt for JARM)
+                                if (!string.IsNullOrEmpty(ctx.ProtocolMessage.ResponseMode))
+                                    authReq.Extra["response_mode"] = ctx.ProtocolMessage.ResponseMode;
+                                // If caller already put any custom params, replicate (none by default)
+                                var (result, error) = await parService.PushAsync(authReq, ctx.HttpContext.RequestAborted);
+                                if (result != null)
+                                {
+                                    // Replace outgoing parameters with PAR reference
+                                    var state = ctx.ProtocolMessage.State; // keep state duplication optional
+                                    var responseMode = ctx.ProtocolMessage.ResponseMode;
+                                    ctx.ProtocolMessage.Parameters.Clear();
+                                    ctx.ProtocolMessage.ClientId = authReq.ClientId;
+                                    ctx.ProtocolMessage.SetParameter("request_uri", result.RequestUri);
+                                    if (!string.IsNullOrEmpty(state)) ctx.ProtocolMessage.State = state; // optional (server also has it)
+                                    if (!string.IsNullOrEmpty(responseMode)) ctx.ProtocolMessage.ResponseMode = responseMode;
+                                    logger?.LogDebug("[PAR] request_uri={ReqUri} stateDup={HasState} rm={RM}", result.RequestUri, !string.IsNullOrEmpty(state), responseMode);
+                                    // Skip local JAR since request is now stored server-side (JAR may have been embedded during push if options.AutoJar)
+                                    externalConfigure?.Invoke(ctx.Options);
+                                    return; // done
+                                }
+                                else if (error != null)
+                                {
+                                    logger?.LogWarning("[PAR] push failed {Err} {Desc}; falling back to direct auth (and JAR if enabled)", error.Error, error.ErrorDescription);
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            logger?.LogWarning(ex, "[PAR] unexpected failure; continuing without PAR");
+                        }
+                    }
+
+                    // Local JAR only if PAR not used or failed
+                    if (options.EnableJar && !parAttempted)
                     {
                         try
                         {
@@ -117,7 +172,6 @@ public static class MrWhoClientAuthBuilderExtensions
                                 bool needJar = true;
                                 if (options.JarOnlyWhenLarge)
                                 {
-                                    // approximate current query length if we didn't use JAR yet
                                     var scope = ctx.ProtocolMessage.Scope ?? string.Join(' ', ctx.Options.Scope);
                                     var approx = $"client_id={ctx.ProtocolMessage.ClientId}&redirect_uri={ctx.ProtocolMessage.RedirectUri}&response_type={ctx.ProtocolMessage.ResponseType}&scope={scope}&state={ctx.ProtocolMessage.State}";
                                     needJar = approx.Length > options.JarQueryLengthThreshold;
@@ -132,10 +186,10 @@ public static class MrWhoClientAuthBuilderExtensions
                                         ResponseType = ctx.ProtocolMessage.ResponseType!,
                                         State = ctx.ProtocolMessage.State,
                                         CodeChallenge = ctx.ProtocolMessage.GetParameter("code_challenge"),
-                                        CodeChallengeMethod = ctx.ProtocolMessage.GetParameter("code_challenge_method")
+                                        CodeChallengeMethod = ctx.ProtocolMessage.GetParameter("code_challenge_method"),
+                                        // NOTE: nonce is added later in server pipeline; we don't have direct access here pre-generation
                                     };
                                     var jwt = await signer.CreateRequestObjectAsync(jarReq, ctx.HttpContext.RequestAborted);
-                                    // Replace parameters with single request object (keep state)
                                     var state = ctx.ProtocolMessage.State;
                                     ctx.ProtocolMessage.Parameters.Clear();
                                     ctx.ProtocolMessage.ClientId = jarReq.ClientId;
@@ -147,7 +201,7 @@ public static class MrWhoClientAuthBuilderExtensions
                                 }
                             }
                         }
-                        catch { /* fail open (fallback to normal authorize) */ }
+                        catch { /* fail open */ }
                     }
 
                     externalConfigure?.Invoke(ctx.Options);
