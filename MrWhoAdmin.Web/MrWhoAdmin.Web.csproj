@@ -8,9 +8,13 @@
 
 	<ItemGroup>
 	  <Compile Remove="Components\Dialogs\**" />
+	  <Compile Remove="Models\**" />
 	  <Content Remove="Components\Dialogs\**" />
+	  <Content Remove="Models\**" />
 	  <EmbeddedResource Remove="Components\Dialogs\**" />
+	  <EmbeddedResource Remove="Models\**" />
 	  <None Remove="Components\Dialogs\**" />
+	  <None Remove="Models\**" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -26,7 +30,6 @@
 
 	<ItemGroup>
 	  <Folder Include="Components\Dialogs\" />
-	  <Folder Include="Models\" />
 	</ItemGroup>
 
 	<ItemGroup>
