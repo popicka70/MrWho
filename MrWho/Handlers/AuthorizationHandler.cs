@@ -85,69 +85,7 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         var clientId = request.ClientId ?? string.Empty;
         _logger.LogDebug("Authorization request received for client {ClientId}", clientId);
 
-        // Resolve pushed authorization request if request_uri present
-        if (!string.IsNullOrEmpty(request.RequestUri) && request.RequestUri.StartsWith("urn:ietf:params:oauth:request_uri:", StringComparison.OrdinalIgnoreCase))
-        {
-            try
-            {
-                var parId = request.RequestUri.Split(':').Last();
-                var par = await _context.Set<PushedAuthorizationRequest>().FirstOrDefaultAsync(p => p.Id == parId);
-                if (par != null)
-                {
-                    if (par.ExpiresAt < DateTime.UtcNow)
-                    {
-                        await _audit.WriteAsync(SecurityAudit.ParExpired, new { clientId = par.ClientId, requestUri = par.RequestUri }, "warn", actorClientId: par.ClientId);
-                        return Results.BadRequest(new { error = OpenIddictConstants.Errors.InvalidRequest, error_description = "request_uri expired" });
-                    }
-                    if (par.ConsumedAt != null)
-                    {
-                        await _audit.WriteAsync(SecurityAudit.ParReuseAttempt, new { clientId = par.ClientId, requestUri = par.RequestUri }, "warn", actorClientId: par.ClientId);
-                        return Results.BadRequest(new { error = OpenIddictConstants.Errors.InvalidRequest, error_description = "request_uri already used" });
-                    }
-                    // Merge stored parameters into current request (original precedence maintained)
-                    var stored = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(par.ParametersJson) ?? new();
-                    foreach (var kv in stored)
-                    {
-                        // Only set if not already provided on query
-                        if (request.GetParameter(kv.Key) is null)
-                        {
-                            request.SetParameter(kv.Key, kv.Value);
-                        }
-                    }
-                    par.ConsumedAt = DateTime.UtcNow;
-                    await _context.SaveChangesAsync();
-                    await _audit.WriteAsync(SecurityAudit.ParConsumed, new { clientId = par.ClientId, requestUri = par.RequestUri }, "info", actorClientId: par.ClientId);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogDebug(ex, "Failed to resolve PAR request_uri {RequestUri}", request.RequestUri);
-            }
-        }
-
-        // PAR required enforcement (if client requires but no request_uri present)
-        try
-        {
-            if (!string.IsNullOrEmpty(clientId))
-            {
-                var parClient = await _context.Clients.AsNoTracking().FirstOrDefaultAsync(c => c.ClientId == clientId);
-                var parMode = parClient?.ParMode ?? PushedAuthorizationMode.Disabled;
-                var hasRequestUri = !string.IsNullOrEmpty(request.RequestUri);
-                if (parMode == PushedAuthorizationMode.Required && !hasRequestUri)
-                {
-                    await _audit.WriteAsync(SecurityAudit.ParRequiredMissing, new { clientId, reason = "par_mode_required_no_request_uri" }, "warn", actorClientId: clientId);
-                    return Results.BadRequest(new { error = OpenIddictConstants.Errors.InvalidRequest, error_description = "PAR required: use request_uri from pushed authorization request" });
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogDebug(ex, "PAR enforcement check failed for {ClientId}", clientId);
-        }
-
-        // ---------------------------------------------------------------------
-        // JAR (JWT Secured Authorization Request) processing (preview Phase 1.5)
-        // ---------------------------------------------------------------------
+        // JAR processing
         if (!string.IsNullOrEmpty(clientId))
         {
             try
@@ -174,7 +112,6 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
                         var maxBytes = _jarOptions.Value.MaxRequestObjectBytes;
                         if (maxBytes > 0 && Encoding.UTF8.GetByteCount(requestJwt) > maxBytes)
                         {
-                            _logger.LogWarning("JAR object too large for client {ClientId}", clientId);
                             return Results.BadRequest(new { error = OpenIddictConstants.Errors.InvalidRequestObject, error_description = "request object too large" });
                         }
                         var jarResult = await ValidateAndApplyJarAsync(dbClient, requestJwt, request, context);
@@ -191,11 +128,8 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
                 return Results.BadRequest(new { error = OpenIddictConstants.Errors.InvalidRequestObject, error_description = "invalid request object" });
             }
         }
-        // ---------------------------------------------------------------------
 
-        // ---------------------------------------------------------------------
-        // Early validation of requested scopes against client allowed list
-        // ---------------------------------------------------------------------
+        // Early scope validation
         try
         {
             var requestedScopes = request.GetScopes().ToList();
@@ -211,7 +145,6 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
                     var missing = requestedScopes.Where(s => !allowed.Contains(s)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
                     if (missing.Count > 0)
                     {
-                        _logger.LogInformation("Authorization request for client {ClientId} contains disallowed scopes: {Scopes}", clientId, string.Join(", ", missing));
                         var currentUrl = context.Request.GetDisplayUrl();
                         var url = "/connect/invalid-scopes?clientId=" + Uri.EscapeDataString(clientId) +
                                   "&returnUrl=" + Uri.EscapeDataString(currentUrl) +
@@ -226,11 +159,10 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         {
             _logger.LogError(ex, "Failed during early scope validation for client {ClientId}", clientId);
         }
-        // ---------------------------------------------------------------------
 
         ClaimsPrincipal? clientPrincipal = null;
-        IdentityUser? authUser = null; // The user we will authorize
-        ClaimsPrincipal? amrSource = null; // For AMR propagation
+        IdentityUser? authUser = null;
+        ClaimsPrincipal? amrSource = null;
 
         // 1) Try client-specific cookie first
         try
@@ -248,10 +180,7 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
                         amrSource = clientPrincipal;
                     }
                 }
-                else
-                {
-                    clientPrincipal = null;
-                }
+                else clientPrincipal = null;
             }
         }
         catch (Exception ex)
@@ -353,7 +282,7 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
             return Results.Redirect(accessDeniedUrl);
         }
 
-        // Consent / MFA logic unchanged below -------------------------------------------------
+        // Consent
         try
         {
             try
@@ -391,6 +320,7 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         }
 
         SKIP_CONSENT:
+        // MFA enforcement
         try
         {
             var dbClient = await _context.Clients.Include(c => c.Realm).FirstOrDefaultAsync(c => c.ClientId == clientId);
@@ -403,8 +333,7 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
                     var allowedList = new List<string>();
                     if (!string.IsNullOrWhiteSpace(allowedMethodsJson))
                     {
-                        try { allowedList = System.Text.Json.JsonSerializer.Deserialize<List<string>>(allowedMethodsJson!) ?? new(); }
-                        catch { allowedList = new(); }
+                        try { allowedList = System.Text.Json.JsonSerializer.Deserialize<List<string>>(allowedMethodsJson!) ?? new(); } catch { allowedList = new(); }
                     }
                     if (allowedList.Count == 0) allowedList = new List<string> { "totp", "fido2", "passkey" };
 
@@ -443,26 +372,20 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
                     if (!amrOk)
                     {
                         var originalAuthorizeUrl = context.Request.GetDisplayUrl();
-                        var passkeyAllowed = allowedList.Any(m => m.Equals("fido2", StringComparison.OrdinalIgnoreCase) || m.Equals("passkey", StringComparison.OrdinalIgnoreCase));
-                        var totpAllowed = allowedList.Any(m => m.Equals("totp", StringComparison.OrdinalIgnoreCase));
                         bool userHasWebAuthn = await _context.WebAuthnCredentials.AnyAsync(c => c.UserId == authUser.Id);
                         bool userTotpEnabled = await _userManager.GetTwoFactorEnabledAsync(authUser);
-
-                        if (totpAllowed && userTotpEnabled)
-                            return Results.Redirect("/mfa/challenge?returnUrl=" + Uri.EscapeDataString(originalAuthorizeUrl));
-                        if (passkeyAllowed && userHasWebAuthn)
-                            return Results.Redirect($"/connect/login?mode=passkey&returnUrl={Uri.EscapeDataString(originalAuthorizeUrl)}&clientId={Uri.EscapeDataString(clientId)}");
-                        if (totpAllowed && !userTotpEnabled)
-                            return Results.Redirect("/mfa/setup?returnUrl=" + Uri.EscapeDataString(originalAuthorizeUrl));
-                        if (passkeyAllowed)
-                            return Results.Redirect($"/connect/login?mode=passkey&returnUrl={Uri.EscapeDataString(originalAuthorizeUrl)}&clientId={Uri.EscapeDataString(clientId)}");
+                        var passkeyAllowed = allowedList.Any(m => m.Equals("fido2", StringComparison.OrdinalIgnoreCase) || m.Equals("passkey", StringComparison.OrdinalIgnoreCase));
+                        var totpAllowed = allowedList.Any(m => m.Equals("totp", StringComparison.OrdinalIgnoreCase));
+                        if (totpAllowed && userTotpEnabled) return Results.Redirect("/mfa/challenge?returnUrl=" + Uri.EscapeDataString(originalAuthorizeUrl));
+                        if (passkeyAllowed && userHasWebAuthn) return Results.Redirect($"/connect/login?mode=passkey&returnUrl={Uri.EscapeDataString(originalAuthorizeUrl)}&clientId={Uri.EscapeDataString(clientId)}");
+                        if (totpAllowed && !userTotpEnabled) return Results.Redirect("/mfa/setup?returnUrl=" + Uri.EscapeDataString(originalAuthorizeUrl));
+                        if (passkeyAllowed) return Results.Redirect($"/connect/login?mode=passkey&returnUrl={Uri.EscapeDataString(originalAuthorizeUrl)}&clientId={Uri.EscapeDataString(clientId)}");
                         return Results.Redirect("/mfa/challenge?returnUrl=" + Uri.EscapeDataString(originalAuthorizeUrl));
                     }
                 }
             }
         }
-        catch (Exception ex)
-        { _logger.LogWarning(ex, "MFA enforcement failed for client {ClientId}", clientId); }
+        catch (Exception ex) { _logger.LogWarning(ex, "MFA enforcement failed {ClientId}", clientId); }
 
         // Build principal
         var claimsIdentity = new ClaimsIdentity(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
@@ -518,16 +441,14 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
             var dbClient = await _context.Clients.Include(c => c.Realm).FirstOrDefaultAsync(c => c.ClientId == clientId);
             if (dbClient != null)
             {
-                var codeTtl = dbClient.GetEffectiveAuthorizationCodeLifetime();
-                authPrincipal.SetAuthorizationCodeLifetime(codeTtl);
+                authPrincipal.SetAuthorizationCodeLifetime(dbClient.GetEffectiveAuthorizationCodeLifetime());
             }
         }
         catch (Exception ex) { _logger.LogWarning(ex, "Failed to set code lifetime for {ClientId}", clientId); }
 
         if (!await _dynamicCookieService.IsAuthenticatedForClientAsync(clientId))
         {
-            try { await _dynamicCookieService.SignInWithClientCookieAsync(clientId, authUser, false); }
-            catch (Exception ex) { _logger.LogDebug(ex, "Client cookie sign-in failed {ClientId}", clientId); }
+            try { await _dynamicCookieService.SignInWithClientCookieAsync(clientId, authUser, false); } catch { }
         }
 
         _logger.LogDebug("Authorization granted for user {UserName} and client {ClientId}", authUser.UserName, clientId);

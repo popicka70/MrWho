@@ -3,6 +3,7 @@
 > Documentation: [Device Authorization (RFC 8628) Custom Implementation](docs/DEVICE_FLOW.md)
 > Comprehensive Implementation Guide: [IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
 > Persistent Keys & Rotation: [Persistent Signing & Encryption Keys](docs/PERSISTENT_KEYS.md)
+> Client OIDC Configuration (NuGet, PAR & JAR): [Client Configuration Guide](docs/client-oidc-configuration.md)
 
 A modular, multi-tenant (realm‑aware) OpenID Connect / OAuth 2.1 identity service built on .NET 9, ASP.NET Core Identity and OpenIddict. Includes an administration UI (Blazor + Radzen) and dynamic runtime configuration for clients, realms, scopes, resources, claim types and authentication cookies.
 
@@ -188,6 +189,11 @@ builder.Services.AddMrWhoAuthentication(o =>
   o.ClientSecret = "optional-secret"; // confidential clients
   o.Scopes.Add("api.read");
 });
+```
+Optional helpers (PAR, JAR, APIs): see [Client Configuration Guide](docs/client-oidc-configuration.md)
+```
+builder.Services.AddMrWhoJarSigner(o => { /* signer */ });
+builder.Services.AddMrWhoParClient(o => { /* PAR */ });
 ```
 Optional helpers for per-user or client credentials APIs:
 ```

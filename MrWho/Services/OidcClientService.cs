@@ -124,17 +124,10 @@ public partial class OidcClientService : IOidcClientService
         var descriptor = new OpenIddictApplicationDescriptor
         {
             ClientId = client.ClientId,
+            ClientSecret = client.ClientSecret,
             DisplayName = client.Name,
             ClientType = client.ClientType == ClientType.Public ? OpenIddictConstants.ClientTypes.Public : OpenIddictConstants.ClientTypes.Confidential
         };
-
-        // Only propagate a concrete secret to OpenIddict when we actually have one.
-        // When the local Client.ClientSecret is the redaction marker from hashing ("{HASHED}"),
-        // skip setting ClientSecret so OpenIddict keeps its current stored hash.
-        if (!string.IsNullOrWhiteSpace(client.ClientSecret) && !string.Equals(client.ClientSecret, "{HASHED}", StringComparison.Ordinal))
-        {
-            descriptor.ClientSecret = client.ClientSecret;
-        }
 
         if (client.AllowAuthorizationCodeFlow)
         {
@@ -150,7 +143,7 @@ public partial class OidcClientService : IOidcClientService
             descriptor.Permissions.Add(OpenIddictConstants.Permissions.GrantTypes.RefreshToken);
         descriptor.Permissions.Add(OpenIddictConstants.Permissions.Endpoints.Token);
 
-        // PAR handling by enum mode
+        // PAR mode handling
         if (client.ParMode is PushedAuthorizationMode.Enabled or PushedAuthorizationMode.Required)
         {
             descriptor.Permissions.Add(OpenIddictConstants.Permissions.Endpoints.PushedAuthorization);
@@ -165,7 +158,7 @@ public partial class OidcClientService : IOidcClientService
         if (hasOpenId)
             descriptor.Permissions.Add(OpenIddictConstants.Permissions.Endpoints.EndSession);
 
-        // Add endpoint permissions using correct dot notation literals (if constants not exposed by current package version)
+        // endpoint access
         if (client.AllowAccessToUserInfoEndpoint == true && hasOpenId)
             descriptor.Permissions.Add(UserInfoEndpointPermission);
         if (client.AllowAccessToRevocationEndpoint == true)
@@ -177,7 +170,6 @@ public partial class OidcClientService : IOidcClientService
         {
             if (permission.StartsWith("scp:") || permission.StartsWith("oidc:scope:"))
                 continue;
-            // Skip legacy forms
             if (permission is "endpoints:userinfo" or "endpoints:revocation" or "endpoints:introspection" ||
                 permission is "endpoints/userinfo" or "endpoints/revocation" or "endpoints/introspection")
                 continue;
@@ -462,8 +454,18 @@ public partial class OidcClientService : IOidcClientService
 
             foreach (var uri in demo1ConfiguredRedirects)
                 _context.ClientRedirectUris.Add(new ClientRedirectUri { ClientId = demo1Client.Id, Uri = uri });
+            // EXTRA: include NuGet demo app redirects
+            foreach (var uri in new[] { "https://localhost:64820/signin-oidc", "https://localhost:64820/callback" })
+                if (!demo1ConfiguredRedirects.Contains(uri, StringComparer.OrdinalIgnoreCase))
+                    _context.ClientRedirectUris.Add(new ClientRedirectUri { ClientId = demo1Client.Id, Uri = uri });
+
             foreach (var uri in demo1ConfiguredPostLogout)
                 _context.ClientPostLogoutUris.Add(new ClientPostLogoutUri { ClientId = demo1Client.Id, Uri = uri });
+            // EXTRA: include NuGet demo app post-logout redirects
+            foreach (var uri in new[] { "https://localhost:64820/", "https://localhost:64820/signout-callback-oidc" })
+                if (!demo1ConfiguredPostLogout.Contains(uri, StringComparer.OrdinalIgnoreCase))
+                    _context.ClientPostLogoutUris.Add(new ClientPostLogoutUri { ClientId = demo1Client.Id, Uri = uri });
+
             foreach (var scope in new[] { StandardScopes.OpenId, StandardScopes.Email, StandardScopes.Profile, StandardScopes.Roles, StandardScopes.OfflineAccess, StandardScopes.ApiRead, StandardScopes.ApiWrite })
                 _context.ClientScopes.Add(new ClientScope { ClientId = demo1Client.Id, Scope = scope });
             foreach (var p in new[] { OpenIddictConstants.Permissions.Endpoints.Authorization, OpenIddictConstants.Permissions.Endpoints.Token, OpenIddictConstants.Permissions.Endpoints.EndSession, OpenIddictConstants.Permissions.GrantTypes.AuthorizationCode, OpenIddictConstants.Permissions.GrantTypes.RefreshToken, OpenIddictConstants.Permissions.ResponseTypes.Code })
@@ -511,6 +513,15 @@ public partial class OidcClientService : IOidcClientService
                     _logger.LogInformation("Added demo1 redirect URI: {Uri}", uri);
                 }
             }
+            // EXTRA: NuGet demo app redirects
+            foreach (var uri in new[] { "https://localhost:64820/signin-oidc", "https://localhost:64820/callback" })
+            {
+                if (!existingDemo1Redirects.Contains(uri))
+                {
+                    _context.ClientRedirectUris.Add(new ClientRedirectUri { ClientId = demo1Client.Id, Uri = uri });
+                    _logger.LogInformation("Added demo1 (NuGet) redirect URI: {Uri}", uri);
+                }
+            }
             var existingDemo1PostLogout = demo1Client.PostLogoutUris.Select(r => r.Uri).ToHashSet(StringComparer.OrdinalIgnoreCase);
             foreach (var uri in demo1ConfiguredPostLogout)
             {
@@ -518,6 +529,15 @@ public partial class OidcClientService : IOidcClientService
                 {
                     _context.ClientPostLogoutUris.Add(new ClientPostLogoutUri { ClientId = demo1Client.Id, Uri = uri });
                     _logger.LogInformation("Added demo1 post-logout URI: {Uri}", uri);
+                }
+            }
+            // EXTRA: NuGet demo app post logout URIs
+            foreach (var uri in new[] { "https://localhost:64820/", "https://localhost:64820/signout-callback-oidc" })
+            {
+                if (!existingDemo1PostLogout.Contains(uri))
+                {
+                    _context.ClientPostLogoutUris.Add(new ClientPostLogoutUri { ClientId = demo1Client.Id, Uri = uri });
+                    _logger.LogInformation("Added demo1 (NuGet) post-logout URI: {Uri}", uri);
                 }
             }
             await _context.SaveChangesAsync();
