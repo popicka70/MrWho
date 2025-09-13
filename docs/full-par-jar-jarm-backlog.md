@@ -11,9 +11,9 @@ _Status: in progress_
 | ID | Item | Notes | Status |
 |----|------|-------|--------|
 | 1 | Extract reusable JAR validator service | `IJarRequestValidator` created & registered | [x] |
-| 2 | Refactor `JarRequestExpansionMiddleware` to use validator | Validator created; middleware not yet refactored | [~] |
+| 2 | Refactor `JarRequestExpansionMiddleware` to use validator | Middleware now uses validator & simplified | [x] |
 | 3 | Accept `request` (JAR) in PAR POST | Custom `/connect/par` controller added (validates & stores) | [x] |
-| 4 | Resolve `request_uri` at `/connect/authorize` | Pending implementation | [ ] |
+| 4 | Resolve `request_uri` at `/connect/authorize` | Implemented in middleware (`_par_resolved` marker) | [x] |
 
 ## Tier 2 – Policy Enforcement
 | ID | Item | Notes | Status |
@@ -26,7 +26,7 @@ _Status: in progress_
 ## Tier 3 – Client Adjustments
 | ID | Item | Notes | Status |
 |----|------|-------|--------|
-| 9 | Re?enable PAR on demo client | After request_uri resolution logic | [ ] |
+| 9 | Re?enable PAR on demo client | Next | [ ] |
 |10 | Ensure JAR built before challenge (PAR push) | After 9 | [ ] |
 |11 | Fallback retry logic (optional) | Pending | [ ] |
 
@@ -69,7 +69,7 @@ _Status: in progress_
 3. JARM encryption (future) needed or signing only is sufficient short-term? (Current scope: signing only.)
 
 ## Next Immediate Actions
-- Implement Tier 1 Task 2 refactor (middleware) & Task 4 (request_uri resolution).
+- Implement Tier 2 policy enforcement (ParMode/JarMode/JarmMode) and re-enable demo client PAR.
 
 ---
 Generated automatically. Update status markers as tasks progress.
