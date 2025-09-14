@@ -42,7 +42,10 @@ public class MfaApiController : ControllerBase
     public async Task<ActionResult<MfaSetupResponse>> GetSetup()
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user is null) return Unauthorized();
+        if (user is null)
+        {
+            return Unauthorized();
+        }
 
         // Reuse existing key or create a new one if none
         var key = await _userManager.GetAuthenticatorKeyAsync(user);
@@ -74,10 +77,16 @@ public class MfaApiController : ControllerBase
     [HttpPost("verify")] // POST api/mfa/verify
     public async Task<ActionResult<MfaVerifyResponse>> PostVerify([FromBody] MfaVerifyRequest request)
     {
-        if (!ModelState.IsValid) return ValidationProblem(ModelState);
+        if (!ModelState.IsValid)
+        {
+            return ValidationProblem(ModelState);
+        }
 
         var user = await _userManager.GetUserAsync(User);
-        if (user is null) return Unauthorized();
+        if (user is null)
+        {
+            return Unauthorized();
+        }
 
         var code = request.Code?.Replace(" ", string.Empty).Replace("-", string.Empty);
         var isValid = await _userManager.VerifyTwoFactorTokenAsync(
@@ -124,8 +133,16 @@ public class MfaApiController : ControllerBase
     public async Task<ActionResult<MfaRecoveryCodesResponse>> PostNewRecoveryCodes()
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user is null) return Unauthorized();
-        if (!user.TwoFactorEnabled) return BadRequest("MFA not enabled");
+        if (user is null)
+        {
+            return Unauthorized();
+        }
+
+        if (!user.TwoFactorEnabled)
+        {
+            return BadRequest("MFA not enabled");
+        }
+
         var codes = await _userManager.GenerateNewTwoFactorRecoveryCodesAsync(user, 10);
         return Ok(new MfaRecoveryCodesResponse { RecoveryCodes = (codes ?? Enumerable.Empty<string>()).ToArray() });
     }
@@ -137,7 +154,11 @@ public class MfaApiController : ControllerBase
     public async Task<ActionResult<MfaDisableResponse>> PostDisable()
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user is null) return Unauthorized();
+        if (user is null)
+        {
+            return Unauthorized();
+        }
+
         if (!user.TwoFactorEnabled)
         {
             return Ok(new MfaDisableResponse { Success = true, AlreadyDisabled = true });

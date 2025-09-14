@@ -1,9 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
-using MrWho.Services.Mediator;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using MrWho.Data;
 using MrWho.Options;
+using MrWho.Services.Mediator;
+using MrWho.Shared.Constants; // added
 
 namespace MrWho.Handlers.Auth;
 
@@ -21,16 +22,15 @@ public sealed class RegisterSuccessGetHandler : IRequestHandler<MrWho.Endpoints.
     public async Task<IActionResult> Handle(MrWho.Endpoints.Auth.RegisterSuccessGetRequest request, CancellationToken cancellationToken)
     {
         var http = request.HttpContext;
-        var returnUrl = http.Request.Query["returnUrl"].ToString();
-        var clientId = http.Request.Query["clientId"].ToString();
+        var returnUrl = http.Request.Query[QueryParameterNames.ReturnUrl].ToString();
+        var clientId = http.Request.Query[QueryParameterNames.ClientId].ToString();
 
         var vd = new Microsoft.AspNetCore.Mvc.ViewFeatures.ViewDataDictionary(new Microsoft.AspNetCore.Mvc.ModelBinding.EmptyModelMetadataProvider(), new Microsoft.AspNetCore.Mvc.ModelBinding.ModelStateDictionary())
         {
-            ["ReturnUrl"] = returnUrl,
-            ["ClientId"] = clientId
+            [ViewDataKeys.ReturnUrl] = returnUrl,
+            [ViewDataKeys.ClientId] = clientId
         };
 
-        // Compute theme with client/realm precedence
         try
         {
             string? themeName = null;
@@ -48,8 +48,14 @@ public sealed class RegisterSuccessGetHandler : IRequestHandler<MrWho.Endpoints.
                     customCssUrl = client.CustomCssUrl ?? client.Realm?.RealmCustomCssUrl;
                     var showClientLogo = (bool?)client.GetType().GetProperty("ShowClientLogo")?.GetValue(client) ?? true;
                     var clientLogo = (string?)client.GetType().GetProperty("LogoUri")?.GetValue(client);
-                    if (showClientLogo && !string.IsNullOrWhiteSpace(clientLogo)) logoUri = clientLogo;
-                    else if (!string.IsNullOrWhiteSpace(client.Realm?.RealmLogoUri)) logoUri = client.Realm!.RealmLogoUri;
+                    if (showClientLogo && !string.IsNullOrWhiteSpace(clientLogo))
+                    {
+                        logoUri = clientLogo;
+                    }
+                    else if (!string.IsNullOrWhiteSpace(client.Realm?.RealmLogoUri))
+                    {
+                        logoUri = client.Realm!.RealmLogoUri;
+                    }
                 }
                 else
                 {
@@ -61,10 +67,25 @@ public sealed class RegisterSuccessGetHandler : IRequestHandler<MrWho.Endpoints.
                 themeName = _mrWhoOptions.Value.DefaultThemeName;
             }
 
-            if (!string.IsNullOrWhiteSpace(themeName)) vd["ThemeName"] = themeName;
-            if (!string.IsNullOrWhiteSpace(customCssUrl)) vd["CustomCssUrl"] = customCssUrl;
-            if (!string.IsNullOrWhiteSpace(logoUri)) vd["LogoUri"] = logoUri;
-            if (!string.IsNullOrWhiteSpace(clientName)) vd["ClientName"] = clientName;
+            if (!string.IsNullOrWhiteSpace(themeName))
+            {
+                vd[ViewDataKeys.ThemeName] = themeName;
+            }
+
+            if (!string.IsNullOrWhiteSpace(customCssUrl))
+            {
+                vd[ViewDataKeys.CustomCssUrl] = customCssUrl;
+            }
+
+            if (!string.IsNullOrWhiteSpace(logoUri))
+            {
+                vd[ViewDataKeys.LogoUri] = logoUri;
+            }
+
+            if (!string.IsNullOrWhiteSpace(clientName))
+            {
+                vd[ViewDataKeys.ClientName] = clientName;
+            }
         }
         catch { }
 

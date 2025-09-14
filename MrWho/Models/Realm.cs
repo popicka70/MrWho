@@ -27,7 +27,7 @@ public class Realm
     // ============================================================================
     // DEFAULT TOKEN LIFETIME CONFIGURATION (REALM-LEVEL DEFAULTS)
     // ============================================================================
-    
+
     public TimeSpan AccessTokenLifetime { get; set; } = TimeSpan.FromMinutes(60);
     public TimeSpan RefreshTokenLifetime { get; set; } = TimeSpan.FromDays(30);
     public TimeSpan AuthorizationCodeLifetime { get; set; } = TimeSpan.FromMinutes(10);
@@ -119,7 +119,11 @@ public class Realm
 
     public List<string> GetAllowedMfaMethods()
     {
-        if (string.IsNullOrEmpty(DefaultAllowedMfaMethods)) return new List<string> { "totp", "sms" };
+        if (string.IsNullOrEmpty(DefaultAllowedMfaMethods))
+        {
+            return new List<string> { "totp", "sms" };
+        }
+
         try { return System.Text.Json.JsonSerializer.Deserialize<List<string>>(DefaultAllowedMfaMethods) ?? new(); }
         catch { return new List<string> { "totp", "sms" }; }
     }

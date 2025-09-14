@@ -15,9 +15,17 @@ public sealed class SymmetricSecretPolicy : ISymmetricSecretPolicy
 
     public SymmetricSecretValidationResult ValidateForAlgorithm(string algorithm, string? secret)
     {
-        if (string.IsNullOrWhiteSpace(algorithm)) return SymmetricSecretValidationResult.Fail("algorithm_missing");
+        if (string.IsNullOrWhiteSpace(algorithm))
+        {
+            return SymmetricSecretValidationResult.Fail("algorithm_missing");
+        }
+
         algorithm = algorithm.ToUpperInvariant();
-        if (secret == null) return SymmetricSecretValidationResult.Fail("secret_missing");
+        if (secret == null)
+        {
+            return SymmetricSecretValidationResult.Fail("secret_missing");
+        }
+
         var length = Encoding.UTF8.GetByteCount(secret);
         int required = algorithm switch
         {
@@ -26,17 +34,35 @@ public sealed class SymmetricSecretPolicy : ISymmetricSecretPolicy
             "HS512" => _options.HS512MinBytes,
             _ => 0
         };
-        if (required == 0) return SymmetricSecretValidationResult.Ok(); // not an enforced alg
+        if (required == 0)
+        {
+            return SymmetricSecretValidationResult.Ok(); // not an enforced alg
+        }
+
         if (length < required)
+        {
             return SymmetricSecretValidationResult.Fail($"secret_length_insufficient:{algorithm}", required, length);
+        }
+
         return SymmetricSecretValidationResult.Ok();
     }
 
     public SymmetricSecretValidationResult ValidateClientMutation(Client client)
     {
-        if (!_options.EnforceOnClientMutation) return SymmetricSecretValidationResult.Ok();
-        if (client is null) return SymmetricSecretValidationResult.Fail("client_null");
-        if (string.IsNullOrWhiteSpace(client.ClientSecret)) return SymmetricSecretValidationResult.Ok(); // allow empty; other validators decide requirement
+        if (!_options.EnforceOnClientMutation)
+        {
+            return SymmetricSecretValidationResult.Ok();
+        }
+
+        if (client is null)
+        {
+            return SymmetricSecretValidationResult.Fail("client_null");
+        }
+
+        if (string.IsNullOrWhiteSpace(client.ClientSecret))
+        {
+            return SymmetricSecretValidationResult.Ok(); // allow empty; other validators decide requirement
+        }
 
         // Inspect AllowedRequestObjectAlgs for HMAC usages (JAR)
         var algsCsv = client.AllowedRequestObjectAlgs;
@@ -48,7 +74,9 @@ public sealed class SymmetricSecretPolicy : ISymmetricSecretPolicy
                 {
                     var res = ValidateForAlgorithm(alg, client.ClientSecret);
                     if (!res.Success)
+                    {
                         return res;
+                    }
                 }
             }
         }

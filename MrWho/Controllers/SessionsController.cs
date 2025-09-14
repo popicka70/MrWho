@@ -1,12 +1,12 @@
-using Microsoft.AspNetCore.Mvc;
-using MrWho.Shared;
+using System.Collections.Immutable;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using OpenIddict.Abstractions;
 using MrWho.Data;
 using MrWho.Services;
-using Microsoft.AspNetCore.Identity;
-using System.Collections.Immutable;
+using MrWho.Shared;
+using OpenIddict.Abstractions;
 
 namespace MrWho.Controllers;
 
@@ -62,7 +62,9 @@ public class SessionsController : ControllerBase
             {
                 var status = await _authorizationManager.GetStatusAsync(authorization);
                 if (status != OpenIddictConstants.Statuses.Valid)
+                {
                     continue;
+                }
 
                 var session = await CreateSessionDto(authorization);
                 if (session != null)
@@ -102,7 +104,9 @@ public class SessionsController : ControllerBase
             {
                 var status = await _authorizationManager.GetStatusAsync(authorization);
                 if (status != OpenIddictConstants.Statuses.Valid)
+                {
                     continue;
+                }
 
                 var session = await CreateSessionDto(authorization);
                 if (session != null)
@@ -154,7 +158,9 @@ public class SessionsController : ControllerBase
             {
                 var status = await _authorizationManager.GetStatusAsync(authorization);
                 if (status != OpenIddictConstants.Statuses.Valid)
+                {
                     continue;
+                }
 
                 var session = await CreateSessionDto(authorization);
                 if (session != null)
@@ -242,7 +248,9 @@ public class SessionsController : ControllerBase
             {
                 var status = await _authorizationManager.GetStatusAsync(authorization);
                 if (status != OpenIddictConstants.Statuses.Valid)
+                {
                     continue;
+                }
 
                 var authorizationId = await _authorizationManager.GetIdAsync(authorization);
                 if (string.IsNullOrEmpty(authorizationId))
@@ -307,7 +315,9 @@ public class SessionsController : ControllerBase
             {
                 var status = await _authorizationManager.GetStatusAsync(authorization);
                 if (status != OpenIddictConstants.Statuses.Valid)
+                {
                     continue;
+                }
 
                 var authorizationId = await _authorizationManager.GetIdAsync(authorization);
                 if (string.IsNullOrEmpty(authorizationId))
@@ -366,7 +376,9 @@ public class SessionsController : ControllerBase
             {
                 var status = await _authorizationManager.GetStatusAsync(authorization);
                 if (status != OpenIddictConstants.Statuses.Valid)
+                {
                     continue;
+                }
 
                 stats.TotalActiveSessions++;
 
@@ -386,7 +398,7 @@ public class SessionsController : ControllerBase
                         if (!string.IsNullOrEmpty(clientId))
                         {
                             clientSessions[clientId] = clientSessions.GetValueOrDefault(clientId, 0) + 1;
-                            
+
                             // Determine session type based on client
                             var sessionType = DetermineSessionType(clientId);
                             sessionTypes[sessionType] = sessionTypes.GetValueOrDefault(sessionType, 0) + 1;
@@ -398,16 +410,24 @@ public class SessionsController : ControllerBase
                 if (creationDate.HasValue)
                 {
                     if (oldestSession == null || creationDate < oldestSession)
+                    {
                         oldestSession = creationDate;
-                    
+                    }
+
                     if (newestSession == null || creationDate > newestSession)
+                    {
                         newestSession = creationDate;
+                    }
 
                     if (creationDate.Value.DateTime >= todayStart)
+                    {
                         stats.SessionsToday++;
-                    
+                    }
+
                     if (creationDate.Value.DateTime >= weekStart)
+                    {
                         stats.SessionsThisWeek++;
+                    }
                 }
 
                 // Check for tokens expiring soon (next hour)
@@ -456,17 +476,23 @@ public class SessionsController : ControllerBase
             var creationDate = await _authorizationManager.GetCreationDateAsync(authorization);
 
             if (string.IsNullOrEmpty(subject) || string.IsNullOrEmpty(applicationId))
+            {
                 return null;
+            }
 
             // Get user information
             var user = await _userManager.FindByIdAsync(subject);
             if (user == null)
+            {
                 return null;
+            }
 
             // Get application information
             var application = await _applicationManager.FindByIdAsync(applicationId);
             if (application == null)
+            {
                 return null;
+            }
 
             var clientId = await _applicationManager.GetClientIdAsync(application);
             var clientName = await _applicationManager.GetDisplayNameAsync(application) ?? clientId;

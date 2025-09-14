@@ -20,19 +20,19 @@ public class IndexModel : PageModel
     {
         var userName = User.Identity?.Name ?? "Anonymous";
         var isAuthenticated = User.Identity?.IsAuthenticated == true;
-        
+
         // Check if user just logged out successfully
-        ShowLogoutSuccess = Request.Query.ContainsKey("logout") && 
-                           Request.Query["logout"] == "success" && 
+        ShowLogoutSuccess = Request.Query.ContainsKey("logout") &&
+                           Request.Query["logout"] == "success" &&
                            !isAuthenticated;
-        
+
         if (ShowLogoutSuccess)
         {
             _logger.LogInformation("? Logout success page displayed - user successfully logged out");
         }
         else
         {
-            _logger.LogInformation("Home page accessed by user: {UserName} (Authenticated: {IsAuthenticated})", 
+            _logger.LogInformation("Home page accessed by user: {UserName} (Authenticated: {IsAuthenticated})",
                 userName, isAuthenticated);
         }
     }

@@ -28,7 +28,11 @@ public class ClientUsersController : ControllerBase
     private async Task<Client?> FindClientByIdOrPublicIdAsync(string clientId)
     {
         var client = await _context.Clients.FirstOrDefaultAsync(c => c.Id == clientId);
-        if (client != null) return client;
+        if (client != null)
+        {
+            return client;
+        }
+
         return await _context.Clients.FirstOrDefaultAsync(c => c.ClientId == clientId);
     }
 
@@ -36,7 +40,10 @@ public class ClientUsersController : ControllerBase
     public async Task<ActionResult<ClientUsersListDto>> GetAssignedUsers(string clientId)
     {
         var client = await _context.Clients.FirstOrDefaultAsync(c => c.Id == clientId || c.ClientId == clientId);
-        if (client == null) return NotFound($"Client '{clientId}' not found");
+        if (client == null)
+        {
+            return NotFound($"Client '{clientId}' not found");
+        }
 
         var assignments = await _context.ClientUsers
             .Where(cu => cu.ClientId == client.Id)
@@ -69,10 +76,16 @@ public class ClientUsersController : ControllerBase
     public async Task<ActionResult<ClientUserDto>> AssignUser(string clientId, [FromBody] AssignClientUserRequest request)
     {
         var client = await FindClientByIdOrPublicIdAsync(clientId);
-        if (client == null) return NotFound($"Client '{clientId}' not found");
+        if (client == null)
+        {
+            return NotFound($"Client '{clientId}' not found");
+        }
 
         var user = await _userManager.FindByIdAsync(request.UserId) ?? await _userManager.FindByNameAsync(request.UserId);
-        if (user == null) return NotFound($"User '{request.UserId}' not found");
+        if (user == null)
+        {
+            return NotFound($"User '{request.UserId}' not found");
+        }
 
         var exists = await _context.ClientUsers.AnyAsync(cu => cu.ClientId == client.Id && cu.UserId == user.Id);
         if (exists)
@@ -109,10 +122,16 @@ public class ClientUsersController : ControllerBase
     public async Task<IActionResult> RemoveUser(string clientId, string userId)
     {
         var client = await FindClientByIdOrPublicIdAsync(clientId);
-        if (client == null) return NotFound($"Client '{clientId}' not found");
+        if (client == null)
+        {
+            return NotFound($"Client '{clientId}' not found");
+        }
 
         var assignment = await _context.ClientUsers.FirstOrDefaultAsync(cu => cu.ClientId == client.Id && cu.UserId == userId);
-        if (assignment == null) return NotFound("Assignment not found");
+        if (assignment == null)
+        {
+            return NotFound("Assignment not found");
+        }
 
         _context.ClientUsers.Remove(assignment);
         await _context.SaveChangesAsync();

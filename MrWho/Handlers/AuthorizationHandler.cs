@@ -1,23 +1,23 @@
-using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Authentication;
-using OpenIddict.Abstractions;
-using OpenIddict.Server.AspNetCore;
-using System.Security.Claims;
-using MrWho.Services; // includes IJarReplayCache, JarOptions
-using Microsoft.AspNetCore.Http.Extensions;
-using Microsoft.AspNetCore;
-using MrWho.Data;
-using Microsoft.EntityFrameworkCore;
-using MrWho.Models;
-using Microsoft.AspNetCore.WebUtilities;
-using Microsoft.AspNetCore.DataProtection;
-using System.Security.Cryptography;
-using MrWho.Shared; // Jar/Jarm enums
 using System.IdentityModel.Tokens.Jwt;
-using Microsoft.IdentityModel.Tokens;
+using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
+using Microsoft.AspNetCore;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Http.Extensions;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens; // modern validation
+using Microsoft.IdentityModel.Tokens;
+using MrWho.Data;
+using MrWho.Models;
+using MrWho.Services; // includes IJarReplayCache, JarOptions
+using MrWho.Shared; // Jar/Jarm enums
+using OpenIddict.Abstractions;
+using OpenIddict.Server.AspNetCore;
 
 namespace MrWho.Handlers;
 
@@ -190,7 +190,10 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
                         amrSource = clientPrincipal;
                     }
                 }
-                else clientPrincipal = null;
+                else
+                {
+                    clientPrincipal = null;
+                }
             }
         }
         catch (Exception ex)
@@ -329,7 +332,7 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
             _logger.LogWarning(ex, "Consent check failed for client {ClientId}; continuing", clientId);
         }
 
-        SKIP_CONSENT:
+    SKIP_CONSENT:
         // MFA enforcement
         try
         {
@@ -345,7 +348,10 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
                     {
                         try { allowedList = System.Text.Json.JsonSerializer.Deserialize<List<string>>(allowedMethodsJson!) ?? new(); } catch { allowedList = new(); }
                     }
-                    if (allowedList.Count == 0) allowedList = new List<string> { "totp", "fido2", "passkey" };
+                    if (allowedList.Count == 0)
+                    {
+                        allowedList = new List<string> { "totp", "fido2", "passkey" };
+                    }
 
                     var currentAmr = amrSource?.FindAll("amr").Select(c => c.Value).ToList() ?? new List<string>();
                     var amrOk = currentAmr.Any(v => v == "mfa" || v == "fido2");
@@ -386,10 +392,26 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
                         bool userTotpEnabled = await _userManager.GetTwoFactorEnabledAsync(authUser);
                         var passkeyAllowed = allowedList.Any(m => m.Equals("fido2", StringComparison.OrdinalIgnoreCase) || m.Equals("passkey", StringComparison.OrdinalIgnoreCase));
                         var totpAllowed = allowedList.Any(m => m.Equals("totp", StringComparison.OrdinalIgnoreCase));
-                        if (totpAllowed && userTotpEnabled) return Results.Redirect("/mfa/challenge?returnUrl=" + Uri.EscapeDataString(originalAuthorizeUrl));
-                        if (passkeyAllowed && userHasWebAuthn) return Results.Redirect($"/connect/login?mode=passkey&returnUrl={Uri.EscapeDataString(originalAuthorizeUrl)}&clientId={Uri.EscapeDataString(clientId)}");
-                        if (totpAllowed && !userTotpEnabled) return Results.Redirect("/mfa/setup?returnUrl=" + Uri.EscapeDataString(originalAuthorizeUrl));
-                        if (passkeyAllowed) return Results.Redirect($"/connect/login?mode=passkey&returnUrl={Uri.EscapeDataString(originalAuthorizeUrl)}&clientId={Uri.EscapeDataString(clientId)}");
+                        if (totpAllowed && userTotpEnabled)
+                        {
+                            return Results.Redirect("/mfa/challenge?returnUrl=" + Uri.EscapeDataString(originalAuthorizeUrl));
+                        }
+
+                        if (passkeyAllowed && userHasWebAuthn)
+                        {
+                            return Results.Redirect($"/connect/login?mode=passkey&returnUrl={Uri.EscapeDataString(originalAuthorizeUrl)}&clientId={Uri.EscapeDataString(clientId)}");
+                        }
+
+                        if (totpAllowed && !userTotpEnabled)
+                        {
+                            return Results.Redirect("/mfa/setup?returnUrl=" + Uri.EscapeDataString(originalAuthorizeUrl));
+                        }
+
+                        if (passkeyAllowed)
+                        {
+                            return Results.Redirect($"/connect/login?mode=passkey&returnUrl={Uri.EscapeDataString(originalAuthorizeUrl)}&clientId={Uri.EscapeDataString(clientId)}");
+                        }
+
                         return Results.Redirect("/mfa/challenge?returnUrl=" + Uri.EscapeDataString(originalAuthorizeUrl));
                     }
                 }
@@ -479,7 +501,9 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         var opts = _jarOptions.Value;
         // Quick structural check
         if (requestJwt.Count(c => c == '.') != 2)
+        {
             return new { error = OpenIddictConstants.Errors.InvalidRequestObject, error_description = "request object must be JWT" };
+        }
 
         // Determine allowed algorithms
         var allowedCsv = dbClient.AllowedRequestObjectAlgs;
@@ -494,9 +518,14 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
 
         var alg = token.Header.Alg;
         if (!allowed.Contains(alg))
+        {
             return new { error = OpenIddictConstants.Errors.InvalidRequestObject, error_description = "unsupported alg" };
+        }
+
         if ((dbClient.RequireSignedRequestObject ?? true) && alg == SecurityAlgorithms.None)
+        {
             return new { error = OpenIddictConstants.Errors.InvalidRequestObject, error_description = "unsigned not allowed" };
+        }
 
         // Validate signature (best-effort) for HS256 / RS256
         try
@@ -514,7 +543,10 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
             {
                 var plainSecret = await _clientSecretService.GetActivePlaintextAsync(dbClient.ClientId, httpContext.RequestAborted);
                 if (string.IsNullOrWhiteSpace(plainSecret) || Encoding.UTF8.GetByteCount(plainSecret) < 32)
+                {
                     return new { error = OpenIddictConstants.Errors.InvalidRequestObject, error_description = "client secret length below policy" };
+                }
+
                 parameters.IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(plainSecret));
             }
             else if (alg.StartsWith("RS", StringComparison.OrdinalIgnoreCase))
@@ -548,13 +580,17 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
             try { exp = DateTimeOffset.FromUnixTimeSeconds(expSec); } catch { exp = null; }
         }
         if (exp is null || exp < now || exp > now.Add(opts.MaxExp))
+        {
             return new { error = OpenIddictConstants.Errors.InvalidRequestObject, error_description = "exp invalid" };
+        }
 
         if (token.Payload.TryGetValue("iat", out var iatObj) && long.TryParse(iatObj.ToString(), out var iatSec))
         {
             var iat = DateTimeOffset.FromUnixTimeSeconds(iatSec);
             if (iat < now.Add(-opts.MaxExp) || iat > now.Add(opts.ClockSkew))
+            {
                 return new { error = OpenIddictConstants.Errors.InvalidRequestObject, error_description = "iat invalid" };
+            }
         }
 
         // JTI replay protection
@@ -574,9 +610,15 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         string? Get(string name) => token.Payload.TryGetValue(name, out var v) ? v?.ToString() : null;
         void CheckMismatch(string paramName, string? jwtValue, string? urlValue)
         {
-            if (string.IsNullOrEmpty(jwtValue) || string.IsNullOrEmpty(urlValue)) return;
+            if (string.IsNullOrEmpty(jwtValue) || string.IsNullOrEmpty(urlValue))
+            {
+                return;
+            }
+
             if (!string.Equals(jwtValue, urlValue, StringComparison.Ordinal))
+            {
                 throw new InvalidOperationException($"parameter mismatch: {paramName}");
+            }
         }
         try
         {
@@ -593,15 +635,34 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
 
         // Apply precedence from request object
         var scopeJwt = Get(OpenIddictConstants.Parameters.Scope);
-        if (!string.IsNullOrEmpty(scopeJwt)) request.Scope = scopeJwt;
+        if (!string.IsNullOrEmpty(scopeJwt))
+        {
+            request.Scope = scopeJwt;
+        }
+
         var redirectJwt = Get(OpenIddictConstants.Parameters.RedirectUri);
-        if (!string.IsNullOrEmpty(redirectJwt)) request.RedirectUri = redirectJwt;
+        if (!string.IsNullOrEmpty(redirectJwt))
+        {
+            request.RedirectUri = redirectJwt;
+        }
+
         var respTypeJwt = Get(OpenIddictConstants.Parameters.ResponseType);
-        if (!string.IsNullOrEmpty(respTypeJwt)) request.ResponseType = respTypeJwt;
+        if (!string.IsNullOrEmpty(respTypeJwt))
+        {
+            request.ResponseType = respTypeJwt;
+        }
+
         var stateJwt = Get(OpenIddictConstants.Parameters.State);
-        if (!string.IsNullOrEmpty(stateJwt)) request.State = stateJwt;
+        if (!string.IsNullOrEmpty(stateJwt))
+        {
+            request.State = stateJwt;
+        }
+
         var nonceJwt = Get(OpenIddictConstants.Parameters.Nonce); // NEW
-        if (!string.IsNullOrEmpty(nonceJwt)) request.Nonce = nonceJwt; // NEW preserve nonce for ID token
+        if (!string.IsNullOrEmpty(nonceJwt))
+        {
+            request.Nonce = nonceJwt; // NEW preserve nonce for ID token
+        }
 
         return null; // success
     }
@@ -612,7 +673,11 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         var returnUrl = Uri.EscapeDataString(currentUrl);
         var cid = Uri.EscapeDataString(clientId ?? string.Empty);
         var url = $"/connect/access-denied?returnUrl={returnUrl}";
-        if (!string.IsNullOrEmpty(cid)) url += $"&clientId={cid}";
+        if (!string.IsNullOrEmpty(cid))
+        {
+            url += $"&clientId={cid}";
+        }
+
         return url;
     }
 
@@ -625,7 +690,10 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         {
             var claims = await _userManager.GetClaimsAsync(user);
             var nameClaim = claims.FirstOrDefault(c => c.Type == "name")?.Value;
-            if (!string.IsNullOrEmpty(nameClaim)) return nameClaim;
+            if (!string.IsNullOrEmpty(nameClaim))
+            {
+                return nameClaim;
+            }
         }
         catch (Exception ex) { _logger.LogError(ex, "Error retrieving name claim for {UserId}", user.Id); }
         return ConvertToFriendlyName(user.UserName ?? "Unknown User");
@@ -666,7 +734,11 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
 
     private string ConvertToFriendlyName(string input)
     {
-        if (string.IsNullOrEmpty(input)) return "Unknown User";
+        if (string.IsNullOrEmpty(input))
+        {
+            return "Unknown User";
+        }
+
         var friendlyName = input.Replace('.', ' ').Replace('_', ' ').Replace('-', ' ');
         var words = friendlyName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         var capitalizedWords = words.Select(word => word.Length > 0 ? char.ToUpper(word[0]) + word.Substring(1).ToLower() : word);

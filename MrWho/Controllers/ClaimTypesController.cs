@@ -3,8 +3,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MrWho.Data;
 using MrWho.Models;
-using MrWho.Shared.Models;
 using MrWho.Shared; // Added for AuthorizationPolicies
+using MrWho.Shared.Models;
 
 namespace MrWho.Controllers;
 
@@ -42,7 +42,11 @@ public class ClaimTypesController : ControllerBase
     public async Task<ActionResult<ClaimTypeInfo>> GetClaimType(string type)
     {
         var ct = await _context.ClaimTypes.AsNoTracking().FirstOrDefaultAsync(c => c.Type == type);
-        if (ct == null) return NotFound();
+        if (ct == null)
+        {
+            return NotFound();
+        }
+
         return Ok(new ClaimTypeInfo(ct.Type, ct.DisplayName, ct.Description ?? string.Empty));
     }
 
@@ -75,7 +79,11 @@ public class ClaimTypesController : ControllerBase
     public async Task<ActionResult<ClaimTypeInfo>> Update(string type, [FromBody] UpsertClaimTypeRequest request)
     {
         var entity = await _context.ClaimTypes.FirstOrDefaultAsync(c => c.Type == type);
-        if (entity == null) return NotFound();
+        if (entity == null)
+        {
+            return NotFound();
+        }
+
         entity.DisplayName = request.DisplayName;
         entity.Description = request.Description;
         entity.Category = request.Category;
@@ -92,7 +100,11 @@ public class ClaimTypesController : ControllerBase
     public async Task<IActionResult> Delete(string type)
     {
         var entity = await _context.ClaimTypes.FirstOrDefaultAsync(c => c.Type == type);
-        if (entity == null) return NotFound();
+        if (entity == null)
+        {
+            return NotFound();
+        }
+
         _context.ClaimTypes.Remove(entity);
         await _context.SaveChangesAsync();
         return NoContent();

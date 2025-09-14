@@ -1,3 +1,4 @@
+@using MrWho.Shared.Constants
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -9,7 +10,7 @@
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/themes.css" asp-append-version="true" />
     @{
-        var customCssUrl = ViewData["CustomCssUrl"] as string;
+        var customCssUrl = ViewData[ViewDataKeys.CustomCssUrl] as string;
         if (!string.IsNullOrWhiteSpace(customCssUrl))
         {
             <link rel="stylesheet" href="@customCssUrl" />
@@ -18,7 +19,7 @@
     @await RenderSectionAsync("Styles", required: false)
 </head>
 @{
-    var themeName = ViewData["ThemeName"] as string;
+    var themeName = ViewData[ViewDataKeys.ThemeName] as string;
     var themeClass = !string.IsNullOrWhiteSpace(themeName) ? ($"theme-" + themeName.ToLowerInvariant()) : null;
 }
 <body class="@themeClass">

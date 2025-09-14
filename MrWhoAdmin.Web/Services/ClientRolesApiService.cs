@@ -23,11 +23,15 @@ public class ClientRolesApiService : IClientRolesApiService
         {
             var url = string.IsNullOrWhiteSpace(clientId) ? "api/clientroles" : $"api/clientroles?clientId={Uri.EscapeDataString(clientId)}";
             var resp = await _httpClient.GetAsync(url);
-            if (!resp.IsSuccessStatusCode) return null;
+            if (!resp.IsSuccessStatusCode)
+            {
+                return null;
+            }
+
             var json = await resp.Content.ReadAsStringAsync();
             return JsonSerializer.Deserialize<List<ClientRoleDto>>(json, _jsonOptions);
         }
-        catch (Exception ex){ _logger.LogError(ex, "GetRoles failed"); return null; }
+        catch (Exception ex) { _logger.LogError(ex, "GetRoles failed"); return null; }
     }
 
     public async Task<List<string>?> GetUserClientRolesAsync(string clientId, string userId)
@@ -35,11 +39,15 @@ public class ClientRolesApiService : IClientRolesApiService
         try
         {
             var resp = await _httpClient.GetAsync($"api/clientroles/{Uri.EscapeDataString(clientId)}/users/{Uri.EscapeDataString(userId)}");
-            if (!resp.IsSuccessStatusCode) return null;
+            if (!resp.IsSuccessStatusCode)
+            {
+                return null;
+            }
+
             var json = await resp.Content.ReadAsStringAsync();
             return JsonSerializer.Deserialize<List<string>>(json, _jsonOptions);
         }
-        catch (Exception ex){ _logger.LogError(ex, "GetUserClientRoles failed"); return null; }
+        catch (Exception ex) { _logger.LogError(ex, "GetUserClientRoles failed"); return null; }
     }
 
     public async Task<ClientRoleDto?> CreateRoleAsync(CreateClientRoleRequest request)
@@ -48,11 +56,15 @@ public class ClientRolesApiService : IClientRolesApiService
         {
             var json = JsonSerializer.Serialize(request, _jsonOptions);
             var resp = await _httpClient.PostAsync("api/clientroles", new StringContent(json, Encoding.UTF8, "application/json"));
-            if (!resp.IsSuccessStatusCode) return null;
+            if (!resp.IsSuccessStatusCode)
+            {
+                return null;
+            }
+
             var body = await resp.Content.ReadAsStringAsync();
             return JsonSerializer.Deserialize<ClientRoleDto>(body, _jsonOptions);
         }
-        catch (Exception ex){ _logger.LogError(ex, "CreateRole failed"); return null; }
+        catch (Exception ex) { _logger.LogError(ex, "CreateRole failed"); return null; }
     }
 
     public async Task<bool> DeleteRoleAsync(DeleteClientRoleRequest request)
@@ -64,7 +76,7 @@ public class ClientRolesApiService : IClientRolesApiService
             var resp = await _httpClient.SendAsync(msg);
             return resp.IsSuccessStatusCode;
         }
-        catch (Exception ex){ _logger.LogError(ex, "DeleteRole failed"); return false; }
+        catch (Exception ex) { _logger.LogError(ex, "DeleteRole failed"); return false; }
     }
 
     public async Task<bool> AssignRoleAsync(AssignClientRoleRequest request)
@@ -75,7 +87,7 @@ public class ClientRolesApiService : IClientRolesApiService
             var resp = await _httpClient.PostAsync("api/clientroles/assign", new StringContent(json, Encoding.UTF8, "application/json"));
             return resp.IsSuccessStatusCode;
         }
-        catch (Exception ex){ _logger.LogError(ex, "AssignRole failed"); return false; }
+        catch (Exception ex) { _logger.LogError(ex, "AssignRole failed"); return false; }
     }
 
     public async Task<bool> RemoveRoleAsync(RemoveClientRoleRequest request)
@@ -86,6 +98,6 @@ public class ClientRolesApiService : IClientRolesApiService
             var resp = await _httpClient.PostAsync("api/clientroles/remove", new StringContent(json, Encoding.UTF8, "application/json"));
             return resp.IsSuccessStatusCode;
         }
-        catch (Exception ex){ _logger.LogError(ex, "RemoveRole failed"); return false; }
+        catch (Exception ex) { _logger.LogError(ex, "RemoveRole failed"); return false; }
     }
 }

@@ -2,17 +2,17 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MrWho.Data;
+using MrWho.Models;
+using MrWho.Services;
 using MrWho.Shared;
 using MrWho.Shared.Models;
 using OpenIddict.Abstractions;
 using OpenIddict.EntityFrameworkCore.Models;
-using MrWho.Models;
-using MrWho.Services;
 
 namespace MrWho.Controllers;
 
 [ApiController]
-[Route("api/monitoring/tokens")] 
+[Route("api/monitoring/tokens")]
 [Authorize(Policy = AuthorizationPolicies.AdminClientApi)]
 public class TokenStatisticsController : ControllerBase
 {

@@ -1,18 +1,19 @@
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore; // added for EF calls
 using Microsoft.Extensions.Options;
-using OpenIddict.Client;
-using OpenIddict.Client.AspNetCore;
-using Microsoft.AspNetCore.Authentication;
-using MrWho.Services.Mediator;
+using MrWho.Data; // added
 using MrWho.Endpoints;
 using MrWho.Handlers.Auth; // add for InvalidScopesGetRequest
-using MrWho.Data; // added
 using MrWho.Models; // added for PushedAuthorizationRequest
-using MrWho.Shared; // added for PushedAuthorizationMode
-using OpenIddict.Abstractions; // added for OpenIddictConstants
-using Microsoft.EntityFrameworkCore; // added for EF calls
 using MrWho.Services; // added for ISecurityAuditWriter & SecurityAudit
+using MrWho.Services.Mediator;
+using MrWho.Shared; // added for PushedAuthorizationMode
+using MrWho.Shared.Constants; // added
+using OpenIddict.Abstractions; // added for OpenIddictConstants
+using OpenIddict.Client;
+using OpenIddict.Client.AspNetCore;
 
 namespace MrWho.Controllers;
 
@@ -51,15 +52,27 @@ public class ConnectController : Controller
         }
 
         var props = new AuthenticationProperties { RedirectUri = "/connect/external/callback" };
-        if (!string.IsNullOrWhiteSpace(returnUrl)) props.Items["returnUrl"] = returnUrl;
-        if (!string.IsNullOrWhiteSpace(clientId)) props.Items["clientId"] = clientId;
+        if (!string.IsNullOrWhiteSpace(returnUrl))
+        {
+            props.Items[ViewDataKeys.ReturnUrl] = returnUrl; // reuse constant (stored temporarily in auth properties)
+        }
+
+        if (!string.IsNullOrWhiteSpace(clientId))
+        {
+            props.Items[ViewDataKeys.ClientId] = clientId;
+        }
+
         props.Items["extRegistrationId"] = registration.RegistrationId;
-        if (!string.IsNullOrWhiteSpace(registration.ProviderName)) props.Items["extProviderName"] = registration.ProviderName;
+        if (!string.IsNullOrWhiteSpace(registration.ProviderName))
+        {
+            props.Items["extProviderName"] = registration.ProviderName;
+        }
+
         props.Items[OpenIddictClientAspNetCoreConstants.Properties.RegistrationId] = registration.RegistrationId;
         if (!string.IsNullOrEmpty(force) && (force == "1" || force.Equals("true", StringComparison.OrdinalIgnoreCase)))
         {
-            props.Parameters["prompt"] = "login";
-            props.Parameters["max_age"] = 0;
+            props.Parameters[QueryParameterNames.Prompt] = "login";
+            props.Parameters[QueryParameterNames.MaxAge] = 0;
         }
         return Challenge(props, OpenIddictClientAspNetCoreDefaults.AuthenticationScheme);
     }
@@ -70,7 +83,11 @@ public class ConnectController : Controller
     public IActionResult ExternalSignOut()
     {
         var regId = HttpContext.Session.GetString("ExternalRegistrationId") ?? User?.FindFirst("ext_reg_id")?.Value;
-        if (string.IsNullOrWhiteSpace(regId)) return NoContent();
+        if (string.IsNullOrWhiteSpace(regId))
+        {
+            return NoContent();
+        }
+
         var props = new AuthenticationProperties { RedirectUri = "/connect/external/signout-callback" };
         props.Items[OpenIddictClientAspNetCoreConstants.Properties.RegistrationId] = regId;
         return SignOut(props, OpenIddictClientAspNetCoreDefaults.AuthenticationScheme);

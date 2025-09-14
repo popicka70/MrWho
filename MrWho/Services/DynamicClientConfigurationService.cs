@@ -1,10 +1,10 @@
+using System.Runtime.Intrinsics.Arm;
+using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 using MrWho.Data;
 using MrWho.Models;
-using System.Runtime.Intrinsics.Arm;
-using System.Text.Json;
 
 namespace MrWho.Services;
 
@@ -17,7 +17,7 @@ public class DynamicClientConfigurationService : IDynamicClientConfigurationServ
     private readonly ILogger<DynamicClientConfigurationService> _logger;
 
     public DynamicClientConfigurationService(
-        ApplicationDbContext context, 
+        ApplicationDbContext context,
         ILogger<DynamicClientConfigurationService> logger)
     {
         _context = context;
@@ -275,7 +275,7 @@ public class DynamicClientConfigurationService : IDynamicClientConfigurationServ
                 options.AccessDeniedPath = client.CustomErrorPageUrl;
             }
 
-            _logger.LogDebug("?? Applied dynamic configuration for client {ClientId}: Session={SessionHours}h, Sliding={Sliding}, HTTPS={RequireHttps}, SameSite={SameSite}", 
+            _logger.LogDebug("?? Applied dynamic configuration for client {ClientId}: Session={SessionHours}h, Sliding={Sliding}, HTTPS={RequireHttps}, SameSite={SameSite}",
                 client.ClientId, sessionHours, useSlidingExpiration, requireHttps, sameSitePolicy);
 
             return Task.FromResult(options);

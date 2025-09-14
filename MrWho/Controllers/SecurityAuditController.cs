@@ -1,11 +1,11 @@
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MrWho.Data;
 using MrWho.Models;
 using MrWho.Services;
-using System.Security.Cryptography;
-using System.Text;
 
 namespace MrWho.Controllers;
 
@@ -25,8 +25,16 @@ public class SecurityAuditController : ControllerBase
     public async Task<IActionResult> Verify([FromQuery] long? startId = null, [FromQuery] long? endId = null)
     {
         var query = _db.SecurityAuditEvents.AsNoTracking().OrderBy(e => e.Id).AsQueryable();
-        if (startId.HasValue) query = query.Where(e => e.Id >= startId.Value);
-        if (endId.HasValue) query = query.Where(e => e.Id <= endId.Value);
+        if (startId.HasValue)
+        {
+            query = query.Where(e => e.Id >= startId.Value);
+        }
+
+        if (endId.HasValue)
+        {
+            query = query.Where(e => e.Id <= endId.Value);
+        }
+
         var list = await query.ToListAsync();
         var issues = new List<object>();
         string? prevHash = null;

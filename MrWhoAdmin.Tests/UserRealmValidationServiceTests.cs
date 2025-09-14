@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Microsoft.Extensions.DependencyInjection;
 using MrWho.Data;
 using MrWho.Models;
 using MrWho.Services;
@@ -51,7 +51,9 @@ public class UserRealmValidationServiceTests
 
             var res = UserManager.CreateAsync(User, "Pass123$!").GetAwaiter().GetResult();
             if (!res.Succeeded)
+            {
                 throw new InvalidOperationException("Failed to create user: " + string.Join(',', res.Errors.Select(e => e.Description)));
+            }
 
             if (assignUser)
             {

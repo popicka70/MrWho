@@ -1,18 +1,18 @@
-using MrWho.Extensions;
-using Microsoft.AspNetCore.DataProtection;
-using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
-using MrWho.Services;
-using Microsoft.AspNetCore.HttpOverrides;
+using System.Threading.RateLimiting;
 using Fido2NetLib;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.AspNetCore.Identity; // added for IdentityConstants
 using Microsoft.AspNetCore.RateLimiting;
-using System.Threading.RateLimiting;
+using Microsoft.Extensions.Options;
+using MrWho.Extensions;
+using MrWho.Options;
+using MrWho.Services;
 using OpenIddict.Client;
 using OpenIddict.Client.AspNetCore;
 using OpenIddict.Client.SystemNetHttp;
-using Microsoft.Extensions.Options;
-using MrWho.Options;
-using Microsoft.AspNetCore.Identity; // added for IdentityConstants
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -92,7 +92,14 @@ var rpId = builder.Configuration["WebAuthn:RelyingPartyId"] ?? new Uri(builder.C
 var rpName = builder.Configuration["WebAuthn:RelyingPartyName"] ?? "MrWho";
 var origins = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "https://localhost:7113", "http://localhost:7113" };
 var fromConfig = builder.Configuration.GetSection("WebAuthn:Origins").Get<string[]>() ?? Array.Empty<string>();
-foreach (var o in fromConfig) if (!string.IsNullOrWhiteSpace(o)) origins.Add(o);
+foreach (var o in fromConfig)
+{
+    if (!string.IsNullOrWhiteSpace(o))
+    {
+        origins.Add(o);
+    }
+}
+
 builder.Services.AddSingleton(new Fido2(new Fido2Configuration
 {
     ServerDomain = rpId,

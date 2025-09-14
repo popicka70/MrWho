@@ -32,8 +32,15 @@ public class AuditLogsController : ControllerBase
         [FromQuery] DateTime? fromUtc = null,
         [FromQuery] DateTime? toUtc = null)
     {
-        if (page < 1) page = 1;
-        if (pageSize < 1 || pageSize > 200) pageSize = 25;
+        if (page < 1)
+        {
+            page = 1;
+        }
+
+        if (pageSize < 1 || pageSize > 200)
+        {
+            pageSize = 25;
+        }
 
         var query = _context.AuditLogs.AsNoTracking().AsQueryable();
 
@@ -99,7 +106,7 @@ public class AuditLogsController : ControllerBase
         });
     }
 
-    [HttpGet("entity-types")] 
+    [HttpGet("entity-types")]
     public async Task<ActionResult<IEnumerable<string>>> GetEntityTypes()
     {
         var types = await _context.AuditLogs
@@ -111,7 +118,7 @@ public class AuditLogsController : ControllerBase
         return Ok(types);
     }
 
-    [HttpGet("actions")] 
+    [HttpGet("actions")]
     public ActionResult<IEnumerable<string>> GetActions()
     {
         var values = Enum.GetNames(typeof(AuditAction));

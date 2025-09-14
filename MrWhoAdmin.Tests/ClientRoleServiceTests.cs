@@ -2,9 +2,9 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Microsoft.Extensions.DependencyInjection;
 using Moq;
 using MrWho.Data;
 using MrWho.Models;
@@ -58,7 +58,9 @@ public class ClientRoleServiceTests
             // Create user
             var createResult = UserManager.CreateAsync(User, "Pass123$!").GetAwaiter().GetResult();
             if (!createResult.Succeeded)
+            {
                 throw new InvalidOperationException("Failed creating test user: " + string.Join(',', createResult.Errors.Select(e => e.Description)));
+            }
 
             // Create a global role and assign to user so global role retrieval path is exercised
             Db.Roles.Add(new IdentityRole { Name = "globalAdmin", NormalizedName = "GLOBALADMIN" });

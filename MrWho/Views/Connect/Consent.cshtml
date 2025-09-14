@@ -1,11 +1,12 @@
+@using MrWho.Shared.Constants
 @{
     Layout = "~/Views/Shared/_Layout.cshtml";
-    var returnUrl = (string?)ViewData["ReturnUrl"] ?? "/";
-    var clientId = (string?)ViewData["ClientId"] ?? string.Empty;
-    var clientName = (string?)ViewData["ClientName"] ?? clientId;
-    var requested = (string[])(ViewData["RequestedScopes"] ?? Array.Empty<string>());
-    var already = (string[])(ViewData["AlreadyGranted"] ?? Array.Empty<string>());
-    var missing = (string[])(ViewData["MissingScopes"] ?? Array.Empty<string>());
+    var returnUrl = (string?)ViewData[ViewDataKeys.ReturnUrl] ?? "/";
+    var clientId = (string?)ViewData[ViewDataKeys.ClientId] ?? string.Empty;
+    var clientName = (string?)ViewData[ViewDataKeys.ClientName] ?? clientId;
+    var requested = (string[])(ViewData[ViewDataKeys.RequestedScopes] ?? Array.Empty<string>());
+    var already = (string[])(ViewData[ViewDataKeys.AlreadyGranted] ?? Array.Empty<string>());
+    var missing = (string[])(ViewData[ViewDataKeys.MissingScopes] ?? Array.Empty<string>());
 }
 <div class="container" style="max-width: 720px; margin-top: 2rem;">
     <h2>Authorize access</h2>
@@ -28,16 +29,16 @@
 
     <form method="post" action="/connect/consent">
         @Html.AntiForgeryToken()
-        <input type="hidden" name="returnUrl" value="@returnUrl" />
-        <input type="hidden" name="clientId" value="@clientId" />
+        <input type="hidden" name="@FormFieldNames.ReturnUrl" value="@returnUrl" />
+        <input type="hidden" name="@FormFieldNames.ClientId" value="@clientId" />
 
         @foreach (var s in requested)
         {
-            <input type="hidden" name="scopes" value="@s" />
+            <input type="hidden" name="@FormFieldNames.Scopes" value="@s" />
         }
 
         <div class="form-check" style="margin-top: 1rem;">
-            <input class="form-check-input" type="checkbox" value="true" id="remember" name="remember" checked>
+            <input class="form-check-input" type="checkbox" value="true" id="remember" name="@FormFieldNames.Remember" checked>
             <label class="form-check-label" for="remember">
                 Remember my decision
             </label>
@@ -45,7 +46,7 @@
 
         <div style="margin-top: 1rem;">
             <button type="submit" class="btn btn-primary">Allow</button>
-            <a href="/connect/access-denied?returnUrl=@Uri.EscapeDataString(returnUrl)&clientId=@Uri.EscapeDataString(clientId)" class="btn btn-outline-secondary">Deny</a>
+            <a href="/connect/access-denied?@QueryParameterNames.ReturnUrl=@Uri.EscapeDataString(returnUrl)&@QueryParameterNames.ClientId=@Uri.EscapeDataString(clientId)" class="btn btn-outline-secondary">Deny</a>
         </div>
     </form>
 </div>

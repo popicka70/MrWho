@@ -1,9 +1,9 @@
+using System.Text.Json;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using MrWho.Data;
 using MrWho.Models;
 using MrWho.Shared;
-using System.Text.Json;
 
 namespace MrWho.Services;
 
@@ -30,8 +30,8 @@ public interface IDeviceManagementService
     Task CleanupExpiredQrSessionsAsync();
 
     // Device Authentication Logging
-    Task LogDeviceActivityAsync(string deviceId, string userId, DeviceAuthActivity activity, 
-        string? clientId = null, bool isSuccessful = true, string? errorMessage = null, 
+    Task LogDeviceActivityAsync(string deviceId, string userId, DeviceAuthActivity activity,
+        string? clientId = null, bool isSuccessful = true, string? errorMessage = null,
         string? ipAddress = null, string? userAgent = null, object? metadata = null);
 
     // Security & Monitoring
@@ -65,7 +65,9 @@ public class DeviceManagementService : IDeviceManagementService
     {
         var user = await _userManager.FindByIdAsync(userId);
         if (user == null)
+        {
             throw new ArgumentException($"User {userId} not found", nameof(userId));
+        }
 
         // Check if device already exists
         var existingDevice = await _context.UserDevices
@@ -87,7 +89,7 @@ public class DeviceManagementService : IDeviceManagementService
 
             await _context.SaveChangesAsync();
 
-            await LogDeviceActivityAsync(existingDevice.Id, userId, DeviceAuthActivity.DeviceUpdated, 
+            await LogDeviceActivityAsync(existingDevice.Id, userId, DeviceAuthActivity.DeviceUpdated,
                 ipAddress: request.IpAddress, userAgent: request.UserAgent);
 
             _logger.LogInformation("Updated existing device {DeviceId} for user {UserId}", request.DeviceId, userId);
@@ -115,10 +117,10 @@ public class DeviceManagementService : IDeviceManagementService
         _context.UserDevices.Add(device);
         await _context.SaveChangesAsync();
 
-        await LogDeviceActivityAsync(device.Id, userId, DeviceAuthActivity.DeviceRegistered, 
+        await LogDeviceActivityAsync(device.Id, userId, DeviceAuthActivity.DeviceRegistered,
             ipAddress: request.IpAddress, userAgent: request.UserAgent);
 
-        _logger.LogInformation("Registered new device {DeviceId} ({DeviceName}) for user {UserId}", 
+        _logger.LogInformation("Registered new device {DeviceId} ({DeviceName}) for user {UserId}",
             request.DeviceId, request.DeviceName, userId);
 
         return device;
@@ -144,7 +146,9 @@ public class DeviceManagementService : IDeviceManagementService
             .Where(d => d.UserId == userId);
 
         if (activeOnly)
+        {
             query = query.Where(d => d.IsActive);
+        }
 
         return await query
             .OrderByDescending(d => d.LastUsedAt ?? d.CreatedAt)
@@ -157,34 +161,54 @@ public class DeviceManagementService : IDeviceManagementService
             .FirstOrDefaultAsync(d => d.DeviceId == deviceId && d.IsActive);
 
         if (device == null)
+        {
             return false;
+        }
 
         if (!string.IsNullOrEmpty(request.DeviceName))
+        {
             device.DeviceName = request.DeviceName;
-        
+        }
+
         if (request.DeviceType.HasValue)
+        {
             device.DeviceType = request.DeviceType.Value;
-        
+        }
+
         if (!string.IsNullOrEmpty(request.OperatingSystem))
+        {
             device.OperatingSystem = request.OperatingSystem;
-        
+        }
+
         if (!string.IsNullOrEmpty(request.UserAgent))
+        {
             device.UserAgent = request.UserAgent;
-        
+        }
+
         if (!string.IsNullOrEmpty(request.PushToken))
+        {
             device.PushToken = request.PushToken;
-        
+        }
+
         if (!string.IsNullOrEmpty(request.PublicKey))
+        {
             device.PublicKey = request.PublicKey;
-        
+        }
+
         if (request.CanApproveLogins.HasValue)
+        {
             device.CanApproveLogins = request.CanApproveLogins.Value;
-        
+        }
+
         if (request.ExpiresAt.HasValue)
+        {
             device.ExpiresAt = request.ExpiresAt.Value;
-        
+        }
+
         if (request.Metadata != null)
+        {
             device.Metadata = JsonSerializer.Serialize(request.Metadata);
+        }
 
         device.UpdatedAt = DateTime.UtcNow;
 
@@ -202,7 +226,9 @@ public class DeviceManagementService : IDeviceManagementService
             .FirstOrDefaultAsync(d => d.UserId == userId && d.DeviceId == deviceId);
 
         if (device == null)
+        {
             return false;
+        }
 
         device.IsActive = false;
         device.UpdatedAt = DateTime.UtcNow;
@@ -221,17 +247,19 @@ public class DeviceManagementService : IDeviceManagementService
             .FirstOrDefaultAsync(d => d.UserId == userId && d.DeviceId == deviceId && d.IsActive);
 
         if (device == null)
+        {
             return false;
+        }
 
         device.IsTrusted = trusted;
         device.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
 
-        await LogDeviceActivityAsync(device.Id, userId, DeviceAuthActivity.DeviceUpdated, 
+        await LogDeviceActivityAsync(device.Id, userId, DeviceAuthActivity.DeviceUpdated,
             metadata: new { TrustedChanged = true, NewTrustedValue = trusted });
 
-        _logger.LogInformation("Set device {DeviceId} trusted status to {Trusted} for user {UserId}", 
+        _logger.LogInformation("Set device {DeviceId} trusted status to {Trusted} for user {UserId}",
             deviceId, trusted, userId);
         return true;
     }
@@ -256,7 +284,7 @@ public class DeviceManagementService : IDeviceManagementService
         _context.PersistentQrSessions.Add(session);
         await _context.SaveChangesAsync();
 
-        _logger.LogInformation("Created QR session {SessionId} (token: {Token}) for client {ClientId}", 
+        _logger.LogInformation("Created QR session {SessionId} (token: {Token}) for client {ClientId}",
             session.Id, session.Token, request.ClientId);
 
         return session;
@@ -276,13 +304,17 @@ public class DeviceManagementService : IDeviceManagementService
             .FirstOrDefaultAsync(q => q.Token == token && q.Status == QrSessionStatus.Pending && q.ExpiresAt > DateTime.UtcNow);
 
         if (session == null)
+        {
             return false;
+        }
 
         var device = await _context.UserDevices
             .FirstOrDefaultAsync(d => d.UserId == userId && d.DeviceId == deviceId && d.IsActive && d.CanApproveLogins);
 
         if (device == null)
+        {
             return false;
+        }
 
         session.UserId = userId;
         session.ApprovedByDeviceId = device.Id;
@@ -294,10 +326,10 @@ public class DeviceManagementService : IDeviceManagementService
 
         await _context.SaveChangesAsync();
 
-        await LogDeviceActivityAsync(device.Id, userId, DeviceAuthActivity.QrLoginApproved, 
+        await LogDeviceActivityAsync(device.Id, userId, DeviceAuthActivity.QrLoginApproved,
             clientId: session.ClientId, metadata: new { QrSessionId = session.Id });
 
-        _logger.LogInformation("QR session {SessionId} approved by device {DeviceId} for user {UserId}", 
+        _logger.LogInformation("QR session {SessionId} approved by device {DeviceId} for user {UserId}",
             session.Id, deviceId, userId);
 
         return true;
@@ -309,23 +341,27 @@ public class DeviceManagementService : IDeviceManagementService
             .FirstOrDefaultAsync(q => q.Token == token && q.Status == QrSessionStatus.Pending && q.ExpiresAt > DateTime.UtcNow);
 
         if (session == null)
+        {
             return false;
+        }
 
         var device = await _context.UserDevices
             .FirstOrDefaultAsync(d => d.UserId == userId && d.DeviceId == deviceId && d.IsActive);
 
         if (device == null)
+        {
             return false;
+        }
 
         session.Status = QrSessionStatus.Rejected;
         session.ApprovedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();
 
-        await LogDeviceActivityAsync(device.Id, userId, DeviceAuthActivity.QrLoginRejected, 
+        await LogDeviceActivityAsync(device.Id, userId, DeviceAuthActivity.QrLoginRejected,
             clientId: session.ClientId, metadata: new { QrSessionId = session.Id });
 
-        _logger.LogInformation("QR session {SessionId} rejected by device {DeviceId} for user {UserId}", 
+        _logger.LogInformation("QR session {SessionId} rejected by device {DeviceId} for user {UserId}",
             session.Id, deviceId, userId);
 
         return true;
@@ -337,7 +373,9 @@ public class DeviceManagementService : IDeviceManagementService
             .FirstOrDefaultAsync(q => q.Token == token && q.Status == QrSessionStatus.Approved);
 
         if (session == null)
+        {
             return false;
+        }
 
         session.Status = QrSessionStatus.Completed;
         session.CompletedAt = DateTime.UtcNow;
@@ -370,8 +408,8 @@ public class DeviceManagementService : IDeviceManagementService
     // DEVICE AUTHENTICATION LOGGING
     // ============================================================================
 
-    public async Task LogDeviceActivityAsync(string deviceId, string userId, DeviceAuthActivity activity, 
-        string? clientId = null, bool isSuccessful = true, string? errorMessage = null, 
+    public async Task LogDeviceActivityAsync(string deviceId, string userId, DeviceAuthActivity activity,
+        string? clientId = null, bool isSuccessful = true, string? errorMessage = null,
         string? ipAddress = null, string? userAgent = null, object? metadata = null)
     {
         var log = new DeviceAuthenticationLog
@@ -388,7 +426,7 @@ public class DeviceManagementService : IDeviceManagementService
         };
 
         _context.DeviceAuthenticationLogs.Add(log);
-        
+
         try
         {
             await _context.SaveChangesAsync();
@@ -423,7 +461,9 @@ public class DeviceManagementService : IDeviceManagementService
             .AnyAsync(l => l.DeviceId == deviceId && l.ActivityType == DeviceAuthActivity.DeviceCompromised);
 
         if (compromisedLog)
+        {
             return true;
+        }
 
         // Additional heuristics can be added here
         // e.g., multiple failed attempts, suspicious IP changes, etc.
@@ -437,7 +477,9 @@ public class DeviceManagementService : IDeviceManagementService
             .FirstOrDefaultAsync(d => d.DeviceId == deviceId);
 
         if (device == null)
+        {
             return;
+        }
 
         // Deactivate the device
         device.IsActive = false;
@@ -447,7 +489,7 @@ public class DeviceManagementService : IDeviceManagementService
 
         await _context.SaveChangesAsync();
 
-        await LogDeviceActivityAsync(device.Id, device.UserId, DeviceAuthActivity.DeviceCompromised, 
+        await LogDeviceActivityAsync(device.Id, device.UserId, DeviceAuthActivity.DeviceCompromised,
             errorMessage: reason, metadata: new { Reason = reason, MarkedAt = DateTime.UtcNow });
 
         _logger.LogWarning("Marked device {DeviceId} as compromised: {Reason}", deviceId, reason);

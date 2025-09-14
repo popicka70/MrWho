@@ -1,28 +1,28 @@
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Options;
 using MrWho.Data;
 using MrWho.Handlers;
+using MrWho.Handlers.Auth;
 using MrWho.Handlers.Users;
 using MrWho.Options;
 using MrWho.Services;
+using MrWho.Services.Background;
+using MrWho.Services.Mediator;
 using MrWho.Shared;
 using MrWho.Shared.Authentication;
 using OpenIddict.Abstractions;
 using OpenIddict.Client;
 using OpenIddict.Client.AspNetCore;
 using OpenIddict.Client.SystemNetHttp;
-using System.Threading.RateLimiting;
-using Microsoft.AspNetCore.Hosting;
-using MrWho.Handlers.Auth;
-using MrWho.Services.Mediator;
-using Microsoft.AspNetCore.Mvc;
-using MrWho.Services.Background;
 
 namespace MrWho.Extensions;
 
@@ -59,7 +59,7 @@ public static partial class ServiceCollectionExtensions
 
         // Register client cookie services
         services.AddScoped<IDynamicCookieService, DynamicCookieService>();
-        
+
         // Register dynamic client configuration service
         services.AddScoped<IDynamicClientConfigurationService, DynamicClientConfigurationService>();
 
@@ -100,6 +100,7 @@ public static partial class ServiceCollectionExtensions
 
         // Register device management service
         services.AddScoped<IDeviceManagementService, DeviceManagementService>();
+        services.AddScoped<IDeviceAutoLoginService, DeviceAutoLoginService>(); // new
 
         // Register enhanced QR login service (supports both session-based and persistent QR)
         services.AddScoped<IEnhancedQrLoginService, EnhancedQrLoginService>();
@@ -165,7 +166,7 @@ public static partial class ServiceCollectionExtensions
         var isDevelopment = builder.Environment.IsDevelopment();
 
         var connectionName = config["Database:ConnectionName"] ?? "mrwhodb";
-        var connectionString = config.GetConnectionString(connectionName) ?? config[$"ConnectionStrings:{connectionName}"]; 
+        var connectionString = config.GetConnectionString(connectionName) ?? config[$"ConnectionStrings:{connectionName}"];
 
         // Provide a sensible local default for tooling/migrations if not configured
         if (string.IsNullOrWhiteSpace(connectionString))
@@ -178,7 +179,7 @@ public static partial class ServiceCollectionExtensions
             options.UseNpgsql(connectionString);
 
             if (isDevelopment)
-			{
+            {
                 options.ConfigureWarnings(w => w.Log(RelationalEventId.PendingModelChangesWarning));
                 options.EnableDetailedErrors();
                 options.EnableSensitiveDataLogging();
@@ -211,7 +212,7 @@ public static partial class ServiceCollectionExtensions
             options.Password.RequireNonAlphanumeric = false;
             options.Password.RequireUppercase = false;
             options.Password.RequireLowercase = false;
-            
+
             // Configure Claims Identity to work with OpenIddict claims
             options.ClaimsIdentity.UserIdClaimType = OpenIddictConstants.Claims.Subject;
             options.ClaimsIdentity.UserNameClaimType = OpenIddictConstants.Claims.Name;
@@ -230,21 +231,20 @@ public static partial class ServiceCollectionExtensions
             options.Cookie.Name = CookieSchemeNaming.DefaultCookieName; // Ensure cookie name is explicitly set
             options.Cookie.HttpOnly = true; // Security best practice
             options.ExpireTimeSpan = TimeSpan.FromHours(8); // Consistent with client cookies
-            
+
             // Add error handling for authentication events
             options.Events = new CookieAuthenticationEvents
             {
                 OnRedirectToLogin = context =>
                 {
-                    // Log when redirecting to login to help debug auth issues
+                    // IMPORTANT: Explicitly perform redirect (previous implementation only logged, causing 401 responses)
                     var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<CookieAuthenticationEvents>>();
-                    logger.LogDebug("Redirecting to login from {Path} using scheme {Scheme}", 
-                        context.Request.Path, context.Scheme.Name);
+                    logger.LogDebug("Redirecting unauthenticated request from {Path} to login {LoginPath} (RedirectUri={RedirectUri})", context.Request.Path, options.LoginPath, context.RedirectUri);
+                    context.Response.Redirect(context.RedirectUri); // restore default redirect behavior
                     return Task.CompletedTask;
                 },
                 OnValidatePrincipal = context =>
                 {
-                    // This can help catch issues with malformed cookies
                     if (context.Principal?.Identity?.IsAuthenticated != true)
                     {
                         var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<CookieAuthenticationEvents>>();
@@ -264,8 +264,8 @@ public static partial class ServiceCollectionExtensions
     /// <summary>
     /// Adds cookie configuration for a specific OIDC client
     /// </summary>
-    public static IServiceCollection AddClientSpecificCookie(this IServiceCollection services, 
-        string clientId, 
+    public static IServiceCollection AddClientSpecificCookie(this IServiceCollection services,
+        string clientId,
         string? cookieName = null,
         Action<CookieAuthenticationOptions>? configureOptions = null)
     {
@@ -334,7 +334,11 @@ public static partial class ServiceCollectionExtensions
             })
             .AddServer(options =>
             {
-                var issuer = configuration["OpenIddict:Issuer"]; if (!string.IsNullOrWhiteSpace(issuer)) options.SetIssuer(new Uri(issuer, UriKind.Absolute));
+                var issuer = configuration["OpenIddict:Issuer"]; if (!string.IsNullOrWhiteSpace(issuer))
+                {
+                    options.SetIssuer(new Uri(issuer, UriKind.Absolute));
+                }
+
                 options.AddEventHandler(CustomUserInfoHandler.Descriptor);
                 options.SetAuthorizationEndpointUris("/connect/authorize")
                        .SetPushedAuthorizationEndpointUris("/connect/par")
@@ -345,10 +349,18 @@ public static partial class ServiceCollectionExtensions
                        .SetIntrospectionEndpointUris("/connect/introspect");
                 options.AllowAuthorizationCodeFlow().AllowClientCredentialsFlow().AllowRefreshTokenFlow();
                 var enablePassword = string.Equals(Environment.GetEnvironmentVariable("MRWHO_TESTS"), "1", StringComparison.OrdinalIgnoreCase) || environment.IsEnvironment("Testing");
-                if (enablePassword) options.AllowPasswordFlow();
+                if (enablePassword)
+                {
+                    options.AllowPasswordFlow();
+                }
+
                 options.RequireProofKeyForCodeExchange();
                 options.SetAccessTokenLifetime(TimeSpan.FromMinutes(60)).SetRefreshTokenLifetime(TimeSpan.FromDays(14));
-                if (environment.IsDevelopment()) options.DisableRollingRefreshTokens();
+                if (environment.IsDevelopment())
+                {
+                    options.DisableRollingRefreshTokens();
+                }
+
                 options.RegisterScopes(StandardScopes.OpenId, OpenIddictConstants.Scopes.Email, OpenIddictConstants.Scopes.Profile, OpenIddictConstants.Scopes.Roles, OpenIddictConstants.Scopes.OfflineAccess, StandardScopes.ApiRead, StandardScopes.ApiWrite, StandardScopes.MrWhoUse, "roles.global", "roles.client", "roles.all");
                 options.UseAspNetCore().EnableAuthorizationEndpointPassthrough().EnableTokenEndpointPassthrough().EnableEndSessionEndpointPassthrough();
                 // JAR/JARM handlers remain
@@ -419,7 +431,8 @@ public static partial class ServiceCollectionExtensions
 
         services.AddRateLimiter(options =>
         {
-            options.OnRejected = (context, token) => {
+            options.OnRejected = (context, token) =>
+            {
                 context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
                 return ValueTask.CompletedTask;
             };

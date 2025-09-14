@@ -1,8 +1,8 @@
 using System.Security.Cryptography;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
 using MrWho.Options;
 using OpenIddict.Server;
-using Microsoft.IdentityModel.Tokens;
 
 namespace MrWho.Services;
 

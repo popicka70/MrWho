@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore; // added for EF operations
+using MrWho.Data; // added
 using MrWho.Models;
 using MrWho.Shared.Models;
-using MrWho.Data; // added
-using Microsoft.EntityFrameworkCore; // added for EF operations
 
 namespace MrWho.Handlers.Users;
 
@@ -63,7 +63,7 @@ public class CreateUserHandler : ICreateUserHandler
                 }
 
                 _logger.LogInformation("Successfully created user {UserName} with ID {UserId}", user.UserName, user.Id);
-                
+
                 var userDto = new UserDto
                 {
                     Id = user.Id,
@@ -94,8 +94,16 @@ public class CreateUserHandler : ICreateUserHandler
 
     private static string BuildDisplayName(string source)
     {
-        if (string.IsNullOrWhiteSpace(source)) return "New User";
-        if (source.Contains('@')) source = source.Split('@')[0];
+        if (string.IsNullOrWhiteSpace(source))
+        {
+            return "New User";
+        }
+
+        if (source.Contains('@'))
+        {
+            source = source.Split('@')[0];
+        }
+
         var friendly = source.Replace('.', ' ').Replace('_', ' ').Replace('-', ' ');
         var words = friendly.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         return string.Join(' ', words.Select(w => char.ToUpper(w[0]) + w[1..].ToLower()));

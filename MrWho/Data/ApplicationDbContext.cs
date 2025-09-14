@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
@@ -5,7 +6,6 @@ using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using MrWho.Models;
 using OpenIddict.EntityFrameworkCore.Models;
-using System.Text.Json;
 
 namespace MrWho.Data;
 
@@ -27,18 +27,18 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
     public DbSet<ClientScope> ClientScopes { get; set; }
     public DbSet<ClientPermission> ClientPermissions { get; set; }
     public DbSet<ClientUser> ClientUsers { get; set; }
-    
+
     // NEW: Client secret history (hashed secrets + metadata)
     public DbSet<ClientSecretHistory> ClientSecretHistories { get; set; }
-    
+
     // NEW: Identity brokering entities
     public DbSet<IdentityProvider> IdentityProviders { get; set; }
     public DbSet<ClientIdentityProvider> ClientIdentityProviders { get; set; }
-    
+
     // Scope management entities
     public DbSet<Scope> Scopes { get; set; }
     public DbSet<ScopeClaim> ScopeClaims { get; set; }
-    
+
     // API Resource management entities
     public DbSet<ApiResource> ApiResources { get; set; }
     public DbSet<ApiResourceScope> ApiResourceScopes { get; set; }
@@ -299,7 +299,7 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
                   .OnDelete(DeleteBehavior.Cascade);
             entity.HasIndex(cp => new { cp.ClientId, cp.Permission }).IsUnique();
         });
-        
+
         // Configure Scope entity
         builder.Entity<Scope>(entity =>
         {
@@ -317,7 +317,7 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
                   .OnDelete(DeleteBehavior.Cascade);
             entity.HasIndex(sc => new { sc.ScopeId, sc.ClaimType }).IsUnique();
         });
-        
+
         // Configure ApiResource entity
         builder.Entity<ApiResource>(entity =>
         {
@@ -369,7 +369,7 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
             entity.HasIndex(d => new { d.UserId, d.DeviceId }).IsUnique();
             entity.HasIndex(d => new { d.UserId, d.IsActive });
             entity.HasIndex(d => new { d.UserId, d.IsTrusted });
-            
+
             entity.HasOne(d => d.User)
                   .WithMany()
                   .HasForeignKey(d => d.UserId)
@@ -384,12 +384,12 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
             entity.HasIndex(q => new { q.UserId, q.Status });
             entity.HasIndex(q => new { q.Status, q.ExpiresAt });
             entity.HasIndex(q => q.ClientId);
-            
+
             entity.HasOne(q => q.User)
                   .WithMany()
                   .HasForeignKey(q => q.UserId)
                   .OnDelete(DeleteBehavior.SetNull); // SetNull is fine since UserId is nullable
-                  
+
             entity.HasOne(q => q.ApprovedByDevice)
                   .WithMany(d => d.QrSessions)
                   .HasForeignKey(q => q.ApprovedByDeviceId)
@@ -404,12 +404,12 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
             entity.HasIndex(l => new { l.UserId, l.OccurredAt });
             entity.HasIndex(l => new { l.ActivityType, l.OccurredAt });
             entity.HasIndex(l => new { l.ClientId, l.OccurredAt });
-            
+
             entity.HasOne(l => l.Device)
                   .WithMany(d => d.AuthenticationLogs)
                   .HasForeignKey(l => l.DeviceId)
                   .OnDelete(DeleteBehavior.Restrict); // No cascade - logs are audit data, keep them
-                  
+
             entity.HasOne(l => l.User)
                   .WithMany()
                   .HasForeignKey(l => l.UserId)
@@ -712,18 +712,30 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
             {
                 SetPropertyIfExists(entry, nameof(Client.CreatedAt), now);
                 SetPropertyIfExists(entry, nameof(Client.UpdatedAt), now);
-                if (!string.IsNullOrEmpty(userId)) SetPropertyIfExists(entry, nameof(Client.CreatedBy), userId);
-                if (!string.IsNullOrEmpty(userId)) SetPropertyIfExists(entry, nameof(Client.UpdatedBy), userId);
+                if (!string.IsNullOrEmpty(userId))
+                {
+                    SetPropertyIfExists(entry, nameof(Client.CreatedBy), userId);
+                }
+
+                if (!string.IsNullOrEmpty(userId))
+                {
+                    SetPropertyIfExists(entry, nameof(Client.UpdatedBy), userId);
+                }
             }
             else if (entry.State == EntityState.Modified)
             {
                 SetPropertyIfExists(entry, nameof(Client.UpdatedAt), now);
-                if (!string.IsNullOrEmpty(userId)) SetPropertyIfExists(entry, nameof(Client.UpdatedBy), userId);
+                if (!string.IsNullOrEmpty(userId))
+                {
+                    SetPropertyIfExists(entry, nameof(Client.UpdatedBy), userId);
+                }
             }
 
             // Build audit log for entity if not AuditLog itself
             if (entry.Entity is AuditLog)
+            {
                 continue;
+            }
 
             var audit = new AuditLog
             {
@@ -810,7 +822,11 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
     private static string GetPrimaryKeyValue(Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry entry)
     {
         var key = entry.Metadata.FindPrimaryKey();
-        if (key == null) return string.Empty;
+        if (key == null)
+        {
+            return string.Empty;
+        }
+
         var values = key.Properties.Select(p => entry.CurrentValues[p] ?? entry.OriginalValues[p]).ToArray();
         return string.Join("|", values.Select(v => v?.ToString()));
     }

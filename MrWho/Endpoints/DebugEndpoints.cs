@@ -7,14 +7,14 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using MrWho.Data;
 using MrWho.Services;
 using MrWho.Services.Mediator;
-using OpenIddict.Abstractions;
 using MrWho.Shared.Authentication; // for naming defaults
+using OpenIddict.Abstractions;
 
 namespace MrWho.Endpoints;
 
@@ -35,11 +35,17 @@ internal static class DebugUrlHelper
     {
         foreach (var uri in client.RedirectUris.Select(r => r.Uri))
         {
-            if (TryGetBase(uri, out var b)) return b;
+            if (TryGetBase(uri, out var b))
+            {
+                return b;
+            }
         }
         foreach (var uri in client.PostLogoutUris.Select(r => r.Uri))
         {
-            if (TryGetBase(uri, out var b)) return b;
+            if (TryGetBase(uri, out var b))
+            {
+                return b;
+            }
         }
         return null;
     }
@@ -67,7 +73,11 @@ internal static class DebugUrlHelper
     {
         var preferred = client.PostLogoutUris.Select(p => p.Uri)
             .FirstOrDefault(u => u.Contains("signout-callback-oidc", StringComparison.OrdinalIgnoreCase));
-        if (!string.IsNullOrEmpty(preferred)) return preferred;
+        if (!string.IsNullOrEmpty(preferred))
+        {
+            return preferred;
+        }
+
         return client.PostLogoutUris.Select(p => p.Uri).FirstOrDefault()
                ?? (GetClientBaseUrl(client) is { } b ? $"{b}/signout-callback-oidc" : "");
     }

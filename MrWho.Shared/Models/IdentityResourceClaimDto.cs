@@ -41,9 +41,9 @@ public class IdentityResourceClaimDto
     public static IdentityResourceClaimDto FromClaimType(string claimType, string? identityResourceId = null)
     {
         var standardClaim = CommonClaimTypes.StandardClaims.FirstOrDefault(s => s.Type == claimType);
-        var displayName = standardClaim?.DisplayName ?? 
+        var displayName = standardClaim?.DisplayName ??
             System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(claimType.Replace("_", " ").ToLower());
-        
+
         return new IdentityResourceClaimDto
         {
             Id = string.Empty, // Will be populated when saved to database

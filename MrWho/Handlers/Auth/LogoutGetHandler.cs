@@ -2,21 +2,22 @@ using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Extensions;
+using Microsoft.AspNetCore.Http.Features; // added for session feature check
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
-using Microsoft.Extensions.Configuration;
-using MrWho.Services;
-using MrWho.Services.Mediator;
-using OpenIddict.Abstractions;
-using OpenIddict.Client.AspNetCore;
-using OpenIddict.Server.AspNetCore;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using MrWho.Data;
 using MrWho.Options;
-using Microsoft.AspNetCore.Http.Features; // added for session feature check
+using MrWho.Services;
+using MrWho.Services.Mediator;
+using MrWho.Shared.Constants; // added
+using OpenIddict.Abstractions;
+using OpenIddict.Client.AspNetCore;
+using OpenIddict.Server.AspNetCore;
 
 namespace MrWho.Handlers.Auth;
 
@@ -42,16 +43,24 @@ public sealed class LogoutGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Logo
     public async Task<IActionResult> Handle(MrWho.Endpoints.Auth.LogoutGetRequest request, CancellationToken cancellationToken)
     {
         var http = request.HttpContext;
-        // helper local functions
         static bool HasSession(HttpContext ctx) => ctx.Features.Get<ISessionFeature>()?.Session != null;
         string? SafeSessionGet(HttpContext ctx, string key)
         {
-            if (!HasSession(ctx)) return null;
+            if (!HasSession(ctx))
+            {
+                return null;
+            }
+
             try { return ctx.Session.GetString(key); } catch { return null; }
         }
         void SafeSessionSet(HttpContext ctx, string key, string value)
         {
-            if (!HasSession(ctx)) return; try { ctx.Session.SetString(key, value); } catch { }
+            if (!HasSession(ctx))
+            {
+                return;
+            }
+
+            try { ctx.Session.SetString(key, value); } catch { }
         }
 
         var clientId = request.ClientId;
@@ -60,7 +69,7 @@ public sealed class LogoutGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Logo
         var audit = http.RequestServices.GetService<ISecurityAuditWriter>();
         var sid = http.User?.FindFirst("sid")?.Value; // capture before sign-out
         var issuer = (http.Request.Scheme + "://" + http.Request.Host).TrimEnd('/');
-        try { if (audit != null) await audit.WriteAsync("logout", "logout.initiated", new { clientId, postUri, sid }, "info", actorClientId: clientId, ip: http.Connection.RemoteIpAddress?.ToString()); } catch { }
+        try { if (audit != null) { await audit.WriteAsync("logout", "logout.initiated", new { clientId, postUri, sid }, "info", actorClientId: clientId, ip: http.Connection.RemoteIpAddress?.ToString()); } } catch { }
 
         _logger.LogInformation("GET /connect/logout accessed directly. ClientId: {ClientId}, PostLogoutUri: {PostLogoutUri}", clientId, postUri);
         bool isOidcLogoutRequest = _logoutHelper.IsOidcLogoutRequest(http);
@@ -69,7 +78,6 @@ public sealed class LogoutGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Logo
             return await ProcessLogoutInternalAsync(http, clientId, postUri, cancellationToken);
         }
 
-        // Try session first, then durable claim on principal for direct (non-OIDC) logout
         var externalRegId = SafeSessionGet(http, "ExternalRegistrationId");
         if (string.IsNullOrWhiteSpace(externalRegId))
         {
@@ -100,11 +108,10 @@ public sealed class LogoutGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Logo
             await _logoutHelper.SignOutClientOnlyAsync(http, clientId);
         }
 
-        // Themed LoggedOut page
         var vd = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary())
         {
-            ["ClientId"] = clientId,
-            ["ReturnUrl"] = postUri
+            [ViewDataKeys.ClientId] = clientId,
+            [ViewDataKeys.ReturnUrl] = postUri
         };
         try
         {
@@ -123,8 +130,14 @@ public sealed class LogoutGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Logo
                     customCssUrl = client.CustomCssUrl ?? client.Realm?.RealmCustomCssUrl;
                     var showClientLogo = (bool?)client.GetType().GetProperty("ShowClientLogo")?.GetValue(client) ?? true;
                     var clientLogo = (string?)client.GetType().GetProperty("LogoUri")?.GetValue(client);
-                    if (showClientLogo && !string.IsNullOrWhiteSpace(clientLogo)) logoUri = clientLogo;
-                    else if (!string.IsNullOrWhiteSpace(client.Realm?.RealmLogoUri)) logoUri = client.Realm!.RealmLogoUri;
+                    if (showClientLogo && !string.IsNullOrWhiteSpace(clientLogo))
+                    {
+                        logoUri = clientLogo;
+                    }
+                    else if (!string.IsNullOrWhiteSpace(client.Realm?.RealmLogoUri))
+                    {
+                        logoUri = client.Realm!.RealmLogoUri;
+                    }
                 }
             }
             else
@@ -132,17 +145,30 @@ public sealed class LogoutGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Logo
                 themeName = _mrWhoOptions.Value.DefaultThemeName;
             }
 
-            if (!string.IsNullOrWhiteSpace(themeName)) vd["ThemeName"] = themeName;
-            if (!string.IsNullOrWhiteSpace(customCssUrl)) vd["CustomCssUrl"] = customCssUrl;
-            if (!string.IsNullOrWhiteSpace(logoUri)) vd["LogoUri"] = logoUri;
-            if (!string.IsNullOrWhiteSpace(clientName)) vd["ClientName"] = clientName;
+            if (!string.IsNullOrWhiteSpace(themeName))
+            {
+                vd[ViewDataKeys.ThemeName] = themeName;
+            }
+
+            if (!string.IsNullOrWhiteSpace(customCssUrl))
+            {
+                vd[ViewDataKeys.CustomCssUrl] = customCssUrl;
+            }
+
+            if (!string.IsNullOrWhiteSpace(logoUri))
+            {
+                vd[ViewDataKeys.LogoUri] = logoUri;
+            }
+
+            if (!string.IsNullOrWhiteSpace(clientName))
+            {
+                vd[ViewDataKeys.ClientName] = clientName;
+            }
         }
         catch { }
 
-        // after themed LoggedOut page ViewData assembled but before return, enumerate front-channel logout iframes
         try
         {
-            // Only emit if user principal had sid and we have any clients with FrontChannelLogoutUri
             if (!string.IsNullOrEmpty(sid))
             {
                 var iframeUrls = await _db.Clients.AsNoTracking()
@@ -152,13 +178,12 @@ public sealed class LogoutGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Logo
                 var list = new List<string>();
                 foreach (var c in iframeUrls)
                 {
-                    // Build query: iss & sid & client_id
                     try
                     {
                         var sep = c.FrontChannelLogoutUri!.Contains('?') ? '&' : '?';
                         var url = $"{c.FrontChannelLogoutUri}{sep}iss={Uri.EscapeDataString(issuer)}&sid={Uri.EscapeDataString(sid)}&client_id={Uri.EscapeDataString(c.ClientId)}";
                         list.Add(url);
-                        try { if (audit != null) await audit.WriteAsync("logout", "logout.frontchannel.dispatch", new { c.ClientId, url }, "info", actorClientId: c.ClientId, ip: http.Connection.RemoteIpAddress?.ToString()); } catch { }
+                        try { if (audit != null) { await audit.WriteAsync("logout", "logout.frontchannel.dispatch", new { c.ClientId, url }, "info", actorClientId: c.ClientId, ip: http.Connection.RemoteIpAddress?.ToString()); } } catch { }
                     }
                     catch (Exception ex)
                     {
@@ -182,13 +207,13 @@ public sealed class LogoutGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Logo
     private async Task<IActionResult> ProcessLogoutInternalAsync(HttpContext http, string? clientId, string? postLogoutUri, CancellationToken ct)
     {
         static bool HasSession(HttpContext ctx) => ctx.Features.Get<ISessionFeature>()?.Session != null;
-        void SafeSessionSet(HttpContext ctx, string key, string value) { if (!HasSession(ctx)) return; try { ctx.Session.SetString(key, value); } catch { } }
+        void SafeSessionSet(HttpContext ctx, string key, string value) { if (!HasSession(ctx)) { return; } try { ctx.Session.SetString(key, value); } catch { } }
         var request = http.GetOpenIddictServerRequest();
         string? detectedClientId = clientId ?? await _logoutHelper.TryGetClientIdFromRequestAsync(http);
         var audit = http.RequestServices.GetService<ISecurityAuditWriter>();
         var sid = http.User?.FindFirst("sid")?.Value; // capture before sign-out
         var issuer = (http.Request.Scheme + "://" + http.Request.Host).TrimEnd('/');
-        try { if (audit != null) await audit.WriteAsync("logout", "logout.initiated", new { clientId = detectedClientId, postLogoutUri, sid, oidc = true }, "info", actorClientId: detectedClientId, ip: http.Connection.RemoteIpAddress?.ToString()); } catch { }
+        try { if (audit != null) { await audit.WriteAsync("logout", "logout.initiated", new { clientId = detectedClientId, postLogoutUri, sid, oidc = true }, "info", actorClientId: detectedClientId, ip: http.Connection.RemoteIpAddress?.ToString()); } } catch { }
 
         _logger.LogDebug("Processing OIDC logout. Method: {Method}, ClientId parameter: {ClientId}, Detected ClientId: {DetectedClientId}, Post logout URI: {PostLogoutUri}", http.Request.Method, clientId, detectedClientId, postLogoutUri ?? request?.PostLogoutRedirectUri);
 
@@ -198,11 +223,9 @@ public sealed class LogoutGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Logo
         }
         else
         {
-            // IMPORTANT: For OIDC logout, only sign the initiating client out locally to avoid impacting other clients.
             await _logoutHelper.SignOutClientOnlyAsync(http, detectedClientId);
         }
 
-        // Enumerate front-channel logout iframes across all enabled clients having FrontChannelLogoutUri
         try
         {
             if (!string.IsNullOrEmpty(sid))
@@ -219,7 +242,7 @@ public sealed class LogoutGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Logo
                         var sep = c.FrontChannelLogoutUri!.Contains('?') ? '&' : '?';
                         var url = $"{c.FrontChannelLogoutUri}{sep}iss={Uri.EscapeDataString(issuer)}&sid={Uri.EscapeDataString(sid)}&client_id={Uri.EscapeDataString(c.ClientId)}";
                         list.Add(url);
-                        try { if (audit != null) await audit.WriteAsync("logout", "logout.frontchannel.dispatch", new { c.ClientId, url, oidc = true }, "info", actorClientId: c.ClientId, ip: http.Connection.RemoteIpAddress?.ToString()); } catch { }
+                        try { if (audit != null) { await audit.WriteAsync("logout", "logout.frontchannel.dispatch", new { c.ClientId, url, oidc = true }, "info", actorClientId: c.ClientId, ip: http.Connection.RemoteIpAddress?.ToString()); } } catch { }
                     }
                     catch (Exception ex)
                     {
@@ -228,7 +251,7 @@ public sealed class LogoutGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Logo
                 }
                 if (list.Count > 0)
                 {
-                    http.Items["FrontChannelLogoutIframes"] = list; // downstream page/view can render hidden iframes
+                    http.Items["FrontChannelLogoutIframes"] = list;
                 }
             }
         }
@@ -237,7 +260,6 @@ public sealed class LogoutGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Logo
             _logger.LogDebug(ex, "Error enumerating OIDC front-channel logout iframes");
         }
 
-        // Delegate end-session redirect/sign-out to OpenIddict
         _logoutHelper.DeleteCookieAcrossDomains(http, ".AspNetCore.Identity.Application");
         return new SignOutResult(new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
     }

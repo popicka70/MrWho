@@ -18,7 +18,7 @@ public interface IUsersApiService
     Task<bool> SetLockoutAsync(string id, DateTimeOffset? lockoutEnd);
     Task<bool> SendConfirmationEmailAsync(string id);
     Task<bool> ForceLogoutAsync(string id);
-    
+
     // Claims management
     Task<List<UserClaimDto>?> GetUserClaimsAsync(string userId);
     Task<bool> AddUserClaimAsync(string userId, AddUserClaimRequest request);

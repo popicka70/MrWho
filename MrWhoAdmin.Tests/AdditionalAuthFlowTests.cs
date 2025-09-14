@@ -1,11 +1,11 @@
 using System.Net;
-using System.Text.Json;
 using System.Net.Http.Headers;
+using System.Text.Json;
 
 namespace MrWhoAdmin.Tests;
 
 [TestClass]
-[TestCategory("OIDC")] 
+[TestCategory("OIDC")]
 public class AdditionalAuthFlowTests
 {
     private static HttpClient CreateServerClient(bool disableRedirects = true) => SharedTestInfrastructure.CreateHttpClient("mrwho", disableRedirects: disableRedirects);
@@ -17,7 +17,7 @@ public class AdditionalAuthFlowTests
         return (resp.StatusCode, body);
     }
 
-    private static async Task<JsonDocument> RequestTokenAsync(Dictionary<string,string> form)
+    private static async Task<JsonDocument> RequestTokenAsync(Dictionary<string, string> form)
     {
         using var client = CreateServerClient();
         var resp = await client.PostAsync("connect/token", new FormUrlEncodedContent(form));
@@ -45,7 +45,7 @@ public class AdditionalAuthFlowTests
     [TestMethod]
     public async Task PasswordGrant_AdminClient_Fails_For_DemoRealm_User()
     {
-        var doc = await RequestTokenAsync(new Dictionary<string,string>
+        var doc = await RequestTokenAsync(new Dictionary<string, string>
         {
             ["grant_type"] = "password",
             ["client_id"] = "mrwho_admin_web",
@@ -64,7 +64,7 @@ public class AdditionalAuthFlowTests
     public async Task AccessToken_Without_mrwho_use_Cannot_Call_Admin_Api()
     {
         // Obtain token intentionally omitting mrwho.use
-        using var tokenDoc = await RequestTokenAsync(new Dictionary<string,string>
+        using var tokenDoc = await RequestTokenAsync(new Dictionary<string, string>
         {
             ["grant_type"] = "password",
             ["client_id"] = "mrwho_admin_web",
@@ -90,7 +90,7 @@ public class AdditionalAuthFlowTests
     [TestMethod]
     public async Task ClientCredentials_Requesting_OfflineAccess_Does_Not_Return_RefreshToken()
     {
-        using var doc = await RequestTokenAsync(new Dictionary<string,string>
+        using var doc = await RequestTokenAsync(new Dictionary<string, string>
         {
             ["grant_type"] = "client_credentials",
             ["client_id"] = "mrwho_m2m",

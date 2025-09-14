@@ -26,10 +26,10 @@ public class ForbiddenRedirectMiddleware
         if (context.Response.StatusCode == 403 && !context.Response.HasStarted)
         {
             var requestPath = context.Request.Path.Value?.ToLowerInvariant() ?? "";
-            
+
             // Don't redirect if we're already on an auth-related page to prevent loops
-            if (requestPath.StartsWith("/auth/") || 
-                requestPath.StartsWith("/login") || 
+            if (requestPath.StartsWith("/auth/") ||
+                requestPath.StartsWith("/login") ||
                 requestPath.StartsWith("/logout") ||
                 requestPath.StartsWith("/signin-oidc") ||
                 requestPath.StartsWith("/signout-") ||
@@ -39,7 +39,7 @@ public class ForbiddenRedirectMiddleware
             }
 
             // Don't redirect for API calls, static resources, or Blazor SignalR hubs
-            if (requestPath.StartsWith("/api/") || 
+            if (requestPath.StartsWith("/api/") ||
                 requestPath.StartsWith("/_blazor") ||
                 requestPath.StartsWith("/_framework") ||
                 requestPath.Contains(".") || // Static files
@@ -55,7 +55,7 @@ public class ForbiddenRedirectMiddleware
             {
                 // Clear the authentication cookies immediately
                 await context.SignOutAsync(AdminCookieScheme);
-                
+
                 // Check if this is a Blazor Server request
                 var isBlazorRequest = context.Request.Headers.ContainsKey("X-Requested-With") ||
                                      requestPath.StartsWith("/_blazor") ||
@@ -85,7 +85,7 @@ public class ForbiddenRedirectMiddleware
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error during automatic logout redirect for 403");
-                
+
                 // Fallback: simple redirect to auth error
                 try
                 {

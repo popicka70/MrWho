@@ -88,7 +88,7 @@ public class UserRealmValidationService : IUserRealmValidationService
         {
             _logger.LogError(ex, "Error validating user realm access for user {UserName} and client {ClientId}",
                 user.UserName, clientId);
-            
+
             return new UserRealmValidationResult
             {
                 IsValid = false,

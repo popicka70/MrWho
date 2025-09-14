@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using MrWho.Shared;
 using Microsoft.EntityFrameworkCore;
 using MrWho.Data;
 using MrWho.Models;
+using MrWho.Shared;
 using MrWho.Shared.Models;
 
 namespace MrWho.Controllers;
@@ -28,7 +28,7 @@ public class IdentityResourcesController : ControllerBase
     private static IdentityResourceClaimDto CreateClaimDto(IdentityResourceClaim entity)
     {
         var standardClaim = CommonClaimTypes.StandardClaims.FirstOrDefault(s => s.Type == entity.ClaimType);
-        
+
         return new IdentityResourceClaimDto
         {
             Id = entity.Id,
@@ -46,7 +46,9 @@ public class IdentityResourcesController : ControllerBase
     private static string ToTitleCase(string input)
     {
         if (string.IsNullOrEmpty(input))
+        {
             return input;
+        }
 
         return System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(input.ToLower());
     }
@@ -75,7 +77,7 @@ public class IdentityResourcesController : ControllerBase
             }
 
             var totalCount = await query.CountAsync();
-            
+
             // First load the entities from database
             var identityResources = await query
                 .OrderBy(ir => ir.Name)
@@ -287,17 +289,34 @@ public class IdentityResourcesController : ControllerBase
 
             // Update basic properties
             if (request.DisplayName != null)
+            {
                 identityResource.DisplayName = request.DisplayName;
+            }
+
             if (request.Description != null)
+            {
                 identityResource.Description = request.Description;
+            }
+
             if (request.IsEnabled.HasValue)
+            {
                 identityResource.IsEnabled = request.IsEnabled.Value;
+            }
+
             if (request.IsRequired.HasValue)
+            {
                 identityResource.IsRequired = request.IsRequired.Value;
+            }
+
             if (request.ShowInDiscoveryDocument.HasValue)
+            {
                 identityResource.ShowInDiscoveryDocument = request.ShowInDiscoveryDocument.Value;
+            }
+
             if (request.Emphasize.HasValue)
+            {
                 identityResource.Emphasize = request.Emphasize.Value;
+            }
 
             identityResource.UpdatedAt = DateTime.UtcNow;
             identityResource.UpdatedBy = userName;

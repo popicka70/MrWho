@@ -187,22 +187,22 @@ public class IdentityResourceSeederService : IIdentityResourceSeederService
                 IsRequired = false,
                 ShowInDiscoveryDocument = true,
                 Emphasize = true,
-                UserClaims = new[] 
-                { 
-                    "name", 
-                    "given_name", 
-                    "family_name", 
-                    "middle_name", 
-                    "nickname", 
-                    "preferred_username", 
-                    "profile", 
-                    "picture", 
-                    "website", 
-                    "gender", 
-                    "birthdate", 
-                    "zoneinfo", 
-                    "locale", 
-                    "updated_at" 
+                UserClaims = new[]
+                {
+                    "name",
+                    "given_name",
+                    "family_name",
+                    "middle_name",
+                    "nickname",
+                    "preferred_username",
+                    "profile",
+                    "picture",
+                    "website",
+                    "gender",
+                    "birthdate",
+                    "zoneinfo",
+                    "locale",
+                    "updated_at"
                 },
                 Properties = new Dictionary<string, string>()
             },

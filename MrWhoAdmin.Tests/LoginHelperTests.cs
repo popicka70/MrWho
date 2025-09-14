@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.FileProviders;
+using Microsoft.Extensions.Hosting;
 using Moq;
 using MrWho.Services;
 
@@ -10,9 +10,9 @@ namespace MrWhoAdmin.Tests;
 [TestClass]
 public class LoginHelperTests
 {
-    private static LoginHelper CreateHelper(IDictionary<string,string?>? settings = null, string environmentName = "Development")
+    private static LoginHelper CreateHelper(IDictionary<string, string?>? settings = null, string environmentName = "Development")
     {
-        var dict = settings ?? new Dictionary<string,string?>();
+        var dict = settings ?? new Dictionary<string, string?>();
         var config = new ConfigurationBuilder().AddInMemoryCollection(dict!).Build();
         var httpClientFactory = new Mock<IHttpClientFactory>();
         var envMock = new Mock<IHostEnvironment>();
@@ -26,7 +26,7 @@ public class LoginHelperTests
     [TestMethod]
     public void ShouldUseRecaptcha_ReturnsFalse_InDevelopment()
     {
-        var helper = CreateHelper(new Dictionary<string,string?>
+        var helper = CreateHelper(new Dictionary<string, string?>
         {
             ["GoogleReCaptcha:SiteKey"] = "site",
             ["GoogleReCaptcha:SecretKey"] = "secret"
@@ -44,7 +44,7 @@ public class LoginHelperTests
         {
             Environment.SetEnvironmentVariable("MRWHO_TESTS", null);
             Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", "Production");
-            var helper = CreateHelper(new Dictionary<string,string?>
+            var helper = CreateHelper(new Dictionary<string, string?>
             {
                 ["GoogleReCaptcha:SiteKey"] = "site",
                 ["GoogleReCaptcha:SecretKey"] = "secret"
@@ -61,7 +61,7 @@ public class LoginHelperTests
     [TestMethod]
     public async Task VerifyRecaptchaAsync_ShortCircuits_WhenDisabled()
     {
-        var helper = CreateHelper(new Dictionary<string,string?>(), environmentName: "Development");
+        var helper = CreateHelper(new Dictionary<string, string?>(), environmentName: "Development");
         var ctx = new DefaultHttpContext();
         var result = await helper.VerifyRecaptchaAsync(ctx, token: null, actionExpected: "login");
         Assert.IsTrue(result, "recaptcha disabled should always return true");
@@ -76,7 +76,7 @@ public class LoginHelperTests
         {
             Environment.SetEnvironmentVariable("MRWHO_TESTS", null);
             Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", "Production");
-            var helper = CreateHelper(new Dictionary<string,string?>
+            var helper = CreateHelper(new Dictionary<string, string?>
             {
                 ["GoogleReCaptcha:SiteKey"] = "site",
                 ["GoogleReCaptcha:SecretKey"] = "secret"

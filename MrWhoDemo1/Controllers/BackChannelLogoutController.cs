@@ -1,8 +1,8 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
-using System.Text.Json;
-using System.IdentityModel.Tokens.Jwt;
 
 namespace MrWhoDemo1.Controllers;
 
@@ -72,8 +72,15 @@ public class BackChannelLogoutController : ControllerBase
                 {
                     using var doc = JsonDocument.Parse(logout_token);
                     var root = doc.RootElement;
-                    if (root.TryGetProperty("sub", out var subElement)) subject = subElement.GetString();
-                    if (root.TryGetProperty("sid", out var sidElement)) sessionId = sidElement.GetString();
+                    if (root.TryGetProperty("sub", out var subElement))
+                    {
+                        subject = subElement.GetString();
+                    }
+
+                    if (root.TryGetProperty("sid", out var sidElement))
+                    {
+                        sessionId = sidElement.GetString();
+                    }
                 }
                 catch (Exception jsonEx)
                 {
@@ -94,9 +101,9 @@ public class BackChannelLogoutController : ControllerBase
                     SessionId = sessionId,
                     Reason = "BackChannelLogout"
                 };
-                
+
                 _cache.Set($"logout_{subject}", logoutInfo, TimeSpan.FromHours(1));
-                
+
                 if (!string.IsNullOrEmpty(sessionId))
                 {
                     _cache.Set($"logout_session_{sessionId}", logoutInfo, TimeSpan.FromHours(1));
@@ -105,7 +112,7 @@ public class BackChannelLogoutController : ControllerBase
 
             // Clear local authentication for this request
             await HttpContext.SignOutAsync("Demo1Cookies");
-            
+
             // Store logout information in session for any active sessions to detect
             if (HttpContext.Session.IsAvailable)
             {

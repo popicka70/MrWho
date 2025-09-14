@@ -1,9 +1,9 @@
-﻿using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.OpenIdConnect;
-using Microsoft.AspNetCore.Mvc;
-using System.IdentityModel.Tokens.Jwt;
+﻿using System.IdentityModel.Tokens.Jwt;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
+using Microsoft.AspNetCore.Mvc;
 using MrWho.Shared;
 
 namespace MrWhoAdmin.Web.Services;
@@ -68,7 +68,7 @@ public class TokenRefreshService : ITokenRefreshService
     public async Task<TokenRefreshResult> RefreshTokenWithReauthAsync(HttpContext httpContext, bool force = false)
     {
         var refreshSuccess = await RefreshTokenInternalAsync(httpContext, forceRefresh: force, updateCookies: true);
-        
+
         if (refreshSuccess)
         {
             return new TokenRefreshResult { Success = true, RequiresReauth = false };
@@ -93,15 +93,15 @@ public class TokenRefreshService : ITokenRefreshService
     public async Task<IActionResult> TriggerReauthenticationAsync(HttpContext httpContext, string? returnUrl = null)
     {
         const string adminCookieScheme = "AdminCookies"; // Match the scheme from ServiceCollectionExtensions
-        
+
         _logger.LogInformation("Triggering re-authentication for user");
 
         // Clear the current authentication cookies using the correct scheme
         await httpContext.SignOutAsync(adminCookieScheme);
 
         // Determine return URL
-        var redirectUrl = !string.IsNullOrEmpty(returnUrl) && IsLocalUrl(httpContext, returnUrl) 
-            ? returnUrl 
+        var redirectUrl = !string.IsNullOrEmpty(returnUrl) && IsLocalUrl(httpContext, returnUrl)
+            ? returnUrl
             : httpContext.Request.Path.ToString();
 
         // Trigger OpenID Connect challenge which will redirect to login
@@ -150,7 +150,7 @@ public class TokenRefreshService : ITokenRefreshService
             var clientSecret = authConfig.GetValue<string>("ClientSecret") ?? "FTZvvlIIFdmtBg7IdBql9EEXRDj1xwLmi1qW9fGbJBY";
 
             using var httpClient = _httpClientFactory.CreateClient();
-            
+
             var tokenRequest = new Dictionary<string, string>
             {
                 [TokenConstants.ParameterNames.GrantType] = TokenConstants.GrantTypes.RefreshToken,
@@ -166,10 +166,10 @@ public class TokenRefreshService : ITokenRefreshService
             {
                 var responseContent = await response.Content.ReadAsStringAsync();
                 _logger.LogDebug("Token response received: {Response}", responseContent);
-                
-                var tokenResponse = JsonSerializer.Deserialize<TokenResponse>(responseContent, new JsonSerializerOptions 
-                { 
-                    PropertyNameCaseInsensitive = true 
+
+                var tokenResponse = JsonSerializer.Deserialize<TokenResponse>(responseContent, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
                 });
 
                 if (tokenResponse?.AccessToken != null)
@@ -186,7 +186,7 @@ public class TokenRefreshService : ITokenRefreshService
                     if (authenticateResult.Properties != null)
                     {
                         authenticateResult.Properties.UpdateTokenValue(TokenConstants.TokenNames.AccessToken, tokenResponse.AccessToken);
-                        
+
                         // CRITICAL: Update refresh token if a new one was provided (token rotation)
                         if (!string.IsNullOrEmpty(tokenResponse.RefreshToken))
                         {
@@ -203,7 +203,7 @@ public class TokenRefreshService : ITokenRefreshService
                         if (tokenResponse.ExpiresIn.HasValue)
                         {
                             var expiresAt = DateTimeOffset.UtcNow.AddSeconds(tokenResponse.ExpiresIn.Value);
-                            authenticateResult.Properties.UpdateTokenValue(TokenConstants.TokenNames.ExpiresAt, 
+                            authenticateResult.Properties.UpdateTokenValue(TokenConstants.TokenNames.ExpiresAt,
                                 expiresAt.ToString("o"));
                         }
 
@@ -218,7 +218,7 @@ public class TokenRefreshService : ITokenRefreshService
                             _logger.LogWarning("Token refresh successful but cookies could not be updated (response already started): {Error}", ex.Message);
                             return true;
                         }
-                        
+
                         return true;
                     }
                 }
@@ -230,11 +230,11 @@ public class TokenRefreshService : ITokenRefreshService
             else
             {
                 var errorContent = await response.Content.ReadAsStringAsync();
-                _logger.LogWarning("Token refresh failed: {StatusCode} - {Error}", 
+                _logger.LogWarning("Token refresh failed: {StatusCode} - {Error}",
                     response.StatusCode, errorContent);
-                
+
                 // If the refresh token is invalid/expired, the user needs to re-authenticate
-                if (response.StatusCode == System.Net.HttpStatusCode.BadRequest && 
+                if (response.StatusCode == System.Net.HttpStatusCode.BadRequest &&
                     errorContent.Contains(TokenConstants.ErrorCodes.InvalidGrant))
                 {
                     _logger.LogWarning("Refresh token is invalid or expired, user needs to re-authenticate");
@@ -274,10 +274,10 @@ public class TokenRefreshService : ITokenRefreshService
             {
                 var timeUntilExpiry = expiresAt - DateTimeOffset.UtcNow;
                 var isExpiringSoon = timeUntilExpiry <= _refreshBeforeExpiryTime;
-                
+
                 _logger.LogDebug("Token expires at {ExpiresAt}, time until expiry: {TimeUntilExpiry}, needs refresh: {NeedsRefresh}",
                     expiresAt, timeUntilExpiry, isExpiringSoon);
-                
+
                 return isExpiringSoon;
             }
 
@@ -289,10 +289,10 @@ public class TokenRefreshService : ITokenRefreshService
                 var expiry = jwtToken.ValidTo;
                 var timeUntilExpiry = expiry - DateTime.UtcNow;
                 var isExpiringSoon = timeUntilExpiry <= _refreshBeforeExpiryTime;
-                
+
                 _logger.LogDebug("JWT token expires at {ExpiresAt}, time until expiry: {TimeUntilExpiry}, needs refresh: {NeedsRefresh}",
                     expiry, timeUntilExpiry, isExpiringSoon);
-                
+
                 return isExpiringSoon;
             }
 
@@ -312,12 +312,16 @@ public class TokenRefreshService : ITokenRefreshService
     private static bool IsLocalUrl(HttpContext httpContext, string url)
     {
         if (string.IsNullOrEmpty(url))
+        {
             return false;
+        }
 
         // Must be a relative URL (not absolute with protocol)
         if (url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
             url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
             return false;
+        }
 
         // Must start with / but not //
         return url.StartsWith("/") && !url.StartsWith("//");
@@ -330,19 +334,19 @@ public class TokenRefreshService : ITokenRefreshService
     {
         [JsonPropertyName(TokenConstants.JsonPropertyNames.AccessToken)]
         public string? AccessToken { get; set; }
-        
+
         [JsonPropertyName(TokenConstants.JsonPropertyNames.RefreshToken)]
         public string? RefreshToken { get; set; }
-        
+
         [JsonPropertyName(TokenConstants.JsonPropertyNames.IdToken)]
         public string? IdToken { get; set; }
-        
+
         [JsonPropertyName(TokenConstants.JsonPropertyNames.TokenType)]
         public string? TokenType { get; set; }
-        
+
         [JsonPropertyName(TokenConstants.JsonPropertyNames.ExpiresIn)]
         public int? ExpiresIn { get; set; }
-        
+
         [JsonPropertyName(TokenConstants.JsonPropertyNames.Scope)]
         public string? Scope { get; set; }
     }

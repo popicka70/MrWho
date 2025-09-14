@@ -1,8 +1,8 @@
-using Microsoft.Extensions.Logging;
-using Aspire.Hosting;
-using OpenIddict.Abstractions; // added (may be unused now but keep if needed elsewhere)
 using System.Diagnostics;
 using System.Text.Json;
+using Aspire.Hosting;
+using Microsoft.Extensions.Logging;
+using OpenIddict.Abstractions; // added (may be unused now but keep if needed elsewhere)
 
 namespace MrWhoAdmin.Tests;
 

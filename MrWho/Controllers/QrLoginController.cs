@@ -1,11 +1,11 @@
+using System.Text;
+using System.Web;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using MrWho.Services;
 using QRCoder;
-using System.Text;
-using System.Web;
 
 namespace MrWho.Controllers;
 
@@ -43,7 +43,7 @@ public class QrLoginController : Controller
     public async Task<IActionResult> Start(string? returnUrl = null, string? clientId = null, bool persistent = false)
     {
         string token;
-        
+
         if (persistent)
         {
             // Create persistent QR session
@@ -67,7 +67,7 @@ public class QrLoginController : Controller
         ViewData["ReturnUrl"] = returnUrl;
         ViewData["ClientId"] = clientId;
         ViewData["IsPersistent"] = persistent;
-        
+
         return View("Start");
     }
 
@@ -75,8 +75,10 @@ public class QrLoginController : Controller
     [AllowAnonymous]
     public IActionResult QrPng([FromQuery] string token, [FromQuery] bool persistent = false)
     {
-        if (string.IsNullOrWhiteSpace(token)) 
+        if (string.IsNullOrWhiteSpace(token))
+        {
             return BadRequest();
+        }
 
         string deepLink;
         if (persistent)
@@ -109,11 +111,12 @@ public class QrLoginController : Controller
         try
         {
             var sessionInfo = await _enhancedQrService.GetQrSessionInfoAsync(token);
-            var approved = sessionInfo.Status == QrSessionStatusEnum.Approved || 
+            var approved = sessionInfo.Status == QrSessionStatusEnum.Approved ||
                          sessionInfo.Status == QrSessionStatusEnum.Completed;
 
-            return Json(new { 
-                approved, 
+            return Json(new
+            {
+                approved,
                 status = sessionInfo.Status.ToString(),
                 deviceName = sessionInfo.DeviceName,
                 approvedAt = sessionInfo.ApprovedAt
@@ -173,7 +176,7 @@ public class QrLoginController : Controller
             ViewData["Token"] = token;
             ViewData["SessionInfo"] = sessionInfo;
             ViewData["UserName"] = user.UserName;
-            
+
             return View("Approve", model: "pending");
         }
         catch (ArgumentException)
@@ -193,7 +196,9 @@ public class QrLoginController : Controller
     {
         var user = await _userManager.GetUserAsync(User);
         if (user == null)
+        {
             return Challenge();
+        }
 
         try
         {
@@ -260,12 +265,14 @@ public class QrLoginController : Controller
     public async Task<IActionResult> Complete([FromForm] string token)
     {
         if (string.IsNullOrEmpty(token))
+        {
             return BadRequest();
+        }
 
         try
         {
             var sessionInfo = await _enhancedQrService.GetQrSessionInfoAsync(token);
-            
+
             if (sessionInfo.Status != QrSessionStatusEnum.Approved)
             {
                 _logger.LogDebug("QR session {Token} not approved, current status: {Status}", token, sessionInfo.Status);
@@ -311,7 +318,7 @@ public class QrLoginController : Controller
                 try
                 {
                     await _dynamicCookieService.SignInWithClientCookieAsync(sessionInfo.ClientId, user, false);
-                    _logger.LogDebug("Signed in user {UserName} with client-specific cookie for client {ClientId}", 
+                    _logger.LogDebug("Signed in user {UserName} with client-specific cookie for client {ClientId}",
                         user.UserName, sessionInfo.ClientId);
                 }
                 catch (Exception ex)

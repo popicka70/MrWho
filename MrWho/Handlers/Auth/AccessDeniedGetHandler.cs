@@ -1,12 +1,12 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
+using Microsoft.EntityFrameworkCore; // added
+using Microsoft.Extensions.Options; // added
+using MrWho.Data; // added
+using MrWho.Options; // added
 using MrWho.Services.Mediator;
 using OpenIddict.Abstractions;
-using Microsoft.EntityFrameworkCore; // added
-using MrWho.Data; // added
-using Microsoft.Extensions.Options; // added
-using MrWho.Options; // added
 
 namespace MrWho.Handlers.Auth;
 
@@ -131,11 +131,19 @@ public sealed class AccessDeniedGetHandler : IRequestHandler<MrWho.Endpoints.Aut
             }
 
             if (!string.IsNullOrWhiteSpace(themeName))
+            {
                 vd["ThemeName"] = themeName;
+            }
+
             if (!string.IsNullOrWhiteSpace(customCssUrl))
+            {
                 vd["CustomCssUrl"] = customCssUrl;
+            }
+
             if (!string.IsNullOrWhiteSpace(logoUri))
+            {
                 vd["LogoUri"] = logoUri;
+            }
         }
         catch (Exception ex)
         {

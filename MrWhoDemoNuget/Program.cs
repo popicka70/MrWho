@@ -1,8 +1,8 @@
-using MrWho.ClientAuth;
-using MrWho.ClientAuth.M2M;
-using MrWho.ClientAuth.Jar; // JAR signer
-using MrWho.ClientAuth.Par; // PAR client
 using Microsoft.IdentityModel.Tokens;
+using MrWho.ClientAuth;
+using MrWho.ClientAuth.Jar; // JAR signer
+using MrWho.ClientAuth.M2M;
+using MrWho.ClientAuth.Par; // PAR client
 
 var builder = WebApplication.CreateBuilder(args);
 

@@ -9,7 +9,7 @@ using Microsoft.IdentityModel.Tokens;
 namespace MrWhoAdmin.Tests;
 
 [TestClass]
-[TestCategory("OIDC")] 
+[TestCategory("OIDC")]
 public class JarParJarmAdditionalTests
 {
     private static HttpClient CreateServerClient(bool noRedirects = true) => SharedTestInfrastructure.CreateHttpClient("mrwho", disableRedirects: noRedirects);
@@ -57,7 +57,7 @@ public class JarParJarmAdditionalTests
     private static (string Verifier, string Challenge) CreatePkcePair()
     {
         var bytes = RandomNumberGenerator.GetBytes(32);
-        string B64(byte[] b) => Convert.ToBase64String(b).TrimEnd('=')[..].Replace('+','-').Replace('/','_');
+        string B64(byte[] b) => Convert.ToBase64String(b).TrimEnd('=')[..].Replace('+', '-').Replace('/', '_');
         var verifier = B64(bytes);
         var hash = SHA256.HashData(Encoding.ASCII.GetBytes(verifier));
         var challenge = B64(hash);
@@ -72,7 +72,11 @@ public class JarParJarmAdditionalTests
         {
             var pad = new byte[required];
             Array.Copy(bytes, pad, bytes.Length);
-            for (int i = bytes.Length; i < required; i++) pad[i] = (byte)'!';
+            for (int i = bytes.Length; i < required; i++)
+            {
+                pad[i] = (byte)'!';
+            }
+
             bytes = pad;
         }
         return new SigningCredentials(new SymmetricSecurityKey(bytes), alg);
@@ -96,7 +100,11 @@ public class JarParJarmAdditionalTests
             ["code_challenge"] = challenge,
             ["code_challenge_method"] = "S256"
         };
-        if (includeJti) claims["jti"] = Guid.NewGuid().ToString("n");
+        if (includeJti)
+        {
+            claims["jti"] = Guid.NewGuid().ToString("n");
+        }
+
         var desc = new SecurityTokenDescriptor
         {
             Issuer = clientId,
@@ -149,7 +157,7 @@ public class JarParJarmAdditionalTests
 
         // PAR push (include client_secret for confidential client auth)
         using var parClient = CreateServerClient();
-        var parForm = new Dictionary<string,string>{{"client_id", clientId},{"client_secret", clientSecret},{"request", jar}};
+        var parForm = new Dictionary<string, string> { { "client_id", clientId }, { "client_secret", clientSecret }, { "request", jar } };
         var parResp = await parClient.PostAsync("connect/par", new FormUrlEncodedContent(parForm));
         var parBody = await parResp.Content.ReadAsStringAsync();
 
@@ -166,7 +174,7 @@ public class JarParJarmAdditionalTests
         using var authClient = CreateServerClient();
         var authorizeUrl = $"connect/authorize?client_id={Uri.EscapeDataString(clientId)}&request_uri={Uri.EscapeDataString(requestUri!)}&response_mode=jwt";
         var authResp = await authClient.GetAsync(authorizeUrl);
-        bool ok = (int)authResp.StatusCode is >=300 and <=399 || authResp.StatusCode == HttpStatusCode.OK;
+        bool ok = (int)authResp.StatusCode is >= 300 and <= 399 || authResp.StatusCode == HttpStatusCode.OK;
         if (!ok)
         {
             var failBody = await authResp.Content.ReadAsStringAsync();
@@ -315,7 +323,7 @@ public class JarParJarmAdditionalTests
         var jar = handler.CreateToken(desc);
 
         using var par1 = CreateServerClient();
-        var form1 = new Dictionary<string,string>{{"client_id", clientId},{"client_secret", clientSecret},{"request", jar}};
+        var form1 = new Dictionary<string, string> { { "client_id", clientId }, { "client_secret", clientSecret }, { "request", jar } };
         var r1 = await par1.PostAsync("connect/par", new FormUrlEncodedContent(form1));
         if (r1.StatusCode == HttpStatusCode.NotFound)
         {
@@ -401,7 +409,7 @@ public class JarParJarmAdditionalTests
         var (verifier, challenge) = CreatePkcePair();
         var now = DateTimeOffset.UtcNow;
         var creds = new SigningCredentials(new RsaSecurityKey(rsa.ExportParameters(true)), SecurityAlgorithms.RsaSha256);
-        var claims = new Dictionary<string,object>
+        var claims = new Dictionary<string, object>
         {
             ["client_id"] = clientId,
             ["iss"] = clientId,
@@ -420,7 +428,7 @@ public class JarParJarmAdditionalTests
         var jar = handler.CreateToken(desc);
 
         using var parClient = CreateServerClient();
-        var form = new Dictionary<string,string>{{"client_id", clientId},{"request", jar}};
+        var form = new Dictionary<string, string> { { "client_id", clientId }, { "request", jar } };
         var parResp = await parClient.PostAsync("connect/par", new FormUrlEncodedContent(form));
         if (parResp.StatusCode == HttpStatusCode.NotFound)
         {

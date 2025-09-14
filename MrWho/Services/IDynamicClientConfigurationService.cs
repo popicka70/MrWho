@@ -12,37 +12,37 @@ public interface IDynamicClientConfigurationService
     /// Gets dynamic cookie authentication options for a specific client
     /// </summary>
     Task<CookieAuthenticationOptions> GetClientCookieOptionsAsync(string clientId);
-    
+
     /// <summary>
     /// Gets dynamic OpenIddict token lifetimes for a specific client
     /// </summary>
     Task<ClientTokenConfiguration> GetClientTokenConfigurationAsync(string clientId);
-    
+
     /// <summary>
     /// Gets dynamic security configuration for a specific client
     /// </summary>
     Task<ClientSecurityConfiguration> GetClientSecurityConfigurationAsync(string clientId);
-    
+
     /// <summary>
     /// Gets dynamic MFA configuration for a specific client
     /// </summary>
     Task<ClientMfaConfiguration> GetClientMfaConfigurationAsync(string clientId);
-    
+
     /// <summary>
     /// Gets dynamic rate limiting configuration for a specific client
     /// </summary>
     Task<ClientRateLimitConfiguration> GetClientRateLimitConfigurationAsync(string clientId);
-    
+
     /// <summary>
     /// Gets dynamic branding configuration for a specific client
     /// </summary>
     Task<ClientBrandingConfiguration> GetClientBrandingConfigurationAsync(string clientId);
-    
+
     /// <summary>
     /// Applies all dynamic configurations to cookie options
     /// </summary>
     Task<CookieAuthenticationOptions> ApplyDynamicConfigurationAsync(Client client, CookieAuthenticationOptions options);
-    
+
     /// <summary>
     /// Gets the effective configuration value with proper fallback hierarchy
     /// </summary>

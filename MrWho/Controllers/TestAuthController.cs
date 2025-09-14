@@ -1,8 +1,8 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
-using Microsoft.AspNetCore.Authentication;
 using MrWho.Shared;
 
 namespace MrWho.Controllers;
@@ -24,11 +24,21 @@ public class TestAuthController : ControllerBase
     {
         var testEnabled = string.Equals(Environment.GetEnvironmentVariable("MRWHO_TESTS"), "1", StringComparison.OrdinalIgnoreCase) ||
                            string.Equals(Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"), "Testing", StringComparison.OrdinalIgnoreCase);
-        if (!testEnabled) return NotFound();
-        if (string.IsNullOrWhiteSpace(userEmail)) return BadRequest("userEmail is required");
+        if (!testEnabled)
+        {
+            return NotFound();
+        }
+
+        if (string.IsNullOrWhiteSpace(userEmail))
+        {
+            return BadRequest("userEmail is required");
+        }
 
         var user = await _userManager.FindByEmailAsync(userEmail);
-        if (user == null) return NotFound("User not found");
+        if (user == null)
+        {
+            return NotFound("User not found");
+        }
 
         var claims = new List<Claim>
         {
