@@ -13,11 +13,13 @@
     bool allowQrQuick = ViewData["AllowQrLoginQuick"] as bool? ?? true;
     bool allowQrSecure = ViewData["AllowQrLoginSecure"] as bool? ?? true;
     bool allowCode = ViewData["AllowCodeLogin"] as bool? ?? true;
+    var originalReturnUrl = ViewData["ReturnUrl"] as string;
+
+    bool showRegisterDeviceDirect = allowLocal && !(originalReturnUrl?.StartsWith("/device-management/register", StringComparison.OrdinalIgnoreCase) ?? false);
 }
 
 <div class="row justify-content-center">
     <div class="col-md-6 col-lg-4">
-        <!-- Logo (client/realm-specific when provided, fallback to default) -->
         <div class="text-center mb-4">
             @if (!string.IsNullOrWhiteSpace(logoUri))
             {
@@ -28,7 +30,6 @@
                 <img src="~/images/AuthMrWho.jpeg" alt="MrWho Identity Server" class="mrwho-logo" />
             }
         </div>
-        
         <div class="card">
             <div class="card-header">
                 @if (!string.IsNullOrEmpty(clientName))
@@ -45,7 +46,6 @@
                 }
             </div>
             <div class="card-body">
-                @* Display error messages based on query parameters *@
                 @if (!string.IsNullOrEmpty(Context.Request.Query["error"]))
                 {
                     var error = Context.Request.Query["error"].ToString();
@@ -62,31 +62,21 @@
                         }
                     </div>
                 }
-                
                 @if (allowLocal)
                 {
                     <form id="loginForm" method="post">
                         @Html.AntiForgeryToken()
                         <div asp-validation-summary="All" class="text-danger"></div>
                         <input type="hidden" id="recaptchaToken" name="recaptchaToken" />
-                        
-                        @if (!string.IsNullOrEmpty(ViewData["ReturnUrl"] as string))
-                        {
-                            <input type="hidden" name="returnUrl" value="@ViewData["ReturnUrl"]" />
-                        }
-                        
-                        @if (!string.IsNullOrEmpty(ViewData["ClientId"] as string))
-                        {
-                            <input type="hidden" name="clientId" value="@ViewData["ClientId"]" />
-                        }
-                        
+                        @if (!string.IsNullOrEmpty(ViewData["ReturnUrl"] as string)) { <input type="hidden" name="returnUrl" value="@ViewData["ReturnUrl"]" /> }
+                        @if (!string.IsNullOrEmpty(ViewData["ClientId"] as string)) { <input type="hidden" name="clientId" value="@ViewData["ClientId"]" /> }
                         <input type="hidden" asp-for="UseCode" />
+                        <input type="hidden" id="registerDeviceFirst" name="registerDeviceFirst" value="0" />
                         <div class="mb-3">
                             <label asp-for="Email" class="form-label">Email</label>
                             <input asp-for="Email" class="form-control" type="email" placeholder="Enter your email" required />
                             <span asp-validation-for="Email" class="text-danger"></span>
                         </div>
-
                         @if (Model.UseCode && allowCode)
                         {
                             <div class="mb-3">
@@ -103,40 +93,31 @@
                                 <span asp-validation-for="Password" class="text-danger"></span>
                             </div>
                         }
-                        
                         <div class="mb-3 form-check">
                             <input asp-for="RememberMe" class="form-check-input" type="checkbox" />
                             <label asp-for="RememberMe" class="form-check-label">Remember me</label>
                         </div>
-                        
                         <div class="d-grid mb-2">
                             <button id="btnLogin" type="submit" class="btn btn-primary btn-lg">
                                 <i class="bi bi-box-arrow-in-right me-2"></i>Sign In
                             </button>
                         </div>
-
                         @{
-                            // Build register link preserving returnUrl + clientId
-                            var regQs = new Dictionary<string, string?>
-                            {
-                                { "returnUrl", ViewData["ReturnUrl"] as string },
-                                { "clientId", ViewData["ClientId"] as string }
-                            };
-                            var regQuery = string.Join("&", regQs.Where(kv => !string.IsNullOrEmpty(kv.Value))
-                                                                 .Select(kv => kv.Key + "=" + Uri.EscapeDataString(kv.Value!)));
+                            var regQs = new Dictionary<string, string?> { { "returnUrl", ViewData["ReturnUrl"] as string }, { "clientId", ViewData["ClientId"] as string } };
+                            var regQuery = string.Join("&", regQs.Where(kv => !string.IsNullOrEmpty(kv.Value)).Select(kv => kv.Key + "=" + Uri.EscapeDataString(kv.Value!)));
                             var registerHref = string.IsNullOrEmpty(regQuery) ? "/connect/register" : ($"/connect/register?{regQuery}");
                         }
-
-                        <div class="text-center mb-3">
-                            <small class="text-muted">Don't have an account?</small>
-                            <div>
-                                <a href="@registerHref" class="btn btn-link p-0"><i class="bi bi-person-plus me-1"></i>Register new account</a>
+                        <div class="text-center mb-3"><small class="text-muted">Don't have an account?</small><div><a href="@registerHref" class="btn btn-link p-0"><i class="bi bi-person-plus me-1"></i>Register new account</a></div></div>
+                        @if (showRegisterDeviceDirect)
+                        {
+                            <div class="d-grid mb-3">
+                                <button type="button" id="btnLoginRegisterDevice" class="btn btn-outline-info">
+                                    <i class="bi bi-phone me-2"></i>Sign in and register device
+                                </button>
                             </div>
-                        </div>
+                        }
                     </form>
                 }
-
-                <!-- Alternative Authentication Methods -->
                 <div class="d-grid gap-2">
                     @{
                         var qs = new Dictionary<string, string?>
@@ -154,7 +135,6 @@
                         var qrHref = string.IsNullOrEmpty(qrQuery) ? "/qr-login/start" : ($"/qr-login/start?{qrQuery}");
                         var enhancedQrHref = string.IsNullOrEmpty(qrQuery) ? "/qr-login/start?persistent=true" : ($"/qr-login/start?persistent=true&{qrQuery}");
                     }
-                    
                     @if (allowCode)
                     {
                         @if (Model.UseCode)
@@ -170,23 +150,18 @@
                             </a>
                         }
                     }
-
                     @if (allowPasskey)
                     {
-                        <!-- Passkey Login -->
                         <button id="btn-passkey" type="button" class="btn btn-outline-primary">
                             <i class="bi bi-fingerprint me-2"></i>Sign in with a passkey
                         </button>
                     }
-                    
                     @if (allowQrQuick || allowQrSecure)
                     {
-                        <!-- QR Login Options with Clear Distinction -->
                         <hr class="my-3">
                         <h6 class="text-center text-muted mb-3">
                             <i class="bi bi-qr-code me-1"></i>QR Code Login Options
                         </h6>
-                        
                         @if (allowQrQuick)
                         {
                             <a href="@qrHref" class="btn auth-button qr-login-quick">
@@ -201,7 +176,6 @@
                                 </div>
                             </a>
                         }
-                        
                         @if (allowQrSecure)
                         {
                             <a href="@enhancedQrHref" class="btn auth-button qr-login-secure">
@@ -217,8 +191,6 @@
                             </a>
                         }
                     }
-
-                    <!-- External Identity Providers -->
                     @if (externalProviders.Any())
                     {
                         <hr class="my-3">
@@ -252,7 +224,6 @@
                             }
                         </div>
                     }
-                    
                     <div class="mt-2">
                         <small class="text-muted">
                             <i class="bi bi-info-circle"></i> 
@@ -267,34 +238,25 @@
 
 @section Scripts {
     <partial name="_LoginPartial" />
+    <script>
+        (function(){
+            const btn = document.getElementById('btnLoginRegisterDevice');
+            if(btn){
+                btn.addEventListener('click', function(){
+                    document.getElementById('registerDeviceFirst').value = '1';
+                    document.getElementById('loginForm').submit();
+                });
+            }
+        })();
+    </script>
     @if (!string.IsNullOrWhiteSpace(recaptchaSiteKey))
     {
         <script src="https://www.google.com/recaptcha/api.js?render=@recaptchaSiteKey"></script>
-        <script>
-            (function(){
-                const form = document.getElementById('loginForm');
-                if(!form || !window.grecaptcha) return;
-                form.addEventListener('submit', function(e){
-                    const existing = document.getElementById('recaptchaToken').value;
-                    if(existing) return; // already have token
-                    e.preventDefault();
-                    const btn = document.getElementById('btnLogin');
-                    if(btn){ btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Verifying...'; }
-                    grecaptcha.ready(function(){
-                        grecaptcha.execute('@recaptchaSiteKey', { action: 'login' }).then(function(token){
-                            document.getElementById('recaptchaToken').value = token;
-                            form.submit();
-                        }).catch(function(){
-                            if(btn){ btn.disabled = false; btn.innerHTML = '<i class="bi bi-box-arrow-in-right me-2"></i>Sign In'; }
-                        });
-                    });
-                });
-            })();
-        </script>
+        <script>(function(){const form=document.getElementById('loginForm');if(!form||!window.grecaptcha)return;form.addEventListener('submit',function(e){const existing=document.getElementById('recaptchaToken').value;if(existing)return;e.preventDefault();const btn=document.getElementById('btnLogin');if(btn){btn.disabled=true;btn.innerHTML='<span class="spinner-border spinner-border-sm me-2"></span> Verifying...';}grecaptcha.ready(function(){grecaptcha.execute('@recaptchaSiteKey',{action:'login'}).then(function(token){document.getElementById('recaptchaToken').value=token;form.submit();}).catch(function(){if(btn){btn.disabled=false;btn.innerHTML='<i class="bi bi-box-arrow-in-right me-2"></i>Sign In';}});});});})();</script>
     }
     <script>
         (function(){
-            if (!(@allowPasskey.ToString().ToLower())) return; // disable passkey script if not allowed
+            if (!(@allowPasskey.ToString().ToLower())) return;
             const passkeyBtn = document.getElementById('btn-passkey');
             if(!passkeyBtn || !window.PublicKeyCredential) return;
             passkeyBtn.addEventListener('click', async () => {
@@ -302,75 +264,18 @@
                     const urlParams = new URLSearchParams(window.location.search);
                     const returnUrl = urlParams.get('returnUrl') || '';
                     const clientId = urlParams.get('clientId') || '';
-
                     const res = await fetch('/webauthn/login/options' + (document.querySelector('[name="Email"]').value ? ('?email=' + encodeURIComponent(document.querySelector('[name="Email"]').value)) : ''));
                     if(!res.ok){ alert('Failed to start passkey'); return; }
                     const options = await res.json();
-
-                    // Convert challenge
                     options.challenge = base64urlToBuffer(options.challenge);
-
-                    // Ensure allowCredentials is either a sequence or omitted entirely
-                    if (!Array.isArray(options.allowCredentials) || options.allowCredentials.length === 0) {
-                        delete options.allowCredentials; // let authenticator use discoverable credentials
-                    } else {
-                        options.allowCredentials = options.allowCredentials.map(c => ({
-                            ...c,
-                            id: base64urlToBuffer(c.id)
-                        }));
-                    }
-
+                    if (!Array.isArray(options.allowCredentials) || options.allowCredentials.length === 0) { delete options.allowCredentials; } else { options.allowCredentials = options.allowCredentials.map(c => ({...c,id: base64urlToBuffer(c.id)})); }
                     const assertion = await navigator.credentials.get({ publicKey: options });
-
-                    const data = {
-                        id: bufferToBase64Url(assertion.rawId),
-                        rawId: bufferToBase64Url(assertion.rawId),
-                        type: assertion.type,
-                        extensions: assertion.getClientExtensionResults ? assertion.getClientExtensionResults() : {},
-                        response: {
-                            clientDataJSON: bufferToBase64Url(assertion.response.clientDataJSON),
-                            authenticatorData: bufferToBase64Url(assertion.response.authenticatorData),
-                            signature: bufferToBase64Url(assertion.response.signature),
-                            userHandle: assertion.response.userHandle ? bufferToBase64Url(assertion.response.userHandle) : null
-                        }
-                    };
-
-                    const verifyRes = await fetch(`/webauthn/login/verify?${new URLSearchParams({ returnUrl, clientId })}`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(data)
-                    });
-
-                    if (verifyRes.redirected) {
-                        window.location.href = verifyRes.url;
-                    } else if (verifyRes.ok) {
-                        window.location.href = returnUrl || '/';
-                    } else {
-                        const msg = await verifyRes.text();
-                        alert('Passkey sign-in failed: ' + msg);
-                    }
-                } catch (e) {
-                    console.error(e);
-                    alert('Passkey sign-in error: ' + e);
-                }
+                    const data = { id: bufferToBase64Url(assertion.rawId), rawId: bufferToBase64Url(assertion.rawId), type: assertion.type, extensions: assertion.getClientExtensionResults ? assertion.getClientExtensionResults() : {}, response: { clientDataJSON: bufferToBase64Url(assertion.response.clientDataJSON), authenticatorData: bufferToBase64Url(assertion.response.authenticatorData), signature: bufferToBase64Url(assertion.response.signature), userHandle: assertion.response.userHandle ? bufferToBase64Url(assertion.response.userHandle) : null } };
+                    const verifyRes = await fetch(`/webauthn/login/verify?${new URLSearchParams({ returnUrl, clientId })}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+                    if (verifyRes.redirected) { window.location.href = verifyRes.url; } else if (verifyRes.ok) { window.location.href = returnUrl || '/'; } else { const msg = await verifyRes.text(); alert('Passkey sign-in failed: ' + msg); }
+                } catch (e) { console.error(e); alert('Passkey sign-in error: ' + e); }
             });
-
-            function base64urlToBuffer(base64url) {
-                const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
-                const pad = base64.length % 4 === 0 ? 0 : 4 - (base64.length % 4);
-                const base64Padded = base64 + '='.repeat(pad);
-                const str = atob(base64Padded);
-                const buffer = new ArrayBuffer(str.length);
-                const view = new Uint8Array(buffer);
-                for (let i = 0; i < str.length; i++) view[i] = str.charCodeAt(i);
-                return buffer;
-            }
-            function bufferToBase64Url(buffer) {
-                const bytes = new Uint8Array(buffer);
-                let str = '';
-                for (let i = 0; i < bytes.byteLength; i++) str += String.fromCharCode(bytes[i]);
-                return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
-            }
+            function base64urlToBuffer(base64url){const base64=base64url.replace(/-/g,'+').replace(/_/g,'/');const pad=base64.length%4===0?0:4-(base64.length%4);const base64Padded=base64+'='.repeat(pad);const str=atob(base64Padded);const buffer=new ArrayBuffer(str.length);const view=new Uint8Array(buffer);for(let i=0;i<str.length;i++)view[i]=str.charCodeAt(i);return buffer;}function bufferToBase64Url(buffer){const bytes=new Uint8Array(buffer);let str='';for(let i=0;i<bytes.byteLength;i++)str+=String.fromCharCode(bytes[i]);return btoa(str).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/g,'');}
         })();
     </script>
 }

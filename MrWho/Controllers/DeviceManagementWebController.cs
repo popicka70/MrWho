@@ -144,11 +144,19 @@ public class DeviceManagementWebController : Controller
     }
 
     /// <summary>
-    /// Device registration page
+    /// Device registration page (supports nested return after registration)
     /// </summary>
     [HttpGet("register")]
-    public IActionResult Register()
+    public IActionResult Register([FromQuery] string? postRegReturn = null, [FromQuery] string? clientId = null)
     {
+        if (!string.IsNullOrWhiteSpace(postRegReturn))
+        {
+            ViewData["PostRegisterReturnUrl"] = postRegReturn;
+        }
+        if (!string.IsNullOrWhiteSpace(clientId))
+        {
+            ViewData["ClientId"] = clientId;
+        }
         return View();
     }
 
@@ -157,7 +165,7 @@ public class DeviceManagementWebController : Controller
     /// </summary>
     [HttpPost("register")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Register([FromForm] string deviceName, [FromForm] string deviceId, [FromForm] bool isTrusted = false)
+    public async Task<IActionResult> Register([FromForm] string deviceName, [FromForm] string deviceId, [FromForm] bool isTrusted = false, [FromForm] string? postRegReturn = null, [FromForm] string? clientId = null)
     {
         var user = await _userManager.GetUserAsync(User);
         if (user == null)
@@ -183,14 +191,43 @@ public class DeviceManagementWebController : Controller
             _logger.LogInformation("Device {DeviceId} registered via web for user {UserId}", device.DeviceId, user.Id);
 
             TempData["SuccessMessage"] = $"Device '{device.DeviceName}' registered successfully!";
+
+            if (!string.IsNullOrWhiteSpace(postRegReturn) && IsSafeReturn(postRegReturn))
+            {
+                if (!string.IsNullOrWhiteSpace(clientId) && !postRegReturn.Contains("client_id=") && postRegReturn.IndexOf("clientId=", StringComparison.OrdinalIgnoreCase) < 0)
+                {
+                    var sep = postRegReturn.Contains('?') ? '&' : '?';
+                    postRegReturn += $"{sep}clientId={Uri.EscapeDataString(clientId)}";
+                }
+                return Redirect(postRegReturn);
+            }
+
             return RedirectToAction("Index");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error registering device via web for user {UserId}", user.Id);
             TempData["ErrorMessage"] = "Failed to register device. Please try again.";
+            if (!string.IsNullOrWhiteSpace(postRegReturn))
+            {
+                ViewData["PostRegisterReturnUrl"] = postRegReturn;
+            }
+            if (!string.IsNullOrWhiteSpace(clientId))
+            {
+                ViewData["ClientId"] = clientId;
+            }
             return View();
         }
+    }
+
+    private static bool IsSafeReturn(string url)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return false;
+        if (url.StartsWith('/'))
+        {
+            return true; // local relative URL
+        }
+        return false; // disallow absolute external URLs
     }
 
     /// <summary>
@@ -238,13 +275,16 @@ public class DeviceManagementWebController : Controller
     }
 
     /// <summary>
-    /// Generate QR code for device registration
+    /// Generate QR code for device registration. Optional query params are embedded so the mobile flow preserves original redirects.
     /// </summary>
     [HttpGet("register-qr.png")]
-    public IActionResult RegisterQrPng()
+    public IActionResult RegisterQrPng([FromQuery] string? postRegReturn = null, [FromQuery] string? clientId = null)
     {
-        // Generate the URL for device registration
-        var registrationUrl = Url.Action("Register", "DeviceManagementWeb", null, Request.Scheme, Request.Host.ToString())!;
+        var routeValues = new Dictionary<string, object?>();
+        if (!string.IsNullOrWhiteSpace(postRegReturn)) routeValues["postRegReturn"] = postRegReturn;
+        if (!string.IsNullOrWhiteSpace(clientId)) routeValues["clientId"] = clientId;
+
+        var registrationUrl = Url.Action("Register", "DeviceManagementWeb", routeValues, Request.Scheme, Request.Host.ToString())!;
 
         using var generator = new QRCodeGenerator();
         var data = generator.CreateQrCode(registrationUrl, QRCodeGenerator.ECCLevel.Q);
@@ -253,12 +293,16 @@ public class DeviceManagementWebController : Controller
     }
 
     /// <summary>
-    /// Show QR code for mobile device registration
+    /// Show QR code for mobile device registration (now also supports forwarding parameters)
     /// </summary>
     [HttpGet("register-qr")]
-    public IActionResult RegisterQr()
+    public IActionResult RegisterQr([FromQuery] string? postRegReturn = null, [FromQuery] string? clientId = null)
     {
-        var registrationUrl = Url.Action("Register", "DeviceManagementWeb", null, Request.Scheme, Request.Host.ToString())!;
+        var routeValues = new Dictionary<string, object?>();
+        if (!string.IsNullOrWhiteSpace(postRegReturn)) routeValues["postRegReturn"] = postRegReturn;
+        if (!string.IsNullOrWhiteSpace(clientId)) routeValues["clientId"] = clientId;
+
+        var registrationUrl = Url.Action("Register", "DeviceManagementWeb", routeValues, Request.Scheme, Request.Host.ToString())!;
         ViewData["RegistrationUrl"] = registrationUrl;
         return View();
     }

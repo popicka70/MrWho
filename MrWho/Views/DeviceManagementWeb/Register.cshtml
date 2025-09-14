@@ -1,143 +1,197 @@
 @{
     ViewData["Title"] = "Register Device";
+    var postRegReturn = ViewData["PostRegisterReturnUrl"] as string;
+    var clientId = ViewData["ClientId"] as string;
+    // Build QR code image src (preserve params for mobile flow)
+    var qrParams = new List<string>();
+    if (!string.IsNullOrEmpty(postRegReturn)) qrParams.Add("postRegReturn=" + Uri.EscapeDataString(postRegReturn));
+    if (!string.IsNullOrEmpty(clientId)) qrParams.Add("clientId=" + Uri.EscapeDataString(clientId));
+    var qrSrc = "/device-management/register-qr.png" + (qrParams.Count > 0 ? ("?" + string.Join("&", qrParams)) : string.Empty);
 }
 
 <div class="container mt-4">
     <div class="row justify-content-center">
-        <div class="col-md-8 col-lg-6">
-            <div class="card">
-                <div class="card-header">
-                    <h3><i class="bi bi-plus-circle"></i> Register New Device</h3>
-                    <small class="text-muted d-block mt-1" id="detectedDevice"></small>
+        <div class="col-xl-10">
+            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                <h2 class="h4 mb-0"><i class="bi bi-phone"></i> Device Registration</h2>
+                @if (!string.IsNullOrEmpty(postRegReturn))
+                {
+                    <a class="btn btn-outline-secondary btn-sm" href="@postRegReturn">
+                        <i class="bi bi-arrow-right-circle"></i> Skip & Continue
+                    </a>
+                }
+            </div>
+            @if (!string.IsNullOrEmpty(postRegReturn))
+            {
+                <div class="alert alert-info mb-4">
+                    <i class="bi bi-arrow-return-right"></i> After registering a device you will be returned to continue signing in.
                 </div>
-                <div class="card-body">
-                    @if (TempData["ErrorMessage"] != null)
-                    {
-                        <div class="alert alert-danger">
-                            @TempData["ErrorMessage"]
-                        </div>
-                    }
-
-                    <form method="post" action="/device-management/register">
-                        @Html.AntiForgeryToken()
-                        
-                        <div class="mb-3">
-                            <label for="deviceName" class="form-label">Device Name <span class="text-danger">*</span></label>
-                            <input type="text" class="form-control" id="deviceName" name="deviceName" 
-                                   placeholder="e.g., John's iPhone, My Work Laptop" required>
-                            <div class="form-text">Choose a descriptive name to identify this device.</div>
-                        </div>
-
-                        <div class="mb-3">
-                            <label for="deviceId" class="form-label">Device ID</label>
-                            <input type="text" class="form-control" id="deviceId" name="deviceId" 
-                                   value="@Guid.NewGuid().ToString("N")[..16]" readonly>
-                            <div class="form-text">Auto-generated unique identifier for this device.</div>
-                        </div>
-
-                        <div class="mb-3">
-                            <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="isTrusted" name="isTrusted">
-                                <label class="form-check-label" for="isTrusted">
-                                    <strong>Mark as Trusted Device</strong>
-                                </label>
-                                <div class="form-text">
-                                    Trusted devices can be used for passwordless authentication and have enhanced privileges.
-                                    Only mark devices you personally control and that are secure.
+            }
+            <ul class="nav nav-tabs" id="regTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="this-device-tab" data-bs-toggle="tab" data-bs-target="#this-device" type="button" role="tab" aria-controls="this-device" aria-selected="true">
+                        <i class="bi bi-display"></i> This Device
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="mobile-device-tab" data-bs-toggle="tab" data-bs-target="#mobile-device" type="button" role="tab" aria-controls="mobile-device" aria-selected="false">
+                        <i class="bi bi-phone"></i> Mobile Device (Scan QR)
+                    </button>
+                </li>
+            </ul>
+            <div class="tab-content border border-top-0 p-4 bg-white rounded-bottom shadow-sm" id="regTabsContent">
+                <div class="tab-pane fade show active" id="this-device" role="tabpanel" aria-labelledby="this-device-tab" tabindex="0">
+                    <div class="row">
+                        <div class="col-lg-7 col-md-12">
+                            <div class="card shadow-sm mb-4">
+                                <div class="card-header bg-primary text-white">
+                                    <h5 class="mb-0"><i class="bi bi-plus-circle"></i> Register This Browser</h5>
+                                </div>
+                                <div class="card-body">
+                                    @if (TempData["ErrorMessage"] != null)
+                                    {
+                                        <div class="alert alert-danger">
+                                            @TempData["ErrorMessage"]
+                                        </div>
+                                    }
+                                    <form method="post" action="/device-management/register" id="registerThisDeviceForm">
+                                        @Html.AntiForgeryToken()
+                                        @if(!string.IsNullOrEmpty(postRegReturn)) { <input type="hidden" name="postRegReturn" value="@postRegReturn" /> }
+                                        @if(!string.IsNullOrEmpty(clientId)) { <input type="hidden" name="clientId" value="@clientId" /> }
+                                        <div class="mb-3">
+                                            <label for="deviceName" class="form-label">Device Name <span class="text-danger">*</span></label>
+                                            <input type="text" class="form-control" id="deviceName" name="deviceName" placeholder="e.g., John's Work Laptop" required>
+                                            <div class="form-text">Choose a descriptive name to identify this device.</div>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label for="deviceId" class="form-label">Device ID</label>
+                                            <input type="text" class="form-control" id="deviceId" name="deviceId" value="@Guid.NewGuid().ToString("N")[..16]" readonly>
+                                            <div class="form-text">Auto-generated unique identifier for this device.</div>
+                                        </div>
+                                        <div class="mb-3">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="isTrusted" name="isTrusted">
+                                                <label class="form-check-label" for="isTrusted">
+                                                    <strong>Mark as Trusted Device</strong>
+                                                </label>
+                                                <div class="form-text">
+                                                    Trusted devices can be used for passwordless or QR approvals. Only mark devices you personally control.
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="alert alert-info mb-4">
+                                            <i class="bi bi-info-circle"></i> This will register the browser you are currently using.
+                                        </div>
+                                        <div class="d-flex justify-content-end gap-2">
+                                            <button type="submit" class="btn btn-primary">
+                                                <i class="bi bi-plus-circle"></i> Register This Device
+                                            </button>
+                                        </div>
+                                    </form>
                                 </div>
                             </div>
                         </div>
-
-                        <div class="alert alert-info">
-                            <h6><i class="bi bi-info-circle"></i> What happens next?</h6>
-                            <ul class="mb-0">
-                                <li>Your device will be registered and can approve QR code logins</li>
-                                <li>You'll be able to monitor authentication activity</li>
-                                <li>If marked as trusted, you can use it for passwordless sign-in</li>
-                                <li>You can revoke this device at any time from your device list</li>
-                            </ul>
+                        <div class="col-lg-5 col-md-12">
+                            <div class="card shadow-sm h-100">
+                                <div class="card-header">
+                                    <h6 class="mb-0"><i class="bi bi-shield-check"></i> Security Tips</h6>
+                                </div>
+                                <div class="card-body small">
+                                    <ul class="mb-2">
+                                        <li><strong>Only register personal devices</strong> – avoid shared/public computers</li>
+                                        <li><strong>Use clear names</strong> to quickly recognize devices</li>
+                                        <li>Revoke old or unused devices regularly</li>
+                                        <li>Mark compromised devices immediately</li>
+                                    </ul>
+                                    <div class="alert alert-warning p-2 mb-0"><i class="bi bi-exclamation-triangle"></i> If this is a temporary computer, do NOT mark it trusted.</div>
+                                </div>
+                            </div>
                         </div>
-
-                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                            <a href="/device-management" class="btn btn-secondary">
-                                <i class="bi bi-arrow-left"></i> Back to Devices
-                            </a>
-                            <button type="submit" class="btn btn-primary">
-                                <i class="bi bi-plus-circle"></i> Register Device
-                            </button>
+                    </div>
+                </div>
+                <div class="tab-pane fade" id="mobile-device" role="tabpanel" aria-labelledby="mobile-device-tab" tabindex="0">
+                    <div class="row g-4">
+                        <div class="col-md-6">
+                            <div class="card shadow-sm h-100">
+                                <div class="card-header bg-secondary text-white">
+                                    <h5 class="mb-0"><i class="bi bi-phone"></i> Register Mobile Device</h5>
+                                </div>
+                                <div class="card-body">
+                                    <ol class="small mb-3">
+                                        <li>Open the camera or QR scanner on your mobile device.</li>
+                                        <li>Scan the QR code shown here.</li>
+                                        <li>Sign in on your mobile (if prompted) and confirm registration.</li>
+                                        <li>Return here (or use the skip link) once done.</li>
+                                    </ol>
+                                    <div class="text-center mb-3">
+                                        <div class="border rounded p-2 d-inline-block bg-white" style="line-height:0">
+                                            <img src="@qrSrc" alt="Mobile Registration QR" width="220" height="220" loading="lazy" />
+                                        </div>
+                                    </div>
+                                    <div class="alert alert-info small">
+                                        <i class="bi bi-info-circle"></i> The QR encodes a secure link to the device registration page. It contains only the redirect parameters necessary to resume your sign-in flow.
+                                    </div>
+                                    @if (!string.IsNullOrEmpty(postRegReturn))
+                                    {
+                                        <a class="btn btn-outline-primary w-100" href="@postRegReturn">
+                                            <i class="bi bi-check2-circle"></i> I finished on my phone – Continue
+                                        </a>
+                                    }
+                                </div>
+                            </div>
                         </div>
-                    </form>
+                        <div class="col-md-6">
+                            <div class="card shadow-sm h-100">
+                                <div class="card-header">
+                                    <h6 class="mb-0"><i class="bi bi-question-circle"></i> Why register a mobile device?</h6>
+                                </div>
+                                <div class="card-body small">
+                                    <p class="mb-2">A registered mobile device can:</p>
+                                    <ul class="mb-2">
+                                        <li>Approve secure QR logins</li>
+                                        <li>Provide passwordless authentication (future)</li>
+                                        <li>Add an extra layer of verification</li>
+                                    </ul>
+                                    <p class="mb-2"><strong>Already registered?</strong> You can skip this step and continue.</p>
+                                    <div class="alert alert-secondary p-2 small mb-0">
+                                        <i class="bi bi-lock"></i> Never share registered devices. Revoke immediately if one is lost.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
-
-            <div class="card mt-4">
-                <div class="card-header">
-                    <h5><i class="bi bi-shield-check"></i> Security Best Practices</h5>
-                </div>
-                <div class="card-body">
-                    <ul>
-                        <li><strong>Only register devices you personally control</strong> - Don't register shared or public computers</li>
-                        <li><strong>Use descriptive names</strong> - This helps you identify devices in your security logs</li>
-                        <li><strong>Mark trusted carefully</strong> - Only mark devices as trusted if they're secure and password-protected</li>
-                        <li><strong>Review regularly</strong> - Check your device list periodically and revoke unused devices</li>
-                        <li><strong>Revoke if compromised</strong> - Immediately revoke any device you suspect has been compromised</li>
-                    </ul>
-                </div>
+            <div class="mt-4">
+                <a href="/device-management" class="btn btn-link"><i class="bi bi-gear"></i> Manage Devices</a>
             </div>
         </div>
     </div>
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Auto-detect device type and suggest name
+(function(){
+    // Auto-detect device type and suggest name only for "This Device" tab
     const userAgent = navigator.userAgent;
     const platform = navigator.platform;
     let deviceType = 'Device';
     let suggestedName = '';
-    
-    // Detect mobile devices
-    if (/iPhone/.test(userAgent)) {
-        deviceType = 'iPhone';
-        suggestedName = "My iPhone";
-    } else if (/iPad/.test(userAgent)) {
-        deviceType = 'iPad';
-        suggestedName = "My iPad";
-    } else if (/Android/.test(userAgent)) {
-        if (/Mobile/.test(userAgent)) {
-            deviceType = 'Android Phone';
-            suggestedName = "My Android Phone";
-        } else {
-            deviceType = 'Android Tablet';
-            suggestedName = "My Android Tablet";
-        }
-    } else if (/Windows/.test(platform)) {
-        deviceType = 'Windows PC';
-        suggestedName = "My Windows PC";
-    } else if (/Mac/.test(platform)) {
-        deviceType = 'Mac';
-        suggestedName = "My Mac";
-    } else if (/Linux/.test(platform)) {
-        deviceType = 'Linux PC';
-        suggestedName = "My Linux PC";
-    }
-    
-    // Update the detected device info
-    const detectedElement = document.getElementById('detectedDevice');
-    detectedElement.textContent = `Detected: ${deviceType}`;
-    
-    // Suggest device name if field is empty
+    if (/iPhone/.test(userAgent)) { deviceType = 'iPhone'; suggestedName = 'My iPhone'; }
+    else if (/iPad/.test(userAgent)) { deviceType = 'iPad'; suggestedName = 'My iPad'; }
+    else if (/Android/.test(userAgent)) { if (/Mobile/.test(userAgent)) { deviceType = 'Android Phone'; suggestedName = 'My Android Phone'; } else { deviceType = 'Android Tablet'; suggestedName = 'My Android Tablet'; } }
+    else if (/Windows/.test(platform)) { deviceType = 'Windows PC'; suggestedName = 'My Windows PC'; }
+    else if (/Mac/.test(platform)) { deviceType = 'Mac'; suggestedName = 'My Mac'; }
+    else if (/Linux/.test(platform)) { deviceType = 'Linux PC'; suggestedName = 'My Linux PC'; }
+
     const deviceNameField = document.getElementById('deviceName');
-    if (!deviceNameField.value) {
+    if (deviceNameField && !deviceNameField.value) {
         deviceNameField.placeholder = suggestedName;
         deviceNameField.value = suggestedName;
     }
-    
-    // Auto-check trusted for personal mobile devices
     const isMobile = /iPhone|iPad|Android.*Mobile/.test(userAgent);
     const trustedCheckbox = document.getElementById('isTrusted');
-    if (isMobile) {
+    if (trustedCheckbox && isMobile) {
         trustedCheckbox.checked = true;
     }
-});
+})();
 </script>
