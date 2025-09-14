@@ -100,6 +100,7 @@ public static partial class ServiceCollectionExtensions
 
         // Register device management service
         services.AddScoped<IDeviceManagementService, DeviceManagementService>();
+        services.AddScoped<IDeviceAutoLoginService, DeviceAutoLoginService>(); // new
 
         // Register enhanced QR login service (supports both session-based and persistent QR)
         services.AddScoped<IEnhancedQrLoginService, EnhancedQrLoginService>();
@@ -236,15 +237,14 @@ public static partial class ServiceCollectionExtensions
             {
                 OnRedirectToLogin = context =>
                 {
-                    // Log when redirecting to login to help debug auth issues
+                    // IMPORTANT: Explicitly perform redirect (previous implementation only logged, causing 401 responses)
                     var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<CookieAuthenticationEvents>>();
-                    logger.LogDebug("Redirecting to login from {Path} using scheme {Scheme}",
-                        context.Request.Path, context.Scheme.Name);
+                    logger.LogDebug("Redirecting unauthenticated request from {Path} to login {LoginPath} (RedirectUri={RedirectUri})", context.Request.Path, options.LoginPath, context.RedirectUri);
+                    context.Response.Redirect(context.RedirectUri); // restore default redirect behavior
                     return Task.CompletedTask;
                 },
                 OnValidatePrincipal = context =>
                 {
-                    // This can help catch issues with malformed cookies
                     if (context.Principal?.Identity?.IsAuthenticated != true)
                     {
                         var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<CookieAuthenticationEvents>>();

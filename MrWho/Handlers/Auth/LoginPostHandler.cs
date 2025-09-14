@@ -49,6 +49,7 @@ public sealed class LoginPostHandler : IRequestHandler<MrWho.Endpoints.Auth.Logi
         var model = request.Model;
         var returnUrl = request.ReturnUrl;
         var clientId = request.ClientId;
+        var registerDeviceFirst = http.Request.Form["registerDeviceFirst"] == "1"; // NEW FLAG
 
         if (_loginHelper.ShouldUseRecaptcha())
         {
@@ -92,7 +93,7 @@ public sealed class LoginPostHandler : IRequestHandler<MrWho.Endpoints.Auth.Logi
         }
         viewData[ViewDataKeys.ClientName] = clientName;
 
-        _logger.LogDebug("Login POST: Email={Email}, ReturnUrl={ReturnUrl}, ClientId={ClientId}", model.Email, returnUrl, clientId);
+        _logger.LogDebug("Login POST: Email={Email}, ReturnUrl={ReturnUrl}, ClientId={ClientId}, RegisterDeviceFirst={RegisterDeviceFirst}", model.Email, returnUrl, clientId, registerDeviceFirst);
 
         List<KeyValuePair<string, string>> modelStateErrors = new();
         bool valid = http.Request.HasFormContentType && IsModelStateValid(model, out modelStateErrors);
@@ -110,6 +111,7 @@ public sealed class LoginPostHandler : IRequestHandler<MrWho.Endpoints.Auth.Logi
             return new ViewResult { ViewName = "Login", ViewData = viewDataWithModel(vd, model) };
         }
 
+        // ===================== CODE (TOTP) LOGIN PATH =====================
         if (model.UseCode)
         {
             if (string.IsNullOrWhiteSpace(model.Email) || string.IsNullOrWhiteSpace(model.Code))
@@ -175,6 +177,13 @@ public sealed class LoginPostHandler : IRequestHandler<MrWho.Endpoints.Auth.Logi
                 catch (Exception ex) { _logger.LogWarning(ex, "Failed to sign in with client-specific cookie for client {ClientId}", clientId); }
             }
 
+            // NEW: Direct device registration redirect
+            if (registerDeviceFirst)
+            {
+                var deviceReg = BuildDeviceRegistrationUrl(returnUrl, clientId);
+                return new RedirectResult(deviceReg);
+            }
+
             if (!string.IsNullOrEmpty(returnUrl))
             {
                 if (returnUrl.Contains("/connect/authorize"))
@@ -189,6 +198,7 @@ public sealed class LoginPostHandler : IRequestHandler<MrWho.Endpoints.Auth.Logi
             return new RedirectToActionResult("Index", "Home", null);
         }
 
+        // ===================== PASSWORD LOGIN PATH =====================
         var result = await _signInManager.PasswordSignInAsync(model.Email, model.Password, model.RememberMe, lockoutOnFailure: false);
         _logger.LogDebug("Login attempt result: Success={Success}, Requires2FA={RequiresTwoFactor}", result.Succeeded, result.RequiresTwoFactor);
 
@@ -236,6 +246,13 @@ public sealed class LoginPostHandler : IRequestHandler<MrWho.Endpoints.Auth.Logi
                 catch (Exception ex) { _logger.LogWarning(ex, "Failed to sign in with client-specific cookie for client {ClientId}", clientId); }
             }
 
+            // NEW: Direct device registration redirect after password sign-in
+            if (registerDeviceFirst)
+            {
+                var deviceReg = BuildDeviceRegistrationUrl(returnUrl, clientId);
+                return new RedirectResult(deviceReg);
+            }
+
             if (!string.IsNullOrEmpty(returnUrl))
             {
                 if (returnUrl.Contains("/connect/authorize"))
@@ -255,6 +272,15 @@ public sealed class LoginPostHandler : IRequestHandler<MrWho.Endpoints.Auth.Logi
             vd[ViewDataKeys.ReturnUrl] = returnUrl; vd[ViewDataKeys.ClientId] = clientId; vd[ViewDataKeys.RecaptchaSiteKey] = viewData[ViewDataKeys.RecaptchaSiteKey]; vd[ViewDataKeys.ClientName] = clientName;
             return new ViewResult { ViewName = "Login", ViewData = viewDataWithModel(vd, model) };
         }
+    }
+
+    private static string BuildDeviceRegistrationUrl(string? originalReturnUrl, string? clientId)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrEmpty(originalReturnUrl)) parts.Add("postRegReturn=" + Uri.EscapeDataString(originalReturnUrl));
+        if (!string.IsNullOrEmpty(clientId)) parts.Add("clientId=" + Uri.EscapeDataString(clientId));
+        var url = "/device-management/register" + (parts.Count > 0 ? ("?" + string.Join("&", parts)) : string.Empty);
+        return url;
     }
 
     private static string BuildAccessDeniedUrl(string? returnUrl, string? clientId)
