@@ -64,6 +64,9 @@ public static class WebApplicationExtensions
         // Enable session before custom middleware that uses it
         app.UseSession();
 
+        // Device auto-login (silent) BEFORE normal auth so principal is established
+        app.UseMiddleware<DeviceAutoLoginMiddleware>();
+
         // Client cookie middleware (requires session)
         app.UseMiddleware<ClientCookieMiddleware>();
 
@@ -122,6 +125,8 @@ public static class WebApplicationExtensions
         app.UseRateLimiter();
 
         app.UseSession();
+
+        app.UseMiddleware<DeviceAutoLoginMiddleware>();
 
         app.UseMiddleware<ClientCookieMiddleware>();
         app.UseAntiforgery();

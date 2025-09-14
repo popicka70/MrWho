@@ -17,17 +17,20 @@ public class DeviceManagementWebController : Controller
     private readonly IEnhancedQrLoginService _qrService;
     private readonly UserManager<IdentityUser> _userManager;
     private readonly ILogger<DeviceManagementWebController> _logger;
+    private readonly IDeviceAutoLoginService _deviceAutoLoginService; // new
 
     public DeviceManagementWebController(
         IDeviceManagementService deviceService,
         IEnhancedQrLoginService qrService,
         UserManager<IdentityUser> userManager,
-        ILogger<DeviceManagementWebController> logger)
+        ILogger<DeviceManagementWebController> logger,
+        IDeviceAutoLoginService deviceAutoLoginService) // new
     {
         _deviceService = deviceService;
         _qrService = qrService;
         _userManager = userManager;
         _logger = logger;
+        _deviceAutoLoginService = deviceAutoLoginService; // new
     }
 
     /// <summary>
@@ -188,6 +191,19 @@ public class DeviceManagementWebController : Controller
 
             var device = await _deviceService.RegisterDeviceAsync(user.Id, request);
 
+            // Issue auto-login token cookie (regardless of trusted for now; could gate on isTrusted)
+            var issued = await _deviceAutoLoginService.IssueTokenAsync(user.Id, device.DeviceId);
+            if (issued != null)
+            {
+                Response.Cookies.Append(".MrWho.DeviceAuth", issued.Value.token, new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = true,
+                    SameSite = SameSiteMode.Lax,
+                    Expires = issued.Value.expiresAt
+                });
+            }
+
             _logger.LogInformation("Device {DeviceId} registered via web for user {UserId}", device.DeviceId, user.Id);
 
             TempData["SuccessMessage"] = $"Device '{device.DeviceName}' registered successfully!";
@@ -263,6 +279,8 @@ public class DeviceManagementWebController : Controller
 
         if (success)
         {
+            await _deviceAutoLoginService.RevokeForDeviceAsync(user.Id, deviceId);
+            Response.Cookies.Delete(".MrWho.DeviceAuth"); // if current device
             TempData["SuccessMessage"] = "Device revoked successfully.";
             _logger.LogInformation("Device {DeviceId} revoked via web for user {UserId}", deviceId, user.Id);
         }

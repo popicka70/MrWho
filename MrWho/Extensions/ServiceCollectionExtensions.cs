@@ -100,6 +100,7 @@ public static partial class ServiceCollectionExtensions
 
         // Register device management service
         services.AddScoped<IDeviceManagementService, DeviceManagementService>();
+        services.AddScoped<IDeviceAutoLoginService, DeviceAutoLoginService>(); // new
 
         // Register enhanced QR login service (supports both session-based and persistent QR)
         services.AddScoped<IEnhancedQrLoginService, EnhancedQrLoginService>();
