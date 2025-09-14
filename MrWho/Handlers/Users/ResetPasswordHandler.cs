@@ -27,7 +27,7 @@ public class ResetPasswordHandler : IResetPasswordHandler
             // Remove current password (admin reset)
             var token = await _userManager.GeneratePasswordResetTokenAsync(user);
             var result = await _userManager.ResetPasswordAsync(user, token, request.NewPassword);
-            
+
             if (result.Succeeded)
             {
                 _logger.LogInformation("Password reset successfully for user {UserId}", id);

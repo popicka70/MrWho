@@ -112,7 +112,7 @@ public class EnhancedQrLoginService : IEnhancedQrLoginService
         };
 
         var session = await _deviceService.CreateQrSessionAsync(request);
-        _logger.LogDebug("Created persistent QR session {SessionId} (token: {Token}) for client {ClientId}", 
+        _logger.LogDebug("Created persistent QR session {SessionId} (token: {Token}) for client {ClientId}",
             session.Id, session.Token, clientId);
         return session.Token;
     }
@@ -244,10 +244,10 @@ public class EnhancedQrLoginService : IEnhancedQrLoginService
     {
         if (sessionTicket.Completed)
             return QrSessionStatusEnum.Completed;
-        
+
         if (!string.IsNullOrEmpty(sessionTicket.ApprovedUserId))
             return QrSessionStatusEnum.Approved;
-        
+
         return QrSessionStatusEnum.Pending;
     }
 }

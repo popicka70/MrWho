@@ -1,5 +1,5 @@
-using MrWhoAdmin.Web.Controllers;
 using Microsoft.AspNetCore.Http;
+using MrWhoAdmin.Web.Controllers;
 
 namespace MrWhoAdmin.Web.Services;
 
@@ -44,7 +44,7 @@ public class DirectHealthService : IDirectHealthService
     private readonly IHttpContextAccessor _httpContextAccessor;
 
     public DirectHealthService(
-        IServiceProvider serviceProvider, 
+        IServiceProvider serviceProvider,
         ILogger<DirectHealthService> logger,
         IHttpContextAccessor httpContextAccessor)
     {
@@ -59,13 +59,13 @@ public class DirectHealthService : IDirectHealthService
         {
             using var scope = _serviceProvider.CreateScope();
             var controller = scope.ServiceProvider.GetRequiredService<HealthController>();
-            
+
             var result = controller.Get();
             if (result is Microsoft.AspNetCore.Mvc.OkObjectResult okResult && okResult.Value != null)
             {
                 return Task.FromResult(ConvertToHealthStatus(okResult.Value));
             }
-            
+
             return Task.FromResult<HealthStatus?>(null);
         }
         catch (Exception ex)
@@ -81,7 +81,7 @@ public class DirectHealthService : IDirectHealthService
         {
             using var scope = _serviceProvider.CreateScope();
             var controller = scope.ServiceProvider.GetRequiredService<HealthController>();
-            
+
             // Set HttpContext for authentication-dependent methods
             if (_httpContextAccessor.HttpContext != null)
             {
@@ -90,13 +90,13 @@ public class DirectHealthService : IDirectHealthService
                     HttpContext = _httpContextAccessor.HttpContext
                 };
             }
-            
+
             var result = await controller.GetDetailed();
             if (result is Microsoft.AspNetCore.Mvc.OkObjectResult okResult && okResult.Value != null)
             {
                 return ConvertToDetailedHealthStatus(okResult.Value);
             }
-            
+
             return null;
         }
         catch (Exception ex)
@@ -112,13 +112,13 @@ public class DirectHealthService : IDirectHealthService
         {
             using var scope = _serviceProvider.CreateScope();
             var controller = scope.ServiceProvider.GetRequiredService<HealthController>();
-            
+
             var result = controller.GetLiveness();
             if (result is Microsoft.AspNetCore.Mvc.OkObjectResult okResult && okResult.Value != null)
             {
                 return Task.FromResult(ConvertToLivenessStatus(okResult.Value));
             }
-            
+
             return Task.FromResult<LivenessStatus?>(null);
         }
         catch (Exception ex)
@@ -134,13 +134,13 @@ public class DirectHealthService : IDirectHealthService
         {
             using var scope = _serviceProvider.CreateScope();
             var controller = scope.ServiceProvider.GetRequiredService<HealthController>();
-            
+
             var result = await controller.GetReadiness();
             if (result is Microsoft.AspNetCore.Mvc.OkObjectResult okResult && okResult.Value != null)
             {
                 return ConvertToReadinessStatus(okResult.Value);
             }
-            
+
             return null;
         }
         catch (Exception ex)
@@ -156,7 +156,7 @@ public class DirectHealthService : IDirectHealthService
         {
             using var scope = _serviceProvider.CreateScope();
             var controller = scope.ServiceProvider.GetRequiredService<HealthController>();
-            
+
             // Set HttpContext for authentication-dependent methods
             if (_httpContextAccessor.HttpContext != null)
             {
@@ -189,13 +189,13 @@ public class DirectHealthService : IDirectHealthService
                     }
                 });
             }
-            
+
             var result = controller.GetAuthenticationSchemes();
             if (result is Microsoft.AspNetCore.Mvc.OkObjectResult okResult && okResult.Value != null)
             {
                 return Task.FromResult(ConvertToAuthSchemesInfo(okResult.Value));
             }
-            
+
             return Task.FromResult<AuthSchemesInfo?>(null);
         }
         catch (Exception ex)

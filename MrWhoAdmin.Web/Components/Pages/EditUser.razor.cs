@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Components;
 using MrWho.Shared.Models;
-using Radzen;
 using MrWhoAdmin.Web.Services;
+using Radzen;
 
 namespace MrWhoAdmin.Web.Components.Pages;
 
@@ -118,9 +118,9 @@ public partial class EditUser
             Logger.LogError(ex, "Error loading edit context for user {UserId}", Id);
             NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to load user context");
         }
-        finally 
-        { 
-            isLoading = false; 
+        finally
+        {
+            isLoading = false;
         }
     }
 
@@ -132,11 +132,11 @@ public partial class EditUser
 
     internal async Task SetProfileState(string state)
     {
-        var ok = await DialogService.Confirm($"Set profile state to '{state}'?", "Change Profile State", new ConfirmOptions(){OkButtonText="Confirm",CancelButtonText="Cancel"});
+        var ok = await DialogService.Confirm($"Set profile state to '{state}'?", "Change Profile State", new ConfirmOptions() { OkButtonText = "Confirm", CancelButtonText = "Cancel" });
         if (ok != true) return;
         try
         {
-            if (await UsersApiService.SetProfileStateAsync(Id!, new SetUserProfileStateRequest{ State = state }))
+            if (await UsersApiService.SetProfileStateAsync(Id!, new SetUserProfileStateRequest { State = state }))
             {
                 NotificationService.Notify(NotificationSeverity.Success, "Updated", $"Profile state set to {state}");
                 await LoadProfileState();
@@ -160,7 +160,7 @@ public partial class EditUser
     {
         try
         {
-            var result = await ClientsApi.GetClientsAsync(page:1,pageSize:200);
+            var result = await ClientsApi.GetClientsAsync(page: 1, pageSize: 200);
             var all = result?.Items ?? new List<ClientDto>();
             availableClients = all.Where(c => !assignedClients.Any(ac => ac.ClientId == c.Id)).ToList();
         }
@@ -285,11 +285,11 @@ public partial class EditUser
 
     internal async Task RemoveClaim(UserClaimDto claim)
     {
-        var ok = await DialogService.Confirm($"Remove claim '{claim.ClaimType}'?", "Remove Claim", new ConfirmOptions(){OkButtonText="Remove",CancelButtonText="Cancel"});
+        var ok = await DialogService.Confirm($"Remove claim '{claim.ClaimType}'?", "Remove Claim", new ConfirmOptions() { OkButtonText = "Remove", CancelButtonText = "Cancel" });
         if (ok != true) return;
         try
         {
-            if (await UsersApiService.RemoveUserClaimAsync(Id!, new RemoveUserClaimRequest{ ClaimType = claim.ClaimType, ClaimValue = claim.ClaimValue }))
+            if (await UsersApiService.RemoveUserClaimAsync(Id!, new RemoveUserClaimRequest { ClaimType = claim.ClaimType, ClaimValue = claim.ClaimValue }))
             {
                 userClaims.Remove(claim);
                 NotificationService.Notify(NotificationSeverity.Success, "Success", "Claim removed");
@@ -326,7 +326,7 @@ public partial class EditUser
     internal async Task RemoveRole(string roleId)
     {
         var role = userRoles.FirstOrDefault(r => r.Id == roleId); if (role == null) return;
-        var ok = await DialogService.Confirm($"Remove role '{role.Name}'?", "Remove Role", new ConfirmOptions(){OkButtonText="Remove",CancelButtonText="Cancel"});
+        var ok = await DialogService.Confirm($"Remove role '{role.Name}'?", "Remove Role", new ConfirmOptions() { OkButtonText = "Remove", CancelButtonText = "Cancel" });
         if (ok != true) return;
         try
         {
@@ -346,7 +346,7 @@ public partial class EditUser
         isAssigningClient = true;
         try
         {
-            var res = await ClientUsersApi.AssignUserAsync(selectedClientId, new AssignClientUserRequest{ UserId = currentUser.Id, ClientId = selectedClientId });
+            var res = await ClientUsersApi.AssignUserAsync(selectedClientId, new AssignClientUserRequest { UserId = currentUser.Id, ClientId = selectedClientId });
             if (res != null)
             {
                 NotificationService.Notify(NotificationSeverity.Success, "Assigned", $"Assigned to '{res.ClientName}'");
@@ -355,7 +355,7 @@ public partial class EditUser
             else NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to assign client");
         }
         catch (Exception ex) { Logger.LogError(ex, "Error assigning client {UserId}", Id); NotificationService.Notify(NotificationSeverity.Error, "Error", ex.Message); }
-            finally { isAssigningClient = false; }
+        finally { isAssigningClient = false; }
     }
 
     internal async Task RemoveClient(UserClientDto c)
@@ -374,7 +374,7 @@ public partial class EditUser
 
     internal async Task LockUser()
     {
-        var ok = await DialogService.Confirm("Lock user account?", "Lock Account", new ConfirmOptions(){OkButtonText="Lock",CancelButtonText="Cancel"});
+        var ok = await DialogService.Confirm("Lock user account?", "Lock Account", new ConfirmOptions() { OkButtonText = "Lock", CancelButtonText = "Cancel" });
         if (ok != true) return;
         isTogglingLock = true;
         try
@@ -389,7 +389,7 @@ public partial class EditUser
 
     internal async Task UnlockUser()
     {
-        var ok = await DialogService.Confirm("Unlock user account?", "Unlock Account", new ConfirmOptions(){OkButtonText="Unlock",CancelButtonText="Cancel"});
+        var ok = await DialogService.Confirm("Unlock user account?", "Unlock Account", new ConfirmOptions() { OkButtonText = "Unlock", CancelButtonText = "Cancel" });
         if (ok != true) return;
         isTogglingLock = true;
         try
@@ -403,7 +403,7 @@ public partial class EditUser
 
     internal async Task ResetPassword()
     {
-        var ok = await DialogService.Confirm("Reset password and generate temporary one?", "Reset Password", new ConfirmOptions(){OkButtonText="Reset",CancelButtonText="Cancel"});
+        var ok = await DialogService.Confirm("Reset password and generate temporary one?", "Reset Password", new ConfirmOptions() { OkButtonText = "Reset", CancelButtonText = "Cancel" });
         if (ok != true) return;
         isResettingPassword = true;
         try
@@ -419,7 +419,7 @@ public partial class EditUser
 
     internal async Task ForceLogout()
     {
-        var ok = await DialogService.Confirm("Force logout all sessions?", "Force Logout", new ConfirmOptions(){OkButtonText="Force Logout",CancelButtonText="Cancel"});
+        var ok = await DialogService.Confirm("Force logout all sessions?", "Force Logout", new ConfirmOptions() { OkButtonText = "Force Logout", CancelButtonText = "Cancel" });
         if (ok != true) return;
         isForcingLogout = true;
         try
@@ -433,7 +433,7 @@ public partial class EditUser
 
     internal async Task DeleteUser()
     {
-        var ok = await DialogService.Confirm($"Delete user '{currentUser?.UserName}'?", "Delete User", new ConfirmOptions(){OkButtonText="Delete",CancelButtonText="Cancel"});
+        var ok = await DialogService.Confirm($"Delete user '{currentUser?.UserName}'?", "Delete User", new ConfirmOptions() { OkButtonText = "Delete", CancelButtonText = "Cancel" });
         if (ok != true) return;
         isDeleting = true;
         try
@@ -451,7 +451,7 @@ public partial class EditUser
     {
         var rnd = new Random();
         const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*";
-        userModel.Password = new string(Enumerable.Repeat(chars,16).Select(s => s[rnd.Next(s.Length)]).ToArray());
+        userModel.Password = new string(Enumerable.Repeat(chars, 16).Select(s => s[rnd.Next(s.Length)]).ToArray());
         confirmPassword = userModel.Password;
         NotificationService.Notify(NotificationSeverity.Info, "Generated", "Password generated");
     }
@@ -460,7 +460,7 @@ public partial class EditUser
     {
         var rnd = new Random();
         const string chars = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
-        return new string(Enumerable.Repeat(chars,12).Select(s => s[rnd.Next(s.Length)]).ToArray());
+        return new string(Enumerable.Repeat(chars, 12).Select(s => s[rnd.Next(s.Length)]).ToArray());
     }
 
     public class UserEditModel

@@ -1,7 +1,7 @@
-﻿using MrWho.Shared;
+﻿using System.Text; // added for UTF8 byte count
+using MrWho.Shared;
 using MrWho.Shared.Models;
 using Radzen;
-using System.Text; // added for UTF8 byte count
 
 namespace MrWhoAdmin.Web.Components.Pages
 {
@@ -247,7 +247,7 @@ namespace MrWhoAdmin.Web.Components.Pages
                 PrimaryAudience = client.PrimaryAudience,
                 IncludeAudInIdToken = client.IncludeAudInIdToken,
                 RequireExplicitAudienceScope = client.RequireExplicitAudienceScope,
-                RoleInclusionOverride = client.RoleInclusionOverride, 
+                RoleInclusionOverride = client.RoleInclusionOverride,
                 ParMode = client.ParMode,
                 JarMode = client.JarMode,
                 JarmMode = client.JarmMode,

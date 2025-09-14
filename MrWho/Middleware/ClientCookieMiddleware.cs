@@ -35,23 +35,23 @@ public class ClientCookieMiddleware
             try
             {
                 var clientId = await cookieService.GetClientIdFromRequestAsync(context);
-                
+
                 // If no client_id found, try to infer it from context
                 if (string.IsNullOrEmpty(clientId))
                 {
                     clientId = InferClientIdFromContext(context);
                 }
-                
+
                 if (!string.IsNullOrEmpty(clientId))
                 {
                     var cookieScheme = cookieService.GetCookieSchemeForClient(clientId);
                     var cookieName = cookieService.GetCookieNameForClient(clientId);
-                    
+
                     // Verify the scheme is actually registered before using it
                     var schemeExists = await schemeProvider.GetSchemeAsync(cookieScheme) != null;
                     if (!schemeExists)
                     {
-                        _logger.LogWarning("Cookie scheme {Scheme} for client {ClientId} is not registered, falling back to default", 
+                        _logger.LogWarning("Cookie scheme {Scheme} for client {ClientId} is not registered, falling back to default",
                             cookieScheme, clientId);
                         cookieScheme = IdentityConstants.ApplicationScheme;
                         cookieName = CookieSchemeNaming.DefaultCookieName;
@@ -66,7 +66,7 @@ public class ClientCookieMiddleware
                         var schemeOptions = optMonitor.Get(cookieScheme);
                         if (schemeOptions?.TicketDataFormat == null && schemeOptions is not null)
                         {
-                            _logger.LogWarning("Cookie scheme {Scheme} for client {ClientId} has null TicketDataFormat (options not initialized) - initializing manually", 
+                            _logger.LogWarning("Cookie scheme {Scheme} for client {ClientId} has null TicketDataFormat (options not initialized) - initializing manually",
                                 cookieScheme, clientId);
                             var provider = context.RequestServices.GetService<IDataProtectionProvider>() ?? throw new Exception("DataProtectionProvider not found");
                             schemeOptions.TicketDataFormat = new TicketDataFormat(provider.CreateProtector("Cookies"));
@@ -86,13 +86,13 @@ public class ClientCookieMiddleware
                     context.Items["ClientCookieScheme"] = cookieScheme;
                     context.Items["ClientId"] = clientId;
                     context.Items["ClientCookieName"] = cookieName;
-                    
-                    _logger.LogDebug("Using cookie scheme {Scheme} (cookie: {CookieName}) for client {ClientId} on path {Path}", 
+
+                    _logger.LogDebug("Using cookie scheme {Scheme} (cookie: {CookieName}) for client {ClientId} on path {Path}",
                         cookieScheme, cookieName, clientId, context.Request.Path);
 
                     // Store client_id in session for callback scenarios (only if session is configured)
                     var hasSession = context.Features.Get<ISessionFeature>() is not null;
-                    if (hasSession && 
+                    if (hasSession &&
                         (context.Request.Path.StartsWithSegments("/connect/authorize") ||
                          context.Request.Path.StartsWithSegments("/login")))
                     {
@@ -108,7 +108,7 @@ public class ClientCookieMiddleware
                     // This is important for endpoints that require authentication but don't have a specific client context
                     string defaultScheme;
                     string defaultCookieName;
-                    
+
                     if (_options.CookieSeparationMode == MrWho.Options.CookieSeparationMode.None)
                     {
                         // In None mode, use standard Identity scheme
@@ -121,7 +121,7 @@ public class ClientCookieMiddleware
                         // This allows the admin client or fallback authentication to work
                         var adminScheme = cookieService.GetCookieSchemeForClient("mrwho_admin_web");
                         var adminSchemeExists = await schemeProvider.GetSchemeAsync(adminScheme) != null;
-                        
+
                         if (adminSchemeExists && IsAdminEndpoint(context.Request.Path))
                         {
                             defaultScheme = adminScheme;
@@ -134,7 +134,7 @@ public class ClientCookieMiddleware
                             defaultCookieName = CookieSchemeNaming.DefaultCookieName;
                         }
                     }
-                    
+
                     // Verify the default scheme exists too
                     var defaultSchemeExists = await schemeProvider.GetSchemeAsync(defaultScheme) != null;
                     if (!defaultSchemeExists)
@@ -161,11 +161,11 @@ public class ClientCookieMiddleware
                             _logger.LogWarning(ex, "Could not retrieve options for default scheme {Scheme}", defaultScheme);
                         }
                     }
-                    
+
                     context.Items["ClientCookieScheme"] = defaultScheme;
                     context.Items["ClientCookieName"] = defaultCookieName;
-                    
-                    _logger.LogDebug("No client ID found, using default scheme {Scheme} (cookie: {CookieName}) for path {Path}", 
+
+                    _logger.LogDebug("No client ID found, using default scheme {Scheme} (cookie: {CookieName}) for path {Path}",
                         defaultScheme, defaultCookieName, context.Request.Path);
                 }
             }
@@ -191,7 +191,7 @@ public class ClientCookieMiddleware
             try
             {
                 var referrerUri = new Uri(referrer);
-                
+
                 // If referrer contains admin-related paths, assume admin client
                 if (referrerUri.AbsolutePath.Contains("/admin", StringComparison.OrdinalIgnoreCase) ||
                     referrerUri.AbsolutePath.Contains("token-inspector", StringComparison.OrdinalIgnoreCase))
@@ -199,7 +199,7 @@ public class ClientCookieMiddleware
                     _logger.LogDebug("Inferred admin client from referrer: {Referrer}", referrer);
                     return "mrwho_admin_web";
                 }
-                
+
                 // Could add more inference logic here for other clients
             }
             catch (UriFormatException)
@@ -225,7 +225,7 @@ public class ClientCookieMiddleware
 
     private static bool IsOidcEndpoint(PathString path)
     {
-        return path.StartsWithSegments("/connect") || 
+        return path.StartsWithSegments("/connect") ||
                path.StartsWithSegments("/.well-known") ||
                path.StartsWithSegments("/signin-oidc") ||
                path.StartsWithSegments("/signout-oidc") ||

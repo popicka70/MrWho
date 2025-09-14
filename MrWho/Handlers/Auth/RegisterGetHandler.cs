@@ -1,14 +1,14 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
-using MrWho.Services.Mediator;
-using MrWho.Shared.Models;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using MrWho.Data;
 using MrWho.Options;
+using MrWho.Services.Mediator;
+using MrWho.Shared.Models;
 
 namespace MrWho.Handlers.Auth;
 

@@ -1,23 +1,23 @@
-using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Authentication;
-using OpenIddict.Abstractions;
-using OpenIddict.Server.AspNetCore;
-using System.Security.Claims;
-using MrWho.Services; // includes IJarReplayCache, JarOptions
-using Microsoft.AspNetCore.Http.Extensions;
-using Microsoft.AspNetCore;
-using MrWho.Data;
-using Microsoft.EntityFrameworkCore;
-using MrWho.Models;
-using Microsoft.AspNetCore.WebUtilities;
-using Microsoft.AspNetCore.DataProtection;
-using System.Security.Cryptography;
-using MrWho.Shared; // Jar/Jarm enums
 using System.IdentityModel.Tokens.Jwt;
-using Microsoft.IdentityModel.Tokens;
+using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
+using Microsoft.AspNetCore;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Http.Extensions;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens; // modern validation
+using Microsoft.IdentityModel.Tokens;
+using MrWho.Data;
+using MrWho.Models;
+using MrWho.Services; // includes IJarReplayCache, JarOptions
+using MrWho.Shared; // Jar/Jarm enums
+using OpenIddict.Abstractions;
+using OpenIddict.Server.AspNetCore;
 
 namespace MrWho.Handlers;
 
@@ -329,7 +329,7 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
             _logger.LogWarning(ex, "Consent check failed for client {ClientId}; continuing", clientId);
         }
 
-        SKIP_CONSENT:
+    SKIP_CONSENT:
         // MFA enforcement
         try
         {

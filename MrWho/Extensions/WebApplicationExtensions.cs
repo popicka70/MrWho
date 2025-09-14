@@ -1,30 +1,30 @@
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
-using MrWho.Data;
-using MrWho.Handlers;
-using MrWho.Services;
-using MrWho.Services.Mediator;
-using MrWho.Endpoints;
-using MrWho.Middleware;
-using OpenIddict.Abstractions;
-using OpenIddict.Server.AspNetCore;
-using Microsoft.AspNetCore;
+using System.Data;
 using System.Linq;
 using System.Reflection;
 using System.Security.Claims;
-using Microsoft.AspNetCore.Mvc;
-using static OpenIddict.Abstractions.OpenIddictConstants;
-using MrWho.Shared;
+using Microsoft.AspNetCore;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.HttpOverrides;
-using MrWho.Models; // added for UserProfile, UserState
-using System.Data;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting; // added for RequireRateLimiting
-using OpenIddict.Client.AspNetCore;
-using OpenIddict.Client; // added for OpenIddictClientOptions/Registration
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using MrWho.Data;
+using MrWho.Endpoints;
+using MrWho.Handlers;
+using MrWho.Middleware;
+using MrWho.Models; // added for UserProfile, UserState
+using MrWho.Services;
+using MrWho.Services.Mediator;
+using MrWho.Shared;
 using MrWho.Shared.Authentication; // for CookieSchemeNaming
+using OpenIddict.Abstractions;
+using OpenIddict.Client; // added for OpenIddictClientOptions/Registration
+using OpenIddict.Client.AspNetCore;
+using OpenIddict.Server.AspNetCore;
+using static OpenIddict.Abstractions.OpenIddictConstants;
 
 namespace MrWho.Extensions;
 
@@ -41,9 +41,9 @@ public static class WebApplicationExtensions
             app.UseHsts();
         }
 
-    // Behind a reverse proxy (Railway, containers), honor X-Forwarded-* so Request.Scheme becomes https
-    // Place this BEFORE redirection/auth so downstream sees the correct scheme/remote IP. Options are configured in DI.
-    app.UseForwardedHeaders();
+        // Behind a reverse proxy (Railway, containers), honor X-Forwarded-* so Request.Scheme becomes https
+        // Place this BEFORE redirection/auth so downstream sees the correct scheme/remote IP. Options are configured in DI.
+        app.UseForwardedHeaders();
 
         // Allow disabling HTTPS redirection for containerized/internal HTTP calls
         var disableHttpsRedirect = string.Equals(Environment.GetEnvironmentVariable("DISABLE_HTTPS_REDIRECT"), "true", StringComparison.OrdinalIgnoreCase);
@@ -52,10 +52,10 @@ public static class WebApplicationExtensions
             app.UseHttpsRedirection();
         }
         app.UseStaticFiles();
-        
+
         // Move JAR/JARM normalization BEFORE routing so OpenIddict never sees unsupported response_mode=jwt.
         app.UseMiddleware<JarRequestExpansionMiddleware>();
-        
+
         app.UseRouting();
 
         // Enable ASP.NET Core rate limiting middleware

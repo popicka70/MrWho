@@ -1,18 +1,18 @@
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore; // added for EF calls
 using Microsoft.Extensions.Options;
-using OpenIddict.Client;
-using OpenIddict.Client.AspNetCore;
-using Microsoft.AspNetCore.Authentication;
-using MrWho.Services.Mediator;
+using MrWho.Data; // added
 using MrWho.Endpoints;
 using MrWho.Handlers.Auth; // add for InvalidScopesGetRequest
-using MrWho.Data; // added
 using MrWho.Models; // added for PushedAuthorizationRequest
+using MrWho.Services; // added for ISecurityAuditWriter & SecurityAudit
+using MrWho.Services.Mediator;
 using MrWho.Shared; // added for PushedAuthorizationMode
 using OpenIddict.Abstractions; // added for OpenIddictConstants
-using Microsoft.EntityFrameworkCore; // added for EF calls
-using MrWho.Services; // added for ISecurityAuditWriter & SecurityAudit
+using OpenIddict.Client;
+using OpenIddict.Client.AspNetCore;
 
 namespace MrWho.Controllers;
 

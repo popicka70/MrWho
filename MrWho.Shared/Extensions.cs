@@ -19,7 +19,7 @@ public static class SharedModelExtensions
             TotalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
         };
     }
-    
+
     /// <summary>
     /// Validates that a client uses standard scopes
     /// </summary>
@@ -34,10 +34,10 @@ public static class SharedModelExtensions
             StandardScopes.ApiRead,
             StandardScopes.ApiWrite
         };
-        
+
         return client.Scopes.All(scope => standardScopes.Contains(scope));
     }
-    
+
     /// <summary>
     /// Gets default scopes for admin clients
     /// </summary>

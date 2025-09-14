@@ -1,17 +1,17 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Http; // for HttpContext, DefaultHttpContext, HostString
+using Microsoft.AspNetCore.Mvc; // for SignOutResult
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using MrWho.Data;
+using MrWho.Endpoints.Auth;
 using MrWho.Handlers.Auth;
 using MrWho.Models;
 using MrWho.Options;
-using MrWho.Services.Mediator;
-using MrWho.Endpoints.Auth;
-using System.Security.Claims;
 using MrWho.Services; // ILogoutHelper
-using Microsoft.AspNetCore.Mvc; // for SignOutResult
+using MrWho.Services.Mediator;
 
 namespace MrWhoAdmin.Tests;
 

@@ -39,7 +39,7 @@ public class SetLockoutHandler : ISetLockoutHandler
                 result = await _userManager.SetLockoutEndDateAsync(user, null);
                 action = "unlocked";
             }
-            
+
             if (result.Succeeded)
             {
                 _logger.LogInformation("User {UserId} {Action} successfully", id, action);

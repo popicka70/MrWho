@@ -1,7 +1,7 @@
-﻿using Microsoft.AspNetCore.Authentication;
+﻿using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
-using System.Security.Claims;
 using static OpenIddict.Abstractions.OpenIddictConstants;
 using static OpenIddict.Abstractions.OpenIddictConstants.Claims;
 
@@ -32,18 +32,18 @@ public class DynamicCookieService : IDynamicCookieService
 
     public async Task SignInWithClientCookieAsync(string clientId, IdentityUser user, bool rememberMe = false)
     {
-        var context = _httpContextAccessor.HttpContext 
+        var context = _httpContextAccessor.HttpContext
             ?? throw new InvalidOperationException("HttpContext is not available");
 
         try
         {
             // CONSISTENT APPROACH: All clients use proper authentication schemes
             var scheme = _cookieConfigService.GetCookieSchemeForClient(clientId);
-            
+
             // Create claims identity for the authentication scheme
             var identity = new ClaimsIdentity(scheme);
             await AddUserClaimsToIdentity(identity, user);
-            
+
             identity.AddClaim(new Claim("client_id", clientId));
             _logger.LogDebug("🔧 Added client_id claim for dynamic client {ClientId}", clientId);
 
@@ -61,8 +61,8 @@ public class DynamicCookieService : IDynamicCookieService
             };
 
             await context.SignInAsync(scheme, principal, properties);
-            
-            _logger.LogDebug("🔧 Signed in user {UserName} with dynamic scheme {Scheme} for client {ClientId}", 
+
+            _logger.LogDebug("🔧 Signed in user {UserName} with dynamic scheme {Scheme} for client {ClientId}",
                 user.UserName, scheme, clientId);
         }
         catch (Exception ex) when (ex.Source == "Microsoft.AspNetCore.Authentication.Cookies")
@@ -79,7 +79,7 @@ public class DynamicCookieService : IDynamicCookieService
 
     public async Task<bool> IsAuthenticatedForClientAsync(string clientId)
     {
-        var context = _httpContextAccessor.HttpContext 
+        var context = _httpContextAccessor.HttpContext
             ?? throw new InvalidOperationException("HttpContext is not available");
 
         try
@@ -87,7 +87,7 @@ public class DynamicCookieService : IDynamicCookieService
             // CONSISTENT APPROACH: All clients (static and dynamic) use authentication schemes
             var scheme = _cookieConfigService.GetCookieSchemeForClient(clientId);
             var authResult = await context.AuthenticateAsync(scheme);
-            
+
             if (!authResult.Succeeded || authResult.Principal?.Identity?.IsAuthenticated != true)
             {
                 return false;
@@ -97,11 +97,11 @@ public class DynamicCookieService : IDynamicCookieService
             var clientIdClaim = authResult.Principal.FindFirst("client_id");
             if (clientIdClaim?.Value != clientId)
             {
-                _logger.LogDebug("🔧 Authentication succeeded but for different client. Expected: {ExpectedClient}, Found: {ActualClient}", 
+                _logger.LogDebug("🔧 Authentication succeeded but for different client. Expected: {ExpectedClient}, Found: {ActualClient}",
                     clientId, clientIdClaim?.Value ?? "NULL");
                 return false;
             }
-            
+
             return true;
         }
         catch (Exception ex) when (ex.Source == "Microsoft.AspNetCore.Authentication.Cookies")
@@ -118,7 +118,7 @@ public class DynamicCookieService : IDynamicCookieService
 
     public async Task SignOutFromClientAsync(string clientId)
     {
-        var context = _httpContextAccessor.HttpContext 
+        var context = _httpContextAccessor.HttpContext
             ?? throw new InvalidOperationException("HttpContext is not available");
 
         try
@@ -126,7 +126,7 @@ public class DynamicCookieService : IDynamicCookieService
             // CONSISTENT APPROACH: All clients use proper authentication schemes
             var scheme = _cookieConfigService.GetCookieSchemeForClient(clientId);
             await context.SignOutAsync(scheme);
-            
+
             _logger.LogDebug("🔧 Signed out from dynamic scheme {Scheme} for client {ClientId}", scheme, clientId);
         }
         catch (Exception ex) when (ex.Source == "Microsoft.AspNetCore.Authentication.Cookies")
@@ -143,7 +143,7 @@ public class DynamicCookieService : IDynamicCookieService
 
     public async Task<ClaimsPrincipal?> GetClientPrincipalAsync(string clientId)
     {
-        var context = _httpContextAccessor.HttpContext 
+        var context = _httpContextAccessor.HttpContext
             ?? throw new InvalidOperationException("HttpContext is not available");
 
         try
@@ -151,10 +151,10 @@ public class DynamicCookieService : IDynamicCookieService
             // CONSISTENT APPROACH: All clients (static and dynamic) use authentication schemes
             var scheme = _cookieConfigService.GetCookieSchemeForClient(clientId);
             var authResult = await context.AuthenticateAsync(scheme);
-            
+
             if (!authResult.Succeeded || authResult.Principal?.Identity?.IsAuthenticated != true)
             {
-                _logger.LogDebug("🔧 No valid authentication for client {ClientId} using scheme {SchemeName}", 
+                _logger.LogDebug("🔧 No valid authentication for client {ClientId} using scheme {SchemeName}",
                     clientId, scheme);
                 return null;
             }
@@ -163,12 +163,12 @@ public class DynamicCookieService : IDynamicCookieService
             var clientIdClaim = authResult.Principal.FindFirst("client_id");
             if (clientIdClaim?.Value != clientId)
             {
-                _logger.LogDebug("🔧 Authentication succeeded but for different client. Expected: {ExpectedClient}, Found: {ActualClient}", 
+                _logger.LogDebug("🔧 Authentication succeeded but for different client. Expected: {ExpectedClient}, Found: {ActualClient}",
                     clientId, clientIdClaim?.Value ?? "NULL");
                 return null;
             }
-                
-            _logger.LogDebug("🔧 DYNAMIC SCHEME SUCCESS: Client {ClientId} authenticated using dynamic scheme {SchemeName}", 
+
+            _logger.LogDebug("🔧 DYNAMIC SCHEME SUCCESS: Client {ClientId} authenticated using dynamic scheme {SchemeName}",
                 clientId, scheme);
 
             return authResult.Principal;
@@ -215,7 +215,7 @@ public class DynamicCookieService : IDynamicCookieService
         {
             var claims = await _userManager.GetClaimsAsync(user);
             var nameClaim = claims.FirstOrDefault(c => c.Type == "name")?.Value;
-            
+
             if (!string.IsNullOrEmpty(nameClaim))
             {
                 return nameClaim;
@@ -258,7 +258,7 @@ public class DynamicCookieService : IDynamicCookieService
 
         // Split into words and capitalize each word
         var words = friendlyName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        var capitalizedWords = words.Select(word => 
+        var capitalizedWords = words.Select(word =>
             word.Length > 0 ? char.ToUpper(word[0]) + word.Substring(1).ToLower() : word);
 
         return string.Join(" ", capitalizedWords);

@@ -10,13 +10,13 @@ public interface IProtocolMetrics
 }
 
 public sealed record ProtocolMetricsSnapshot(
-    IReadOnlyDictionary<string,int> JarRequests,
-    IReadOnlyDictionary<string,int> JarmResponses);
+    IReadOnlyDictionary<string, int> JarRequests,
+    IReadOnlyDictionary<string, int> JarmResponses);
 
 internal sealed class InMemoryProtocolMetrics : IProtocolMetrics
 {
-    private readonly ConcurrentDictionary<string,int> _jar = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<string,int> _jarm = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, int> _jar = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, int> _jarm = new(StringComparer.OrdinalIgnoreCase);
 
     public void IncrementJarRequest(string outcome, string alg)
     {

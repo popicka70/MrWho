@@ -1,10 +1,10 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting; // added
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using MrWho.Data;
 using MrWho.Models;
-using Microsoft.Extensions.Logging;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.RateLimiting; // added
 
 namespace MrWho.Controllers;
 
@@ -70,7 +70,8 @@ public class DeviceAuthorizationController : Controller
         Response.Headers.CacheControl = "no-store";
         Response.Headers.Pragma = "no-cache";
 
-        return Ok(new {
+        return Ok(new
+        {
             device_code = deviceCode,
             user_code = userCode,
             verification_uri = verificationUri,
@@ -194,7 +195,7 @@ public class DeviceAuthorizationController : Controller
     private static string GenerateOpaque(int bytes)
     {
         var b = System.Security.Cryptography.RandomNumberGenerator.GetBytes(bytes);
-        return Convert.ToBase64String(b).Replace('+','-').Replace('/','_').TrimEnd('=');
+        return Convert.ToBase64String(b).Replace('+', '-').Replace('/', '_').TrimEnd('=');
     }
 
     private static string GenerateUserCode()

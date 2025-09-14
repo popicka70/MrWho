@@ -1,9 +1,9 @@
 using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
-using Microsoft.IdentityModel.Tokens;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection; // add for IServiceCollection
-using System.Security.Cryptography.X509Certificates;
+using Microsoft.IdentityModel.Tokens;
 
 namespace MrWho.ClientAuth.Jar;
 
@@ -49,7 +49,7 @@ public sealed class JarRequest
     public string? CodeChallenge { get; set; }
     public string? CodeChallengeMethod { get; set; } = "S256";
     public string? Nonce { get; set; } // NEW
-    public Dictionary<string,string> Extra { get; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, string> Extra { get; } = new(StringComparer.OrdinalIgnoreCase);
 }
 
 internal sealed class JarRequestObjectSigner : IJarRequestObjectSigner

@@ -7,14 +7,14 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using MrWho.Data;
 using MrWho.Services;
 using MrWho.Services.Mediator;
-using OpenIddict.Abstractions;
 using MrWho.Shared.Authentication; // for naming defaults
+using OpenIddict.Abstractions;
 
 namespace MrWho.Endpoints;
 

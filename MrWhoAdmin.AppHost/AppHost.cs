@@ -1,8 +1,8 @@
+using System.IO;
 using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
-using Microsoft.Extensions.Hosting; // for HostOptions
 using Microsoft.Extensions.DependencyInjection; // for IServiceCollection.Configure
-using System.IO;
+using Microsoft.Extensions.Hosting; // for HostOptions
 
 var builder = DistributedApplication.CreateBuilder(args);
 

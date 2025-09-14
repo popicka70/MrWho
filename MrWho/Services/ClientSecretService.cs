@@ -1,8 +1,8 @@
+using System.Text; // potential future use
+using Microsoft.AspNetCore.DataProtection; // added for encryption
 using Microsoft.EntityFrameworkCore;
 using MrWho.Data;
 using MrWho.Models;
-using Microsoft.AspNetCore.DataProtection; // added for encryption
-using System.Text; // potential future use
 
 namespace MrWho.Services;
 
@@ -129,6 +129,6 @@ public sealed class ClientSecretService : IClientSecretService
     private static string GenerateHighEntropySecret()
     {
         var bytes = System.Security.Cryptography.RandomNumberGenerator.GetBytes(48);
-        return Convert.ToBase64String(bytes).Replace('+','-').Replace('/','_').TrimEnd('=');
+        return Convert.ToBase64String(bytes).Replace('+', '-').Replace('/', '_').TrimEnd('=');
     }
 }

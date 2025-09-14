@@ -1,6 +1,6 @@
 using System.Net.Http.Headers;
-using System.Text.Json;
 using System.Text;
+using System.Text.Json;
 
 namespace MrWhoAdmin.Tests;
 
@@ -9,7 +9,7 @@ namespace MrWhoAdmin.Tests;
 /// Uses dynamic base address from Aspire test host instead of hard-coded port.
 /// </summary>
 [TestClass]
-[TestCategory("Integration")] 
+[TestCategory("Integration")]
 public class BasicApiReadTests
 {
     private static readonly JsonSerializerOptions JsonOptions = new()

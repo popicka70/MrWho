@@ -17,7 +17,7 @@ public interface IJarRequestValidator
     Task<JarValidationResult> ValidateAsync(string jwt, string? queryClientId, CancellationToken ct = default);
 }
 
-public sealed record JarValidationResult(bool Success, string? Error, string? ErrorDescription, string? ClientId, string? Algorithm, Dictionary<string,string>? Parameters);
+public sealed record JarValidationResult(bool Success, string? Error, string? ErrorDescription, string? ClientId, string? Algorithm, Dictionary<string, string>? Parameters);
 
 internal sealed class JarRequestValidator : IJarRequestValidator
 {
@@ -56,7 +56,7 @@ internal sealed class JarRequestValidator : IJarRequestValidator
     public async Task<JarValidationResult> ValidateAsync(string jwt, string? queryClientId, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(jwt)) return new(false, OpenIddict.Abstractions.OpenIddictConstants.Errors.InvalidRequestObject, "empty request object", null, null, null);
-        if (jwt.Count(c => c=='.')!=2) return new(false, OpenIddict.Abstractions.OpenIddictConstants.Errors.InvalidRequestObject, "request object must be JWT", null, null, null);
+        if (jwt.Count(c => c == '.') != 2) return new(false, OpenIddict.Abstractions.OpenIddictConstants.Errors.InvalidRequestObject, "request object must be JWT", null, null, null);
 
         JwtSecurityToken token;
         var handler = new JwtSecurityTokenHandler();
@@ -87,7 +87,7 @@ internal sealed class JarRequestValidator : IJarRequestValidator
         {
             if (!token.Payload.TryGetValue("jti", out var jtiObj) || string.IsNullOrWhiteSpace(jtiObj?.ToString()))
                 return new(false, OpenIddict.Abstractions.OpenIddictConstants.Errors.InvalidRequestObject, "jti required", effectiveClientId, alg, null);
-            if (!_replay.TryAdd("jar:jti:"+jtiObj, exp.Value))
+            if (!_replay.TryAdd("jar:jti:" + jtiObj, exp.Value))
                 return new(false, OpenIddict.Abstractions.OpenIddictConstants.Errors.InvalidRequestObject, "jti replay", effectiveClientId, alg, null);
         }
 
@@ -160,7 +160,7 @@ internal sealed class JarRequestValidator : IJarRequestValidator
         catch (Exception ex)
         { _logger.LogDebug(ex, "JAR signature validation failed"); return new(false, OpenIddict.Abstractions.OpenIddictConstants.Errors.InvalidRequestObject, "signature invalid", effectiveClientId, alg, null); }
 
-        var dict = new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase);
+        var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var p in _recognized)
         {
             if (token.Payload.TryGetValue(p, out var val) && val is not null)

@@ -5,7 +5,7 @@ using System.Text.Json;
 namespace MrWhoAdmin.Tests;
 
 [TestClass]
-[TestCategory("DynamicRegistration")] 
+[TestCategory("DynamicRegistration")]
 public class DynamicClientRegistrationTests
 {
     private static HttpClient CreateServerClient() => SharedTestInfrastructure.CreateHttpClient("mrwho", disableRedirects: true);

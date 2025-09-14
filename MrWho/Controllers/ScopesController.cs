@@ -1,11 +1,11 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using MrWho.Shared;
 using Microsoft.EntityFrameworkCore;
 using MrWho.Data;
 using MrWho.Models;
-using MrWho.Shared.Models;
 using MrWho.Services;
+using MrWho.Shared;
+using MrWho.Shared.Models;
 
 namespace MrWho.Controllers;
 
@@ -177,7 +177,7 @@ public class ScopesController : ControllerBase
                 var scopeWithClaims = await _context.Scopes
                     .Include(s => s.Claims)
                     .FirstAsync(s => s.Id == scope.Id);
-                
+
                 await _scopeSyncService.RegisterScopeAsync(scopeWithClaims);
                 _logger.LogInformation("Successfully registered new scope '{ScopeName}' with OpenIddict", scope.Name);
             }

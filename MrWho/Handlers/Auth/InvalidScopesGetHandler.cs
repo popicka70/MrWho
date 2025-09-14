@@ -1,11 +1,11 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
-using MrWho.Services.Mediator;
 using Microsoft.EntityFrameworkCore;
-using MrWho.Data;
 using Microsoft.Extensions.Options;
+using MrWho.Data;
 using MrWho.Options;
+using MrWho.Services.Mediator;
 
 namespace MrWho.Handlers.Auth;
 
@@ -36,11 +36,11 @@ public sealed class InvalidScopesGetHandler : IRequestHandler<InvalidScopesGetRe
         {
             try
             {
-                var client = await _db.Clients.AsNoTracking().Include(c => c.Scopes).Include(c=>c.Realm)
+                var client = await _db.Clients.AsNoTracking().Include(c => c.Scopes).Include(c => c.Realm)
                     .FirstOrDefaultAsync(c => c.ClientId == request.ClientId, cancellationToken);
                 if (client != null)
                 {
-                    vd["AllowedScopes"] = client.Scopes.Select(s => s.Scope).OrderBy(s=>s).ToList();
+                    vd["AllowedScopes"] = client.Scopes.Select(s => s.Scope).OrderBy(s => s).ToList();
                     vd["ClientName"] = client.Name ?? request.ClientId;
                     vd["ThemeName"] = client.ThemeName ?? client.Realm?.DefaultThemeName ?? _opts.Value.DefaultThemeName;
                 }

@@ -38,7 +38,7 @@ public class ClientRolesController : ControllerBase
                 Name = r.Name,
                 ClientId = r.ClientId,
                 UserCount = r.UserClientRoles.Count
-            }).OrderBy(r=>r.ClientId).ThenBy(r=>r.Name).ToListAsync();
+            }).OrderBy(r => r.ClientId).ThenBy(r => r.Name).ToListAsync();
         return Ok(roles);
     }
 
@@ -60,7 +60,7 @@ public class ClientRolesController : ControllerBase
     public async Task<IActionResult> Delete([FromBody] DeleteClientRoleRequest request)
     {
         var normalized = request.Name.Trim().ToUpperInvariant();
-        var role = await _db.ClientRoles.Include(r=>r.UserClientRoles).FirstOrDefaultAsync(r => r.ClientId == request.ClientId && r.NormalizedName == normalized);
+        var role = await _db.ClientRoles.Include(r => r.UserClientRoles).FirstOrDefaultAsync(r => r.ClientId == request.ClientId && r.NormalizedName == normalized);
         if (role == null) return NotFound();
         if (role.UserClientRoles.Count > 0) return Conflict("Role has assigned users");
         _db.ClientRoles.Remove(role);

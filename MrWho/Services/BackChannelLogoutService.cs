@@ -1,13 +1,13 @@
-using Microsoft.AspNetCore.Authentication;
+using System.Diagnostics.Metrics;
+using System.IdentityModel.Tokens.Jwt;
 using System.Text.Json;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
 using MrWho.Data;
 using OpenIddict.Abstractions;
-using Microsoft.Extensions.Options;
 using OpenIddict.Server;
-using System.IdentityModel.Tokens.Jwt;
-using Microsoft.IdentityModel.Tokens;
-using System.Diagnostics.Metrics;
 
 namespace MrWho.Services;
 

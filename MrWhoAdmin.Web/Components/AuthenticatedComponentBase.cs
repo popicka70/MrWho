@@ -20,16 +20,16 @@ public abstract class AuthenticatedComponentBase : ComponentBase, IDisposable
     protected override async Task OnInitializedAsync()
     {
         if (_disposed) return;
-        
+
         // During prerendering, we'll assume authentication is OK
         // and perform the real check after the component becomes interactive
-        
+
         if (!_hasRendered)
         {
             // Set initial state for prerendering
             IsLoading = true;
             IsAuthenticated = true; // Assume authenticated during prerendering
-            
+
             // Check for authentication errors in URL (this is safe during prerendering)
             try
             {
@@ -45,21 +45,21 @@ public abstract class AuthenticatedComponentBase : ComponentBase, IDisposable
                 Logger.LogError(ex, "Error checking for authentication errors during initialization");
             }
         }
-        
+
         await base.OnInitializedAsync();
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (_disposed) return;
-        
+
         if (firstRender)
         {
             _hasRendered = true;
             // Now we're in an interactive context, perform the real authentication check
             await CheckAuthenticationAsync();
         }
-        
+
         await base.OnAfterRenderAsync(firstRender);
     }
 
@@ -69,7 +69,7 @@ public abstract class AuthenticatedComponentBase : ComponentBase, IDisposable
     protected virtual async Task CheckAuthenticationAsync()
     {
         if (_disposed) return;
-        
+
         try
         {
             IsLoading = true;
@@ -79,7 +79,7 @@ public abstract class AuthenticatedComponentBase : ComponentBase, IDisposable
             }
 
             Logger.LogDebug("Checking authentication status (interactive context)");
-            
+
             // Re-check for authentication errors in URL
             if (BlazorAuthService.HasAuthenticationError())
             {
@@ -91,7 +91,7 @@ public abstract class AuthenticatedComponentBase : ComponentBase, IDisposable
 
             // Ensure user is authenticated (this will now work in interactive context)
             IsAuthenticated = await BlazorAuthService.EnsureAuthenticatedAsync();
-            
+
             if (IsAuthenticated)
             {
                 Logger.LogDebug("Authentication check successful");
@@ -128,7 +128,7 @@ public abstract class AuthenticatedComponentBase : ComponentBase, IDisposable
     protected async Task TriggerReauthenticationAsync()
     {
         if (_disposed) return;
-        
+
         try
         {
             if (!_hasRendered)
@@ -164,7 +164,7 @@ public abstract class AuthenticatedComponentBase : ComponentBase, IDisposable
     protected void ClearAuthError()
     {
         if (_disposed) return;
-        
+
         AuthErrorMessage = null;
         StateHasChanged();
     }
@@ -183,7 +183,7 @@ public abstract class AuthenticatedComponentBase : ComponentBase, IDisposable
     protected RenderFragment RenderAuthenticationStatus() => builder =>
     {
         if (_disposed) return;
-        
+
         if (IsLoading)
         {
             builder.OpenElement(0, "div");

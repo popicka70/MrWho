@@ -73,28 +73,28 @@ builder.Services.AddAuthentication(options =>
     options.LogoutPath = "/Account/Logout";
     // FIXED: Use relative path that will redirect back to the identity server during OIDC flow
     options.AccessDeniedPath = "/Account/AccessDenied";
-    
+
     // CRITICAL: Add event to check for session invalidation on each request
     options.Events.OnValidatePrincipal = async context =>
     {
         var cache = context.HttpContext.RequestServices.GetRequiredService<Microsoft.Extensions.Caching.Memory.IMemoryCache>();
         var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-        
+
         if (context.Principal?.Identity?.IsAuthenticated == true)
         {
             var subjectClaim = context.Principal.FindFirst("sub")?.Value;
-            
+
             if (!string.IsNullOrEmpty(subjectClaim))
             {
                 // Check if this subject has been logged out via back-channel logout
                 if (cache.TryGetValue($"logout_{subjectClaim}", out var logoutInfo))
                 {
                     logger.LogInformation("Demo1 session invalidated for subject {Subject} due to back-channel logout", subjectClaim);
-                    
+
                     // Reject the principal to force re-authentication
                     context.RejectPrincipal();
                     await context.HttpContext.SignOutAsync(demo1CookieScheme);
-                    
+
                     // Remove the logout notification after processing
                     cache.Remove($"logout_{subjectClaim}");
                 }
@@ -109,7 +109,7 @@ builder.Services.AddAuthentication(options =>
     options.ClientId = "mrwho_demo1";
     options.ClientSecret = "PyfrZln6d2ifAbdL_2gr316CERUMyzfpgmxJ1J3xJsWUnfHGakcvjWenB_OwQqnv";
     options.ResponseType = OpenIdConnectResponseType.Code;
-    
+
     // Scopes
     options.Scope.Clear();
     options.Scope.Add("openid");
@@ -119,10 +119,10 @@ builder.Services.AddAuthentication(options =>
     options.Scope.Add("offline_access");
     options.Scope.Add("api.read");
     options.Scope.Add("api.write");
-    
+
     // Save tokens for display and API calls
     options.SaveTokens = true;
-    
+
     // Use PKCE for additional security
     options.UsePkce = true;
 
@@ -133,20 +133,20 @@ builder.Services.AddAuthentication(options =>
         context.SkipPush();
         return Task.CompletedTask;
     };
-    
+
     // SSL configuration for production authority
     options.RequireHttpsMetadata = true; // Production: require HTTPS metadata
-    
+
     // Disable the default inbound claim type mappings to preserve JWT claim names
     options.MapInboundClaims = false;
-    
+
     // Map claims to preserve JWT claim names
     options.TokenValidationParameters.NameClaimType = "name";
     options.TokenValidationParameters.RoleClaimType = "role";
-    
+
     // Clear default claim type mappings to ensure we get the raw JWT claims
     options.ClaimActions.Clear();
-    
+
     // Map the claims we want to preserve from the ID token
     options.ClaimActions.MapUniqueJsonKey("sub", "sub");
     options.ClaimActions.MapUniqueJsonKey("name", "name");
@@ -156,15 +156,15 @@ builder.Services.AddAuthentication(options =>
     options.ClaimActions.MapUniqueJsonKey("email_verified", "email_verified");
     options.ClaimActions.MapUniqueJsonKey("preferred_username", "preferred_username");
     options.ClaimActions.MapUniqueJsonKey("role", "role");
-    
+
     // CRITICAL FIX: Configure post-logout redirect to home page (which no longer requires auth)
     options.SignedOutRedirectUri = "/?logout=success";
-    
+
     // Events for diagnostics
     options.Events.OnTokenValidated = context =>
     {
         var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-        logger.LogDebug("Demo1 claims in ID token: {Claims}", 
+        logger.LogDebug("Demo1 claims in ID token: {Claims}",
             string.Join(", ", context.Principal?.Claims.Select(c => $"{c.Type}={c.Value}") ?? Array.Empty<string>()));
         return Task.CompletedTask;
     };
@@ -289,9 +289,9 @@ app.MapGet("/call-mrwho-realms", async () =>
 });
 
 // Add health check endpoint
-app.MapGet("/health", () => Results.Ok(new 
-{ 
-    Status = "Healthy", 
+app.MapGet("/health", () => Results.Ok(new
+{
+    Status = "Healthy",
     Application = "MrWho Demo 1",
     Timestamp = DateTime.UtcNow,
     Version = "1.0.0"
@@ -306,7 +306,7 @@ if (app.Environment.IsDevelopment())
         var authType = context.User.Identity?.AuthenticationType;
         var name = context.User.Identity?.Name;
         var claims = context.User.Claims.Select(c => new { c.Type, c.Value }).ToList();
-        
+
         return Results.Json(new
         {
             IsAuthenticated = isAuthenticated,
@@ -322,7 +322,7 @@ if (app.Environment.IsDevelopment())
     {
         await context.SignOutAsync(demo1CookieScheme);
         await context.SignOutAsync(OpenIdConnectDefaults.AuthenticationScheme); // Use standard OIDC scheme
-        
+
         return Results.Ok(new { Message = "Signed out from Demo1 using standard schemes with server-side isolation", Timestamp = DateTime.UtcNow });
     });
 
@@ -347,50 +347,52 @@ if (app.Environment.IsDevelopment())
             IdTokenLength = idToken?.Length ?? 0
         });
     });
-    
+
     // Debug endpoint to test logout flow step by step
     app.MapGet("/debug/logout-flow", async (HttpContext context) =>
     {
         var steps = new List<object>();
-        
+
         // Step 1: Check current authentication status
         var isAuthenticated = context.User.Identity?.IsAuthenticated == true;
         steps.Add(new { step = 1, description = "Check authentication", result = isAuthenticated });
-        
+
         if (isAuthenticated)
         {
             // Step 2: Check available tokens
             var accessToken = await context.GetTokenAsync("access_token");
             var refreshToken = await context.GetTokenAsync("refresh_token");
             var idToken = await context.GetTokenAsync("id_token");
-            
-            steps.Add(new { 
-                step = 2, 
-                description = "Check tokens", 
-                result = new { 
+
+            steps.Add(new
+            {
+                step = 2,
+                description = "Check tokens",
+                result = new
+                {
                     hasAccessToken = !string.IsNullOrEmpty(accessToken),
                     hasRefreshToken = !string.IsNullOrEmpty(refreshToken),
                     hasIdToken = !string.IsNullOrEmpty(idToken)
                 }
             });
-            
+
             // Step 3: Check cookies
             var cookies = context.Request.Cookies
                 .Where(c => c.Key.Contains("Demo1") || c.Key.Contains("AspNet"))
                 .Select(c => new { name = c.Key, length = c.Value.Length })
                 .ToList();
-            
+
             steps.Add(new { step = 3, description = "Check cookies", result = cookies });
         }
-        
+
         return Results.Json(new
         {
             title = "Demo1 Logout Flow Debug",
             currentState = new { isAuthenticated = isAuthenticated },
             sessionIsolation = "Server-side via DynamicCookieService",
             steps = steps,
-            nextActions = isAuthenticated ? 
-                new[] { "Visit /Account/Logout to test logout flow" } : 
+            nextActions = isAuthenticated ?
+                new[] { "Visit /Account/Logout to test logout flow" } :
                 new[] { "Visit /Account/Login to authenticate first" }
         });
     });

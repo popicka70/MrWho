@@ -25,7 +25,7 @@ public class DeleteUserHandler : IDeleteUserHandler
             }
 
             var result = await _userManager.DeleteAsync(user);
-            
+
             if (result.Succeeded)
             {
                 _logger.LogInformation("Successfully deleted user {UserName} with ID {UserId}", user.UserName, user.Id);

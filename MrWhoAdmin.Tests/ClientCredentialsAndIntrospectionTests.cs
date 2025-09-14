@@ -6,7 +6,7 @@ using Microsoft.IdentityModel.JsonWebTokens;
 namespace MrWhoAdmin.Tests;
 
 [TestClass]
-[TestCategory("OIDC")] 
+[TestCategory("OIDC")]
 public class ClientCredentialsAndIntrospectionTests
 {
     private async Task<JsonDocument> RequestClientCredentialsAsync(string clientId = "mrwho_m2m", string secret = "FTZvvlIIFdmtBg7IdBql9EEXRDj1xwLmi1qW9fGbJBY")
@@ -56,7 +56,7 @@ public class ClientCredentialsAndIntrospectionTests
         using var http = SharedTestInfrastructure.CreateHttpClient("mrwho", disableRedirects: true);
         var req = new HttpRequestMessage(HttpMethod.Post, "connect/introspect")
         {
-            Content = new FormUrlEncodedContent(new Dictionary<string,string>
+            Content = new FormUrlEncodedContent(new Dictionary<string, string>
             {
                 ["token"] = token!
             })

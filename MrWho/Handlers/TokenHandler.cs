@@ -1,15 +1,15 @@
-using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Authentication;
-using OpenIddict.Abstractions;
-using OpenIddict.Server.AspNetCore;
 using System.Security.Claims;
 using Microsoft.AspNetCore;
-using MrWho.Services;
-using MrWho.Data; // add db
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore; // include for Include
-using MrWho.Shared; // for AudienceMode
-using static OpenIddict.Abstractions.OpenIddictConstants;
+using MrWho.Data; // add db
 using MrWho.Models; // for Destinations & claims
+using MrWho.Services;
+using MrWho.Shared; // for AudienceMode
+using OpenIddict.Abstractions;
+using OpenIddict.Server.AspNetCore;
+using static OpenIddict.Abstractions.OpenIddictConstants;
 
 namespace MrWho.Handlers;
 
@@ -52,7 +52,7 @@ public class TokenHandler : ITokenHandler
                       throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
 
         // Log the grant type for debugging
-        _logger.LogDebug("Token request received: GrantType={GrantType}, ClientId={ClientId}", 
+        _logger.LogDebug("Token request received: GrantType={GrantType}, ClientId={ClientId}",
             request.GrantType, request.ClientId);
 
         if (request.IsPasswordGrantType())
@@ -344,14 +344,14 @@ public class TokenHandler : ITokenHandler
         }
 
         var clientId = request.ClientId!;
-        
+
         // CRITICAL: Validate user can access this client based on realm restrictions
         var realmValidation = await _realmValidationService.ValidateUserRealmAccessAsync(user, clientId);
         if (!realmValidation.IsValid)
         {
-            _logger.LogWarning("User {UserName} denied access to client {ClientId} via password grant: {Reason}", 
+            _logger.LogWarning("User {UserName} denied access to client {ClientId} via password grant: {Reason}",
                 user.UserName, clientId, realmValidation.Reason);
-            
+
             var forbidProperties = new AuthenticationProperties(new Dictionary<string, string?>
             {
                 [OpenIddictServerAspNetCoreConstants.Properties.Error] = Errors.AccessDenied,
@@ -361,7 +361,7 @@ public class TokenHandler : ITokenHandler
             return Results.Forbid(forbidProperties, new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
         }
 
-        _logger.LogInformation("User {UserName} validated for password grant access to client {ClientId} in realm {Realm}", 
+        _logger.LogInformation("User {UserName} validated for password grant access to client {ClientId} in realm {Realm}",
             user.UserName, clientId, realmValidation.ClientRealm);
 
         var scopes = request.GetScopes();
@@ -442,7 +442,7 @@ public class TokenHandler : ITokenHandler
         ClaimsPrincipal? authPrincipal = null;
         var cookieScheme = _cookieService.GetCookieSchemeForClient(clientId);
         try { var cookieResult = await context.AuthenticateAsync(cookieScheme); if (cookieResult.Succeeded && cookieResult.Principal?.Identity?.IsAuthenticated == true) authPrincipal = cookieResult.Principal; }
-        catch (Exception ex){ _logger.LogDebug(ex, "Cookie auth failed for scheme {Scheme}", cookieScheme); }
+        catch (Exception ex) { _logger.LogDebug(ex, "Cookie auth failed for scheme {Scheme}", cookieScheme); }
         if (authPrincipal == null)
         {
             var fallback = await context.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
@@ -614,7 +614,7 @@ public class TokenHandler : ITokenHandler
         {
             var claims = await _userManager.GetClaimsAsync(user);
             var nameClaim = claims.FirstOrDefault(c => c.Type == "name")?.Value;
-            
+
             if (!string.IsNullOrEmpty(nameClaim))
             {
                 return nameClaim;
@@ -644,7 +644,7 @@ public class TokenHandler : ITokenHandler
                 : new[] { Destinations.AccessToken }; // userinfo-only exposure for privacy
 
             var claims = await _userManager.GetClaimsAsync(user);
-            
+
             // Only include profile claims if profile scope is requested
             if (scopes.Contains(OpenIddictConstants.Scopes.Profile))
             {
@@ -716,7 +716,7 @@ public class TokenHandler : ITokenHandler
 
         // Split into words and capitalize each word
         var words = friendlyName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        var capitalizedWords = words.Select(word => 
+        var capitalizedWords = words.Select(word =>
             word.Length > 0 ? char.ToUpper(word[0]) + word.Substring(1).ToLower() : word);
 
         return string.Join(" ", capitalizedWords);
@@ -730,14 +730,14 @@ public class TokenHandler : ITokenHandler
         {
             if (string.IsNullOrWhiteSpace(clientId)) return new(false);
             var scopeSet = requestedScopes?.ToHashSet(StringComparer.OrdinalIgnoreCase) ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var client = await _db.Clients.Include(c => c.Audiences).Include(c=>c.Realm).FirstOrDefaultAsync(c => c.ClientId == clientId);
+            var client = await _db.Clients.Include(c => c.Audiences).Include(c => c.Realm).FirstOrDefaultAsync(c => c.ClientId == clientId);
             if (client == null) return new(false);
             var mode = client.AudienceMode ?? client.Realm?.AudienceMode ?? AudienceMode.RequestedIntersection;
             var includeInId = client.IncludeAudInIdToken ?? client.Realm?.IncludeAudInIdToken ?? true;
             var explicitRequired = client.RequireExplicitAudienceScope ?? client.Realm?.RequireExplicitAudienceScope ?? false;
             var primary = client.PrimaryAudience ?? client.Realm?.PrimaryAudience;
-            var configured = client.Audiences.Select(a => a.Audience).Where(a=>!string.IsNullOrWhiteSpace(a)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-            if (configured.Count==0 || mode==AudienceMode.None) return new(false);
+            var configured = client.Audiences.Select(a => a.Audience).Where(a => !string.IsNullOrWhiteSpace(a)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            if (configured.Count == 0 || mode == AudienceMode.None) return new(false);
             var intersection = configured.Where(a => scopeSet.Contains(a)).ToList();
 
             List<string> result = new();
@@ -748,28 +748,28 @@ public class TokenHandler : ITokenHandler
                 case AudienceMode.AllConfigured:
                     result = configured; break;
                 case AudienceMode.RequestedOrAll:
-                    result = intersection.Count>0 ? intersection : configured; break;
+                    result = intersection.Count > 0 ? intersection : configured; break;
                 case AudienceMode.RequestedOrPrimary:
-                    if (intersection.Count>0) result = intersection;
-                    else if (!string.IsNullOrWhiteSpace(primary) && configured.Contains(primary, StringComparer.OrdinalIgnoreCase)) result = new(){primary!};
-                    else result = new(){configured.First()};
+                    if (intersection.Count > 0) result = intersection;
+                    else if (!string.IsNullOrWhiteSpace(primary) && configured.Contains(primary, StringComparer.OrdinalIgnoreCase)) result = new() { primary! };
+                    else result = new() { configured.First() };
                     break;
                 case AudienceMode.ErrorIfUnrequested:
-                    if (intersection.Count==0)
+                    if (intersection.Count == 0)
                         return new(true, "Required audience scope missing");
                     result = intersection; break;
                 case AudienceMode.AccessTokenOnly:
                     result = intersection; break;
             }
 
-            if (explicitRequired && intersection.Count==0 && mode != AudienceMode.AllConfigured)
+            if (explicitRequired && intersection.Count == 0 && mode != AudienceMode.AllConfigured)
             {
                 // explicit flag demands at least one requested audience
                 return new(true, "Explicit audience scope required");
             }
 
-            if (result.Count==0) return new(false);
-            if (principal.HasClaim(c=>c.Type==Claims.Audience)) return new(false);
+            if (result.Count == 0) return new(false);
+            if (principal.HasClaim(c => c.Type == Claims.Audience)) return new(false);
 
             foreach (var aud in result.Distinct())
             {

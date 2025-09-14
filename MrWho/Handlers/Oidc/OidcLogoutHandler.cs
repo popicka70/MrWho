@@ -1,14 +1,14 @@
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore; // for extension visibility
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using MrWho.Services;
 using MrWho.Services.Mediator;
-using OpenIddict.Server.AspNetCore;
-using Microsoft.AspNetCore; // for extension visibility
-using Microsoft.AspNetCore.Authentication;
 using OpenIddict.Client.AspNetCore;
+using OpenIddict.Server.AspNetCore;
 
 namespace MrWho.Handlers.Oidc;
 

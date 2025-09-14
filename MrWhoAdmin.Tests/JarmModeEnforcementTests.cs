@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.WebUtilities; // for QueryHelpers
 namespace MrWhoAdmin.Tests;
 
 [TestClass]
-[TestCategory("OIDC")] 
+[TestCategory("OIDC")]
 public class JarmModeEnforcementTests
 {
     private static HttpClient CreateServerClient(bool noRedirects = true) => SharedTestInfrastructure.CreateHttpClient("mrwho", disableRedirects: noRedirects);
@@ -16,7 +16,7 @@ public class JarmModeEnforcementTests
     private static async Task<string> GetAdminAccessTokenAsync()
     {
         using var http = CreateServerClient();
-        var form = new Dictionary<string,string>
+        var form = new Dictionary<string, string>
         {
             ["grant_type"] = "password",
             ["client_id"] = "mrwho_admin_web",
@@ -46,7 +46,7 @@ public class JarmModeEnforcementTests
     private static (string Verifier, string Challenge) CreatePkcePair()
     {
         var bytes = RandomNumberGenerator.GetBytes(32);
-        string B64(byte[] b) => Convert.ToBase64String(b).TrimEnd('=').Replace('+','-').Replace('/','_');
+        string B64(byte[] b) => Convert.ToBase64String(b).TrimEnd('=').Replace('+', '-').Replace('/', '_');
         var verifier = B64(bytes);
         var hash = SHA256.HashData(Encoding.ASCII.GetBytes(verifier));
         var challenge = B64(hash);
@@ -106,11 +106,11 @@ public class JarmModeEnforcementTests
         var authResp = await authClient.GetAsync(authorizeUrl);
 
         // Expect redirect (login) or OK (rendered login) but NOT a 400
-        Assert.IsTrue(((int)authResp.StatusCode >=300 && (int)authResp.StatusCode <=399) || authResp.StatusCode == HttpStatusCode.OK,
-            $"Expected redirect/OK. Got {(int)authResp.StatusCode} {authResp.StatusCode}. Body: {await authResp.Content.ReadAsStringAsync()}" );
+        Assert.IsTrue(((int)authResp.StatusCode >= 300 && (int)authResp.StatusCode <= 399) || authResp.StatusCode == HttpStatusCode.OK,
+            $"Expected redirect/OK. Got {(int)authResp.StatusCode} {authResp.StatusCode}. Body: {await authResp.Content.ReadAsStringAsync()}");
 
         // Follow intermediate authorize caching redirect if present
-        if ((int)authResp.StatusCode is >=300 and <=399)
+        if ((int)authResp.StatusCode is >= 300 and <= 399)
         {
             var loc = authResp.Headers.Location?.ToString() ?? string.Empty;
             if (loc.Contains("/connect/authorize", StringComparison.OrdinalIgnoreCase) && loc.Contains("request_uri=", StringComparison.OrdinalIgnoreCase))
@@ -125,7 +125,7 @@ public class JarmModeEnforcementTests
         }
 
         // After following any intermediate redirect, inspect final redirect (likely to login) for mrwho_jarm evidence.
-        if ((int)authResp.StatusCode is >=300 and <=399)
+        if ((int)authResp.StatusCode is >= 300 and <= 399)
         {
             var loc = authResp.Headers.Location?.ToString() ?? string.Empty;
             if (loc.Contains("/connect/login", StringComparison.OrdinalIgnoreCase))

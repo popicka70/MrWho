@@ -1,12 +1,12 @@
 using System.Net;
-using System.Text.Json;
 using System.Security.Cryptography; // added for PKCE
 using System.Text; // added for PKCE
+using System.Text.Json;
 
 namespace MrWhoAdmin.Tests;
 
 [TestClass]
-[TestCategory("OIDC")] 
+[TestCategory("OIDC")]
 public class JarmTests
 {
     private const string DemoClientId = "mrwho_demo1";
@@ -23,9 +23,9 @@ public class JarmTests
     private static (string Verifier, string Challenge) CreatePkcePair()
     {
         var bytes = RandomNumberGenerator.GetBytes(32);
-        var verifier = Convert.ToBase64String(bytes).TrimEnd('=').Replace('+','-').Replace('/','_');
+        var verifier = Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
         var hash = SHA256.HashData(Encoding.ASCII.GetBytes(verifier));
-        var challenge = Convert.ToBase64String(hash).TrimEnd('=').Replace('+','-').Replace('/','_');
+        var challenge = Convert.ToBase64String(hash).TrimEnd('=').Replace('+', '-').Replace('/', '_');
         return (verifier, challenge);
     }
 

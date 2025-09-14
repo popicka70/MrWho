@@ -73,12 +73,12 @@ public static class WebApplicationExtensions
     public static WebApplication ConfigureAuthenticationEndpoints(this WebApplication app)
     {
         const string adminCookieScheme = "AdminCookies"; // Match the scheme from AddAuthenticationServices
-        
+
         // Logout endpoint
         app.MapGet("/logout", async (HttpContext context, string? returnUrl = null) =>
         {
-            var redirectUri = string.IsNullOrEmpty(returnUrl) || !Uri.IsWellFormedUriString(returnUrl, UriKind.Relative) 
-                ? "/signed-out" 
+            var redirectUri = string.IsNullOrEmpty(returnUrl) || !Uri.IsWellFormedUriString(returnUrl, UriKind.Relative)
+                ? "/signed-out"
                 : returnUrl;
 
             var properties = new AuthenticationProperties
@@ -102,13 +102,13 @@ public static class WebApplicationExtensions
             {
                 await context.SignOutAsync(adminCookieScheme);
                 await context.SignOutAsync(OpenIdConnectDefaults.AuthenticationScheme);
-                
+
                 // Clear all cookies
                 foreach (var cookie in context.Request.Cookies.Keys)
                 {
                     context.Response.Cookies.Delete(cookie);
                 }
-                
+
                 return Results.Redirect("/");
             });
         }

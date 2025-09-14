@@ -218,13 +218,13 @@ public class ScopeSeederService : IScopeSeederService
         {
             // Update existing scope if needed
             var updated = false;
-            
+
             if (existingScope.DisplayName != standardScope.DisplayName)
             {
                 existingScope.DisplayName = standardScope.DisplayName;
                 updated = true;
             }
-            
+
             if (existingScope.Description != standardScope.Description)
             {
                 existingScope.Description = standardScope.Description;
@@ -318,13 +318,13 @@ public class ScopeSeederService : IScopeSeederService
         {
             // Update existing identity resource if needed
             var updated = false;
-            
+
             if (existing.DisplayName != identityResource.DisplayName)
             {
                 existing.DisplayName = identityResource.DisplayName;
                 updated = true;
             }
-            
+
             if (existing.Description != identityResource.Description)
             {
                 existing.Description = identityResource.Description;

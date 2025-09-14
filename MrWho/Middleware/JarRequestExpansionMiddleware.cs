@@ -5,13 +5,13 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.JsonWebTokens; // added for JsonWebTokenHandler
 using Microsoft.IdentityModel.Tokens;
 using MrWho.Data;
+using MrWho.Options; // ensure options namespace if needed
 using MrWho.Services;
 using MrWho.Shared;
 using OpenIddict.Abstractions;
-using Microsoft.IdentityModel.JsonWebTokens; // added for JsonWebTokenHandler
-using MrWho.Options; // ensure options namespace if needed
 
 namespace MrWho.Middleware;
 

@@ -14,7 +14,7 @@ public interface IUserRealmValidationService
     /// <param name="clientId">The client ID the user is trying to access</param>
     /// <returns>True if the user can access the client, false otherwise</returns>
     Task<bool> CanUserAccessClientAsync(IdentityUser user, string clientId);
-    
+
     /// <summary>
     /// Gets the realm restriction information for a user and client
     /// </summary>

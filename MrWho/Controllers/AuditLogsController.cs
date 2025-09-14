@@ -99,7 +99,7 @@ public class AuditLogsController : ControllerBase
         });
     }
 
-    [HttpGet("entity-types")] 
+    [HttpGet("entity-types")]
     public async Task<ActionResult<IEnumerable<string>>> GetEntityTypes()
     {
         var types = await _context.AuditLogs
@@ -111,7 +111,7 @@ public class AuditLogsController : ControllerBase
         return Ok(types);
     }
 
-    [HttpGet("actions")] 
+    [HttpGet("actions")]
     public ActionResult<IEnumerable<string>> GetActions()
     {
         var values = Enum.GetNames(typeof(AuditAction));

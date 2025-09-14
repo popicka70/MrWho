@@ -1,10 +1,10 @@
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.Extensions.Options;
-using OpenIddict.Validation.AspNetCore;
 using System.Security.Claims;
-using MrWho.Shared;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.Extensions.Options;
+using MrWho.Shared;
+using OpenIddict.Validation.AspNetCore;
 
 namespace MrWho.Services;
 

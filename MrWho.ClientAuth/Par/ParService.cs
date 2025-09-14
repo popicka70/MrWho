@@ -1,9 +1,9 @@
 using System.Net.Http.Headers;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Web;
 using MrWho.ClientAuth.Jar;
-using System.Security.Cryptography;
 
 namespace MrWho.ClientAuth.Par;
 
@@ -25,7 +25,7 @@ internal sealed class PushedAuthorizationService : IPushedAuthorizationService
     private static string GenerateNonce(int bytes = 16)
     {
         var data = RandomNumberGenerator.GetBytes(bytes);
-        var b64 = Convert.ToBase64String(data).Replace('+','-').Replace('/','_').TrimEnd('=');
+        var b64 = Convert.ToBase64String(data).Replace('+', '-').Replace('/', '_').TrimEnd('=');
         return b64;
     }
 

@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore; // added for EF operations
+using MrWho.Data; // added
 using MrWho.Models;
 using MrWho.Shared.Models;
-using MrWho.Data; // added
-using Microsoft.EntityFrameworkCore; // added for EF operations
 
 namespace MrWho.Handlers.Users;
 
@@ -63,7 +63,7 @@ public class CreateUserHandler : ICreateUserHandler
                 }
 
                 _logger.LogInformation("Successfully created user {UserName} with ID {UserId}", user.UserName, user.Id);
-                
+
                 var userDto = new UserDto
                 {
                     Id = user.Id,

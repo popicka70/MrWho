@@ -1,10 +1,10 @@
+using System.Data.Common;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.Extensions.Options;
 using MrWho.Data;
 using OpenIddict.Client;
-using System.Data.Common;
 
 namespace MrWho.Services;
 

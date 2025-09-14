@@ -1,18 +1,18 @@
+using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 using Fido2NetLib;
 using Fido2NetLib.Objects;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using MrWho.Data;
 using MrWho.Models;
-using System.Security.Claims;
-using System.Text;
-using Microsoft.AspNetCore.WebUtilities;
 using MrWho.Services;
-using System.Security.Cryptography;
-using Microsoft.AspNetCore.DataProtection;
 
 namespace MrWho.Controllers;
 
@@ -113,8 +113,11 @@ public class WebAuthnController : Controller
         CredentialCreateOptions options;
         dynamic f = _fido2;
         try { options = f.RequestNewCredential(fidoUser, exclude, authSel, AttestationConveyancePreference.None, null); }
-        catch { try { options = f.RequestNewCredential(fidoUser, exclude, authSel, AttestationConveyancePreference.None); }
-            catch { options = f.RequestNewCredential(fidoUser, exclude); } }
+        catch
+        {
+            try { options = f.RequestNewCredential(fidoUser, exclude, authSel, AttestationConveyancePreference.None); }
+            catch { options = f.RequestNewCredential(fidoUser, exclude); }
+        }
 
         _attestationOptions[user.Id] = options;
         return Json(options);

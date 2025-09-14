@@ -25,7 +25,7 @@ public class ClientsController : ControllerBase
     private readonly ISymmetricSecretPolicy _symmetricPolicy; // added
 
     public ClientsController(
-        ApplicationDbContext context, 
+        ApplicationDbContext context,
         ILogger<ClientsController> logger,
         IOpenIddictApplicationManager applicationManager,
         UserManager<IdentityUser> userManager,
@@ -99,7 +99,7 @@ public class ClientsController : ControllerBase
 
         if (!string.IsNullOrWhiteSpace(search))
         {
-            query = query.Where(c => c.ClientId.Contains(search) || 
+            query = query.Where(c => c.ClientId.Contains(search) ||
                                    c.Name.Contains(search) ||
                                    (c.Description != null && c.Description.Contains(search)));
         }
@@ -1021,7 +1021,7 @@ public class ClientsController : ControllerBase
                 {
                     await _clientSecretService.SetNewSecretAsync(client.Id, providedPlaintext: request.ClientSecret);
                 }
-                
+
                 // Create OpenIddict application only if valid
                 if (!requiresSecret || !string.IsNullOrWhiteSpace(request.ClientSecret))
                 {
@@ -1395,8 +1395,8 @@ public class ClientsController : ControllerBase
             ClientId = client.ClientId,
             ClientSecret = request.ClientSecret, // use plaintext provided at creation
             DisplayName = client.Name,
-            ClientType = client.ClientType == ClientType.Public 
-                ? OpenIddictConstants.ClientTypes.Public 
+            ClientType = client.ClientType == ClientType.Public
+                ? OpenIddictConstants.ClientTypes.Public
                 : OpenIddictConstants.ClientTypes.Confidential
         };
 

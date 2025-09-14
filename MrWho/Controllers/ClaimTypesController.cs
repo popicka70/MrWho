@@ -3,8 +3,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MrWho.Data;
 using MrWho.Models;
-using MrWho.Shared.Models;
 using MrWho.Shared; // Added for AuthorizationPolicies
+using MrWho.Shared.Models;
 
 namespace MrWho.Controllers;
 

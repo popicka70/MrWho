@@ -31,7 +31,7 @@ public class ClientTypesApiService : IClientTypesApiService
         try
         {
             var response = await _httpClient.GetAsync("api/clienttypes");
-            
+
             if (response.IsSuccessStatusCode)
             {
                 var result = await response.Content.ReadFromJsonAsync<IEnumerable<ClientTypeInfoDto>>();
@@ -56,7 +56,7 @@ public class ClientTypesApiService : IClientTypesApiService
         try
         {
             var response = await _httpClient.GetAsync($"api/clienttypes/{type}");
-            
+
             if (response.IsSuccessStatusCode)
             {
                 var result = await response.Content.ReadFromJsonAsync<ClientTypeInfoDto>();

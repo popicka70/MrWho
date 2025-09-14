@@ -27,7 +27,7 @@ public class Realm
     // ============================================================================
     // DEFAULT TOKEN LIFETIME CONFIGURATION (REALM-LEVEL DEFAULTS)
     // ============================================================================
-    
+
     public TimeSpan AccessTokenLifetime { get; set; } = TimeSpan.FromMinutes(60);
     public TimeSpan RefreshTokenLifetime { get; set; } = TimeSpan.FromDays(30);
     public TimeSpan AuthorizationCodeLifetime { get; set; } = TimeSpan.FromMinutes(10);

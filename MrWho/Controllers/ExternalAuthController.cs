@@ -1,12 +1,12 @@
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Mvc;
-using OpenIddict.Client.AspNetCore;
-using Microsoft.AspNetCore.Identity;
 using System.Security.Claims;
-using MrWho.Services;
-using MrWho.Data;
-using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using MrWho.Data;
+using MrWho.Services;
+using OpenIddict.Client.AspNetCore;
 
 namespace MrWho.Controllers;
 

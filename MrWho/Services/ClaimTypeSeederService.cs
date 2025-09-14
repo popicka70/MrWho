@@ -1,8 +1,8 @@
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using MrWho.Data;
 using MrWho.Models;
 using MrWho.Shared.Models;
-using System.Globalization;
 
 namespace MrWho.Services;
 

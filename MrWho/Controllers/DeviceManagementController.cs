@@ -1,11 +1,11 @@
+using System.ComponentModel.DataAnnotations;
+using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using MrWho.Models;
 using MrWho.Services;
 using MrWho.Shared;
-using System.ComponentModel.DataAnnotations;
-using System.Text.Json;
 
 namespace MrWho.Controllers;
 
@@ -67,9 +67,9 @@ public class DeviceManagementController : ControllerBase
             };
 
             var device = await _deviceService.RegisterDeviceAsync(user.Id, deviceRequest);
-            
+
             _logger.LogInformation("Device {DeviceId} registered for user {UserId}", device.DeviceId, user.Id);
-            
+
             return Ok(MapToDto(device));
         }
         catch (Exception ex)
@@ -178,7 +178,7 @@ public class DeviceManagementController : ControllerBase
         if (!success)
             return NotFound();
 
-        _logger.LogInformation("Device {DeviceId} trusted status set to {Trusted} for user {UserId}", 
+        _logger.LogInformation("Device {DeviceId} trusted status set to {Trusted} for user {UserId}",
             deviceId, request.IsTrusted, user.Id);
         return NoContent();
     }
@@ -229,11 +229,11 @@ public class DeviceManagementController : ControllerBase
         try
         {
             var sessionInfo = await _qrService.GetQrSessionInfoAsync(token);
-            
+
             return Ok(new QrSessionStatusResponse
             {
                 Status = sessionInfo.Status.ToString(),
-                IsApproved = sessionInfo.Status == QrSessionStatusEnum.Approved || 
+                IsApproved = sessionInfo.Status == QrSessionStatusEnum.Approved ||
                            sessionInfo.Status == QrSessionStatusEnum.Completed,
                 ApprovedAt = sessionInfo.ApprovedAt,
                 DeviceName = sessionInfo.DeviceName,
@@ -267,7 +267,7 @@ public class DeviceManagementController : ControllerBase
             if (!success)
                 return BadRequest(new { error = "Failed to approve QR session. Session may be expired or device invalid." });
 
-            _logger.LogInformation("QR session {Token} approved by user {UserId} with device {DeviceId}", 
+            _logger.LogInformation("QR session {Token} approved by user {UserId} with device {DeviceId}",
                 token, user.Id, request.DeviceId);
 
             return Ok(new { message = "QR session approved successfully" });
@@ -295,7 +295,7 @@ public class DeviceManagementController : ControllerBase
             if (!success)
                 return BadRequest(new { error = "Failed to reject QR session. Session may be expired or device invalid." });
 
-            _logger.LogInformation("QR session {Token} rejected by user {UserId} with device {DeviceId}", 
+            _logger.LogInformation("QR session {Token} rejected by user {UserId} with device {DeviceId}",
                 token, user.Id, request.DeviceId);
 
             return Ok(new { message = "QR session rejected successfully" });
@@ -361,7 +361,7 @@ public class DeviceManagementController : ControllerBase
 
         await _deviceService.MarkDeviceCompromisedAsync(deviceId, request.Reason);
 
-        _logger.LogWarning("Device {DeviceId} marked as compromised by user {UserId}: {Reason}", 
+        _logger.LogWarning("Device {DeviceId} marked as compromised by user {UserId}: {Reason}",
             deviceId, user.Id, request.Reason);
 
         return Ok(new { message = "Device marked as compromised and deactivated" });
@@ -423,24 +423,24 @@ public class RegisterDeviceApiRequest
 {
     [Required]
     public string DeviceId { get; set; } = string.Empty;
-    
+
     [Required]
     public string DeviceName { get; set; } = string.Empty;
-    
+
     public DeviceType DeviceType { get; set; } = DeviceType.Unknown;
-    
+
     public string? OperatingSystem { get; set; }
-    
+
     public bool IsTrusted { get; set; } = false;
-    
+
     public bool CanApproveLogins { get; set; } = true;
-    
+
     public string? PushToken { get; set; }
-    
+
     public string? PublicKey { get; set; }
-    
+
     public DateTime? ExpiresAt { get; set; }
-    
+
     public object? Metadata { get; set; }
 }
 

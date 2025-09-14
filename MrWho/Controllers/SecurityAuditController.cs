@@ -1,11 +1,11 @@
+using System.Security.Cryptography;
+using System.Text;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MrWho.Data;
 using MrWho.Models;
 using MrWho.Services;
-using System.Security.Cryptography;
-using System.Text;
 
 namespace MrWho.Controllers;
 

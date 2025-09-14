@@ -58,7 +58,7 @@ public sealed class CorrelationMiddleware
             context.Response.Body.Position = pos; // restore
         }
 
-        using (_logger.BeginScope(new Dictionary<string, object>{{"CorrelationId", correlationId},{"ActorType", actorType},{"ActorUserId", userId ?? string.Empty},{"ActorClientId", clientId ?? string.Empty}}))
+        using (_logger.BeginScope(new Dictionary<string, object> { { "CorrelationId", correlationId }, { "ActorType", actorType }, { "ActorUserId", userId ?? string.Empty }, { "ActorClientId", clientId ?? string.Empty } }))
         {
             await _next(context);
         }
@@ -67,6 +67,6 @@ public sealed class CorrelationMiddleware
     private static string GenerateId()
     {
         var bytes = System.Security.Cryptography.RandomNumberGenerator.GetBytes(12);
-        return Convert.ToBase64String(bytes).Replace('+','-').Replace('/','_').TrimEnd('=');
+        return Convert.ToBase64String(bytes).Replace('+', '-').Replace('/', '_').TrimEnd('=');
     }
 }

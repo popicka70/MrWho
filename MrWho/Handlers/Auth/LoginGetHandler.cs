@@ -5,12 +5,12 @@ using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using MrWho.Data;
+using MrWho.Options;
 using MrWho.Services;
 using MrWho.Services.Mediator;
 using OpenIddict.Abstractions;
-using Microsoft.Extensions.Options;
-using MrWho.Options;
 
 namespace MrWho.Handlers.Auth;
 
@@ -144,11 +144,11 @@ public sealed class LoginGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Login
                     if (showClientLogo && !string.IsNullOrWhiteSpace(clientLogo))
                     {
                         logoUri = clientLogo;
-                      }
-                      else if (!string.IsNullOrWhiteSpace(client.Realm?.RealmLogoUri))
-                      {
+                    }
+                    else if (!string.IsNullOrWhiteSpace(client.Realm?.RealmLogoUri))
+                    {
                         logoUri = client.Realm!.RealmLogoUri;
-                      }
+                    }
                 }
                 catch (Exception ex)
                 {

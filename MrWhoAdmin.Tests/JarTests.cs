@@ -8,7 +8,7 @@ using Microsoft.IdentityModel.Tokens;
 namespace MrWhoAdmin.Tests;
 
 [TestClass]
-[TestCategory("OIDC")] 
+[TestCategory("OIDC")]
 public class JarTests
 {
     private const string DemoClientId = "mrwho_demo1";

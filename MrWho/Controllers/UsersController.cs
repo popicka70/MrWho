@@ -1,14 +1,14 @@
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using MrWho.Models;
-using MrWho.Handlers.Users;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
-using MrWho.Shared.Models;
-using MrWho.Shared;
-using System.Security.Claims;
 using System.Globalization;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using MrWho.Data;
+using MrWho.Handlers.Users;
+using MrWho.Models;
+using MrWho.Shared;
+using MrWho.Shared.Models;
 
 namespace MrWho.Controllers;
 
@@ -261,7 +261,7 @@ public class UsersController : ControllerBase
             return BadRequest(ModelState);
         }
 
-        _logger.LogInformation("Successfully added claim '{ClaimType}' with value '{ClaimValue}' to user {UserName}", 
+        _logger.LogInformation("Successfully added claim '{ClaimType}' with value '{ClaimValue}' to user {UserName}",
             request.ClaimType, request.ClaimValue, user.UserName);
 
         return Ok($"Claim '{request.ClaimType}' added to user '{user.UserName}' successfully.");
@@ -287,7 +287,7 @@ public class UsersController : ControllerBase
         // Check if claim exists
         var existingClaims = await _userManager.GetClaimsAsync(user);
         var claimToRemove = existingClaims.FirstOrDefault(c => c.Type == request.ClaimType && c.Value == request.ClaimValue);
-        
+
         if (claimToRemove == null)
         {
             return NotFound($"User does not have claim '{request.ClaimType}' with value '{request.ClaimValue}'.");
@@ -304,7 +304,7 @@ public class UsersController : ControllerBase
             return BadRequest(ModelState);
         }
 
-        _logger.LogInformation("Successfully removed claim '{ClaimType}' with value '{ClaimValue}' from user {UserName}", 
+        _logger.LogInformation("Successfully removed claim '{ClaimType}' with value '{ClaimValue}' from user {UserName}",
             request.ClaimType, request.ClaimValue, user.UserName);
 
         return Ok($"Claim '{request.ClaimType}' removed from user '{user.UserName}' successfully.");
@@ -330,7 +330,7 @@ public class UsersController : ControllerBase
         // Check if old claim exists
         var existingClaims = await _userManager.GetClaimsAsync(user);
         var oldClaim = existingClaims.FirstOrDefault(c => c.Type == request.OldClaimType && c.Value == request.OldClaimValue);
-        
+
         if (oldClaim == null)
         {
             return NotFound($"User does not have claim '{request.OldClaimType}' with value '{request.OldClaimValue}'.");
@@ -357,7 +357,7 @@ public class UsersController : ControllerBase
             return BadRequest(ModelState);
         }
 
-        _logger.LogInformation("Successfully updated claim for user {UserName} from '{OldType}:{OldValue}' to '{NewType}:{NewValue}'", 
+        _logger.LogInformation("Successfully updated claim for user {UserName} from '{OldType}:{OldValue}' to '{NewType}:{NewValue}'",
             user.UserName, request.OldClaimType, request.OldClaimValue, request.NewClaimType, request.NewClaimValue);
 
         return Ok($"Claim updated successfully for user '{user.UserName}'.");

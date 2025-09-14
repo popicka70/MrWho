@@ -2,21 +2,21 @@ using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Extensions;
+using Microsoft.AspNetCore.Http.Features; // added for session feature check
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
+using MrWho.Data;
+using MrWho.Options;
 using MrWho.Services;
 using MrWho.Services.Mediator;
 using OpenIddict.Abstractions;
 using OpenIddict.Client.AspNetCore;
 using OpenIddict.Server.AspNetCore;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
-using MrWho.Data;
-using MrWho.Options;
-using Microsoft.AspNetCore.Http.Features; // added for session feature check
 
 namespace MrWho.Handlers.Auth;
 

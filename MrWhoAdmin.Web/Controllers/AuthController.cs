@@ -2,8 +2,8 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using MrWhoAdmin.Web.Services;
 using MrWhoAdmin.Web.Extensions;
+using MrWhoAdmin.Web.Services;
 
 namespace MrWhoAdmin.Web.Controllers;
 

@@ -12,12 +12,12 @@ public enum ClientType
     /// Confidential client - can securely store credentials
     /// </summary>
     Confidential = 0,
-    
+
     /// <summary>
     /// Public client - cannot securely store credentials
     /// </summary>
     Public = 1,
-    
+
     /// <summary>
     /// Machine-to-machine client
     /// </summary>

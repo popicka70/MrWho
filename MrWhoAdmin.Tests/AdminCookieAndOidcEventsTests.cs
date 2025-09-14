@@ -1,11 +1,11 @@
+using System.Globalization;
+using System.Linq;
 using System.Security.Claims;
 using System.Text.Json;
-using Microsoft.AspNetCore.Authentication.OpenIdConnect;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Http;
-using System.Linq;
-using System.Globalization;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace MrWhoAdmin.Tests;
 
@@ -35,7 +35,7 @@ public class AdminCookieAndOidcEventsTests
                         if (prop.Value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined) continue;
                         bool Already(string type, string val) => identity.HasClaim(c => c.Type == type && c.Value == val);
                         void Add(string type, string val)
-                        { if (!string.IsNullOrWhiteSpace(val) && !Already(type,val)) identity.AddClaim(new Claim(type,val)); }
+                        { if (!string.IsNullOrWhiteSpace(val) && !Already(type, val)) identity.AddClaim(new Claim(type, val)); }
                         switch (prop.Value.ValueKind)
                         {
                             case JsonValueKind.String:
@@ -69,13 +69,13 @@ public class AdminCookieAndOidcEventsTests
     public async Task Oidc_OnUserInformationReceived_Projects_All_Supported_ValueKinds_And_Suppresses_Duplicates()
     {
         var (oidcEvents, sp) = Create();
-        var identity = new ClaimsIdentity(new[] { new Claim("sub","abc") }, "oidc");
+        var identity = new ClaimsIdentity(new[] { new Claim("sub", "abc") }, "oidc");
         var principal = new ClaimsPrincipal(identity);
         var json = "{\n  \"stringClaim\": \"value1\",\n  \"boolClaim\": true,\n  \"numClaim\": 123,\n  \"arrayClaim\": [\"a\", \"b\", true],\n  \"objClaim\": { \"nested\": 42 },\n  \"stringClaim\": \"value1\"\n}"; // duplicate stringClaim intentionally
         using var userInfoDoc = JsonDocument.Parse(json);
         var httpContext = new DefaultHttpContext { RequestServices = sp };
         var options = new OpenIdConnectOptions();
-        var evtCtx = new UserInformationReceivedContext(httpContext, new AuthenticationScheme("oidc","oidc", typeof(OpenIdConnectHandler)), options, principal, new AuthenticationProperties())
+        var evtCtx = new UserInformationReceivedContext(httpContext, new AuthenticationScheme("oidc", "oidc", typeof(OpenIdConnectHandler)), options, principal, new AuthenticationProperties())
         { User = userInfoDoc };
         await oidcEvents.OnUserInformationReceived!(evtCtx);
         string? Find(string type) => identity.Claims.FirstOrDefault(c => c.Type == type)?.Value;

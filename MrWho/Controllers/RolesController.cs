@@ -1,10 +1,10 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MrWho.Shared;
 using MrWho.Shared.Models;
-using System.Security.Claims;
 
 namespace MrWho.Controllers;
 
@@ -206,12 +206,12 @@ public class RolesController : ControllerBase
         {
             var claims = await _roleManager.GetClaimsAsync(role);
             var existingDescriptionClaim = claims.FirstOrDefault(c => c.Type == "description");
-            
+
             if (existingDescriptionClaim != null)
             {
                 await _roleManager.RemoveClaimAsync(role, existingDescriptionClaim);
             }
-            
+
             if (!string.IsNullOrEmpty(request.Description))
             {
                 await _roleManager.AddClaimAsync(role, new Claim("description", request.Description));
@@ -223,12 +223,12 @@ public class RolesController : ControllerBase
         {
             var claims = await _roleManager.GetClaimsAsync(role);
             var existingEnabledClaim = claims.FirstOrDefault(c => c.Type == "enabled");
-            
+
             if (existingEnabledClaim != null)
             {
                 await _roleManager.RemoveClaimAsync(role, existingEnabledClaim);
             }
-            
+
             await _roleManager.AddClaimAsync(role, new Claim("enabled", request.IsEnabled.Value.ToString()));
         }
 
@@ -403,12 +403,12 @@ public class RolesController : ControllerBase
 
         // Get all users in the role (identity API returns list already in-memory)
         var usersInRole = await _userManager.GetUsersInRoleAsync(role.Name!);
-        
+
         // Apply search filter if provided
         IEnumerable<IdentityUser> filteredUsers = usersInRole;
         if (!string.IsNullOrWhiteSpace(search))
         {
-            filteredUsers = usersInRole.Where(u => 
+            filteredUsers = usersInRole.Where(u =>
                 (u.UserName != null && u.UserName.IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0) ||
                 (u.Email != null && u.Email.IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0));
         }
@@ -444,7 +444,7 @@ public class RolesController : ControllerBase
             TotalPages = (int)Math.Ceiling(totalCount / (double)pageSize)
         };
 
-        _logger.LogInformation("Retrieved {UserCount} users for role '{RoleName}' (page {Page})", 
+        _logger.LogInformation("Retrieved {UserCount} users for role '{RoleName}' (page {Page})",
             pagedUsers.Count, role.Name, page);
 
         return Ok(result);

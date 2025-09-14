@@ -117,7 +117,7 @@ public class JarNegativeAndEdgeTests
         if ((int)first.StatusCode >= 400)
         {
             var bodyFirst = await first.Content.ReadAsStringAsync();
-            Assert.Inconclusive($"Initial JAR use unexpectedly failed (status {(int)first.StatusCode}). Body snippet: {bodyFirst[..Math.Min(bodyFirst.Length,120)]}");
+            Assert.Inconclusive($"Initial JAR use unexpectedly failed (status {(int)first.StatusCode}). Body snippet: {bodyFirst[..Math.Min(bodyFirst.Length, 120)]}");
         }
 
         var second = await SendAuthorizeAsync(http, jar, DemoClientId);
@@ -173,7 +173,7 @@ public class JarNegativeAndEdgeTests
         if (resp.StatusCode == HttpStatusCode.BadRequest)
         {
             var body = await resp.Content.ReadAsStringAsync();
-            Assert.Inconclusive($"Near-exp (60s) JAR was rejected (400). Treating as inconclusive due to environment timing/policy. Body snippet: {body[..Math.Min(body.Length,120)]}");
+            Assert.Inconclusive($"Near-exp (60s) JAR was rejected (400). Treating as inconclusive due to environment timing/policy. Body snippet: {body[..Math.Min(body.Length, 120)]}");
         }
         Assert.IsTrue(IsAcceptableAuthRedirect(resp) || resp.StatusCode == HttpStatusCode.Redirect || resp.StatusCode == HttpStatusCode.OK,
             $"Near-exp (60s) JAR should pass validation. Got {resp.StatusCode}");

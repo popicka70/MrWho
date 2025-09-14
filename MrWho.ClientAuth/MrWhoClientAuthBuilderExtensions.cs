@@ -1,15 +1,15 @@
 using System.Net.Http;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging; // add logging extensions
 using Microsoft.IdentityModel.Protocols;
 using Microsoft.IdentityModel.Protocols.OpenIdConnect;
-using System.Security.Claims;
 using Microsoft.IdentityModel.Tokens;
 using MrWho.ClientAuth.Jar;
 using MrWho.ClientAuth.Par; // NEW PAR
-using Microsoft.Extensions.Logging; // add logging extensions
 
 namespace MrWho.ClientAuth;
 
@@ -77,17 +77,17 @@ public static class MrWhoClientAuthBuilderExtensions
             oidc.ConfigurationManager = new ConfigurationManager<OpenIdConnectConfiguration>(metadata, new OpenIdConnectConfigurationRetriever(), httpRetriever);
 
             oidc.ClaimActions.Clear();
-            foreach (var claim in new[] { "iss","aud","exp","iat","nonce","at_hash","azp","oi_au_id","oi_tbn_id" }) oidc.ClaimActions.DeleteClaim(claim);
-            oidc.ClaimActions.MapJsonKey("sub","sub");
-            oidc.ClaimActions.MapJsonKey("name","name");
-            oidc.ClaimActions.MapJsonKey("given_name","given_name");
-            oidc.ClaimActions.MapJsonKey("family_name","family_name");
-            oidc.ClaimActions.MapJsonKey("email","email");
-            oidc.ClaimActions.MapJsonKey("email_verified","email_verified");
-            oidc.ClaimActions.MapJsonKey("preferred_username","preferred_username");
-            oidc.ClaimActions.MapJsonKey("phone_number","phone_number");
-            oidc.ClaimActions.MapJsonKey("phone_number_verified","phone_number_verified");
-            oidc.ClaimActions.MapJsonKey("role","role");
+            foreach (var claim in new[] { "iss", "aud", "exp", "iat", "nonce", "at_hash", "azp", "oi_au_id", "oi_tbn_id" }) oidc.ClaimActions.DeleteClaim(claim);
+            oidc.ClaimActions.MapJsonKey("sub", "sub");
+            oidc.ClaimActions.MapJsonKey("name", "name");
+            oidc.ClaimActions.MapJsonKey("given_name", "given_name");
+            oidc.ClaimActions.MapJsonKey("family_name", "family_name");
+            oidc.ClaimActions.MapJsonKey("email", "email");
+            oidc.ClaimActions.MapJsonKey("email_verified", "email_verified");
+            oidc.ClaimActions.MapJsonKey("preferred_username", "preferred_username");
+            oidc.ClaimActions.MapJsonKey("phone_number", "phone_number");
+            oidc.ClaimActions.MapJsonKey("phone_number_verified", "phone_number_verified");
+            oidc.ClaimActions.MapJsonKey("role", "role");
 
             oidc.Events = new OpenIdConnectEvents
             {

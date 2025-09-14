@@ -1,11 +1,11 @@
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using MrWho.Data;
+using MrWho.Models; // ensure access to Realm, Scope, ScopeClaim
 using MrWho.Shared;
 using MrWho.Shared.Models;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using MrWho.Data;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.Identity;
-using MrWho.Models; // ensure access to Realm, Scope, ScopeClaim
 
 namespace MrWho.Controllers;
 
@@ -55,7 +55,7 @@ public class RealmsController : ControllerBase
                 DefaultJarMode = r.DefaultJarMode,
                 DefaultJarmMode = r.DefaultJarmMode
             }).ToListAsync();
-        return Ok(new PagedResult<RealmDto>{ Items = realms, TotalCount = totalCount, Page = page, PageSize = pageSize, TotalPages = (int)Math.Ceiling(totalCount / (double)pageSize)});
+        return Ok(new PagedResult<RealmDto> { Items = realms, TotalCount = totalCount, Page = page, PageSize = pageSize, TotalPages = (int)Math.Ceiling(totalCount / (double)pageSize) });
     }
 
     // ===================== GET =====================
@@ -577,7 +577,7 @@ public class RealmsController : ControllerBase
     public async Task<ActionResult<RealmDto>> CreateRealm([FromBody] CreateRealmRequest request)
     {
         if (!ModelState.IsValid) return ValidationProblem(ModelState);
-        if (await _context.Realms.AnyAsync(r => r.Name == request.Name)) { ModelState.AddModelError(nameof(request.Name), "A realm with this name already exists."); return ValidationProblem(ModelState);}        
+        if (await _context.Realms.AnyAsync(r => r.Name == request.Name)) { ModelState.AddModelError(nameof(request.Name), "A realm with this name already exists."); return ValidationProblem(ModelState); }
         var now = DateTime.UtcNow; var userName = User?.Identity?.Name;
         var realm = new Realm { Name = request.Name, DisplayName = request.DisplayName, Description = request.Description, IsEnabled = request.IsEnabled, AccessTokenLifetime = request.AccessTokenLifetime, RefreshTokenLifetime = request.RefreshTokenLifetime, AuthorizationCodeLifetime = request.AuthorizationCodeLifetime, CreatedAt = now, UpdatedAt = now, CreatedBy = userName, UpdatedBy = userName };
         _context.Realms.Add(realm); await _context.SaveChangesAsync();

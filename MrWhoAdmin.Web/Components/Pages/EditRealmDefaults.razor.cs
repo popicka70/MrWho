@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Components;
-using MrWho.Shared.Models;
-using Radzen;
-using MrWhoAdmin.Web.Services;
 using MrWho.Shared; // added for enums
+using MrWho.Shared.Models;
+using MrWhoAdmin.Web.Services;
+using Radzen;
 
 namespace MrWhoAdmin.Web.Components.Pages;
 
@@ -222,7 +222,7 @@ public partial class EditRealmDefaults
 
     internal async Task ResetToSystemDefaults()
     {
-        var ok = await DialogService.Confirm("Reset all realm defaults to system-wide defaults?", "Reset to System Defaults", new ConfirmOptions(){OkButtonText="Reset",CancelButtonText="Cancel"});
+        var ok = await DialogService.Confirm("Reset all realm defaults to system-wide defaults?", "Reset to System Defaults", new ConfirmOptions() { OkButtonText = "Reset", CancelButtonText = "Cancel" });
         if (ok != true) return;
         // Token lifetimes
         model.AccessTokenLifetime = MrWho.Shared.MrWhoConstants.TokenLifetimes.AccessToken;

@@ -17,10 +17,10 @@ public static class TestConfiguration
     {
         // Option 1: Use shared test database (faster, but requires careful test design)
         services.AddSharedTestDatabase();
-        
+
         // Option 2: Use isolated test database (slower, but each test is completely isolated)
         // services.AddIsolatedTestDatabase();
-        
+
         // Option 3: Custom configuration
         // services.AddTestDatabaseConfiguration(options =>
         // {

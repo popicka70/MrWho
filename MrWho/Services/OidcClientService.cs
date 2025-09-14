@@ -1,12 +1,12 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using MrWho.Data;
 using MrWho.Models;
+using MrWho.Options;
 using MrWho.Shared;
 using OpenIddict.Abstractions;
 using OpenIddict.EntityFrameworkCore.Models;
-using Microsoft.Extensions.Options;
-using MrWho.Options;
 
 namespace MrWho.Services;
 
@@ -521,7 +521,7 @@ public partial class OidcClientService : IOidcClientService
         }
         else
         {
-            var legacy = demo1Client.Permissions.Where(p => p.Permission.StartsWith("oidc:scope:") || (p.Permission.StartsWith("api." ) && !p.Permission.StartsWith("scp:")) || p.Permission == "scp:openid").ToList();
+            var legacy = demo1Client.Permissions.Where(p => p.Permission.StartsWith("oidc:scope:") || (p.Permission.StartsWith("api.") && !p.Permission.StartsWith("scp:")) || p.Permission == "scp:openid").ToList();
             if (legacy.Any()) { _context.ClientPermissions.RemoveRange(legacy); await _context.SaveChangesAsync(); }
 
             // Backfill ParMode for demo1 if missing
@@ -930,7 +930,7 @@ public partial class OidcClientService : IOidcClientService
         else
         {
             // Clean legacy permissions
-            var legacy = defaultClient.Permissions.Where(p => p.Permission.StartsWith("oidc:scope:") || p.Permission == "scp:openid" || p.Permission.StartsWith("scp:email") || p.Permission.StartsWith("scp:profile") || p.Permission.StartsWith("scp:roles") ).ToList();
+            var legacy = defaultClient.Permissions.Where(p => p.Permission.StartsWith("oidc:scope:") || p.Permission == "scp:openid" || p.Permission.StartsWith("scp:email") || p.Permission.StartsWith("scp:profile") || p.Permission.StartsWith("scp:roles")).ToList();
             if (legacy.Any())
             {
                 _context.ClientPermissions.RemoveRange(legacy);

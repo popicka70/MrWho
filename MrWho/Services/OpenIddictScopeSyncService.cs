@@ -63,7 +63,7 @@ public class OpenIddictScopeSyncService : IOpenIddictScopeSyncService
         {
             // Check if scope already exists in OpenIddict
             var existingOpenIddictScope = await _scopeManager.FindByNameAsync(scope.Name);
-            
+
             var descriptor = new OpenIddictScopeDescriptor
             {
                 Name = scope.Name,

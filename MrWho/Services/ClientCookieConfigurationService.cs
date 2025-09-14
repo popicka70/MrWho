@@ -1,14 +1,14 @@
-using Microsoft.AspNetCore.Authentication.Cookies;
-using MrWho.Services;
-using OpenIddict.Abstractions;
-using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore;
-using Microsoft.Extensions.Options;
-using MrWho.Options;
-using MrWho.Data;
-using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using MrWho.Data;
+using MrWho.Options;
+using MrWho.Services;
 using MrWho.Shared.Authentication; // unify naming
+using OpenIddict.Abstractions;
 
 namespace MrWho.Services;
 
@@ -137,7 +137,7 @@ public class ClientCookieConfigurationService : IClientCookieConfigurationServic
 
 
         // Method 5: Check if this is a callback and get from state parameter or stored session
-        if (context.Request.Path.StartsWithSegments("/signin-oidc") || 
+        if (context.Request.Path.StartsWithSegments("/signin-oidc") ||
             context.Request.Path.StartsWithSegments("/connect/authorize"))
         {
             // For callbacks, we might need to store the client_id in session during the initial challenge

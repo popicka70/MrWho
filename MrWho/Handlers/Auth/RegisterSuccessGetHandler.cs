@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
-using MrWho.Services.Mediator;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using MrWho.Data;
 using MrWho.Options;
+using MrWho.Services.Mediator;
 
 namespace MrWho.Handlers.Auth;
 

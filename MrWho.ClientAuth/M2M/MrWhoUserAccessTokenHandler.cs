@@ -1,10 +1,10 @@
+using System.Net.Http.Headers;
+using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System.Net.Http.Headers;
-using System.Text.Json;
 
 namespace MrWho.ClientAuth.M2M;
 

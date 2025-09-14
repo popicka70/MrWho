@@ -1,15 +1,15 @@
+using System.Security.Cryptography; // added for KeyId derivation
+using System.Text.Json; // for JSON array construction
+using Microsoft.EntityFrameworkCore; // added for context queries
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.IdentityModel.JsonWebTokens;
+using Microsoft.IdentityModel.Tokens; // signing
+using MrWho.Data; // for ApplicationDbContext
+using MrWho.Options; // for symmetric policy options
+using MrWho.Shared; // for JarMode enum
+using OpenIddict.Abstractions;
 using OpenIddict.Server;
 using static OpenIddict.Server.OpenIddictServerEvents;
-using Microsoft.Extensions.Caching.Memory;
-using System.Text.Json; // for JSON array construction
-using OpenIddict.Abstractions;
-using Microsoft.IdentityModel.Tokens; // signing
-using Microsoft.IdentityModel.JsonWebTokens;
-using Microsoft.EntityFrameworkCore; // added for context queries
-using MrWho.Options; // for symmetric policy options
-using MrWho.Data; // for ApplicationDbContext
-using MrWho.Shared; // for JarMode enum
-using System.Security.Cryptography; // added for KeyId derivation
 
 namespace MrWho.Services;
 
@@ -297,7 +297,7 @@ internal sealed class JarmAuthorizationResponseHandler : IOpenIddictServerHandle
             }
             response["response"] = jwt;
             _logger.LogDebug("Issued JARM JWT (iss={Issuer}, aud={Aud}, codePresent={HasCode}, errorPresent={HasError}, kid={Kid})", issuer, clientId, !string.IsNullOrEmpty(codeValue), !string.IsNullOrEmpty(errorValue), signingKey.KeyId);
-            try { await _auditWriter.WriteAsync("auth.security", errorValue==null?"jarm.issued":"jarm.error", new { clientId, hasCode = codeValue!=null, error = errorValue, state = stateValue, kid = signingKey.KeyId }, "info", actorClientId: clientId); } catch { }
+            try { await _auditWriter.WriteAsync("auth.security", errorValue == null ? "jarm.issued" : "jarm.error", new { clientId, hasCode = codeValue != null, error = errorValue, state = stateValue, kid = signingKey.KeyId }, "info", actorClientId: clientId); } catch { }
         }
         catch (Exception ex)
         {

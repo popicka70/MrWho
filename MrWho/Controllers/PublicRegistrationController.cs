@@ -1,10 +1,10 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting; // added
 using MrWho.Data;
 using MrWho.Models;
 using MrWho.Shared.Models;
-using Microsoft.AspNetCore.RateLimiting; // added
 
 namespace MrWho.Controllers;
 

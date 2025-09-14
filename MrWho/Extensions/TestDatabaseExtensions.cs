@@ -17,7 +17,7 @@ public static class TestDatabaseExtensions
     /// <param name="configureOptions">Optional configuration for database initialization</param>
     /// <returns>The service collection for chaining</returns>
     public static IServiceCollection AddTestDatabaseConfiguration(
-        this IServiceCollection services, 
+        this IServiceCollection services,
         Action<DatabaseInitializationOptions>? configureOptions = null)
     {
         var options = new DatabaseInitializationOptions
@@ -104,7 +104,7 @@ public static class TestDatabaseExtensions
     {
         using var scope = serviceProvider.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        
+
         // Clear all custom entities first (due to foreign key constraints)
         context.ClientPermissions.RemoveRange(context.ClientPermissions);
         context.ClientScopes.RemoveRange(context.ClientScopes);
@@ -114,7 +114,7 @@ public static class TestDatabaseExtensions
         context.ScopeClaims.RemoveRange(context.ScopeClaims);
         context.Scopes.RemoveRange(context.Scopes);
         context.Realms.RemoveRange(context.Realms);
-        
+
         // Clear Identity entities
         context.UserRoles.RemoveRange(context.UserRoles);
         context.UserClaims.RemoveRange(context.UserClaims);
@@ -123,7 +123,7 @@ public static class TestDatabaseExtensions
         context.RoleClaims.RemoveRange(context.RoleClaims);
         context.Users.RemoveRange(context.Users);
         context.Roles.RemoveRange(context.Roles);
-        
+
         await context.SaveChangesAsync();
     }
 }

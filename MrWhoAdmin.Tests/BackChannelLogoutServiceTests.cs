@@ -1,3 +1,9 @@
+using System.Diagnostics.Metrics;
+using System.Linq;
+using System.Net;
+using System.Net.Http;
+using System.Text;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -7,12 +13,6 @@ using MrWho.Models;
 using MrWho.Services;
 using OpenIddict.Abstractions;
 using OpenIddict.Server;
-using System.Net;
-using System.Net.Http;
-using System.Text;
-using System.Linq;
-using Microsoft.AspNetCore.Http;
-using System.Diagnostics.Metrics;
 
 namespace MrWhoAdmin.Tests;
 
@@ -48,8 +48,8 @@ public class BackChannelLogoutServiceTests
     private sealed class FakeScheduler : IBackChannelLogoutRetryScheduler
     {
         public List<BackChannelLogoutRetryWork> Scheduled { get; } = new();
-        public List<(string clientId,string sessionId,int attempt,bool success,string? status,string? error)> AttemptOutcomes { get; } = new();
-        public List<(string clientId,string sessionId,int attempts)> Exhausted { get; } = new();
+        public List<(string clientId, string sessionId, int attempt, bool success, string? status, string? error)> AttemptOutcomes { get; } = new();
+        public List<(string clientId, string sessionId, int attempts)> Exhausted { get; } = new();
         public void ScheduleRetry(BackChannelLogoutRetryWork work) => Scheduled.Add(work with { Attempt = work.Attempt + 1 });
         public void ReportAttemptOutcome(string clientId, string subject, string sessionId, int attempt, bool success, string? status, string? error)
             => AttemptOutcomes.Add((clientId, sessionId, attempt, success, status, error));
@@ -162,15 +162,15 @@ public class BackChannelLogoutServiceTests
     [TestMethod]
     public async Task Metrics_Counters_Increment_For_Success_And_Failure()
     {
-        var listenerValues = new Dictionary<string,long>();
+        var listenerValues = new Dictionary<string, long>();
         using var listener = new MeterListener();
         listener.InstrumentPublished = (inst, l) => { if (inst.Meter.Name == "MrWho.Logout") l.EnableMeasurementEvents(inst); };
         listener.SetMeasurementEventCallback<long>((inst, value, tags, state) =>
         {
-            lock(listenerValues)
+            lock (listenerValues)
             {
-                if(!listenerValues.ContainsKey(inst.Name)) listenerValues[inst.Name]=0;
-                listenerValues[inst.Name]+=value;
+                if (!listenerValues.ContainsKey(inst.Name)) listenerValues[inst.Name] = 0;
+                listenerValues[inst.Name] += value;
             }
         });
         listener.Start();
@@ -184,7 +184,7 @@ public class BackChannelLogoutServiceTests
         // small delay to allow listener to receive callbacks
         await Task.Delay(50);
 
-        lock(listenerValues)
+        lock (listenerValues)
         {
             Assert.IsTrue(listenerValues.TryGetValue("mrwho_logout_backchannel_attempts_total", out var attempts) && attempts >= 2, "Expected at least 2 attempt increments");
             Assert.IsTrue(listenerValues.TryGetValue("mrwho_logout_backchannel_failures_total", out var failures) && failures >= 1, "Expected at least 1 failure increment");
@@ -202,13 +202,13 @@ public class BackChannelLogoutServiceTests
         services.AddDbContext<ApplicationDbContext>(o => o.UseInMemoryDatabase("jwt_signed"));
         var sp = services.BuildServiceProvider();
         var svc = new BackChannelLogoutService(new HttpClientFactoryStub(), sp.GetRequiredService<ILogger<BackChannelLogoutService>>(), sp, sp.GetRequiredService<IOptionsMonitor<OpenIddictServerOptions>>(), null, null, new TestDiagSink());
-        var jwt = await svc.CreateLogoutTokenAsync("clientX","subj","sess123");
+        var jwt = await svc.CreateLogoutTokenAsync("clientX", "subj", "sess123");
         var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
         Assert.IsTrue(handler.CanReadToken(jwt), "Expected readable JWT token");
         var token = handler.ReadJwtToken(jwt);
         Assert.AreEqual("logout+jwt", token.Header[System.IdentityModel.Tokens.Jwt.JwtHeaderParameterNames.Typ]);
-        Assert.AreEqual("subj", token.Claims.First(c=>c.Type=="sub").Value);
-        Assert.AreEqual("sess123", token.Claims.First(c=>c.Type=="sid").Value);
+        Assert.AreEqual("subj", token.Claims.First(c => c.Type == "sub").Value);
+        Assert.AreEqual("sess123", token.Claims.First(c => c.Type == "sid").Value);
         Assert.IsTrue(token.Payload.ContainsKey("events"), "Missing events claim");
     }
 
@@ -222,7 +222,7 @@ public class BackChannelLogoutServiceTests
         services.AddDbContext<ApplicationDbContext>(o => o.UseInMemoryDatabase("jwt_json"));
         var sp = services.BuildServiceProvider();
         var svc = new BackChannelLogoutService(new HttpClientFactoryStub(), sp.GetRequiredService<ILogger<BackChannelLogoutService>>(), sp, sp.GetRequiredService<IOptionsMonitor<OpenIddictServerOptions>>(), null, null, new TestDiagSink());
-        var tokenStr = await svc.CreateLogoutTokenAsync("clientY","user","sidABC");
+        var tokenStr = await svc.CreateLogoutTokenAsync("clientY", "user", "sidABC");
         var handler = new System.IdentityModel.Tokens.Jwt.JwtSecurityTokenHandler();
         Assert.IsFalse(handler.CanReadToken(tokenStr), "Fallback should not be a JWT");
         Assert.IsTrue(tokenStr.Contains("\"events\""), "JSON fallback should contain events field");

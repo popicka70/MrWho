@@ -106,7 +106,7 @@ public class IdentityProvidersController : ControllerBase
     }
 
     // Per-client link management
-    [HttpGet("{id}/clients")] 
+    [HttpGet("{id}/clients")]
     public async Task<ActionResult<IEnumerable<ClientIdentityProviderDto>>> GetClientLinks(string id)
     {
         var links = await _db.ClientIdentityProviders

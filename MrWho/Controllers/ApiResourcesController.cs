@@ -1,11 +1,11 @@
+using System.Text.Json; // added for JSON
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using MrWho.Shared;
 using Microsoft.EntityFrameworkCore;
 using MrWho.Data;
 using MrWho.Models;
+using MrWho.Shared;
 using MrWho.Shared.Models;
-using System.Text.Json; // added for JSON
 
 namespace MrWho.Controllers;
 
@@ -29,8 +29,8 @@ public class ApiResourcesController : ControllerBase
         try
         {
             var arr = JsonSerializer.Deserialize<List<string>>(json) ?? new List<string>();
-            var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase){"access_token","identity_token"};
-            return arr.Where(a=>!string.IsNullOrWhiteSpace(a) && allowed.Contains(a)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "access_token", "identity_token" };
+            return arr.Where(a => !string.IsNullOrWhiteSpace(a) && allowed.Contains(a)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         }
         catch { return new List<string>(); }
     }
@@ -38,8 +38,8 @@ public class ApiResourcesController : ControllerBase
     private static string? SerializeDestinations(IEnumerable<string>? list)
     {
         if (list == null) return null;
-        var filtered = list.Where(l=>!string.IsNullOrWhiteSpace(l)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-        if (filtered.Count==0) return null;
+        var filtered = list.Where(l => !string.IsNullOrWhiteSpace(l)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        if (filtered.Count == 0) return null;
         return JsonSerializer.Serialize(filtered);
     }
 

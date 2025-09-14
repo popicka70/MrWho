@@ -1,5 +1,5 @@
-using MrWho.Shared.Models;
 using System.Text.Json;
+using MrWho.Shared.Models;
 
 namespace MrWhoAdmin.Web.Services;
 

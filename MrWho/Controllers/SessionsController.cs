@@ -1,12 +1,12 @@
-using Microsoft.AspNetCore.Mvc;
-using MrWho.Shared;
+using System.Collections.Immutable;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using OpenIddict.Abstractions;
 using MrWho.Data;
 using MrWho.Services;
-using Microsoft.AspNetCore.Identity;
-using System.Collections.Immutable;
+using MrWho.Shared;
+using OpenIddict.Abstractions;
 
 namespace MrWho.Controllers;
 
@@ -386,7 +386,7 @@ public class SessionsController : ControllerBase
                         if (!string.IsNullOrEmpty(clientId))
                         {
                             clientSessions[clientId] = clientSessions.GetValueOrDefault(clientId, 0) + 1;
-                            
+
                             // Determine session type based on client
                             var sessionType = DetermineSessionType(clientId);
                             sessionTypes[sessionType] = sessionTypes.GetValueOrDefault(sessionType, 0) + 1;
@@ -399,13 +399,13 @@ public class SessionsController : ControllerBase
                 {
                     if (oldestSession == null || creationDate < oldestSession)
                         oldestSession = creationDate;
-                    
+
                     if (newestSession == null || creationDate > newestSession)
                         newestSession = creationDate;
 
                     if (creationDate.Value.DateTime >= todayStart)
                         stats.SessionsToday++;
-                    
+
                     if (creationDate.Value.DateTime >= weekStart)
                         stats.SessionsThisWeek++;
                 }

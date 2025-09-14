@@ -1,20 +1,20 @@
+using System.Security.Claims;
+using System.Web;
 using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using MrWho.Data;
+using MrWho.Endpoints.Auth; // added
+using MrWho.Models;
+using MrWho.Services;
+using MrWho.Services.Mediator; // added
+using MrWho.Shared.Models;
 using OpenIddict.Abstractions;
 using OpenIddict.Server.AspNetCore;
-using MrWho.Services;
-using System.Security.Claims;
-using System.Web;
 using static OpenIddict.Abstractions.OpenIddictConstants;
-using MrWho.Shared.Models;
-using MrWho.Data;
-using MrWho.Models;
-using Microsoft.AspNetCore.RateLimiting;
-using MrWho.Services.Mediator; // added
-using MrWho.Endpoints.Auth; // added
 
 namespace MrWho.Controllers;
 

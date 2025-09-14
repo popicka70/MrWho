@@ -121,7 +121,7 @@ public class DeviceManagementWebController : Controller
 
             if (success)
             {
-                _logger.LogInformation("QR session {Token} {Action} by user {UserId} with device {DeviceId}", 
+                _logger.LogInformation("QR session {Token} {Action} by user {UserId} with device {DeviceId}",
                     token, action, user.Id, deviceId);
                 return View("ApprovalSuccess", model: actionMessage);
             }
@@ -171,9 +171,9 @@ public class DeviceManagementWebController : Controller
             };
 
             var device = await _deviceService.RegisterDeviceAsync(user.Id, request);
-            
+
             _logger.LogInformation("Device {DeviceId} registered via web for user {UserId}", device.DeviceId, user.Id);
-            
+
             TempData["SuccessMessage"] = $"Device '{device.DeviceName}' registered successfully!";
             return RedirectToAction("Index");
         }
@@ -211,7 +211,7 @@ public class DeviceManagementWebController : Controller
             return Challenge();
 
         var success = await _deviceService.RevokeDeviceAsync(user.Id, deviceId);
-        
+
         if (success)
         {
             TempData["SuccessMessage"] = "Device revoked successfully.";

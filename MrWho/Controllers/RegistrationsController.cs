@@ -10,7 +10,7 @@ using MrWho.Shared.Models;
 namespace MrWho.Controllers;
 
 [ApiController]
-[Route("api/registrations")] 
+[Route("api/registrations")]
 [Authorize(Policy = AuthorizationPolicies.AdminClientApi)]
 public class RegistrationsController : ControllerBase
 {

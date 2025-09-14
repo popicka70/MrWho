@@ -1,10 +1,10 @@
-using MrWhoAdmin.Web.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Abstractions;
 using Microsoft.AspNetCore.Routing;
 using MrWho.Shared;
+using MrWhoAdmin.Web.Services;
 
 namespace MrWhoAdmin.Web.Middleware;
 
@@ -26,7 +26,7 @@ public class TokenRefreshMiddleware
     {
         // Only check token refresh for authenticated interactive requests (not API calls)
         // AND avoid refresh during response streaming (Blazor scenarios)
-        if (context.User.Identity?.IsAuthenticated == true && 
+        if (context.User.Identity?.IsAuthenticated == true &&
             IsInteractiveRequest(context) &&
             !IsApiRequest(context) &&
             !context.Response.HasStarted)  // CRITICAL: Don't refresh if response has started
@@ -46,32 +46,32 @@ public class TokenRefreshMiddleware
                     // Check if token needs refreshing (but only on major page navigations, not every request)
                     if (IsMajorPageNavigation(context) && await tokenRefreshService.IsTokenExpiredOrExpiringSoonAsync(context))
                     {
-                        _logger.LogDebug("Token is expired or expiring soon, attempting proactive refresh for path: {Path}", 
+                        _logger.LogDebug("Token is expired or expiring soon, attempting proactive refresh for path: {Path}",
                             context.Request.Path);
-                        
+
                         // Use the new method that can trigger re-authentication
                         var refreshResult = await tokenRefreshService.RefreshTokenWithReauthAsync(context);
-                        
+
                         if (refreshResult.Success)
                         {
-                            _logger.LogInformation("Proactive token refresh successful for path: {Path}", 
+                            _logger.LogInformation("Proactive token refresh successful for path: {Path}",
                                 context.Request.Path);
                         }
                         else if (refreshResult.RequiresReauth)
                         {
-                            _logger.LogWarning("Token refresh failed, triggering re-authentication for path: {Path}. Reason: {Reason}", 
+                            _logger.LogWarning("Token refresh failed, triggering re-authentication for path: {Path}. Reason: {Reason}",
                                 context.Request.Path, refreshResult.Reason);
-                            
+
                             // Instead of executing action result, redirect to auth controller
                             var returnUrl = Uri.EscapeDataString(context.Request.Path);
                             var redirectUrl = $"/auth/check-and-reauth?returnUrl={returnUrl}";
-                            
+
                             context.Response.Redirect(redirectUrl);
                             return;
                         }
                         else
                         {
-                            _logger.LogWarning("Proactive token refresh failed for path: {Path}. Reason: {Reason}", 
+                            _logger.LogWarning("Proactive token refresh failed for path: {Path}. Reason: {Reason}",
                                 context.Request.Path, refreshResult.Reason);
                         }
                     }
@@ -124,9 +124,9 @@ public class TokenRefreshMiddleware
     {
         // Skip refresh on AJAX requests or partial updates
         var headers = context.Request.Headers;
-        
+
         // Check for AJAX indicators
-        if (headers.ContainsKey("X-Requested-With") || 
+        if (headers.ContainsKey("X-Requested-With") ||
             headers.ContainsKey("HX-Request") || // htmx
             headers.ContainsKey("X-CSRF-TOKEN"))
         {

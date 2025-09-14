@@ -1,28 +1,28 @@
+using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Options;
 using MrWho.Data;
 using MrWho.Handlers;
+using MrWho.Handlers.Auth;
 using MrWho.Handlers.Users;
 using MrWho.Options;
 using MrWho.Services;
+using MrWho.Services.Background;
+using MrWho.Services.Mediator;
 using MrWho.Shared;
 using MrWho.Shared.Authentication;
 using OpenIddict.Abstractions;
 using OpenIddict.Client;
 using OpenIddict.Client.AspNetCore;
 using OpenIddict.Client.SystemNetHttp;
-using System.Threading.RateLimiting;
-using Microsoft.AspNetCore.Hosting;
-using MrWho.Handlers.Auth;
-using MrWho.Services.Mediator;
-using Microsoft.AspNetCore.Mvc;
-using MrWho.Services.Background;
 
 namespace MrWho.Extensions;
 
@@ -59,7 +59,7 @@ public static partial class ServiceCollectionExtensions
 
         // Register client cookie services
         services.AddScoped<IDynamicCookieService, DynamicCookieService>();
-        
+
         // Register dynamic client configuration service
         services.AddScoped<IDynamicClientConfigurationService, DynamicClientConfigurationService>();
 
@@ -165,7 +165,7 @@ public static partial class ServiceCollectionExtensions
         var isDevelopment = builder.Environment.IsDevelopment();
 
         var connectionName = config["Database:ConnectionName"] ?? "mrwhodb";
-        var connectionString = config.GetConnectionString(connectionName) ?? config[$"ConnectionStrings:{connectionName}"]; 
+        var connectionString = config.GetConnectionString(connectionName) ?? config[$"ConnectionStrings:{connectionName}"];
 
         // Provide a sensible local default for tooling/migrations if not configured
         if (string.IsNullOrWhiteSpace(connectionString))
@@ -178,7 +178,7 @@ public static partial class ServiceCollectionExtensions
             options.UseNpgsql(connectionString);
 
             if (isDevelopment)
-			{
+            {
                 options.ConfigureWarnings(w => w.Log(RelationalEventId.PendingModelChangesWarning));
                 options.EnableDetailedErrors();
                 options.EnableSensitiveDataLogging();
@@ -211,7 +211,7 @@ public static partial class ServiceCollectionExtensions
             options.Password.RequireNonAlphanumeric = false;
             options.Password.RequireUppercase = false;
             options.Password.RequireLowercase = false;
-            
+
             // Configure Claims Identity to work with OpenIddict claims
             options.ClaimsIdentity.UserIdClaimType = OpenIddictConstants.Claims.Subject;
             options.ClaimsIdentity.UserNameClaimType = OpenIddictConstants.Claims.Name;
@@ -230,7 +230,7 @@ public static partial class ServiceCollectionExtensions
             options.Cookie.Name = CookieSchemeNaming.DefaultCookieName; // Ensure cookie name is explicitly set
             options.Cookie.HttpOnly = true; // Security best practice
             options.ExpireTimeSpan = TimeSpan.FromHours(8); // Consistent with client cookies
-            
+
             // Add error handling for authentication events
             options.Events = new CookieAuthenticationEvents
             {
@@ -238,7 +238,7 @@ public static partial class ServiceCollectionExtensions
                 {
                     // Log when redirecting to login to help debug auth issues
                     var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<CookieAuthenticationEvents>>();
-                    logger.LogDebug("Redirecting to login from {Path} using scheme {Scheme}", 
+                    logger.LogDebug("Redirecting to login from {Path} using scheme {Scheme}",
                         context.Request.Path, context.Scheme.Name);
                     return Task.CompletedTask;
                 },
@@ -264,8 +264,8 @@ public static partial class ServiceCollectionExtensions
     /// <summary>
     /// Adds cookie configuration for a specific OIDC client
     /// </summary>
-    public static IServiceCollection AddClientSpecificCookie(this IServiceCollection services, 
-        string clientId, 
+    public static IServiceCollection AddClientSpecificCookie(this IServiceCollection services,
+        string clientId,
         string? cookieName = null,
         Action<CookieAuthenticationOptions>? configureOptions = null)
     {
@@ -419,7 +419,8 @@ public static partial class ServiceCollectionExtensions
 
         services.AddRateLimiter(options =>
         {
-            options.OnRejected = (context, token) => {
+            options.OnRejected = (context, token) =>
+            {
                 context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
                 return ValueTask.CompletedTask;
             };

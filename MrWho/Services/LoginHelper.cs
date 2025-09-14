@@ -79,7 +79,7 @@ public sealed class LoginHelper : ILoginHelper
             if (Uri.TryCreate(returnUrl, UriKind.Absolute, out var absUri))
             {
                 var query = System.Web.HttpUtility.ParseQueryString(absUri.Query);
-                return query["client_id"];            
+                return query["client_id"];
             }
             else
             {
@@ -87,7 +87,7 @@ public sealed class LoginHelper : ILoginHelper
                 if (idx >= 0 && idx < returnUrl.Length - 1)
                 {
                     var query = System.Web.HttpUtility.ParseQueryString(returnUrl.Substring(idx));
-                    return query["client_id"];            
+                    return query["client_id"];
                 }
             }
         }

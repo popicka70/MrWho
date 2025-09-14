@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using MrWho.Shared;
 using Microsoft.EntityFrameworkCore;
 using MrWho.Data;
 using MrWho.Models;
+using MrWho.Shared;
 using MrWho.Shared.Models;
 
 namespace MrWho.Controllers;
@@ -28,7 +28,7 @@ public class IdentityResourcesController : ControllerBase
     private static IdentityResourceClaimDto CreateClaimDto(IdentityResourceClaim entity)
     {
         var standardClaim = CommonClaimTypes.StandardClaims.FirstOrDefault(s => s.Type == entity.ClaimType);
-        
+
         return new IdentityResourceClaimDto
         {
             Id = entity.Id,
@@ -75,7 +75,7 @@ public class IdentityResourcesController : ControllerBase
             }
 
             var totalCount = await query.CountAsync();
-            
+
             // First load the entities from database
             var identityResources = await query
                 .OrderBy(ir => ir.Name)
