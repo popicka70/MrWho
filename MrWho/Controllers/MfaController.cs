@@ -6,13 +6,13 @@ using System.Text;
 using System.Text.Encodings.Web;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
-using MrWho.Services;
-using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using MrWho.Data;
+using MrWho.Services;
 
 namespace MrWho.Controllers;
 
@@ -58,7 +58,10 @@ public class MfaController : Controller
     public async Task<IActionResult> Setup([FromQuery] string? returnUrl = null)
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user is null) return Challenge();
+        if (user is null)
+        {
+            return Challenge();
+        }
 
         var key = await _userManager.GetAuthenticatorKeyAsync(user);
         if (string.IsNullOrEmpty(key))
@@ -94,7 +97,10 @@ public class MfaController : Controller
         }
 
         var user = await _userManager.GetUserAsync(User);
-        if (user is null) return Challenge();
+        if (user is null)
+        {
+            return Challenge();
+        }
 
         var code = input.Code?.Replace(" ", string.Empty).Replace("-", string.Empty);
         var isValid = await _userManager.VerifyTwoFactorTokenAsync(
@@ -120,7 +126,10 @@ public class MfaController : Controller
     private async Task<IActionResult> RebuildSetupViewAsync()
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user is null) return Challenge();
+        if (user is null)
+        {
+            return Challenge();
+        }
 
         var key = await _userManager.GetAuthenticatorKeyAsync(user);
         if (string.IsNullOrEmpty(key))
@@ -147,7 +156,11 @@ public class MfaController : Controller
     public async Task<IActionResult> RecoveryCodes()
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user is null) return Challenge();
+        if (user is null)
+        {
+            return Challenge();
+        }
+
         var codes = await _userManager.GenerateNewTwoFactorRecoveryCodesAsync(user, 10);
         return View("RecoveryCodes", (codes ?? Enumerable.Empty<string>()).ToArray());
     }
@@ -157,7 +170,11 @@ public class MfaController : Controller
     public async Task<IActionResult> Disable()
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user is null) return Challenge();
+        if (user is null)
+        {
+            return Challenge();
+        }
+
         await _userManager.SetTwoFactorEnabledAsync(user, false);
         await _userManager.ResetAuthenticatorKeyAsync(user);
         _logger.LogInformation("User {UserId} disabled MFA.", user.Id);
@@ -178,7 +195,9 @@ public class MfaController : Controller
     public async Task<IActionResult> ChallengeMfaPost([FromForm] VerifyMfaInput input)
     {
         if (!ModelState.IsValid)
+        {
             return View("Challenge", input);
+        }
 
         var normalized = input.Code?.Replace(" ", string.Empty).Replace("-", string.Empty);
         if (string.IsNullOrWhiteSpace(normalized))
@@ -288,7 +307,9 @@ public class MfaController : Controller
         if (!string.IsNullOrEmpty(input.ReturnUrl))
         {
             if (Url.IsLocalUrl(input.ReturnUrl) || input.ReturnUrl.Contains("/connect/authorize", StringComparison.OrdinalIgnoreCase))
+            {
                 return Redirect(input.ReturnUrl);
+            }
         }
         return Redirect("/");
     }

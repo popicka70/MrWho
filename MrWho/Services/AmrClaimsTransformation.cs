@@ -10,7 +10,9 @@ public sealed class AmrClaimsTransformation : IClaimsTransformation
     public Task<ClaimsPrincipal> TransformAsync(ClaimsPrincipal principal)
     {
         if (principal.Identity is not ClaimsIdentity id)
+        {
             return Task.FromResult(principal);
+        }
 
         var method = id.FindFirst(ClaimTypes.AuthenticationMethod)?.Value;
         if (!string.IsNullOrEmpty(method))

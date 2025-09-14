@@ -1,10 +1,10 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using MrWho.Data;
-using OpenIddict.Client;
-using Microsoft.AspNetCore.Authorization;
 using MrWho.Shared;
+using OpenIddict.Client;
 
 namespace MrWho.Controllers;
 

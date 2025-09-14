@@ -17,17 +17,20 @@ public class DeviceManagementWebController : Controller
     private readonly IEnhancedQrLoginService _qrService;
     private readonly UserManager<IdentityUser> _userManager;
     private readonly ILogger<DeviceManagementWebController> _logger;
+    private readonly IDeviceAutoLoginService _deviceAutoLoginService; // new
 
     public DeviceManagementWebController(
         IDeviceManagementService deviceService,
         IEnhancedQrLoginService qrService,
         UserManager<IdentityUser> userManager,
-        ILogger<DeviceManagementWebController> logger)
+        ILogger<DeviceManagementWebController> logger,
+        IDeviceAutoLoginService deviceAutoLoginService) // new
     {
         _deviceService = deviceService;
         _qrService = qrService;
         _userManager = userManager;
         _logger = logger;
+        _deviceAutoLoginService = deviceAutoLoginService; // new
     }
 
     /// <summary>
@@ -38,7 +41,9 @@ public class DeviceManagementWebController : Controller
     {
         var user = await _userManager.GetUserAsync(User);
         if (user == null)
+        {
             return Challenge();
+        }
 
         var devices = await _deviceService.GetUserDevicesAsync(user.Id);
         return View(devices);
@@ -65,7 +70,9 @@ public class DeviceManagementWebController : Controller
 
             var user = await _userManager.GetUserAsync(User);
             if (user == null)
+            {
                 return Challenge();
+            }
 
             // Get user's devices that can approve logins
             var devices = await _deviceService.GetUserDevicesAsync(user.Id);
@@ -97,7 +104,9 @@ public class DeviceManagementWebController : Controller
     {
         var user = await _userManager.GetUserAsync(User);
         if (user == null)
+        {
             return Challenge();
+        }
 
         try
         {
@@ -121,7 +130,7 @@ public class DeviceManagementWebController : Controller
 
             if (success)
             {
-                _logger.LogInformation("QR session {Token} {Action} by user {UserId} with device {DeviceId}", 
+                _logger.LogInformation("QR session {Token} {Action} by user {UserId} with device {DeviceId}",
                     token, action, user.Id, deviceId);
                 return View("ApprovalSuccess", model: actionMessage);
             }
@@ -138,11 +147,19 @@ public class DeviceManagementWebController : Controller
     }
 
     /// <summary>
-    /// Device registration page
+    /// Device registration page (supports nested return after registration)
     /// </summary>
     [HttpGet("register")]
-    public IActionResult Register()
+    public IActionResult Register([FromQuery] string? postRegReturn = null, [FromQuery] string? clientId = null)
     {
+        if (!string.IsNullOrWhiteSpace(postRegReturn))
+        {
+            ViewData["PostRegisterReturnUrl"] = postRegReturn;
+        }
+        if (!string.IsNullOrWhiteSpace(clientId))
+        {
+            ViewData["ClientId"] = clientId;
+        }
         return View();
     }
 
@@ -151,11 +168,13 @@ public class DeviceManagementWebController : Controller
     /// </summary>
     [HttpPost("register")]
     [ValidateAntiForgeryToken]
-    public async Task<IActionResult> Register([FromForm] string deviceName, [FromForm] string deviceId, [FromForm] bool isTrusted = false)
+    public async Task<IActionResult> Register([FromForm] string deviceName, [FromForm] string deviceId, [FromForm] bool isTrusted = false, [FromForm] string? postRegReturn = null, [FromForm] string? clientId = null)
     {
         var user = await _userManager.GetUserAsync(User);
         if (user == null)
+        {
             return Challenge();
+        }
 
         try
         {
@@ -171,18 +190,60 @@ public class DeviceManagementWebController : Controller
             };
 
             var device = await _deviceService.RegisterDeviceAsync(user.Id, request);
-            
+
+            // Issue auto-login token cookie (regardless of trusted for now; could gate on isTrusted)
+            var issued = await _deviceAutoLoginService.IssueTokenAsync(user.Id, device.DeviceId);
+            if (issued != null)
+            {
+                Response.Cookies.Append(".MrWho.DeviceAuth", issued.Value.token, new CookieOptions
+                {
+                    HttpOnly = true,
+                    Secure = true,
+                    SameSite = SameSiteMode.Lax,
+                    Expires = issued.Value.expiresAt
+                });
+            }
+
             _logger.LogInformation("Device {DeviceId} registered via web for user {UserId}", device.DeviceId, user.Id);
-            
+
             TempData["SuccessMessage"] = $"Device '{device.DeviceName}' registered successfully!";
+
+            if (!string.IsNullOrWhiteSpace(postRegReturn) && IsSafeReturn(postRegReturn))
+            {
+                if (!string.IsNullOrWhiteSpace(clientId) && !postRegReturn.Contains("client_id=") && postRegReturn.IndexOf("clientId=", StringComparison.OrdinalIgnoreCase) < 0)
+                {
+                    var sep = postRegReturn.Contains('?') ? '&' : '?';
+                    postRegReturn += $"{sep}clientId={Uri.EscapeDataString(clientId)}";
+                }
+                return Redirect(postRegReturn);
+            }
+
             return RedirectToAction("Index");
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error registering device via web for user {UserId}", user.Id);
             TempData["ErrorMessage"] = "Failed to register device. Please try again.";
+            if (!string.IsNullOrWhiteSpace(postRegReturn))
+            {
+                ViewData["PostRegisterReturnUrl"] = postRegReturn;
+            }
+            if (!string.IsNullOrWhiteSpace(clientId))
+            {
+                ViewData["ClientId"] = clientId;
+            }
             return View();
         }
+    }
+
+    private static bool IsSafeReturn(string url)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return false;
+        if (url.StartsWith('/'))
+        {
+            return true; // local relative URL
+        }
+        return false; // disallow absolute external URLs
     }
 
     /// <summary>
@@ -193,7 +254,9 @@ public class DeviceManagementWebController : Controller
     {
         var user = await _userManager.GetUserAsync(User);
         if (user == null)
+        {
             return Challenge();
+        }
 
         var activity = await _deviceService.GetUserDeviceActivityAsync(user.Id, 50);
         return View(activity);
@@ -208,12 +271,16 @@ public class DeviceManagementWebController : Controller
     {
         var user = await _userManager.GetUserAsync(User);
         if (user == null)
+        {
             return Challenge();
+        }
 
         var success = await _deviceService.RevokeDeviceAsync(user.Id, deviceId);
-        
+
         if (success)
         {
+            await _deviceAutoLoginService.RevokeForDeviceAsync(user.Id, deviceId);
+            Response.Cookies.Delete(".MrWho.DeviceAuth"); // if current device
             TempData["SuccessMessage"] = "Device revoked successfully.";
             _logger.LogInformation("Device {DeviceId} revoked via web for user {UserId}", deviceId, user.Id);
         }
@@ -226,13 +293,16 @@ public class DeviceManagementWebController : Controller
     }
 
     /// <summary>
-    /// Generate QR code for device registration
+    /// Generate QR code for device registration. Optional query params are embedded so the mobile flow preserves original redirects.
     /// </summary>
     [HttpGet("register-qr.png")]
-    public IActionResult RegisterQrPng()
+    public IActionResult RegisterQrPng([FromQuery] string? postRegReturn = null, [FromQuery] string? clientId = null)
     {
-        // Generate the URL for device registration
-        var registrationUrl = Url.Action("Register", "DeviceManagementWeb", null, Request.Scheme, Request.Host.ToString())!;
+        var routeValues = new Dictionary<string, object?>();
+        if (!string.IsNullOrWhiteSpace(postRegReturn)) routeValues["postRegReturn"] = postRegReturn;
+        if (!string.IsNullOrWhiteSpace(clientId)) routeValues["clientId"] = clientId;
+
+        var registrationUrl = Url.Action("Register", "DeviceManagementWeb", routeValues, Request.Scheme, Request.Host.ToString())!;
 
         using var generator = new QRCodeGenerator();
         var data = generator.CreateQrCode(registrationUrl, QRCodeGenerator.ECCLevel.Q);
@@ -241,12 +311,16 @@ public class DeviceManagementWebController : Controller
     }
 
     /// <summary>
-    /// Show QR code for mobile device registration
+    /// Show QR code for mobile device registration (now also supports forwarding parameters)
     /// </summary>
     [HttpGet("register-qr")]
-    public IActionResult RegisterQr()
+    public IActionResult RegisterQr([FromQuery] string? postRegReturn = null, [FromQuery] string? clientId = null)
     {
-        var registrationUrl = Url.Action("Register", "DeviceManagementWeb", null, Request.Scheme, Request.Host.ToString())!;
+        var routeValues = new Dictionary<string, object?>();
+        if (!string.IsNullOrWhiteSpace(postRegReturn)) routeValues["postRegReturn"] = postRegReturn;
+        if (!string.IsNullOrWhiteSpace(clientId)) routeValues["clientId"] = clientId;
+
+        var registrationUrl = Url.Action("Register", "DeviceManagementWeb", routeValues, Request.Scheme, Request.Host.ToString())!;
         ViewData["RegistrationUrl"] = registrationUrl;
         return View();
     }

@@ -112,7 +112,7 @@ public class EnhancedQrLoginService : IEnhancedQrLoginService
         };
 
         var session = await _deviceService.CreateQrSessionAsync(request);
-        _logger.LogDebug("Created persistent QR session {SessionId} (token: {Token}) for client {ClientId}", 
+        _logger.LogDebug("Created persistent QR session {SessionId} (token: {Token}) for client {ClientId}",
             session.Id, session.Token, clientId);
         return session.Token;
     }
@@ -204,7 +204,9 @@ public class EnhancedQrLoginService : IEnhancedQrLoginService
         {
             var persistentResult = await ApprovePersistentQrAsync(token, userId, deviceId);
             if (persistentResult)
+            {
                 return true;
+            }
         }
 
         // Fallback to session-based QR
@@ -216,7 +218,9 @@ public class EnhancedQrLoginService : IEnhancedQrLoginService
         // Try persistent QR first
         var persistentResult = await CompletePersistentQrAsync(token);
         if (persistentResult)
+        {
             return true;
+        }
 
         // Fallback to session-based QR
         return CompleteSessionQr(token);
@@ -243,11 +247,15 @@ public class EnhancedQrLoginService : IEnhancedQrLoginService
     private static QrSessionStatusEnum MapSessionStatus(QrLoginTicket sessionTicket)
     {
         if (sessionTicket.Completed)
+        {
             return QrSessionStatusEnum.Completed;
-        
+        }
+
         if (!string.IsNullOrEmpty(sessionTicket.ApprovedUserId))
+        {
             return QrSessionStatusEnum.Approved;
-        
+        }
+
         return QrSessionStatusEnum.Pending;
     }
 }
@@ -289,7 +297,11 @@ public sealed class InMemoryQrLoginStore : IQrLoginStore
     public bool Approve(string token, string userId)
     {
         var t = Get(token);
-        if (t is null) return false;
+        if (t is null)
+        {
+            return false;
+        }
+
         t.ApprovedUserId = userId;
         return true;
     }

@@ -25,7 +25,7 @@ public class ClientsController : ControllerBase
     private readonly ISymmetricSecretPolicy _symmetricPolicy; // added
 
     public ClientsController(
-        ApplicationDbContext context, 
+        ApplicationDbContext context,
         ILogger<ClientsController> logger,
         IOpenIddictApplicationManager applicationManager,
         UserManager<IdentityUser> userManager,
@@ -48,11 +48,15 @@ public class ClientsController : ControllerBase
     {
         var client = await _context.Clients.FirstOrDefaultAsync(c => c.Id == id || c.ClientId == id);
         if (client is null)
+        {
             return NotFound("Client not found");
+        }
 
         var requiresSecret = (client.ClientType == ClientType.Confidential || client.ClientType == ClientType.Machine) && client.RequireClientSecret;
         if (!requiresSecret)
+        {
             return BadRequest("This client type does not use client secrets");
+        }
 
         var expiresAt = request?.ExpiresAtUtc;
         var retireOld = request?.RetireOld ?? true;
@@ -80,8 +84,15 @@ public class ClientsController : ControllerBase
         [FromQuery] string? search = null,
         [FromQuery] string? realmId = null)
     {
-        if (page < 1) page = 1;
-        if (pageSize < 1 || pageSize > 100) pageSize = 10;
+        if (page < 1)
+        {
+            page = 1;
+        }
+
+        if (pageSize < 1 || pageSize > 100)
+        {
+            pageSize = 10;
+        }
 
         var query = _context.Clients
             .Include(c => c.Realm)
@@ -99,7 +110,7 @@ public class ClientsController : ControllerBase
 
         if (!string.IsNullOrWhiteSpace(search))
         {
-            query = query.Where(c => c.ClientId.Contains(search) || 
+            query = query.Where(c => c.ClientId.Contains(search) ||
                                    c.Name.Contains(search) ||
                                    (c.Description != null && c.Description.Contains(search)));
         }
@@ -343,7 +354,10 @@ public class ClientsController : ControllerBase
     public async Task<ActionResult<IEnumerable<ClientIdentityProviderDto>>> GetIdentityProviderLinksForClient(string id)
     {
         var exists = await _context.Clients.AnyAsync(c => c.Id == id);
-        if (!exists) return NotFound("Client not found");
+        if (!exists)
+        {
+            return NotFound("Client not found");
+        }
 
         var links = await _context.ClientIdentityProviders
             .Where(l => l.ClientId == id)
@@ -373,11 +387,17 @@ public class ClientsController : ControllerBase
     public async Task<ActionResult<ClientIdentityProviderDto>> LinkIdentityProviderToClient(string id, string providerId, [FromBody] ClientIdentityProviderDto? dto)
     {
         var client = await _context.Clients.FirstOrDefaultAsync(c => c.Id == id || c.ClientId == id);
-        if (client is null) return NotFound("Client not found");
+        if (client is null)
+        {
+            return NotFound("Client not found");
+        }
 
         // Accept providerId as either IdentityProvider.Id or Name
         var provider = await _context.IdentityProviders.FirstOrDefaultAsync(p => p.Id == providerId || p.Name == providerId);
-        if (provider is null) return NotFound("Identity provider not found");
+        if (provider is null)
+        {
+            return NotFound("Identity provider not found");
+        }
 
         // Prevent duplicate link
         var exists = await _context.ClientIdentityProviders.AnyAsync(l => l.ClientId == client.Id && l.IdentityProviderId == provider.Id);
@@ -425,17 +445,27 @@ public class ClientsController : ControllerBase
     public async Task<IActionResult> UnlinkIdentityProviderFromClient(string id, string linkId)
     {
         var clientExists = await _context.Clients.AnyAsync(c => c.Id == id || c.ClientId == id);
-        if (!clientExists) return NotFound("Client not found");
+        if (!clientExists)
+        {
+            return NotFound("Client not found");
+        }
 
         var link = await _context.ClientIdentityProviders.FirstOrDefaultAsync(l => l.Id == linkId && l.ClientId == id);
         if (link is null)
         {
             // If "id" passed was ClientId (public id), try resolving client id first
             var client = await _context.Clients.FirstOrDefaultAsync(c => c.Id == id || c.ClientId == id);
-            if (client is null) return NotFound("Client not found");
+            if (client is null)
+            {
+                return NotFound("Client not found");
+            }
+
             link = await _context.ClientIdentityProviders.FirstOrDefaultAsync(l => l.Id == linkId && l.ClientId == client.Id);
         }
-        if (link is null) return NotFound();
+        if (link is null)
+        {
+            return NotFound();
+        }
 
         _context.ClientIdentityProviders.Remove(link);
         await _context.SaveChangesAsync();
@@ -457,7 +487,10 @@ public class ClientsController : ControllerBase
             .Include(c => c.Audiences)
             .FirstOrDefaultAsync(c => c.Id == id);
 
-        if (client == null) return NotFound();
+        if (client == null)
+        {
+            return NotFound();
+        }
 
         var export = new ClientExportDto
         {
@@ -909,7 +942,10 @@ public class ClientsController : ControllerBase
 
         // === NEW: Jar/JARM guards (Item 6) ===
         var jarCheck = ValidateJarConfig(request.JarMode, request.RequireSignedRequestObject, request.AllowedRequestObjectAlgs);
-        if (!jarCheck.ok) return jarCheck.error!;
+        if (!jarCheck.ok)
+        {
+            return jarCheck.error!;
+        }
 
         var strategy = _context.Database.CreateExecutionStrategy();
         var result = await strategy.ExecuteAsync(async () =>
@@ -1021,7 +1057,7 @@ public class ClientsController : ControllerBase
                 {
                     await _clientSecretService.SetNewSecretAsync(client.Id, providedPlaintext: request.ClientSecret);
                 }
-                
+
                 // Create OpenIddict application only if valid
                 if (!requiresSecret || !string.IsNullOrWhiteSpace(request.ClientSecret))
                 {
@@ -1102,14 +1138,20 @@ public class ClientsController : ControllerBase
     {
         // Pre-fetch current client to evaluate effective values for validation (need jar invariants)
         var existingClient = await _context.Clients.AsNoTracking().FirstOrDefaultAsync(c => c.Id == id);
-        if (existingClient == null) return NotFound($"Client with ID '{id}' not found.");
+        if (existingClient == null)
+        {
+            return NotFound($"Client with ID '{id}' not found.");
+        }
 
         // Determine effective values (fall back to existing when request omits)
         var effJarMode = request.JarMode ?? existingClient.JarMode;
         var effRequireSigned = request.RequireSignedRequestObject ?? existingClient.RequireSignedRequestObject;
         var effAlgs = request.AllowedRequestObjectAlgs ?? existingClient.AllowedRequestObjectAlgs;
         var jarCheck = ValidateJarConfig(effJarMode, effRequireSigned, effAlgs);
-        if (!jarCheck.ok) return jarCheck.error!;
+        if (!jarCheck.ok)
+        {
+            return jarCheck.error!;
+        }
 
         // validate secret requirement before persisting/creating openiddict app
         var targetType = request.ClientType ?? existingClient.ClientType;
@@ -1139,23 +1181,65 @@ public class ClientsController : ControllerBase
                     .Include(c => c.Permissions)
                     .Include(c => c.Audiences)
                     .FirstOrDefaultAsync(c => c.Id == id);
-                if (client == null) return (ActionResult<ClientDto>)NotFound($"Client with ID '{id}' not found.");
+                if (client == null)
+                {
+                    return (ActionResult<ClientDto>)NotFound($"Client with ID '{id}' not found.");
+                }
 
                 var now = DateTime.UtcNow;
                 var userName = User?.Identity?.Name;
 
                 // Basic property updates (same as previous implementation) ---------------------------------
-                if (!string.IsNullOrEmpty(request.Name)) client.Name = request.Name;
+                if (!string.IsNullOrEmpty(request.Name))
+                {
+                    client.Name = request.Name;
+                }
+
                 client.Description = request.Description;
-                if (request.IsEnabled.HasValue) client.IsEnabled = request.IsEnabled.Value;
-                if (request.ClientType.HasValue) client.ClientType = request.ClientType.Value;
-                if (request.AllowAuthorizationCodeFlow.HasValue) client.AllowAuthorizationCodeFlow = request.AllowAuthorizationCodeFlow.Value;
-                if (request.AllowClientCredentialsFlow.HasValue) client.AllowClientCredentialsFlow = request.AllowClientCredentialsFlow.Value;
-                if (request.AllowPasswordFlow.HasValue) client.AllowPasswordFlow = request.AllowPasswordFlow.Value;
-                if (request.AllowRefreshTokenFlow.HasValue) client.AllowRefreshTokenFlow = request.AllowRefreshTokenFlow.Value;
-                if (request.AllowDeviceCodeFlow.HasValue) client.AllowDeviceCodeFlow = request.AllowDeviceCodeFlow.Value;
-                if (request.RequirePkce.HasValue) client.RequirePkce = request.RequirePkce.Value;
-                if (request.RequireClientSecret.HasValue) client.RequireClientSecret = request.RequireClientSecret.Value;
+                if (request.IsEnabled.HasValue)
+                {
+                    client.IsEnabled = request.IsEnabled.Value;
+                }
+
+                if (request.ClientType.HasValue)
+                {
+                    client.ClientType = request.ClientType.Value;
+                }
+
+                if (request.AllowAuthorizationCodeFlow.HasValue)
+                {
+                    client.AllowAuthorizationCodeFlow = request.AllowAuthorizationCodeFlow.Value;
+                }
+
+                if (request.AllowClientCredentialsFlow.HasValue)
+                {
+                    client.AllowClientCredentialsFlow = request.AllowClientCredentialsFlow.Value;
+                }
+
+                if (request.AllowPasswordFlow.HasValue)
+                {
+                    client.AllowPasswordFlow = request.AllowPasswordFlow.Value;
+                }
+
+                if (request.AllowRefreshTokenFlow.HasValue)
+                {
+                    client.AllowRefreshTokenFlow = request.AllowRefreshTokenFlow.Value;
+                }
+
+                if (request.AllowDeviceCodeFlow.HasValue)
+                {
+                    client.AllowDeviceCodeFlow = request.AllowDeviceCodeFlow.Value;
+                }
+
+                if (request.RequirePkce.HasValue)
+                {
+                    client.RequirePkce = request.RequirePkce.Value;
+                }
+
+                if (request.RequireClientSecret.HasValue)
+                {
+                    client.RequireClientSecret = request.RequireClientSecret.Value;
+                }
 
                 client.AccessTokenLifetime = request.AccessTokenLifetime ?? client.AccessTokenLifetime;
                 client.RefreshTokenLifetime = request.RefreshTokenLifetime ?? client.RefreshTokenLifetime;
@@ -1224,11 +1308,30 @@ public class ClientsController : ControllerBase
                 client.AllowCodeLogin = request.AllowCodeLogin;
 
                 // === JAR/JARM fields (ensure effective values applied) ===
-                if (request.JarMode.HasValue) client.JarMode = request.JarMode;
-                if (request.JarmMode.HasValue) client.JarmMode = request.JarmMode;
-                if (request.RequireSignedRequestObject.HasValue) client.RequireSignedRequestObject = request.RequireSignedRequestObject;
-                if (request.AllowedRequestObjectAlgs != null) client.AllowedRequestObjectAlgs = request.AllowedRequestObjectAlgs; // allow explicit clearing via empty string handled by guard above
-                if (request.JarRsaPublicKeyPem != null) client.JarRsaPublicKeyPem = request.JarRsaPublicKeyPem;
+                if (request.JarMode.HasValue)
+                {
+                    client.JarMode = request.JarMode;
+                }
+
+                if (request.JarmMode.HasValue)
+                {
+                    client.JarmMode = request.JarmMode;
+                }
+
+                if (request.RequireSignedRequestObject.HasValue)
+                {
+                    client.RequireSignedRequestObject = request.RequireSignedRequestObject;
+                }
+
+                if (request.AllowedRequestObjectAlgs != null)
+                {
+                    client.AllowedRequestObjectAlgs = request.AllowedRequestObjectAlgs; // allow explicit clearing via empty string handled by guard above
+                }
+
+                if (request.JarRsaPublicKeyPem != null)
+                {
+                    client.JarRsaPublicKeyPem = request.JarRsaPublicKeyPem;
+                }
 
                 client.UpdatedAt = now;
                 client.UpdatedBy = userName;
@@ -1236,23 +1339,33 @@ public class ClientsController : ControllerBase
                 // Replace collections
                 _context.ClientRedirectUris.RemoveRange(client.RedirectUris);
                 foreach (var uri in (request.RedirectUris ?? new List<string>()).Distinct())
+                {
                     _context.ClientRedirectUris.Add(new ClientRedirectUri { ClientId = client.Id, Uri = uri });
+                }
 
                 _context.ClientPostLogoutUris.RemoveRange(client.PostLogoutUris);
                 foreach (var uri in (request.PostLogoutUris ?? new List<string>()).Distinct())
+                {
                     _context.ClientPostLogoutUris.Add(new ClientPostLogoutUri { ClientId = client.Id, Uri = uri });
+                }
 
                 _context.ClientScopes.RemoveRange(client.Scopes);
                 foreach (var s in (request.Scopes ?? new List<string>()).Distinct())
+                {
                     _context.ClientScopes.Add(new ClientScope { ClientId = client.Id, Scope = s });
+                }
 
                 _context.ClientPermissions.RemoveRange(client.Permissions);
                 foreach (var p in (request.Permissions ?? new List<string>()).Distinct())
+                {
                     _context.ClientPermissions.Add(new ClientPermission { ClientId = client.Id, Permission = p });
+                }
 
                 _context.ClientAudiences.RemoveRange(client.Audiences);
                 foreach (var a in (request.Audiences ?? new List<string>()).Distinct())
+                {
                     _context.ClientAudiences.Add(new ClientAudience { ClientId = client.Id, Audience = a });
+                }
 
                 await _context.SaveChangesAsync();
 
@@ -1395,8 +1508,8 @@ public class ClientsController : ControllerBase
             ClientId = client.ClientId,
             ClientSecret = request.ClientSecret, // use plaintext provided at creation
             DisplayName = client.Name,
-            ClientType = client.ClientType == ClientType.Public 
-                ? OpenIddictConstants.ClientTypes.Public 
+            ClientType = client.ClientType == ClientType.Public
+                ? OpenIddictConstants.ClientTypes.Public
                 : OpenIddictConstants.ClientTypes.Confidential
         };
 
@@ -1666,7 +1779,11 @@ public class ClientsController : ControllerBase
         var baseId = new string((name ?? "client").ToLowerInvariant()
             .Where(c => char.IsLetterOrDigit(c) || c == '-' || c == '_')
             .ToArray());
-        if (string.IsNullOrWhiteSpace(baseId)) baseId = "client";
+        if (string.IsNullOrWhiteSpace(baseId))
+        {
+            baseId = "client";
+        }
+
         return $"{baseId}_{Guid.NewGuid().ToString("N")[..6]}"; // short suffix to avoid collisions
     }
 }

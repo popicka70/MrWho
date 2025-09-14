@@ -8,8 +8,8 @@ using OpenTelemetry;
 using OpenTelemetry.Exporter;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
-using OpenTelemetry.Trace;
 using OpenTelemetry.Resources; // added
+using OpenTelemetry.Trace;
 using Serilog;
 using Serilog.Events;
 using Serilog.Sinks.GoogleCloudLogging; // Added for GoogleCloudLogging sink

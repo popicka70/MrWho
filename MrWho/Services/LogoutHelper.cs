@@ -75,11 +75,22 @@ public sealed class LogoutHelper : ILogoutHelper
             try
             {
                 var req = http.GetOpenIddictServerRequest();
-                if (!string.IsNullOrEmpty(req?.ClientId)) return req.ClientId;
+                if (!string.IsNullOrEmpty(req?.ClientId))
+                {
+                    return req.ClientId;
+                }
+
                 var query = http.Request.Query["client_id"].ToString();
-                if (!string.IsNullOrEmpty(query)) return query;
+                if (!string.IsNullOrEmpty(query))
+                {
+                    return query;
+                }
+
                 var form = http.Request.HasFormContentType ? http.Request.Form["client_id"].ToString() : null;
-                if (!string.IsNullOrEmpty(form)) return form;
+                if (!string.IsNullOrEmpty(form))
+                {
+                    return form;
+                }
             }
             catch { }
             return null;
@@ -164,7 +175,10 @@ public sealed class LogoutHelper : ILogoutHelper
 
     public void DeleteCookieAcrossDomains(HttpContext http, string cookieName)
     {
-        if (string.IsNullOrWhiteSpace(cookieName)) return;
+        if (string.IsNullOrWhiteSpace(cookieName))
+        {
+            return;
+        }
 
         var configured = _configuration["Cookie:Domain"];
         var host = http.Request.Host.Host;
@@ -175,12 +189,18 @@ public sealed class LogoutHelper : ILogoutHelper
         if (!string.IsNullOrWhiteSpace(host))
         {
             domains.Add(host);
-            if (!host.StartsWith('.')) domains.Add("." + host);
+            if (!host.StartsWith('.'))
+            {
+                domains.Add("." + host);
+            }
         }
         if (!string.IsNullOrWhiteSpace(configured))
         {
             domains.Add(configured);
-            if (!configured.StartsWith('.')) domains.Add("." + configured);
+            if (!configured.StartsWith('.'))
+            {
+                domains.Add("." + configured);
+            }
         }
 
         foreach (var d in domains.Distinct(StringComparer.OrdinalIgnoreCase))

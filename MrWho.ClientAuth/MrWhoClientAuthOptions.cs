@@ -120,7 +120,9 @@ public sealed class MrWhoClientAuthOptions
     internal string ResolveMetadataAddress()
     {
         if (!string.IsNullOrWhiteSpace(MetadataAddress))
+        {
             return MetadataAddress!;
+        }
 
         // ALWAYS use the standard .well-known path with hyphens
         var baseUrl = Authority.TrimEnd('/');

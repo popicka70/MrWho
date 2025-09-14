@@ -12,17 +12,17 @@ public interface IOpenIddictScopeSyncService
     /// Synchronizes all enabled scopes from the database with OpenIddict
     /// </summary>
     Task SynchronizeAllScopesAsync();
-    
+
     /// <summary>
     /// Registers or updates a single scope with OpenIddict
     /// </summary>
     Task RegisterScopeAsync(Scope scope);
-    
+
     /// <summary>
     /// Removes a scope from OpenIddict
     /// </summary>
     Task RemoveScopeAsync(string scopeName);
-    
+
     /// <summary>
     /// Checks if a scope exists in OpenIddict
     /// </summary>

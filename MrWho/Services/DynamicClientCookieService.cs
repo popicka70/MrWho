@@ -111,7 +111,7 @@ public class DynamicClientCookieService : IHostedService
                 _optionsCache.TryAdd(schemeName, cookieOptions);
 
                 registeredCount++;
-                _logger.LogInformation("Registered client scheme: {ClientId} -> {CookieName} (Scheme: {SchemeName})", 
+                _logger.LogInformation("Registered client scheme: {ClientId} -> {CookieName} (Scheme: {SchemeName})",
                     client.ClientId, cookieName, schemeName);
             }
             catch (Exception ex)
@@ -120,7 +120,7 @@ public class DynamicClientCookieService : IHostedService
             }
         }
 
-        _logger.LogInformation("Dynamic client cookie registration completed. Registered: {RegisteredCount}/{TotalCount} clients", 
+        _logger.LogInformation("Dynamic client cookie registration completed. Registered: {RegisteredCount}/{TotalCount} clients",
             registeredCount, enabledClients.Count());
     }
 
@@ -174,7 +174,7 @@ public class DynamicClientCookieService : IHostedService
                 _optionsCache.TryAdd(schemeName, cookieOptions);
 
                 registered++;
-                _logger.LogInformation("Registered realm scheme: {RealmName} -> {CookieName} (Scheme: {SchemeName})", 
+                _logger.LogInformation("Registered realm scheme: {RealmName} -> {CookieName} (Scheme: {SchemeName})",
                     realm.Name, cookieName, schemeName);
             }
             catch (Exception ex)
@@ -221,14 +221,14 @@ public class DynamicClientCookieService : IHostedService
                 OnRedirectToAccessDenied = context =>
                 {
                     var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<DynamicClientCookieService>>();
-                    logger.LogWarning("REDIRECTING TO ACCESS DENIED for dynamic client {ClientId}: RedirectUri={RedirectUri}, ReturnUrl={ReturnUrl}", 
+                    logger.LogWarning("REDIRECTING TO ACCESS DENIED for dynamic client {ClientId}: RedirectUri={RedirectUri}, ReturnUrl={ReturnUrl}",
                         client.ClientId, context.RedirectUri, context.Request.Query["ReturnUrl"].ToString());
                     return Task.CompletedTask;
                 },
                 OnValidatePrincipal = context =>
                 {
                     var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<DynamicClientCookieService>>();
-                    logger.LogDebug("Validating principal for dynamic client {ClientId}: IsAuthenticated={IsAuthenticated}, Name={Name}", 
+                    logger.LogDebug("Validating principal for dynamic client {ClientId}: IsAuthenticated={IsAuthenticated}, Name={Name}",
                         client.ClientId, context.Principal?.Identity?.IsAuthenticated, context.Principal?.Identity?.Name);
                     return Task.CompletedTask;
                 }
@@ -279,7 +279,11 @@ public class DynamicClientCookieService : IHostedService
 
     private static string Sanitize(string name)
     {
-        if (string.IsNullOrWhiteSpace(name)) return "Default";
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return "Default";
+        }
+
         Span<char> buffer = stackalloc char[name.Length];
         var i = 0;
         foreach (var ch in name)
@@ -311,8 +315,8 @@ public class DynamicCookieOptionsConfigurator : IConfigureNamedOptions<CookieAut
     public void Configure(string? name, CookieAuthenticationOptions options)
     {
         // Handle both the default Identity scheme and dynamic client schemes
-        if (string.IsNullOrEmpty(name) || 
-            (!name.StartsWith("Identity.Application") && 
+        if (string.IsNullOrEmpty(name) ||
+            (!name.StartsWith("Identity.Application") &&
              !name.Equals(IdentityConstants.ApplicationScheme, StringComparison.Ordinal)))
         {
             return;
@@ -330,13 +334,13 @@ public class DynamicCookieOptionsConfigurator : IConfigureNamedOptions<CookieAut
                 _logger.LogDebug("Setting default cookie name for Identity.Application scheme");
                 options.Cookie.Name = CookieSchemeNaming.DefaultCookieName;
             }
-            
+
             // Ensure TicketDataFormat is configured for data protection
             if (options.TicketDataFormat == null)
             {
                 _logger.LogWarning("TicketDataFormat is null for default Identity scheme, this may cause authentication issues");
             }
-            
+
             return;
         }
 

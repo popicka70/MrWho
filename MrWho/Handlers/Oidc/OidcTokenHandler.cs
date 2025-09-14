@@ -1,8 +1,8 @@
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
-using MrWho.Services.Mediator;
 using MrWho.Handlers;
+using MrWho.Services.Mediator;
 
 namespace MrWho.Handlers.Oidc;
 

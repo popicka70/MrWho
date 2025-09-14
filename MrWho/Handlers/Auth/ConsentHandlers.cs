@@ -1,15 +1,15 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
+using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using MrWho.Data;
 using MrWho.Services;
 using MrWho.Services.Mediator;
 using OpenIddict.Abstractions;
-using System.Security.Claims;
-using Microsoft.AspNetCore.WebUtilities;
 
 namespace MrWho.Handlers.Auth;
 
@@ -36,7 +36,7 @@ public sealed class ConsentGetHandler : IRequestHandler<ConsentGetRequest, IActi
         vd["ReturnUrl"] = request.ReturnUrl;
         vd["ClientId"] = request.ClientId;
 
-        var client = await _db.Clients.AsNoTracking().Include(c=>c.Realm).FirstOrDefaultAsync(c => c.ClientId == request.ClientId, cancellationToken);
+        var client = await _db.Clients.AsNoTracking().Include(c => c.Realm).FirstOrDefaultAsync(c => c.ClientId == request.ClientId, cancellationToken);
         if (client != null)
         {
             vd["ClientName"] = client.Name ?? request.ClientId;

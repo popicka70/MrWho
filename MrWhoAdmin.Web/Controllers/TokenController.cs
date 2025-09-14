@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using MrWhoAdmin.Web.Services;
 using MrWho.Shared;
+using MrWhoAdmin.Web.Services;
 
 namespace MrWhoAdmin.Web.Controllers;
 
@@ -40,35 +40,35 @@ public class TokenController : Controller
             if (refreshSuccess)
             {
                 _logger.LogInformation("Token refresh successful via HTTP context");
-                
+
                 // Redirect back to the return URL or default to debug page
-                var redirectUrl = !string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl) 
-                    ? returnUrl 
+                var redirectUrl = !string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl)
+                    ? returnUrl
                     : "/debug-token-refresh";
-                
+
                 return Redirect(redirectUrl);
             }
             else
             {
                 _logger.LogWarning("Token refresh failed via HTTP context");
-                
+
                 // Redirect with error indication
-                var redirectUrl = !string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl) 
-                    ? $"{returnUrl}?refreshError=true" 
+                var redirectUrl = !string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl)
+                    ? $"{returnUrl}?refreshError=true"
                     : "/debug-token-refresh?refreshError=true";
-                
+
                 return Redirect(redirectUrl);
             }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Exception during token refresh via HTTP context");
-            
+
             // Redirect with error indication
-            var redirectUrl = !string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl) 
-                ? $"{returnUrl}?refreshError=true" 
+            var redirectUrl = !string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl)
+                ? $"{returnUrl}?refreshError=true"
                 : "/debug-token-refresh?refreshError=true";
-            
+
             return Redirect(redirectUrl);
         }
     }
@@ -84,9 +84,9 @@ public class TokenController : Controller
             var accessToken = await HttpContext.GetTokenAsync(TokenConstants.TokenNames.AccessToken);
             var refreshToken = await HttpContext.GetTokenAsync(TokenConstants.TokenNames.RefreshToken);
             var expiresAt = await HttpContext.GetTokenAsync(TokenConstants.TokenNames.ExpiresAt);
-            
+
             var isExpiring = await _tokenRefreshService.IsTokenExpiredOrExpiringSoonAsync(HttpContext);
-            
+
             return Json(new
             {
                 HasAccessToken = !string.IsNullOrEmpty(accessToken),
@@ -94,8 +94,8 @@ public class TokenController : Controller
                 ExpiresAt = expiresAt,
                 IsExpiring = isExpiring,
                 CurrentTime = DateTimeOffset.UtcNow.ToString("o"),
-                AccessTokenPreview = !string.IsNullOrEmpty(accessToken) 
-                    ? accessToken.Substring(0, Math.Min(20, accessToken.Length)) + "..." 
+                AccessTokenPreview = !string.IsNullOrEmpty(accessToken)
+                    ? accessToken.Substring(0, Math.Min(20, accessToken.Length)) + "..."
                     : null
             });
         }

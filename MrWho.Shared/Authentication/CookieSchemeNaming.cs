@@ -66,7 +66,11 @@ public static class CookieSchemeNaming
     /// </summary>
     public static string Sanitize(string? value)
     {
-        if (string.IsNullOrWhiteSpace(value)) return "Default";
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "Default";
+        }
+
         ReadOnlySpan<char> src = value.AsSpan();
         Span<char> buffer = stackalloc char[src.Length];
         var i = 0;

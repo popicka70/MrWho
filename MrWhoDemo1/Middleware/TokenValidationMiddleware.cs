@@ -19,7 +19,7 @@ public class TokenValidationMiddleware
     public async Task InvokeAsync(HttpContext context)
     {
         // Only validate for authenticated requests to protected resources
-        if (context.User.Identity?.IsAuthenticated == true && 
+        if (context.User.Identity?.IsAuthenticated == true &&
             IsProtectedResource(context) &&
             !context.Response.HasStarted)
         {
@@ -42,7 +42,7 @@ public class TokenValidationMiddleware
         {
             // Get the stored access token
             var accessToken = await context.GetTokenAsync("access_token");
-            
+
             if (string.IsNullOrEmpty(accessToken))
             {
                 _logger.LogWarning("No access token found for authenticated user, signing out");
@@ -52,19 +52,19 @@ public class TokenValidationMiddleware
 
             // Make a quick call to the OIDC server to validate the token
             using var httpClient = new HttpClient();
-            httpClient.DefaultRequestHeaders.Authorization = 
+            httpClient.DefaultRequestHeaders.Authorization =
                 new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
-            
+
             // Call a simple endpoint that requires authentication
             var response = await httpClient.GetAsync("https://localhost:7113/connect/userinfo");
-            
+
             if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {
                 _logger.LogWarning("Access token is invalid or revoked, signing out user");
                 await SignOutUserAsync(context);
                 return;
             }
-            
+
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogWarning("Token validation failed with status: {StatusCode}", response.StatusCode);
@@ -89,10 +89,10 @@ public class TokenValidationMiddleware
     private async Task SignOutUserAsync(HttpContext context)
     {
         _logger.LogInformation("Signing out user due to invalid/revoked token");
-        
+
         // Sign out from the local cookie scheme
         await context.SignOutAsync("Demo1Cookies");
-        
+
         // Redirect to login page with a message
         var returnUrl = Uri.EscapeDataString(context.Request.Path + context.Request.QueryString);
         context.Response.Redirect($"/Account/Login?returnUrl={returnUrl}&reason=session_revoked");
@@ -101,7 +101,7 @@ public class TokenValidationMiddleware
     private static bool IsProtectedResource(HttpContext context)
     {
         var path = context.Request.Path.Value?.ToLowerInvariant();
-        
+
         // Skip validation for:
         // - Static files
         // - Authentication endpoints

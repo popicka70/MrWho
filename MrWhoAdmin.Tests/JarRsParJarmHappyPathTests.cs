@@ -9,7 +9,7 @@ using Microsoft.IdentityModel.Tokens;
 namespace MrWhoAdmin.Tests;
 
 [TestClass]
-[TestCategory("OIDC")] 
+[TestCategory("OIDC")]
 public class JarRsParJarmHappyPathTests
 {
     private static HttpClient CreateServerClient(bool noRedirects = true) => SharedTestInfrastructure.CreateHttpClient("mrwho", disableRedirects: noRedirects);
@@ -47,7 +47,7 @@ public class JarRsParJarmHappyPathTests
     private static (string verifier, string challenge) CreatePkcePair()
     {
         var bytes = RandomNumberGenerator.GetBytes(32);
-        string Base64Url(byte[] b) => Convert.ToBase64String(b).TrimEnd('=').Replace('+','-').Replace('/','_');
+        string Base64Url(byte[] b) => Convert.ToBase64String(b).TrimEnd('=').Replace('+', '-').Replace('/', '_');
         var verifier = Base64Url(bytes);
         var hash = SHA256.HashData(Encoding.ASCII.GetBytes(verifier));
         var challenge = Base64Url(hash);
@@ -140,7 +140,7 @@ public class JarRsParJarmHappyPathTests
 
         // PAR push
         using var parClient = CreateServerClient();
-        var parForm = new Dictionary<string,string>
+        var parForm = new Dictionary<string, string>
         {
             ["client_id"] = clientId,
             ["request"] = jar
@@ -158,7 +158,7 @@ public class JarRsParJarmHappyPathTests
         var authResp = await authClient.GetAsync(authorizeUrl);
 
         // Accept redirect to login (3xx) or initial OK with rendered login page
-        bool success = (int)authResp.StatusCode is >=300 and <=399 || authResp.StatusCode == HttpStatusCode.OK;
+        bool success = (int)authResp.StatusCode is >= 300 and <= 399 || authResp.StatusCode == HttpStatusCode.OK;
         if (!success)
         {
             var failBody = await authResp.Content.ReadAsStringAsync();

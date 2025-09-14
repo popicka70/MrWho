@@ -1,13 +1,13 @@
-using Microsoft.AspNetCore.Authentication;
+using System.Diagnostics.Metrics;
+using System.IdentityModel.Tokens.Jwt;
 using System.Text.Json;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
 using MrWho.Data;
 using OpenIddict.Abstractions;
-using Microsoft.Extensions.Options;
 using OpenIddict.Server;
-using System.IdentityModel.Tokens.Jwt;
-using Microsoft.IdentityModel.Tokens;
-using System.Diagnostics.Metrics;
 
 namespace MrWho.Services;
 
@@ -223,7 +223,11 @@ public class BackChannelLogoutService : IBackChannelLogoutService
 
     private string? GetBackChannelLogoutUri(Models.Client client)
     {
-        if (!string.IsNullOrWhiteSpace(client.BackChannelLogoutUri)) return client.BackChannelLogoutUri;
+        if (!string.IsNullOrWhiteSpace(client.BackChannelLogoutUri))
+        {
+            return client.BackChannelLogoutUri;
+        }
+
         return client.ClientId switch { "mrwho_demo1" => "https://localhost:7037/signout-backchannel", "mrwho_admin_web" => "https://localhost:7257/signout-backchannel", _ => null };
     }
 }

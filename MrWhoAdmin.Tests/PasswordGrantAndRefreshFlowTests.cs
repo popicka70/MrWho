@@ -1,16 +1,16 @@
 using System.Net;
-using System.Text.Json;
 using System.Text;
+using System.Text.Json;
 
 namespace MrWhoAdmin.Tests;
 
 [TestClass]
-[TestCategory("OIDC")] 
+[TestCategory("OIDC")]
 public class PasswordGrantAndRefreshFlowTests
 {
     private static HttpClient CreateServerClient() => SharedTestInfrastructure.CreateHttpClient("mrwho", disableRedirects: true);
 
-    private static async Task<JsonDocument> PostTokenAsync(Dictionary<string,string> form)
+    private static async Task<JsonDocument> PostTokenAsync(Dictionary<string, string> form)
     {
         using var client = CreateServerClient();
         var resp = await client.PostAsync("connect/token", new FormUrlEncodedContent(form));
@@ -30,7 +30,7 @@ public class PasswordGrantAndRefreshFlowTests
     public async Task PasswordGrant_AdminClient_Succeeds_Returns_RefreshToken()
     {
         // admin client allows password flow when MRWHO_TESTS=1 env var is set by test infrastructure
-        var doc = await PostTokenAsync(new Dictionary<string,string>
+        var doc = await PostTokenAsync(new Dictionary<string, string>
         {
             ["grant_type"] = "password",
             ["client_id"] = "mrwho_admin_web",
@@ -52,7 +52,7 @@ public class PasswordGrantAndRefreshFlowTests
     public async Task PasswordGrant_Demo1Client_Fails()
     {
         // demo1 client explicitly disallows password flow
-        var doc = await PostTokenAsync(new Dictionary<string,string>
+        var doc = await PostTokenAsync(new Dictionary<string, string>
         {
             ["grant_type"] = "password",
             ["client_id"] = "mrwho_demo1",
@@ -73,7 +73,7 @@ public class PasswordGrantAndRefreshFlowTests
     public async Task RefreshToken_Flow_Issues_New_AccessToken()
     {
         // Initial password grant for admin client
-        var initial = await PostTokenAsync(new Dictionary<string,string>
+        var initial = await PostTokenAsync(new Dictionary<string, string>
         {
             ["grant_type"] = "password",
             ["client_id"] = "mrwho_admin_web",
@@ -87,7 +87,7 @@ public class PasswordGrantAndRefreshFlowTests
         Assert.IsFalse(string.IsNullOrEmpty(refresh), "Initial refresh token missing");
 
         // Exchange refresh token
-        var refreshed = await PostTokenAsync(new Dictionary<string,string>
+        var refreshed = await PostTokenAsync(new Dictionary<string, string>
         {
             ["grant_type"] = "refresh_token",
             ["client_id"] = "mrwho_admin_web",

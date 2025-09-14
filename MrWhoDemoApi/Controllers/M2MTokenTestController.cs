@@ -1,7 +1,7 @@
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
 using System.Net.Http.Headers;
 using System.Text.Json;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 
 namespace MrWhoDemoApi.Controllers;
 
@@ -18,7 +18,7 @@ public class M2MTokenTestController : ControllerBase
         _logger = logger;
     }
 
-    [HttpGet("obtain-token-and-call" )]
+    [HttpGet("obtain-token-and-call")]
     public async Task<IActionResult> GetViaClientCredentials()
     {
         // This demonstrates obtaining a token with client credentials INSIDE the API (for demo only).

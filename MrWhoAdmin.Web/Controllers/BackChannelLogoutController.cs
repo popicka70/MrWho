@@ -1,8 +1,8 @@
+using System.IdentityModel.Tokens.Jwt;
+using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
-using System.Text.Json;
-using System.IdentityModel.Tokens.Jwt;
 
 namespace MrWhoAdmin.Web.Controllers;
 
@@ -71,8 +71,15 @@ public class BackChannelLogoutController : ControllerBase
                 {
                     using var doc = JsonDocument.Parse(logout_token);
                     var root = doc.RootElement;
-                    if (root.TryGetProperty("sub", out var subElement)) subject = subElement.GetString();
-                    if (root.TryGetProperty("sid", out var sidElement)) sessionId = sidElement.GetString();
+                    if (root.TryGetProperty("sub", out var subElement))
+                    {
+                        subject = subElement.GetString();
+                    }
+
+                    if (root.TryGetProperty("sid", out var sidElement))
+                    {
+                        sessionId = sidElement.GetString();
+                    }
                 }
                 catch (Exception jsonEx)
                 {
@@ -94,11 +101,11 @@ public class BackChannelLogoutController : ControllerBase
                     SessionId = sessionId,
                     Reason = "BackChannelLogout"
                 };
-                
+
                 // Store logout notification for this subject for 1 hour
                 // This helps detect invalidated sessions on subsequent requests
                 _cache.Set($"logout_{subject}", logoutInfo, TimeSpan.FromHours(1));
-                
+
                 // Also store by session ID if available
                 if (!string.IsNullOrEmpty(sessionId))
                 {
@@ -109,7 +116,7 @@ public class BackChannelLogoutController : ControllerBase
             // Force logout by clearing all authentication
             // This will clear the local authentication cookie for this request
             await HttpContext.SignOutAsync("AdminCookies");
-            
+
             // Store logout information in session for any active sessions to detect
             if (HttpContext.Session.IsAvailable)
             {

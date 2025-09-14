@@ -14,7 +14,7 @@ public class HealthApiService : IHealthApiService
     private readonly JsonSerializerOptions _jsonOptions;
 
     public HealthApiService(
-        HttpClient httpClient, 
+        HttpClient httpClient,
         ILogger<HealthApiService> logger,
         NavigationManager navigationManager)
     {
@@ -37,9 +37,9 @@ public class HealthApiService : IHealthApiService
         {
             _logger.LogDebug("Fetching basic health status from {BaseAddress}api/health", _httpClient.BaseAddress);
             var response = await _httpClient.GetAsync("api/health");
-            
+
             _logger.LogDebug("Basic health API response: {StatusCode}", response.StatusCode);
-            
+
             if (response.IsSuccessStatusCode)
             {
                 var content = await response.Content.ReadAsStringAsync();
@@ -48,9 +48,9 @@ public class HealthApiService : IHealthApiService
                 _logger.LogDebug("Successfully retrieved basic health status: {Status}", result?.Status);
                 return result;
             }
-            
+
             var errorContent = await response.Content.ReadAsStringAsync();
-            _logger.LogWarning("Health API returned status code: {StatusCode}, Content: {Content}", 
+            _logger.LogWarning("Health API returned status code: {StatusCode}, Content: {Content}",
                 response.StatusCode, errorContent);
             return null;
         }
@@ -67,16 +67,16 @@ public class HealthApiService : IHealthApiService
         {
             _logger.LogDebug("Fetching detailed health status");
             var response = await _httpClient.GetAsync("api/health/detailed");
-            
+
             if (response.IsSuccessStatusCode)
             {
                 var content = await response.Content.ReadAsStringAsync();
                 var result = JsonSerializer.Deserialize<DetailedHealthStatus>(content, _jsonOptions);
-                _logger.LogDebug("Successfully retrieved detailed health status with {CheckCount} checks", 
+                _logger.LogDebug("Successfully retrieved detailed health status with {CheckCount} checks",
                     result?.Checks?.Count ?? 0);
                 return result;
             }
-            
+
             _logger.LogWarning("Detailed health API returned status code: {StatusCode}", response.StatusCode);
             return null;
         }
@@ -93,7 +93,7 @@ public class HealthApiService : IHealthApiService
         {
             _logger.LogDebug("Fetching liveness status");
             var response = await _httpClient.GetAsync("api/health/liveness");
-            
+
             if (response.IsSuccessStatusCode)
             {
                 var content = await response.Content.ReadAsStringAsync();
@@ -101,7 +101,7 @@ public class HealthApiService : IHealthApiService
                 _logger.LogDebug("Successfully retrieved liveness status: {Status}", result?.Status);
                 return result;
             }
-            
+
             _logger.LogWarning("Liveness API returned status code: {StatusCode}", response.StatusCode);
             return null;
         }
@@ -118,7 +118,7 @@ public class HealthApiService : IHealthApiService
         {
             _logger.LogDebug("Fetching readiness status");
             var response = await _httpClient.GetAsync("api/health/readiness");
-            
+
             if (response.IsSuccessStatusCode)
             {
                 var content = await response.Content.ReadAsStringAsync();
@@ -126,7 +126,7 @@ public class HealthApiService : IHealthApiService
                 _logger.LogDebug("Successfully retrieved readiness status: {Status}", result?.Status);
                 return result;
             }
-            
+
             _logger.LogWarning("Readiness API returned status code: {StatusCode}", response.StatusCode);
             return null;
         }
@@ -143,16 +143,16 @@ public class HealthApiService : IHealthApiService
         {
             _logger.LogDebug("Fetching authentication schemes information");
             var response = await _httpClient.GetAsync("api/health/auth-schemes");
-            
+
             if (response.IsSuccessStatusCode)
             {
                 var content = await response.Content.ReadAsStringAsync();
                 var result = JsonSerializer.Deserialize<AuthSchemesInfo>(content, _jsonOptions);
-                _logger.LogDebug("Successfully retrieved auth schemes info for user: {UserName}", 
+                _logger.LogDebug("Successfully retrieved auth schemes info for user: {UserName}",
                     result?.User?.Name ?? "Unknown");
                 return result;
             }
-            
+
             _logger.LogWarning("Auth schemes API returned status code: {StatusCode}", response.StatusCode);
             return null;
         }

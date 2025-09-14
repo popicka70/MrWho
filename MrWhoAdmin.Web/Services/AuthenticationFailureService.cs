@@ -12,12 +12,12 @@ public interface IAuthenticationFailureService
     /// Handles authentication failure (403, 401) and redirects to appropriate error page
     /// </summary>
     Task HandleAuthenticationFailureAsync(int statusCode, string? requestPath = null, string? error = null);
-    
+
     /// <summary>
     /// Handles API authentication failures
     /// </summary>
     Task HandleApiAuthenticationFailureAsync(HttpResponseMessage response, string? requestPath = null);
-    
+
     /// <summary>
     /// Checks if a response indicates authentication failure
     /// </summary>
@@ -48,7 +48,7 @@ public class AuthenticationFailureService : IAuthenticationFailureService
         try
         {
             var currentPath = requestPath ?? _navigationManager.ToBaseRelativePath(_navigationManager.Uri);
-            
+
             // Build error URL with details
             var errorUrl = "/auth/error?" +
                           $"error={Uri.EscapeDataString(error ?? "authentication_failed")}&" +
@@ -57,13 +57,13 @@ public class AuthenticationFailureService : IAuthenticationFailureService
                           $"original_path={Uri.EscapeDataString(currentPath)}";
 
             _logger.LogInformation("Redirecting to authentication error page: {ErrorUrl}", errorUrl);
-            
+
             _navigationManager.NavigateTo(errorUrl, forceLoad: true);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error handling authentication failure");
-            
+
             // Fallback
             _navigationManager.NavigateTo("/auth/error", forceLoad: true);
         }

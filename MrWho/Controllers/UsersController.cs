@@ -1,14 +1,14 @@
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using MrWho.Models;
-using MrWho.Handlers.Users;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
-using MrWho.Shared.Models;
-using MrWho.Shared;
-using System.Security.Claims;
 using System.Globalization;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using MrWho.Data;
+using MrWho.Handlers.Users;
+using MrWho.Models;
+using MrWho.Shared;
+using MrWho.Shared.Models;
 
 namespace MrWho.Controllers;
 
@@ -261,7 +261,7 @@ public class UsersController : ControllerBase
             return BadRequest(ModelState);
         }
 
-        _logger.LogInformation("Successfully added claim '{ClaimType}' with value '{ClaimValue}' to user {UserName}", 
+        _logger.LogInformation("Successfully added claim '{ClaimType}' with value '{ClaimValue}' to user {UserName}",
             request.ClaimType, request.ClaimValue, user.UserName);
 
         return Ok($"Claim '{request.ClaimType}' added to user '{user.UserName}' successfully.");
@@ -287,7 +287,7 @@ public class UsersController : ControllerBase
         // Check if claim exists
         var existingClaims = await _userManager.GetClaimsAsync(user);
         var claimToRemove = existingClaims.FirstOrDefault(c => c.Type == request.ClaimType && c.Value == request.ClaimValue);
-        
+
         if (claimToRemove == null)
         {
             return NotFound($"User does not have claim '{request.ClaimType}' with value '{request.ClaimValue}'.");
@@ -304,7 +304,7 @@ public class UsersController : ControllerBase
             return BadRequest(ModelState);
         }
 
-        _logger.LogInformation("Successfully removed claim '{ClaimType}' with value '{ClaimValue}' from user {UserName}", 
+        _logger.LogInformation("Successfully removed claim '{ClaimType}' with value '{ClaimValue}' from user {UserName}",
             request.ClaimType, request.ClaimValue, user.UserName);
 
         return Ok($"Claim '{request.ClaimType}' removed from user '{user.UserName}' successfully.");
@@ -330,7 +330,7 @@ public class UsersController : ControllerBase
         // Check if old claim exists
         var existingClaims = await _userManager.GetClaimsAsync(user);
         var oldClaim = existingClaims.FirstOrDefault(c => c.Type == request.OldClaimType && c.Value == request.OldClaimValue);
-        
+
         if (oldClaim == null)
         {
             return NotFound($"User does not have claim '{request.OldClaimType}' with value '{request.OldClaimValue}'.");
@@ -357,7 +357,7 @@ public class UsersController : ControllerBase
             return BadRequest(ModelState);
         }
 
-        _logger.LogInformation("Successfully updated claim for user {UserName} from '{OldType}:{OldValue}' to '{NewType}:{NewValue}'", 
+        _logger.LogInformation("Successfully updated claim for user {UserName} from '{OldType}:{OldValue}' to '{NewType}:{NewValue}'",
             user.UserName, request.OldClaimType, request.OldClaimValue, request.NewClaimType, request.NewClaimValue);
 
         return Ok($"Claim updated successfully for user '{user.UserName}'.");
@@ -545,8 +545,15 @@ public class UsersController : ControllerBase
         [FromQuery] int pageSize = 10,
         [FromQuery] string? search = null)
     {
-        if (page < 1) page = 1;
-        if (pageSize < 1 || pageSize > 100) pageSize = 10;
+        if (page < 1)
+        {
+            page = 1;
+        }
+
+        if (pageSize < 1 || pageSize > 100)
+        {
+            pageSize = 10;
+        }
 
         var query = _roleManager.Roles.AsQueryable();
 
@@ -696,7 +703,10 @@ public class UsersController : ControllerBase
     public async Task<ActionResult<UserEditContextDto>> GetUserEditContext(string id)
     {
         var user = await _userManager.FindByIdAsync(id);
-        if (user == null) return NotFound($"User with ID '{id}' not found.");
+        if (user == null)
+        {
+            return NotFound($"User with ID '{id}' not found.");
+        }
 
         var userRoleNames = await _userManager.GetRolesAsync(user);
         var userClaims = await _userManager.GetClaimsAsync(user);
@@ -819,8 +829,16 @@ public class UsersController : ControllerBase
 
     private static string BuildDisplayName(string source)
     {
-        if (string.IsNullOrWhiteSpace(source)) return "New User";
-        if (source.Contains('@')) source = source.Split('@')[0];
+        if (string.IsNullOrWhiteSpace(source))
+        {
+            return "New User";
+        }
+
+        if (source.Contains('@'))
+        {
+            source = source.Split('@')[0];
+        }
+
         var friendly = source.Replace('.', ' ').Replace('_', ' ').Replace('-', ' ');
         var words = friendly.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         return string.Join(' ', words.Select(w => char.ToUpper(w[0]) + w[1..].ToLower()));
@@ -846,7 +864,9 @@ public static class StringExtensions
     public static string ToTitleCase(this string input)
     {
         if (string.IsNullOrEmpty(input))
+        {
             return input;
+        }
 
         return CultureInfo.CurrentCulture.TextInfo.ToTitleCase(input.ToLower());
     }

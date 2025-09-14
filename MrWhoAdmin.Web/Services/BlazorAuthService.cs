@@ -13,7 +13,7 @@ public class BlazorAuthService : IBlazorAuthService
     private readonly NavigationManager _navigationManager;
 
     public BlazorAuthService(
-        IJSRuntime jsRuntime, 
+        IJSRuntime jsRuntime,
         ILogger<BlazorAuthService> logger,
         NavigationManager navigationManager)
     {
@@ -33,9 +33,9 @@ public class BlazorAuthService : IBlazorAuthService
             var currentUrl = returnUrl ?? _navigationManager.Uri;
             var encodedReturnUrl = Uri.EscapeDataString(currentUrl);
             var checkAuthUrl = $"/auth/check-and-reauth?returnUrl={encodedReturnUrl}";
-            
+
             _logger.LogInformation("Triggering re-authentication via redirect to {CheckAuthUrl}", checkAuthUrl);
-            
+
             // Check if we can use JavaScript (not during prerendering)
             if (_jsRuntime is IJSInProcessRuntime)
             {
@@ -52,18 +52,18 @@ public class BlazorAuthService : IBlazorAuthService
         catch (InvalidOperationException ex) when (ex.Message.Contains("JavaScript interop calls cannot be issued"))
         {
             _logger.LogWarning("JavaScript interop not available (prerendering), using server-side navigation");
-            
+
             // Fallback to server-side navigation
             var currentUrl = returnUrl ?? _navigationManager.Uri;
             var encodedReturnUrl = Uri.EscapeDataString(currentUrl);
             var checkAuthUrl = $"/auth/check-and-reauth?returnUrl={encodedReturnUrl}";
-            
+
             _navigationManager.NavigateTo(checkAuthUrl, forceLoad: true);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error triggering re-authentication");
-            
+
             // Last resort fallback - simple navigation
             try
             {
@@ -87,9 +87,9 @@ public class BlazorAuthService : IBlazorAuthService
         {
             // For now, we'll use a simpler approach that doesn't require HTTP calls during prerendering
             // The actual authentication check will be handled by the middleware and AuthenticatedComponentBase
-            
+
             _logger.LogDebug("EnsureAuthenticatedAsync called - deferring to component lifecycle");
-            
+
             // During prerendering, we can't make HTTP calls reliably
             // Return true and let the component handle authentication checks after rendering
             if (!IsInteractiveContext())
@@ -97,14 +97,14 @@ public class BlazorAuthService : IBlazorAuthService
                 _logger.LogDebug("Prerendering context detected, deferring authentication check");
                 return true; // Let the component handle this after interactive rendering starts
             }
-            
+
             // In interactive context, we can perform the authentication check
             return await PerformAuthenticationCheckAsync();
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error checking authentication status");
-            
+
             // If we can't check authentication status, assume not authenticated
             // and trigger re-authentication
             await TriggerReauthenticationAsync();
@@ -121,7 +121,7 @@ public class BlazorAuthService : IBlazorAuthService
         try
         {
             var errorMessage = message ?? "Your session has expired. Please log in again.";
-            
+
             // Only use JavaScript if we're in an interactive context
             if (IsInteractiveContext())
             {
@@ -149,8 +149,8 @@ public class BlazorAuthService : IBlazorAuthService
         {
             var uri = new Uri(_navigationManager.Uri);
             var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
-            
-            return query["authError"] == "true" || 
+
+            return query["authError"] == "true" ||
                    query["refreshError"] == "true" ||
                    query["error"] != null;
         }
@@ -171,23 +171,23 @@ public class BlazorAuthService : IBlazorAuthService
         {
             var uri = new Uri(_navigationManager.Uri);
             var query = System.Web.HttpUtility.ParseQueryString(uri.Query);
-            
+
             if (query["authError"] == "true")
             {
                 return "Authentication failed. Please try logging in again.";
             }
-            
+
             if (query["refreshError"] == "true")
             {
                 return "Token refresh failed. Please log in again.";
             }
-            
+
             var error = query["error"];
             if (!string.IsNullOrEmpty(error))
             {
                 return $"Authentication error: {error}";
             }
-            
+
             return null;
         }
         catch (Exception ex)
@@ -224,7 +224,7 @@ public class BlazorAuthService : IBlazorAuthService
             using var httpClient = new HttpClient();
             httpClient.BaseAddress = new Uri(_navigationManager.BaseUri);
             httpClient.Timeout = TimeSpan.FromSeconds(5); // Short timeout
-            
+
             var response = await httpClient.GetAsync("/auth/status");
             if (response.IsSuccessStatusCode)
             {
@@ -233,12 +233,12 @@ public class BlazorAuthService : IBlazorAuthService
                 {
                     PropertyNameCaseInsensitive = true
                 });
-                
+
                 if (authStatus?.Authenticated == true && authStatus.NeedsRefresh != true)
                 {
                     return true; // Authentication is valid
                 }
-                
+
                 if (authStatus?.Authenticated == true && authStatus.NeedsRefresh == true)
                 {
                     _logger.LogInformation("Token needs refresh, triggering re-authentication");
@@ -246,7 +246,7 @@ public class BlazorAuthService : IBlazorAuthService
                     return false;
                 }
             }
-            
+
             // Not authenticated or status check failed
             _logger.LogWarning("Authentication status check failed or user not authenticated");
             await TriggerReauthenticationAsync();

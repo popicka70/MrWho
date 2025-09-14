@@ -17,7 +17,7 @@ public interface IJarRequestValidator
     Task<JarValidationResult> ValidateAsync(string jwt, string? queryClientId, CancellationToken ct = default);
 }
 
-public sealed record JarValidationResult(bool Success, string? Error, string? ErrorDescription, string? ClientId, string? Algorithm, Dictionary<string,string>? Parameters);
+public sealed record JarValidationResult(bool Success, string? Error, string? ErrorDescription, string? ClientId, string? Algorithm, Dictionary<string, string>? Parameters);
 
 internal sealed class JarRequestValidator : IJarRequestValidator
 {
@@ -55,8 +55,15 @@ internal sealed class JarRequestValidator : IJarRequestValidator
 
     public async Task<JarValidationResult> ValidateAsync(string jwt, string? queryClientId, CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(jwt)) return new(false, OpenIddict.Abstractions.OpenIddictConstants.Errors.InvalidRequestObject, "empty request object", null, null, null);
-        if (jwt.Count(c => c=='.')!=2) return new(false, OpenIddict.Abstractions.OpenIddictConstants.Errors.InvalidRequestObject, "request object must be JWT", null, null, null);
+        if (string.IsNullOrWhiteSpace(jwt))
+        {
+            return new(false, OpenIddict.Abstractions.OpenIddictConstants.Errors.InvalidRequestObject, "empty request object", null, null, null);
+        }
+
+        if (jwt.Count(c => c == '.') != 2)
+        {
+            return new(false, OpenIddict.Abstractions.OpenIddictConstants.Errors.InvalidRequestObject, "request object must be JWT", null, null, null);
+        }
 
         JwtSecurityToken token;
         var handler = new JwtSecurityTokenHandler();
@@ -65,30 +72,47 @@ internal sealed class JarRequestValidator : IJarRequestValidator
         { _logger.LogDebug(ex, "JAR parse failed"); return new(false, OpenIddict.Abstractions.OpenIddictConstants.Errors.InvalidRequestObject, "invalid request object", null, null, null); }
 
         var alg = token.Header.Alg;
-        if (string.IsNullOrWhiteSpace(alg)) return new(false, OpenIddict.Abstractions.OpenIddictConstants.Errors.InvalidRequestObject, "missing alg", null, null, null);
+        if (string.IsNullOrWhiteSpace(alg))
+        {
+            return new(false, OpenIddict.Abstractions.OpenIddictConstants.Errors.InvalidRequestObject, "missing alg", null, null, null);
+        }
 
         var clientIdClaim = token.Payload.TryGetValue(OpenIddict.Abstractions.OpenIddictConstants.Parameters.ClientId, out var cidObj) ? cidObj?.ToString() : null;
         if (!string.IsNullOrEmpty(queryClientId) && !string.IsNullOrEmpty(clientIdClaim) && !string.Equals(queryClientId, clientIdClaim, StringComparison.Ordinal))
+        {
             return new(false, OpenIddict.Abstractions.OpenIddictConstants.Errors.InvalidRequestObject, "client_id mismatch", null, alg, null);
+        }
+
         var effectiveClientId = clientIdClaim ?? queryClientId;
         if (string.IsNullOrEmpty(effectiveClientId))
+        {
             return new(false, OpenIddict.Abstractions.OpenIddictConstants.Errors.InvalidRequestObject, "client_id missing", null, alg, null);
+        }
 
         var client = await _db.Clients.AsNoTracking().FirstOrDefaultAsync(c => c.ClientId == effectiveClientId, ct);
         if (client == null || !client.IsEnabled)
+        {
             return new(false, OpenIddict.Abstractions.OpenIddictConstants.Errors.InvalidClient, "unknown client", effectiveClientId, alg, null);
+        }
 
         var expSeconds = token.Payload.Expiration; var now = DateTimeOffset.UtcNow;
         var exp = expSeconds.HasValue ? DateTimeOffset.FromUnixTimeSeconds(expSeconds.Value) : (DateTimeOffset?)null;
         if (exp is null || exp < now || exp > now.Add(_options.MaxExp))
+        {
             return new(false, OpenIddict.Abstractions.OpenIddictConstants.Errors.InvalidRequestObject, "exp invalid", effectiveClientId, alg, null);
+        }
 
         if (_options.RequireJti)
         {
             if (!token.Payload.TryGetValue("jti", out var jtiObj) || string.IsNullOrWhiteSpace(jtiObj?.ToString()))
+            {
                 return new(false, OpenIddict.Abstractions.OpenIddictConstants.Errors.InvalidRequestObject, "jti required", effectiveClientId, alg, null);
-            if (!_replay.TryAdd("jar:jti:"+jtiObj, exp.Value))
+            }
+
+            if (!_replay.TryAdd("jar:jti:" + jtiObj, exp.Value))
+            {
                 return new(false, OpenIddict.Abstractions.OpenIddictConstants.Errors.InvalidRequestObject, "jti replay", effectiveClientId, alg, null);
+            }
         }
 
         var tvp = new TokenValidationParameters
@@ -155,16 +179,20 @@ internal sealed class JarRequestValidator : IJarRequestValidator
             var jsonHandler = new JsonWebTokenHandler();
             var result = await jsonHandler.ValidateTokenAsync(jwt, tvp);
             if (!result.IsValid)
+            {
                 return new(false, OpenIddict.Abstractions.OpenIddictConstants.Errors.InvalidRequestObject, "signature invalid", effectiveClientId, alg, null);
+            }
         }
         catch (Exception ex)
         { _logger.LogDebug(ex, "JAR signature validation failed"); return new(false, OpenIddict.Abstractions.OpenIddictConstants.Errors.InvalidRequestObject, "signature invalid", effectiveClientId, alg, null); }
 
-        var dict = new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase);
+        var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var p in _recognized)
         {
             if (token.Payload.TryGetValue(p, out var val) && val is not null)
+            {
                 dict[p] = val.ToString()!;
+            }
         }
         dict[OpenIddict.Abstractions.OpenIddictConstants.Parameters.ClientId] = effectiveClientId;
         return new(true, null, null, effectiveClientId, alg, dict);

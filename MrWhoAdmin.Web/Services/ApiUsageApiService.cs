@@ -30,7 +30,11 @@ public class ApiUsageApiService : IApiUsageApiService
         {
             await SetAuthorizationHeaderAsync();
             var resp = await _httpClient.GetAsync("api/monitoring/usage/overview", ct);
-            if (!resp.IsSuccessStatusCode) return null;
+            if (!resp.IsSuccessStatusCode)
+            {
+                return null;
+            }
+
             var json = await resp.Content.ReadAsStringAsync(ct);
             return JsonSerializer.Deserialize<ApiUsageOverviewDto>(json, _jsonOptions);
         }
@@ -47,7 +51,11 @@ public class ApiUsageApiService : IApiUsageApiService
         {
             await SetAuthorizationHeaderAsync();
             var resp = await _httpClient.GetAsync($"api/monitoring/usage/top-clients?take={take}", ct);
-            if (!resp.IsSuccessStatusCode) return new();
+            if (!resp.IsSuccessStatusCode)
+            {
+                return new();
+            }
+
             var json = await resp.Content.ReadAsStringAsync(ct);
             return JsonSerializer.Deserialize<List<ApiUsageTopClientDto>>(json, _jsonOptions) ?? new();
         }
@@ -64,7 +72,11 @@ public class ApiUsageApiService : IApiUsageApiService
         {
             await SetAuthorizationHeaderAsync();
             var resp = await _httpClient.GetAsync($"api/monitoring/usage/top-endpoints?take={take}", ct);
-            if (!resp.IsSuccessStatusCode) return new();
+            if (!resp.IsSuccessStatusCode)
+            {
+                return new();
+            }
+
             var json = await resp.Content.ReadAsStringAsync(ct);
             return JsonSerializer.Deserialize<List<ApiEndpointUsageDto>>(json, _jsonOptions) ?? new();
         }
@@ -81,7 +93,11 @@ public class ApiUsageApiService : IApiUsageApiService
         {
             await SetAuthorizationHeaderAsync();
             var resp = await _httpClient.GetAsync($"api/monitoring/usage/timeseries?days={days}", ct);
-            if (!resp.IsSuccessStatusCode) return new();
+            if (!resp.IsSuccessStatusCode)
+            {
+                return new();
+            }
+
             var json = await resp.Content.ReadAsStringAsync(ct);
             return JsonSerializer.Deserialize<List<ApiUsageTimeSeriesPointDto>>(json, _jsonOptions) ?? new();
         }
@@ -95,7 +111,11 @@ public class ApiUsageApiService : IApiUsageApiService
     private async Task SetAuthorizationHeaderAsync()
     {
         var context = _httpContextAccessor.HttpContext;
-        if (context == null) return;
+        if (context == null)
+        {
+            return;
+        }
+
         var token = await context.GetTokenAsync("access_token");
         if (!string.IsNullOrEmpty(token))
         {

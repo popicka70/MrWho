@@ -32,7 +32,9 @@ public sealed class CustomUserInfoHandler : IOpenIddictServerHandler<HandleUserI
     public async ValueTask HandleAsync(HandleUserInfoRequestContext context)
     {
         if (context.IsRequestHandled || context.IsRejected)
+        {
             return;
+        }
 
         // OpenIddict exposes a Principal property on the specific context type even if not visible through events alias.
         var principal = context.AccessTokenPrincipal;
@@ -115,7 +117,11 @@ public sealed class CustomUserInfoHandler : IOpenIddictServerHandler<HandleUserI
     private async Task<List<IdentityResource>> GetIdentityResourcesForScopesAsync(IEnumerable<string> scopes)
     {
         var set = scopes.Select(s => s.Trim()).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        if (set.Count == 0) return new();
+        if (set.Count == 0)
+        {
+            return new();
+        }
+
         return await _db.IdentityResources
             .Include(r => r.UserClaims)
             .Where(r => r.IsEnabled && set.Contains(r.Name))
@@ -128,14 +134,22 @@ public sealed class CustomUserInfoHandler : IOpenIddictServerHandler<HandleUserI
         {
             ["sub"] = user.Id
         };
-        if (idResources.Count == 0) return dict;
+        if (idResources.Count == 0)
+        {
+            return dict;
+        }
+
         var claims = await _userManager.GetClaimsAsync(user);
         var lookup = claims.GroupBy(c => c.Type, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.First().Value, StringComparer.OrdinalIgnoreCase);
         foreach (var res in idResources)
         {
             foreach (var uc in res.UserClaims)
             {
-                if (dict.ContainsKey(uc.ClaimType)) continue;
+                if (dict.ContainsKey(uc.ClaimType))
+                {
+                    continue;
+                }
+
                 if (lookup.TryGetValue(uc.ClaimType, out var val) && !string.IsNullOrWhiteSpace(val))
                 {
                     dict[uc.ClaimType] = val;
@@ -157,7 +171,11 @@ public sealed class CustomUserInfoHandler : IOpenIddictServerHandler<HandleUserI
     {
         async Task Add(string type)
         {
-            if (onlyIfMissing && userInfo.ContainsKey(type)) return;
+            if (onlyIfMissing && userInfo.ContainsKey(type))
+            {
+                return;
+            }
+
             await AddClaimIfPresent(userInfo, user, type);
         }
         switch (scope.ToLowerInvariant())
@@ -171,7 +189,10 @@ public sealed class CustomUserInfoHandler : IOpenIddictServerHandler<HandleUserI
                 if (!userInfo.ContainsKey("role"))
                 {
                     var roles = await GetRolesAsync(user);
-                    if (roles.Length > 0) userInfo["role"] = roles;
+                    if (roles.Length > 0)
+                    {
+                        userInfo["role"] = roles;
+                    }
                 }
                 break;
             case "address": await Add("address"); break;
@@ -180,9 +201,17 @@ public sealed class CustomUserInfoHandler : IOpenIddictServerHandler<HandleUserI
 
     private async Task AddClaimIfPresent(Dictionary<string, object> userInfo, IdentityUser user, string type)
     {
-        if (userInfo.ContainsKey(type)) return;
+        if (userInfo.ContainsKey(type))
+        {
+            return;
+        }
+
         var val = await GetClaimValueAsync(user, type);
-        if (val == null) return;
+        if (val == null)
+        {
+            return;
+        }
+
         userInfo[type] = val is bool b ? b : val;
     }
 
@@ -221,7 +250,11 @@ public sealed class CustomUserInfoHandler : IOpenIddictServerHandler<HandleUserI
 
     private string GetDisplayName(IdentityUser user)
     {
-        if (string.IsNullOrWhiteSpace(user.UserName)) return "Unknown User";
+        if (string.IsNullOrWhiteSpace(user.UserName))
+        {
+            return "Unknown User";
+        }
+
         var input = user.UserName.Contains('@') ? user.UserName.Split('@')[0] : user.UserName;
         var friendly = input.Replace('.', ' ').Replace('_', ' ').Replace('-', ' ');
         return string.Join(" ", friendly.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(w => char.ToUpper(w[0]) + w[1..].ToLower()));

@@ -40,10 +40,14 @@ public class ScopesApiService : IScopesApiService
             };
 
             if (!string.IsNullOrWhiteSpace(search))
+            {
                 queryParams.Add($"search={Uri.EscapeDataString(search)}");
+            }
 
             if (type.HasValue)
+            {
                 queryParams.Add($"type={type.Value}");
+            }
 
             var queryString = string.Join("&", queryParams);
             var response = await _httpClient.GetAsync($"api/scopes?{queryString}");

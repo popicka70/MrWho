@@ -8,6 +8,7 @@ using Microsoft.Extensions.Hosting;
 using MrWho.Data;
 using MrWho.Services;
 using MrWho.Services.Mediator;
+using MrWho.Shared.Constants; // added
 
 namespace MrWho.Handlers.Auth;
 
@@ -48,6 +49,7 @@ public sealed class LoginPostHandler : IRequestHandler<MrWho.Endpoints.Auth.Logi
         var model = request.Model;
         var returnUrl = request.ReturnUrl;
         var clientId = request.ClientId;
+        var registerDeviceFirst = http.Request.Form["registerDeviceFirst"] == "1"; // NEW FLAG
 
         if (_loginHelper.ShouldUseRecaptcha())
         {
@@ -56,9 +58,9 @@ public sealed class LoginPostHandler : IRequestHandler<MrWho.Endpoints.Auth.Logi
             if (!recaptchaOk)
             {
                 var vd = NewViewData();
-                vd["ReturnUrl"] = returnUrl;
-                vd["ClientId"] = clientId;
-                vd["RecaptchaSiteKey"] = _loginHelper.GetRecaptchaSiteKey();
+                vd[ViewDataKeys.ReturnUrl] = returnUrl;
+                vd[ViewDataKeys.ClientId] = clientId;
+                vd[ViewDataKeys.RecaptchaSiteKey] = _loginHelper.GetRecaptchaSiteKey();
                 vd.ModelState.AddModelError(string.Empty, "reCAPTCHA verification failed. Please try again.");
                 return new ViewResult { ViewName = "Login", ViewData = viewDataWithModel(vd, model) };
             }
@@ -75,9 +77,9 @@ public sealed class LoginPostHandler : IRequestHandler<MrWho.Endpoints.Auth.Logi
         }
 
         var viewData = NewViewData();
-        viewData["ReturnUrl"] = returnUrl;
-        viewData["ClientId"] = clientId;
-        viewData["RecaptchaSiteKey"] = _loginHelper.GetRecaptchaSiteKey();
+        viewData[ViewDataKeys.ReturnUrl] = returnUrl;
+        viewData[ViewDataKeys.ClientId] = clientId;
+        viewData[ViewDataKeys.RecaptchaSiteKey] = _loginHelper.GetRecaptchaSiteKey();
 
         string? clientName = null;
         if (!string.IsNullOrEmpty(clientId))
@@ -89,9 +91,9 @@ public sealed class LoginPostHandler : IRequestHandler<MrWho.Endpoints.Auth.Logi
             }
             catch { }
         }
-        viewData["ClientName"] = clientName;
+        viewData[ViewDataKeys.ClientName] = clientName;
 
-        _logger.LogDebug("Login POST: Email={Email}, ReturnUrl={ReturnUrl}, ClientId={ClientId}", model.Email, returnUrl, clientId);
+        _logger.LogDebug("Login POST: Email={Email}, ReturnUrl={ReturnUrl}, ClientId={ClientId}, RegisterDeviceFirst={RegisterDeviceFirst}", model.Email, returnUrl, clientId, registerDeviceFirst);
 
         List<KeyValuePair<string, string>> modelStateErrors = new();
         bool valid = http.Request.HasFormContentType && IsModelStateValid(model, out modelStateErrors);
@@ -99,19 +101,24 @@ public sealed class LoginPostHandler : IRequestHandler<MrWho.Endpoints.Auth.Logi
         {
             _logger.LogDebug("Login ModelState invalid");
             var vd = NewViewData();
-            foreach (var err in modelStateErrors) vd.ModelState.AddModelError(err.Key, err.Value);
-            vd["ReturnUrl"] = returnUrl; vd["ClientId"] = clientId; vd["RecaptchaSiteKey"] = viewData["RecaptchaSiteKey"];
-            vd["ClientName"] = clientName;
+            foreach (var err in modelStateErrors)
+            {
+                vd.ModelState.AddModelError(err.Key, err.Value);
+            }
+
+            vd[ViewDataKeys.ReturnUrl] = returnUrl; vd[ViewDataKeys.ClientId] = clientId; vd[ViewDataKeys.RecaptchaSiteKey] = viewData[ViewDataKeys.RecaptchaSiteKey];
+            vd[ViewDataKeys.ClientName] = clientName;
             return new ViewResult { ViewName = "Login", ViewData = viewDataWithModel(vd, model) };
         }
 
+        // ===================== CODE (TOTP) LOGIN PATH =====================
         if (model.UseCode)
         {
             if (string.IsNullOrWhiteSpace(model.Email) || string.IsNullOrWhiteSpace(model.Code))
             {
                 var vd = NewViewData();
                 vd.ModelState.AddModelError(string.Empty, "Email and code are required.");
-                vd["ReturnUrl"] = returnUrl; vd["ClientId"] = clientId; vd["RecaptchaSiteKey"] = viewData["RecaptchaSiteKey"]; vd["ClientName"] = clientName;
+                vd[ViewDataKeys.ReturnUrl] = returnUrl; vd[ViewDataKeys.ClientId] = clientId; vd[ViewDataKeys.RecaptchaSiteKey] = viewData[ViewDataKeys.RecaptchaSiteKey]; vd[ViewDataKeys.ClientName] = clientName;
                 return new ViewResult { ViewName = "Login", ViewData = viewDataWithModel(vd, model) };
             }
 
@@ -119,14 +126,14 @@ public sealed class LoginPostHandler : IRequestHandler<MrWho.Endpoints.Auth.Logi
             if (user == null)
             {
                 var vd = NewViewData(); vd.ModelState.AddModelError(string.Empty, "Invalid login attempt.");
-                vd["ReturnUrl"] = returnUrl; vd["ClientId"] = clientId; vd["RecaptchaSiteKey"] = viewData["RecaptchaSiteKey"]; vd["ClientName"] = clientName;
+                vd[ViewDataKeys.ReturnUrl] = returnUrl; vd[ViewDataKeys.ClientId] = clientId; vd[ViewDataKeys.RecaptchaSiteKey] = viewData[ViewDataKeys.RecaptchaSiteKey]; vd[ViewDataKeys.ClientName] = clientName;
                 return new ViewResult { ViewName = "Login", ViewData = viewDataWithModel(vd, model) };
             }
 
             if (!await _userManager.GetTwoFactorEnabledAsync(user))
             {
                 var vd = NewViewData(); vd.ModelState.AddModelError(string.Empty, "This account does not allow code-only sign in.");
-                vd["ReturnUrl"] = returnUrl; vd["ClientId"] = clientId; vd["RecaptchaSiteKey"] = viewData["RecaptchaSiteKey"]; vd["ClientName"] = clientName;
+                vd[ViewDataKeys.ReturnUrl] = returnUrl; vd[ViewDataKeys.ClientId] = clientId; vd[ViewDataKeys.RecaptchaSiteKey] = viewData[ViewDataKeys.RecaptchaSiteKey]; vd[ViewDataKeys.ClientName] = clientName;
                 return new ViewResult { ViewName = "Login", ViewData = viewDataWithModel(vd, model) };
             }
 
@@ -135,7 +142,7 @@ public sealed class LoginPostHandler : IRequestHandler<MrWho.Endpoints.Auth.Logi
             if (!isValid)
             {
                 var vd = NewViewData(); vd.ModelState.AddModelError(string.Empty, "Invalid code.");
-                vd["ReturnUrl"] = returnUrl; vd["ClientId"] = clientId; vd["RecaptchaSiteKey"] = viewData["RecaptchaSiteKey"]; vd["ClientName"] = clientName;
+                vd[ViewDataKeys.ReturnUrl] = returnUrl; vd[ViewDataKeys.ClientId] = clientId; vd[ViewDataKeys.RecaptchaSiteKey] = viewData[ViewDataKeys.RecaptchaSiteKey]; vd[ViewDataKeys.ClientName] = clientName;
                 return new ViewResult { ViewName = "Login", ViewData = viewDataWithModel(vd, model) };
             }
 
@@ -170,14 +177,28 @@ public sealed class LoginPostHandler : IRequestHandler<MrWho.Endpoints.Auth.Logi
                 catch (Exception ex) { _logger.LogWarning(ex, "Failed to sign in with client-specific cookie for client {ClientId}", clientId); }
             }
 
+            // NEW: Direct device registration redirect
+            if (registerDeviceFirst)
+            {
+                var deviceReg = BuildDeviceRegistrationUrl(returnUrl, clientId);
+                return new RedirectResult(deviceReg);
+            }
+
             if (!string.IsNullOrEmpty(returnUrl))
             {
-                if (returnUrl.Contains("/connect/authorize")) return new RedirectResult(returnUrl);
-                else if (_loginHelper.IsLocalUrl(returnUrl)) return new RedirectResult(returnUrl);
+                if (returnUrl.Contains("/connect/authorize"))
+                {
+                    return new RedirectResult(returnUrl);
+                }
+                else if (_loginHelper.IsLocalUrl(returnUrl))
+                {
+                    return new RedirectResult(returnUrl);
+                }
             }
             return new RedirectToActionResult("Index", "Home", null);
         }
 
+        // ===================== PASSWORD LOGIN PATH =====================
         var result = await _signInManager.PasswordSignInAsync(model.Email, model.Password, model.RememberMe, lockoutOnFailure: false);
         _logger.LogDebug("Login attempt result: Success={Success}, Requires2FA={RequiresTwoFactor}", result.Succeeded, result.RequiresTwoFactor);
 
@@ -192,7 +213,7 @@ public sealed class LoginPostHandler : IRequestHandler<MrWho.Endpoints.Auth.Logi
             if (user == null)
             {
                 var vd = NewViewData(); vd.ModelState.AddModelError(string.Empty, "Authentication error occurred.");
-                vd["ReturnUrl"] = returnUrl; vd["ClientId"] = clientId; vd["RecaptchaSiteKey"] = viewData["RecaptchaSiteKey"]; vd["ClientName"] = clientName;
+                vd[ViewDataKeys.ReturnUrl] = returnUrl; vd[ViewDataKeys.ClientId] = clientId; vd[ViewDataKeys.RecaptchaSiteKey] = viewData[ViewDataKeys.RecaptchaSiteKey]; vd[ViewDataKeys.ClientName] = clientName;
                 return new ViewResult { ViewName = "Login", ViewData = viewDataWithModel(vd, model) };
             }
 
@@ -225,19 +246,41 @@ public sealed class LoginPostHandler : IRequestHandler<MrWho.Endpoints.Auth.Logi
                 catch (Exception ex) { _logger.LogWarning(ex, "Failed to sign in with client-specific cookie for client {ClientId}", clientId); }
             }
 
+            // NEW: Direct device registration redirect after password sign-in
+            if (registerDeviceFirst)
+            {
+                var deviceReg = BuildDeviceRegistrationUrl(returnUrl, clientId);
+                return new RedirectResult(deviceReg);
+            }
+
             if (!string.IsNullOrEmpty(returnUrl))
             {
-                if (returnUrl.Contains("/connect/authorize")) return new RedirectResult(returnUrl);
-                else if (_loginHelper.IsLocalUrl(returnUrl)) return new RedirectResult(returnUrl);
+                if (returnUrl.Contains("/connect/authorize"))
+                {
+                    return new RedirectResult(returnUrl);
+                }
+                else if (_loginHelper.IsLocalUrl(returnUrl))
+                {
+                    return new RedirectResult(returnUrl);
+                }
             }
             return new RedirectToActionResult("Index", "Home", null);
         }
         else
         {
             var vd = NewViewData(); vd.ModelState.AddModelError(string.Empty, "Invalid login attempt.");
-            vd["ReturnUrl"] = returnUrl; vd["ClientId"] = clientId; vd["RecaptchaSiteKey"] = viewData["RecaptchaSiteKey"]; vd["ClientName"] = clientName;
+            vd[ViewDataKeys.ReturnUrl] = returnUrl; vd[ViewDataKeys.ClientId] = clientId; vd[ViewDataKeys.RecaptchaSiteKey] = viewData[ViewDataKeys.RecaptchaSiteKey]; vd[ViewDataKeys.ClientName] = clientName;
             return new ViewResult { ViewName = "Login", ViewData = viewDataWithModel(vd, model) };
         }
+    }
+
+    private static string BuildDeviceRegistrationUrl(string? originalReturnUrl, string? clientId)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrEmpty(originalReturnUrl)) parts.Add("postRegReturn=" + Uri.EscapeDataString(originalReturnUrl));
+        if (!string.IsNullOrEmpty(clientId)) parts.Add("clientId=" + Uri.EscapeDataString(clientId));
+        var url = "/device-management/register" + (parts.Count > 0 ? ("?" + string.Join("&", parts)) : string.Empty);
+        return url;
     }
 
     private static string BuildAccessDeniedUrl(string? returnUrl, string? clientId)
@@ -257,13 +300,27 @@ public sealed class LoginPostHandler : IRequestHandler<MrWho.Endpoints.Auth.Logi
         if (model is null) { errors.Add(new("", "Invalid model")); return false; }
         if (!model.UseCode)
         {
-            if (string.IsNullOrWhiteSpace(model.Email)) errors.Add(new("Email", "The Email field is required."));
-            if (string.IsNullOrWhiteSpace(model.Password)) errors.Add(new("Password", "The Password field is required."));
+            if (string.IsNullOrWhiteSpace(model.Email))
+            {
+                errors.Add(new("Email", "The Email field is required."));
+            }
+
+            if (string.IsNullOrWhiteSpace(model.Password))
+            {
+                errors.Add(new("Password", "The Password field is required."));
+            }
         }
         else
         {
-            if (string.IsNullOrWhiteSpace(model.Email)) errors.Add(new("Email", "The Email field is required."));
-            if (string.IsNullOrWhiteSpace(model.Code)) errors.Add(new("Code", "The Code field is required."));
+            if (string.IsNullOrWhiteSpace(model.Email))
+            {
+                errors.Add(new("Email", "The Email field is required."));
+            }
+
+            if (string.IsNullOrWhiteSpace(model.Code))
+            {
+                errors.Add(new("Code", "The Code field is required."));
+            }
         }
         return errors.Count == 0;
     }

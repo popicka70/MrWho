@@ -1,12 +1,13 @@
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Mvc;
-using OpenIddict.Client.AspNetCore;
-using Microsoft.AspNetCore.Identity;
 using System.Security.Claims;
-using MrWho.Services;
-using MrWho.Data;
-using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using MrWho.Data;
+using MrWho.Services;
+using MrWho.Shared.Constants; // added
+using OpenIddict.Client.AspNetCore;
 
 namespace MrWho.Controllers;
 
@@ -20,6 +21,18 @@ public class ExternalAuthController : ControllerBase
     private readonly ILogger<ExternalAuthController> _logger;
     private readonly ApplicationDbContext _db;
     private readonly IUserRealmValidationService _realmValidationService; // added
+
+    // Property/claim key constants (scoped to this controller)
+    private static class ExtKeys
+    {
+        public const string RegistrationId = "extRegistrationId";
+        public const string ProviderName = "extProviderName";
+        public const string ReturnUrl = ViewDataKeys.ReturnUrl; // "ReturnUrl" to align with existing keys
+        public const string ClientId = ViewDataKeys.ClientId;   // "ClientId"
+        public const string ExtRegIdClaim = "ext_reg_id";
+        public const string ExtProviderClaim = "ext_provider";
+        public const string ExtSubjectClaim = "ext_sub";
+    }
 
     public ExternalAuthController(
         UserManager<IdentityUser> userManager,
@@ -57,7 +70,7 @@ public class ExternalAuthController : ControllerBase
             if (result.Properties?.Items != null)
             {
                 // Prefer custom roundtripped id if present
-                if (result.Properties.Items.TryGetValue("extRegistrationId", out var regIdCustom) && !string.IsNullOrWhiteSpace(regIdCustom))
+                if (result.Properties.Items.TryGetValue(ExtKeys.RegistrationId, out var regIdCustom) && !string.IsNullOrWhiteSpace(regIdCustom))
                 {
                     regId = regIdCustom;
                 }
@@ -66,7 +79,7 @@ public class ExternalAuthController : ControllerBase
                     regId = regIdStd;
                 }
 
-                if (result.Properties.Items.TryGetValue("extProviderName", out var extProv) && !string.IsNullOrWhiteSpace(extProv))
+                if (result.Properties.Items.TryGetValue(ExtKeys.ProviderName, out var extProv) && !string.IsNullOrWhiteSpace(extProv))
                 {
                     providerName = extProv;
                 }
@@ -87,11 +100,11 @@ public class ExternalAuthController : ControllerBase
         string? clientId = null;
         if (result.Properties?.Items != null)
         {
-            result.Properties.Items.TryGetValue("returnUrl", out returnUrl);
-            result.Properties.Items.TryGetValue("clientId", out clientId);
+            result.Properties.Items.TryGetValue(ExtKeys.ReturnUrl, out returnUrl);
+            result.Properties.Items.TryGetValue(ExtKeys.ClientId, out clientId);
         }
-        returnUrl ??= Request.Query["returnUrl"].ToString();
-        clientId ??= Request.Query["clientId"].ToString();
+        returnUrl ??= Request.Query[QueryParameterNames.ReturnUrl].ToString();
+        clientId ??= Request.Query[QueryParameterNames.ClientId].ToString();
 
         var principal = result.Principal!;
         var email = principal.FindFirst("email")?.Value
@@ -142,9 +155,21 @@ public class ExternalAuthController : ControllerBase
             var given = principal.FindFirst("given_name")?.Value;
             var family = principal.FindFirst("family_name")?.Value;
             var claims = new List<Claim>();
-            if (!string.IsNullOrWhiteSpace(name)) claims.Add(new Claim("name", name));
-            if (!string.IsNullOrWhiteSpace(given)) claims.Add(new Claim("given_name", given));
-            if (!string.IsNullOrWhiteSpace(family)) claims.Add(new Claim("family_name", family));
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+                claims.Add(new Claim("name", name));
+            }
+
+            if (!string.IsNullOrWhiteSpace(given))
+            {
+                claims.Add(new Claim("given_name", given));
+            }
+
+            if (!string.IsNullOrWhiteSpace(family))
+            {
+                claims.Add(new Claim("family_name", family));
+            }
+
             if (claims.Count > 0)
             {
                 await _userManager.AddClaimsAsync(user, claims);
@@ -326,9 +351,9 @@ public class ExternalAuthController : ControllerBase
 
         // Build additional per-session claims to remember external provider for cascade sign-out
         var sessionClaims = new List<Claim>();
-        if (!string.IsNullOrWhiteSpace(regId)) sessionClaims.Add(new Claim("ext_reg_id", regId));
-        if (!string.IsNullOrWhiteSpace(providerName)) sessionClaims.Add(new Claim("ext_provider", providerName));
-        if (!string.IsNullOrWhiteSpace(subject)) sessionClaims.Add(new Claim("ext_sub", subject));
+        if (!string.IsNullOrWhiteSpace(regId)) sessionClaims.Add(new Claim(ExtKeys.ExtRegIdClaim, regId));
+        if (!string.IsNullOrWhiteSpace(providerName)) sessionClaims.Add(new Claim(ExtKeys.ExtProviderClaim, providerName));
+        if (!string.IsNullOrWhiteSpace(subject)) sessionClaims.Add(new Claim(ExtKeys.ExtSubjectClaim, subject));
 
         await _signInManager.SignInWithClaimsAsync(user, isPersistent: false, sessionClaims);
 
@@ -373,12 +398,7 @@ public class ExternalAuthController : ControllerBase
     [IgnoreAntiforgeryToken]
     public IActionResult SignoutCallback([FromQuery] string? returnUrl = null)
     {
-        try
-        {
-            HttpContext.Session.Remove("ExternalRegistrationId");
-        }
-        catch { }
-
+        try { HttpContext.Session.Remove("ExternalRegistrationId"); } catch { }
         try
         {
             var resume = HttpContext.Session.GetString("ExternalSignoutResumeUrl");
@@ -394,15 +414,13 @@ public class ExternalAuthController : ControllerBase
         {
             return Redirect(returnUrl);
         }
-
         return Ok(new { Message = "External sign-out completed" });
     }
 
     private static string BuildDisplayNameFromEmailOrUserName(string? input)
     {
         if (string.IsNullOrWhiteSpace(input)) return "New User";
-        var source = input;
-        if (source.Contains('@')) source = source.Split('@')[0];
+        var source = input.Contains('@') ? input.Split('@')[0] : input;
         var friendly = source.Replace('.', ' ').Replace('_', ' ').Replace('-', ' ');
         var words = friendly.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         return string.Join(' ', words.Select(w => char.ToUpper(w[0]) + w.Substring(1).ToLower()));
@@ -414,8 +432,8 @@ public class ExternalAuthController : ControllerBase
         var cid = !string.IsNullOrEmpty(clientId) ? Uri.EscapeDataString(clientId) : string.Empty;
         var url = "/connect/access-denied";
         var hasQuery = false;
-        if (!string.IsNullOrEmpty(ret)) { url += $"?returnUrl={ret}"; hasQuery = true; }
-        if (!string.IsNullOrEmpty(cid)) { url += hasQuery ? $"&clientId={cid}" : $"?clientId={cid}"; }
+        if (!string.IsNullOrEmpty(ret)) { url += $"?{QueryParameterNames.ReturnUrl}={ret}"; hasQuery = true; }
+        if (!string.IsNullOrEmpty(cid)) { url += hasQuery ? $"&{QueryParameterNames.ClientId}={cid}" : $"?{QueryParameterNames.ClientId}={cid}"; }
         return url;
     }
 }

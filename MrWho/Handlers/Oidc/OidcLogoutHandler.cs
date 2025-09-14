@@ -1,14 +1,14 @@
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore; // for extension visibility
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using MrWho.Services;
 using MrWho.Services.Mediator;
-using OpenIddict.Server.AspNetCore;
-using Microsoft.AspNetCore; // for extension visibility
-using Microsoft.AspNetCore.Authentication;
 using OpenIddict.Client.AspNetCore;
+using OpenIddict.Server.AspNetCore;
 
 namespace MrWho.Handlers.Oidc;
 
@@ -78,13 +78,21 @@ public sealed class OidcLogoutHandler : IRequestHandler<MrWho.Endpoints.OidcLogo
             }
 
             await _dynamicCookieService.SignOutFromClientAsync(clientId);
-            if (audit != null) await audit.WriteAsync("auth.security", "logout.client", new { clientId }, "info", actorClientId: clientId, ip: context.Connection.RemoteIpAddress?.ToString());
+            if (audit != null)
+            {
+                await audit.WriteAsync("auth.security", "logout.client", new { clientId }, "info", actorClientId: clientId, ip: context.Connection.RemoteIpAddress?.ToString());
+            }
+
             return Results.SignOut(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error processing OIDC logout");
-            if (audit != null) await audit.WriteAsync("auth.security", "logout.error", new { ex = ex.Message }, "error", ip: context.Connection.RemoteIpAddress?.ToString());
+            if (audit != null)
+            {
+                await audit.WriteAsync("auth.security", "logout.error", new { ex = ex.Message }, "error", ip: context.Connection.RemoteIpAddress?.ToString());
+            }
+
             return Results.Problem("Error processing logout");
         }
     }

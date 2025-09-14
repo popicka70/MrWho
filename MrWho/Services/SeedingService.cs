@@ -2,8 +2,8 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using MrWho.Data;
 using MrWho.Models;
-using MrWho.Shared;
 using MrWho.Services;
+using MrWho.Shared;
 using OpenIddict.Abstractions;
 
 namespace MrWho.Services;
@@ -66,13 +66,13 @@ public class SeedingService : ISeedingService
         {
             await _claimTypeSeederService.SeedClaimTypesAsync();
         }
-        
+
         // Seed predefined external identity providers (disabled by default)
         await SeedPredefinedIdentityProvidersAsync();
-        
+
         // Seed default OIDC applications
         await SeedDefaultApplications();
-        
+
         // NEW: Ensure essential admin/demo data + admin client (needed for tests) -> registers with OpenIddict
         try
         {
@@ -161,7 +161,7 @@ public class SeedingService : ISeedingService
         var defaultClient = await _context.Clients
             .Include(c => c.RedirectUris)
             .Include(c => c.PostLogoutUris)
-            .Include(c => c.Scopes)  
+            .Include(c => c.Scopes)
             .Include(c => c.Permissions)
             .FirstOrDefaultAsync(c => c.ClientId == "postman_client");
 
@@ -210,18 +210,18 @@ public class SeedingService : ISeedingService
             {
                 var role = new IdentityRole(roleName);
                 var result = await _roleManager.CreateAsync(role);
-                
+
                 if (result.Succeeded)
                 {
                     // Add description and enabled status as role claims
                     await _roleManager.AddClaimAsync(role, new System.Security.Claims.Claim("description", description));
                     await _roleManager.AddClaimAsync(role, new System.Security.Claims.Claim("enabled", "true"));
-                    
+
                     _logger.LogInformation("Created default role: {RoleName} with description: {Description}", roleName, description);
                 }
                 else
                 {
-                    _logger.LogError("Failed to create role {RoleName}: {Errors}", 
+                    _logger.LogError("Failed to create role {RoleName}: {Errors}",
                         roleName, string.Join(", ", result.Errors.Select(e => e.Description)));
                 }
             }

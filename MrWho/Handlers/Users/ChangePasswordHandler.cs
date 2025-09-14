@@ -25,7 +25,7 @@ public class ChangePasswordHandler : IChangePasswordHandler
             }
 
             var result = await _userManager.ChangePasswordAsync(user, request.CurrentPassword, request.NewPassword);
-            
+
             if (result.Succeeded)
             {
                 _logger.LogInformation("Password changed successfully for user {UserId}", id);

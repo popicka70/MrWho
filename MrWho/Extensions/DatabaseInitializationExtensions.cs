@@ -1,8 +1,8 @@
+using System.Net.Sockets;
 using Microsoft.EntityFrameworkCore;
 using MrWho.Data;
 using MrWho.Services;
 using Npgsql; // for NpgsqlException
-using System.Net.Sockets;
 
 namespace MrWho.Extensions;
 

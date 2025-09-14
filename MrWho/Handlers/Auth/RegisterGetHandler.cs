@@ -1,14 +1,15 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
-using MrWho.Services.Mediator;
-using MrWho.Shared.Models;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using MrWho.Data;
 using MrWho.Options;
+using MrWho.Services.Mediator;
+using MrWho.Shared.Constants; // added
+using MrWho.Shared.Models;
 
 namespace MrWho.Handlers.Auth;
 
@@ -32,8 +33,8 @@ public sealed class RegisterGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Re
         var http = request.HttpContext;
 
         // Capture context so the form can POST it back
-        var returnUrl = http.Request.Query["returnUrl"].ToString();
-        var clientId = http.Request.Query["clientId"].ToString();
+        var returnUrl = http.Request.Query[QueryParameterNames.ReturnUrl].ToString();
+        var clientId = http.Request.Query[QueryParameterNames.ClientId].ToString();
         if (string.IsNullOrEmpty(clientId) && !string.IsNullOrEmpty(returnUrl))
         {
             clientId = TryExtractClientIdFromReturnUrl(returnUrl) ?? clientId;
@@ -41,9 +42,9 @@ public sealed class RegisterGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Re
 
         var vd = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary())
         {
-            ["RecaptchaSiteKey"] = ShouldUseRecaptcha() ? _configuration["GoogleReCaptcha:SiteKey"] : null,
-            ["ReturnUrl"] = returnUrl,
-            ["ClientId"] = clientId
+            [ViewDataKeys.RecaptchaSiteKey] = ShouldUseRecaptcha() ? _configuration["GoogleReCaptcha:SiteKey"] : null,
+            [ViewDataKeys.ReturnUrl] = returnUrl,
+            [ViewDataKeys.ClientId] = clientId
         };
 
         // Compute theme and logo similar to Login
@@ -91,10 +92,25 @@ public sealed class RegisterGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Re
                 themeName = _mrWhoOptions.Value.DefaultThemeName;
             }
 
-            if (!string.IsNullOrWhiteSpace(themeName)) vd["ThemeName"] = themeName;
-            if (!string.IsNullOrWhiteSpace(customCssUrl)) vd["CustomCssUrl"] = customCssUrl;
-            if (!string.IsNullOrWhiteSpace(logoUri)) vd["LogoUri"] = logoUri;
-            if (!string.IsNullOrWhiteSpace(clientName)) vd["ClientName"] = clientName;
+            if (!string.IsNullOrWhiteSpace(themeName))
+            {
+                vd[ViewDataKeys.ThemeName] = themeName;
+            }
+
+            if (!string.IsNullOrWhiteSpace(customCssUrl))
+            {
+                vd[ViewDataKeys.CustomCssUrl] = customCssUrl;
+            }
+
+            if (!string.IsNullOrWhiteSpace(logoUri))
+            {
+                vd[ViewDataKeys.LogoUri] = logoUri;
+            }
+
+            if (!string.IsNullOrWhiteSpace(clientName))
+            {
+                vd[ViewDataKeys.ClientName] = clientName;
+            }
         }
         catch { /* ignore theme errors */ }
 
@@ -103,24 +119,35 @@ public sealed class RegisterGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Re
 
     private bool ShouldUseRecaptcha()
     {
-        if (_env.IsDevelopment()) return false;
+        if (_env.IsDevelopment())
+        {
+            return false;
+        }
+
         var site = _configuration["GoogleReCaptcha:SiteKey"];
         var secret = _configuration["GoogleReCaptcha:SecretKey"];
         var enabledFlag = _configuration["GoogleReCaptcha:Enabled"];
         if (!string.IsNullOrWhiteSpace(enabledFlag) && bool.TryParse(enabledFlag, out var enabled) && !enabled)
+        {
             return false;
+        }
+
         return !string.IsNullOrWhiteSpace(site) && !string.IsNullOrWhiteSpace(secret);
     }
 
     private static string? TryExtractClientIdFromReturnUrl(string? returnUrl)
     {
-        if (string.IsNullOrEmpty(returnUrl)) return null;
+        if (string.IsNullOrEmpty(returnUrl))
+        {
+            return null;
+        }
+
         try
         {
             if (Uri.TryCreate(returnUrl, UriKind.Absolute, out var absUri))
             {
                 var query = System.Web.HttpUtility.ParseQueryString(absUri.Query);
-                return query["client_id"];
+                return query[QueryParameterNames.OidcClientId];
             }
             else
             {
@@ -128,7 +155,7 @@ public sealed class RegisterGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Re
                 if (idx >= 0 && idx < returnUrl.Length - 1)
                 {
                     var query = System.Web.HttpUtility.ParseQueryString(returnUrl.Substring(idx));
-                    return query["client_id"];
+                    return query[QueryParameterNames.OidcClientId];
                 }
             }
         }

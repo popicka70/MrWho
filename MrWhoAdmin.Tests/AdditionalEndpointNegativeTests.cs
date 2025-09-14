@@ -3,7 +3,7 @@ using System.Text.Json;
 namespace MrWhoAdmin.Tests;
 
 [TestClass]
-[TestCategory("Integration")] 
+[TestCategory("Integration")]
 public class AdditionalEndpointNegativeTests
 {
     // Disable redirects and cookies to avoid leaking authentication state from other tests via shared handlers/cookies.
@@ -42,7 +42,7 @@ public class AdditionalEndpointNegativeTests
     public async Task Connect_Token_Invalid_Client_Shows_Error()
     {
         using var client = CreateServerClient();
-        var form = new Dictionary<string,string>
+        var form = new Dictionary<string, string>
         {
             ["grant_type"] = "client_credentials",
             ["client_id"] = "invalid_client_xyz",

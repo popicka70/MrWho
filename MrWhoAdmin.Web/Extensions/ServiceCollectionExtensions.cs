@@ -1,11 +1,11 @@
+using System.Security.Claims;
+using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
-using MrWhoAdmin.Web.Services;
 using MrWhoAdmin.Web.Extensions;
+using MrWhoAdmin.Web.Services;
 using Radzen;
-using System.Security.Claims;
-using System.Text.Json;
 
 namespace MrWhoAdmin.Web.Extensions;
 
@@ -49,13 +49,24 @@ internal sealed class AdminProfileService : IAdminProfileService
     public AdminProfile? GetCurrentProfile(HttpContext? context = null)
     {
         context ??= _http.HttpContext;
-        if (context == null) return _profiles.FirstOrDefault();
+        if (context == null)
+        {
+            return _profiles.FirstOrDefault();
+        }
+
         if (context.Items.TryGetValue(typeof(AdminProfile), out var obj) && obj is AdminProfile cached)
+        {
             return cached;
+        }
+
         if (context.Request.Cookies.TryGetValue(ProfileCookie, out var name))
         {
             var prof = _profiles.FirstOrDefault(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
-            if (prof != null) context.Items[typeof(AdminProfile)] = prof;
+            if (prof != null)
+            {
+                context.Items[typeof(AdminProfile)] = prof;
+            }
+
             return prof ?? _profiles.FirstOrDefault();
         }
         return _profiles.FirstOrDefault();
@@ -66,7 +77,11 @@ internal sealed class AdminProfileService : IAdminProfileService
     public void SetCurrentProfile(HttpContext context, string name)
     {
         var profile = Find(name);
-        if (profile == null) return;
+        if (profile == null)
+        {
+            return;
+        }
+
         if (!context.Response.HasStarted)
         {
             try
@@ -138,7 +153,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<NotificationService>();
         services.AddScoped<TooltipService>();
         services.AddScoped<ContextMenuService>();
-        
+
         return services;
     }
 
@@ -150,29 +165,29 @@ public static class ServiceCollectionExtensions
         services.AddHttpContextAccessor();
         services.AddTransient<AuthenticationDelegatingHandler>();
         services.AddTransient<ProfileApiBaseHandler>();
-        
+
         // Add token refresh service
         services.AddScoped<ITokenRefreshService, TokenRefreshService>();
-        
+
         // Add Blazor authentication service
         services.AddScoped<IBlazorAuthService, BlazorAuthService>();
-        
+
         // Add authentication failure service
         services.AddScoped<IAuthenticationFailureService, AuthenticationFailureService>();
-        
+
         // Add circuit handler service for better Blazor Server error handling
         services.AddScoped<CircuitHandlerService>();
-        
+
         // CRITICAL: Ensure antiforgery services are explicitly added
         // This should be automatic with Blazor Server, but we'll add it explicitly to fix the error
         services.AddAntiforgery();
-        
+
         // Add direct health service for local health checks
         services.AddScoped<IDirectHealthService, DirectHealthService>();
-        
+
         // Register HealthController for direct service calls
         services.AddScoped<MrWhoAdmin.Web.Controllers.HealthController>();
-        
+
         // Configure HttpClient defaults for better connection management
         services.ConfigureHttpClientDefaults(builder =>
         {
@@ -180,7 +195,7 @@ public static class ServiceCollectionExtensions
             {
                 client.Timeout = TimeSpan.FromSeconds(30); // Default timeout
             });
-            
+
             // Configure connection lifetime to prevent stale connections
             builder.ConfigurePrimaryHttpMessageHandler(() =>
             {
@@ -192,7 +207,7 @@ public static class ServiceCollectionExtensions
                 };
             });
         });
-        
+
         return services;
     }
 
@@ -267,12 +282,12 @@ public static class ServiceCollectionExtensions
         {
             // Fallback to existing single-profile logic using first profile OR appsettings Authentication section
             const string adminCookieScheme = "AdminCookies";
-            
+
             // Compute admin cookie name using the same convention as the server
             static string GetMrWhoCookieName(string clientId) => $".MrWho.{clientId}";
             var clientId = profiles.FirstOrDefault()?.ClientId ?? (configuration.GetSection("Authentication").GetValue<string>("ClientId") ?? "mrwho_admin_web");
             var adminCookieName = GetMrWhoCookieName(clientId);
-            
+
             services.AddAuthentication(options =>
             {
                 options.DefaultScheme = adminCookieScheme;
@@ -289,28 +304,28 @@ public static class ServiceCollectionExtensions
                 options.SlidingExpiration = true;
                 options.LoginPath = "/login";
                 options.LogoutPath = "/logout";
-                
+
                 // CRITICAL: Add event to check for session invalidation on each request
                 options.Events.OnValidatePrincipal = async context =>
                 {
                     var cache = context.HttpContext.RequestServices.GetRequiredService<Microsoft.Extensions.Caching.Memory.IMemoryCache>();
                     var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-                    
+
                     if (context.Principal?.Identity?.IsAuthenticated == true)
                     {
                         var subjectClaim = context.Principal.FindFirst("sub")?.Value;
-                        
+
                         if (!string.IsNullOrEmpty(subjectClaim))
                         {
                             // Check if this subject has been logged out via back-channel logout
                             if (cache.TryGetValue($"logout_{subjectClaim}", out var logoutInfo))
                             {
                                 logger.LogInformation("Admin Web session invalidated for subject {Subject} due to back-channel logout", subjectClaim);
-                                
+
                                 // Reject the principal to force re-authentication
                                 context.RejectPrincipal();
                                 await context.HttpContext.SignOutAsync(adminCookieScheme);
-                                
+
                                 // Remove the logout notification after processing
                                 cache.Remove($"logout_{subjectClaim}");
                             }
@@ -478,7 +493,7 @@ public static class ServiceCollectionExtensions
     {
         // Since we're not using UserInfo endpoint due to 403 issue, get claims from ID token
         options.ClaimActions.Clear();
-        
+
         // Remove technical OpenIddict claims we don't need
         options.ClaimActions.DeleteClaim("iss");
         options.ClaimActions.DeleteClaim("aud");
@@ -521,7 +536,7 @@ public static class ServiceCollectionExtensions
                     if (!string.Equals(context.ProtocolMessage.IssuerAddress, desiredAuthorize, StringComparison.OrdinalIgnoreCase))
                     {
                         context.ProtocolMessage.IssuerAddress = desiredAuthorize;
-                      }
+                    }
                 }
                 if (context.Properties?.Items.TryGetValue("force", out var force) == true && force == "1")
                 {

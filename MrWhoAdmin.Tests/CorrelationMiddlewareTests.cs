@@ -1,10 +1,10 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using MrWho.Middleware;
 using MrWho.Services;
-using System.Security.Claims;
 
 namespace MrWhoAdmin.Tests;
 

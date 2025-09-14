@@ -19,7 +19,7 @@ public class ClientsApiService : IClientsApiService
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             PropertyNameCaseInsensitive = true
         };
-        
+
         // Log HttpClient configuration for debugging
         _logger.LogInformation("ClientsApiService initialized with BaseAddress: {BaseAddress}", _httpClient.BaseAddress);
     }
@@ -40,30 +40,30 @@ public class ClientsApiService : IClientsApiService
 
             var requestUri = $"api/clients{queryString}";
             var fullUri = new Uri(_httpClient.BaseAddress!, requestUri);
-            
+
             _logger.LogInformation("Making request to: {FullUri}", fullUri);
-            _logger.LogDebug("Request headers: {Headers}", 
+            _logger.LogDebug("Request headers: {Headers}",
                 string.Join(", ", _httpClient.DefaultRequestHeaders.Select(h => $"{h.Key}={string.Join(",", h.Value)}")));
 
             var response = await _httpClient.GetAsync(requestUri);
-            
+
             _logger.LogInformation("Response Status: {StatusCode} for {RequestUri}", response.StatusCode, fullUri);
-            
+
             if (!response.IsSuccessStatusCode)
             {
                 var errorContent = await response.Content.ReadAsStringAsync();
                 _logger.LogError("API Error - Status: {StatusCode}, Content: {ErrorContent}", response.StatusCode, errorContent);
-                
+
                 // Log response headers for debugging
-                _logger.LogDebug("Response headers: {Headers}", 
+                _logger.LogDebug("Response headers: {Headers}",
                     string.Join(", ", response.Headers.Select(h => $"{h.Key}={string.Join(",", h.Value)}")));
-                
+
                 return null;
             }
 
             var json = await response.Content.ReadAsStringAsync();
             _logger.LogDebug("Response content length: {Length}", json.Length);
-            
+
             var result = JsonSerializer.Deserialize<PagedResult<ClientDto>>(json, _jsonOptions);
             _logger.LogInformation("Successfully deserialized {ItemCount} clients", result?.Items.Count ?? 0);
             return result;

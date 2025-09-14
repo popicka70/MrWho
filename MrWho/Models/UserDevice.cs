@@ -115,6 +115,24 @@ public class UserDevice
     [StringLength(2000)]
     public string? Metadata { get; set; }
 
+    // ===================== AUTO-LOGIN TOKEN (Option 1) =====================
+    /// <summary>
+    /// Hash of the device auto-login token (base64) if issued. Null when not issued or revoked.
+    /// </summary>
+    [StringLength(512)]
+    public string? DeviceAuthTokenHash { get; set; }
+
+    /// <summary>
+    /// Salt used when hashing the device auto-login token (base64). Separate per device token.
+    /// </summary>
+    [StringLength(256)]
+    public string? DeviceAuthTokenSalt { get; set; }
+
+    /// <summary>
+    /// Expiration timestamp (UTC) for the device auto-login token. After this time token is invalid.
+    /// </summary>
+    public DateTime? DeviceAuthTokenExpiresAt { get; set; }
+
     // Navigation property
     [ForeignKey(nameof(UserId))]
     public virtual IdentityUser User { get; set; } = null!;

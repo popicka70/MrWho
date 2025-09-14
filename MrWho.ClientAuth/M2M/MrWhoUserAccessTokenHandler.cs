@@ -1,10 +1,10 @@
+using System.Net.Http.Headers;
+using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System.Net.Http.Headers;
-using System.Text.Json;
 
 namespace MrWho.ClientAuth.M2M;
 
@@ -118,8 +118,15 @@ internal sealed class MrWhoUserAccessTokenHandler : DelegatingHandler
                 ["grant_type"] = "refresh_token",
                 ["refresh_token"] = refreshToken
             };
-            if (!string.IsNullOrEmpty(oidc.ClientId)) form["client_id"] = oidc.ClientId;
-            if (!string.IsNullOrEmpty(oidc.ClientSecret)) form["client_secret"] = oidc.ClientSecret;
+            if (!string.IsNullOrEmpty(oidc.ClientId))
+            {
+                form["client_id"] = oidc.ClientId;
+            }
+
+            if (!string.IsNullOrEmpty(oidc.ClientSecret))
+            {
+                form["client_secret"] = oidc.ClientSecret;
+            }
 
             using var req = new HttpRequestMessage(HttpMethod.Post, tokenEndpoint) { Content = new FormUrlEncodedContent(form) };
             using var resp = await client.SendAsync(req, ct);

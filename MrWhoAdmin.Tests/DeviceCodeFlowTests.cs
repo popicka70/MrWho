@@ -4,12 +4,12 @@ using System.Text.Json;
 namespace MrWhoAdmin.Tests;
 
 [TestClass]
-[TestCategory("OIDC")] 
+[TestCategory("OIDC")]
 public class DeviceCodeFlowTests
 {
     private static HttpClient CreateServerClient(bool disableRedirects = true) => SharedTestInfrastructure.CreateHttpClient("mrwho", disableRedirects: disableRedirects);
 
-    private static async Task<JsonDocument> PostAsync(string url, Dictionary<string,string> form)
+    private static async Task<JsonDocument> PostAsync(string url, Dictionary<string, string> form)
     {
         using var client = CreateServerClient();
         var resp = await client.PostAsync(url, new FormUrlEncodedContent(form));
@@ -20,17 +20,21 @@ public class DeviceCodeFlowTests
     [TestMethod]
     public async Task Device_Authorization_And_Token_Polling_Pending()
     {
-        using var deviceDoc = await PostAsync("connect/device", new Dictionary<string,string>
+        using var deviceDoc = await PostAsync("connect/device", new Dictionary<string, string>
         {
             ["client_id"] = "mrwho_admin_web",
             ["scope"] = "openid profile"
         });
         var root = deviceDoc.RootElement;
-        if (root.TryGetProperty("error", out var err)) Assert.Inconclusive($"Device endpoint error: {err.GetString()} {root}");
+        if (root.TryGetProperty("error", out var err))
+        {
+            Assert.Inconclusive($"Device endpoint error: {err.GetString()} {root}");
+        }
+
         var deviceCode = root.GetProperty("device_code").GetString();
         Assert.IsFalse(string.IsNullOrEmpty(deviceCode));
 
-        using var poll = await PostAsync("connect/token", new Dictionary<string,string>
+        using var poll = await PostAsync("connect/token", new Dictionary<string, string>
         {
             ["grant_type"] = "urn:ietf:params:oauth:grant-type:device_code",
             ["device_code"] = deviceCode!,

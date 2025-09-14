@@ -10,7 +10,7 @@ using MrWho.Shared.Models;
 namespace MrWho.Controllers;
 
 [ApiController]
-[Route("api/registrations")] 
+[Route("api/registrations")]
 [Authorize(Policy = AuthorizationPolicies.AdminClientApi)]
 public class RegistrationsController : ControllerBase
 {
@@ -55,7 +55,10 @@ public class RegistrationsController : ControllerBase
     public async Task<IActionResult> Approve(string id)
     {
         var profile = await _context.UserProfiles.FirstOrDefaultAsync(p => p.UserId == id);
-        if (profile == null) return NotFound("User profile not found");
+        if (profile == null)
+        {
+            return NotFound("User profile not found");
+        }
 
         profile.State = UserState.Active;
         profile.UpdatedAt = DateTime.UtcNow;
@@ -70,7 +73,10 @@ public class RegistrationsController : ControllerBase
     public async Task<IActionResult> Reject(string id)
     {
         var profile = await _context.UserProfiles.FirstOrDefaultAsync(p => p.UserId == id);
-        if (profile == null) return NotFound("User profile not found");
+        if (profile == null)
+        {
+            return NotFound("User profile not found");
+        }
 
         profile.State = UserState.Disabled;
         profile.UpdatedAt = DateTime.UtcNow;

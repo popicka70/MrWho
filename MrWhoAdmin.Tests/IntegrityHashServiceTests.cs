@@ -1,10 +1,10 @@
+using System.Diagnostics;
+using Microsoft.AspNetCore.Http; // added
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using MrWho.Data;
 using MrWho.Models;
 using MrWho.Services;
-using System.Diagnostics;
-using Microsoft.AspNetCore.Http; // added
 
 namespace MrWhoAdmin.Tests;
 

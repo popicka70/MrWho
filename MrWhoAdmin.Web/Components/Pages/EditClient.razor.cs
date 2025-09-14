@@ -1,7 +1,7 @@
-﻿using MrWho.Shared;
+﻿using System.Text; // added for UTF8 byte count
+using MrWho.Shared;
 using MrWho.Shared.Models;
 using Radzen;
-using System.Text; // added for UTF8 byte count
 
 namespace MrWhoAdmin.Web.Components.Pages
 {
@@ -247,7 +247,7 @@ namespace MrWhoAdmin.Web.Components.Pages
                 PrimaryAudience = client.PrimaryAudience,
                 IncludeAudInIdToken = client.IncludeAudInIdToken,
                 RequireExplicitAudienceScope = client.RequireExplicitAudienceScope,
-                RoleInclusionOverride = client.RoleInclusionOverride, 
+                RoleInclusionOverride = client.RoleInclusionOverride,
                 ParMode = client.ParMode,
                 JarMode = client.JarMode,
                 JarmMode = client.JarmMode,
@@ -506,7 +506,11 @@ namespace MrWhoAdmin.Web.Components.Pages
 
         internal async Task AddIdentityLink()
         {
-            if (!IsEdit || string.IsNullOrEmpty(selectedProviderId)) return;
+            if (!IsEdit || string.IsNullOrEmpty(selectedProviderId))
+            {
+                return;
+            }
+
             try
             {
                 var dto = new ClientIdentityProviderDto
@@ -562,7 +566,10 @@ namespace MrWhoAdmin.Web.Components.Pages
         internal bool IsMethodSelected(string method)
         {
             if (string.IsNullOrEmpty(model.AllowedMfaMethods))
+            {
                 return false;
+            }
+
             try
             {
                 var methods = System.Text.Json.JsonSerializer.Deserialize<string[]>(model.AllowedMfaMethods);
@@ -579,13 +586,19 @@ namespace MrWhoAdmin.Web.Components.Pages
                 try
                 {
                     var existing = System.Text.Json.JsonSerializer.Deserialize<string[]>(model.AllowedMfaMethods);
-                    if (existing != null) methods.AddRange(existing);
+                    if (existing != null)
+                    {
+                        methods.AddRange(existing);
+                    }
                 }
                 catch { }
             }
             if (selected)
             {
-                if (!methods.Contains(method)) methods.Add(method);
+                if (!methods.Contains(method))
+                {
+                    methods.Add(method);
+                }
             }
             else
             {
@@ -598,7 +611,9 @@ namespace MrWhoAdmin.Web.Components.Pages
         {
             // Skip if JAR disabled explicitly
             if (model.JarMode == JarMode.Disabled)
+            {
                 return true;
+            }
 
             // Determine requested HS algorithms
             var algCsv = model.AllowedRequestObjectAlgs;
@@ -613,13 +628,22 @@ namespace MrWhoAdmin.Web.Components.Pages
                 foreach (var a in algCsv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
                 {
                     if (a.StartsWith("HS", StringComparison.OrdinalIgnoreCase))
+                    {
                         hsAlgs.Add(a.ToUpperInvariant());
+                    }
                 }
             }
-            if (hsAlgs.Count == 0) return true; // only asymmetric
+            if (hsAlgs.Count == 0)
+            {
+                return true; // only asymmetric
+            }
 
             // If secret not supplied during create, allow (server will validate requirement if needed)
-            if (IsEdit && string.IsNullOrWhiteSpace(model.ClientSecret)) return true; // updating without changing secret
+            if (IsEdit && string.IsNullOrWhiteSpace(model.ClientSecret))
+            {
+                return true; // updating without changing secret
+            }
+
             if (string.IsNullOrWhiteSpace(model.ClientSecret))
             {
                 NotificationService.Notify(NotificationSeverity.Error, "Secret Required", "Provide a client secret to use HMAC (HS*) algorithms.");
@@ -627,7 +651,19 @@ namespace MrWhoAdmin.Web.Components.Pages
             }
             var secretBytes = Encoding.UTF8.GetByteCount(model.ClientSecret);
             int required = 0;
-            if (hsAlgs.Contains("HS512")) required = 64; else if (hsAlgs.Contains("HS384")) required = 48; else if (hsAlgs.Contains("HS256")) required = 32;
+            if (hsAlgs.Contains("HS512"))
+            {
+                required = 64;
+            }
+            else if (hsAlgs.Contains("HS384"))
+            {
+                required = 48;
+            }
+            else if (hsAlgs.Contains("HS256"))
+            {
+                required = 32;
+            }
+
             if (secretBytes < required)
             {
                 NotificationService.Notify(NotificationSeverity.Error, "Secret Too Short", $"Selected algorithms require >= {required} bytes secret (current {secretBytes}). Rotate or generate a longer secret.");
@@ -638,7 +674,11 @@ namespace MrWhoAdmin.Web.Components.Pages
 
         private async Task OnSave(CreateClientRequest args)
         {
-            if (!ValidateSymmetricSecretPolicy()) return; // block
+            if (!ValidateSymmetricSecretPolicy())
+            {
+                return; // block
+            }
+
             ClientDto? result;
             if (IsEdit)
             {
@@ -748,10 +788,17 @@ namespace MrWhoAdmin.Web.Components.Pages
         internal void ToggleScopeSelection(string scopeName, bool selected)
         {
             var item = scopeItems.FirstOrDefault(i => i.Name == scopeName);
-            if (item != null) item.Selected = selected;
+            if (item != null)
+            {
+                item.Selected = selected;
+            }
+
             if (selected)
             {
-                if (!selectedScopes.Contains(scopeName)) selectedScopes.Add(scopeName);
+                if (!selectedScopes.Contains(scopeName))
+                {
+                    selectedScopes.Add(scopeName);
+                }
             }
             else
             {
@@ -766,7 +813,10 @@ namespace MrWhoAdmin.Web.Components.Pages
                 item.Selected = select;
                 if (select)
                 {
-                    if (!selectedScopes.Contains(item.Name)) selectedScopes.Add(item.Name);
+                    if (!selectedScopes.Contains(item.Name))
+                    {
+                        selectedScopes.Add(item.Name);
+                    }
                 }
                 else
                 {

@@ -9,7 +9,7 @@ public static class MrWhoConstants
     public const string DefaultRealmName = "default";
     public const string AdminClientId = "mrwho_admin_web";
     public const string ServiceM2MClientId = "mrwho_m2m"; // added for standard service machine client
-    
+
     /// <summary>
     /// Default token lifetimes
     /// </summary>
@@ -19,7 +19,7 @@ public static class MrWhoConstants
         public static readonly TimeSpan RefreshToken = TimeSpan.FromDays(30);
         public static readonly TimeSpan AuthorizationCode = TimeSpan.FromMinutes(10);
     }
-    
+
     /// <summary>
     /// API endpoints
     /// </summary>
@@ -29,31 +29,31 @@ public static class MrWhoConstants
         public const string Clients = "api/clients";
         public const string Users = "api/users";
     }
-    
+
     /// <summary>
     /// Default redirect URIs for admin client
     /// </summary>
     public static class AdminClientDefaults
     {
-        public static readonly string[] RedirectUris = 
+        public static readonly string[] RedirectUris =
         {
             "https://localhost:7257/signin-oidc",
             "https://localhost:7257/callback"
         };
-        
-        public static readonly string[] PostLogoutUris = 
+
+        public static readonly string[] PostLogoutUris =
         {
             "https://localhost:7257/",
             "https://localhost:7257/signout-callback-oidc"
         };
-        
-        public static readonly string[] Scopes = 
+
+        public static readonly string[] Scopes =
         {
-            StandardScopes.OpenId, 
-            StandardScopes.Email, 
-            StandardScopes.Profile, 
-            StandardScopes.Roles, 
-            StandardScopes.ApiRead, 
+            StandardScopes.OpenId,
+            StandardScopes.Email,
+            StandardScopes.Profile,
+            StandardScopes.Roles,
+            StandardScopes.ApiRead,
             StandardScopes.ApiWrite
         };
     }

@@ -8,7 +8,7 @@ using Microsoft.IdentityModel.Tokens;
 namespace MrWhoAdmin.Tests;
 
 [TestClass]
-[TestCategory("OIDC")] 
+[TestCategory("OIDC")]
 public class JarTests
 {
     private const string DemoClientId = "mrwho_demo1";
@@ -57,7 +57,11 @@ public class JarTests
         {
             var padded = new byte[requiredLen];
             Array.Copy(keyBytes, padded, keyBytes.Length);
-            for (int i = keyBytes.Length; i < requiredLen; i++) padded[i] = (byte)'!';
+            for (int i = keyBytes.Length; i < requiredLen; i++)
+            {
+                padded[i] = (byte)'!';
+            }
+
             keyBytes = padded;
         }
 
@@ -96,7 +100,10 @@ public class JarTests
         }
         if (extraClaims != null)
         {
-            foreach (var kv in extraClaims) claims[kv.Key] = kv.Value;
+            foreach (var kv in extraClaims)
+            {
+                claims[kv.Key] = kv.Value;
+            }
         }
 
         var descriptor = new SecurityTokenDescriptor
@@ -121,7 +128,11 @@ public class JarTests
 
     private static bool IsAcceptableAuthRedirect(HttpResponseMessage resp)
     {
-        if ((int)resp.StatusCode < 300 || (int)resp.StatusCode > 399) return false;
+        if ((int)resp.StatusCode < 300 || (int)resp.StatusCode > 399)
+        {
+            return false;
+        }
+
         var loc = resp.Headers.Location?.ToString() ?? string.Empty;
         // Accept any /connect/* or /mfa/* intermediate as successful progression of auth flow
         return loc.Contains("/connect/", StringComparison.OrdinalIgnoreCase) ||
