@@ -20,7 +20,8 @@ public sealed class ProfileController : Controller
     [IgnoreAntiforgeryToken]
     public IActionResult Select(string name, string? returnUrl = null)
     {
-        if (string.IsNullOrWhiteSpace(name)) {
+        if (string.IsNullOrWhiteSpace(name))
+        {
             return BadRequest("name required");
         }
 

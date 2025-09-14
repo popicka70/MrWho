@@ -40,7 +40,8 @@ public class IdentityProvidersController : ControllerBase
     public async Task<ActionResult<IdentityProviderDto>> GetOne(string id)
     {
         var item = await _db.IdentityProviders.FindAsync(id);
-        if (item == null) {
+        if (item == null)
+        {
             return NotFound();
         }
 
@@ -50,7 +51,8 @@ public class IdentityProvidersController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<IdentityProviderDto>> Create([FromBody] IdentityProviderDto dto)
     {
-        if (string.IsNullOrWhiteSpace(dto.Name)) {
+        if (string.IsNullOrWhiteSpace(dto.Name))
+        {
             return ValidationProblem("Name is required");
         }
 
@@ -67,7 +69,8 @@ public class IdentityProvidersController : ControllerBase
     public async Task<ActionResult<IdentityProviderDto>> Update(string id, [FromBody] IdentityProviderDto dto)
     {
         var existing = await _db.IdentityProviders.FindAsync(id);
-        if (existing == null) {
+        if (existing == null)
+        {
             return NotFound();
         }
 
@@ -103,7 +106,8 @@ public class IdentityProvidersController : ControllerBase
     public async Task<IActionResult> Delete(string id)
     {
         var existing = await _db.IdentityProviders.FindAsync(id);
-        if (existing == null) {
+        if (existing == null)
+        {
             return NotFound();
         }
 
@@ -130,11 +134,13 @@ public class IdentityProvidersController : ControllerBase
     [HttpPost("{id}/clients/{clientId}")]
     public async Task<ActionResult<ClientIdentityProviderDto>> LinkToClient(string id, string clientId, [FromBody] ClientIdentityProviderDto? dto)
     {
-        if (!await _db.IdentityProviders.AnyAsync(x => x.Id == id)) {
+        if (!await _db.IdentityProviders.AnyAsync(x => x.Id == id))
+        {
             return NotFound("IdP not found");
         }
 
-        if (!await _db.Clients.AnyAsync(x => x.Id == clientId || x.ClientId == clientId)) {
+        if (!await _db.Clients.AnyAsync(x => x.Id == clientId || x.ClientId == clientId))
+        {
             return NotFound("Client not found");
         }
 
@@ -162,7 +168,8 @@ public class IdentityProvidersController : ControllerBase
     public async Task<IActionResult> UnlinkFromClient(string id, string linkId)
     {
         var link = await _db.ClientIdentityProviders.FirstOrDefaultAsync(x => x.Id == linkId && x.IdentityProviderId == id);
-        if (link == null) {
+        if (link == null)
+        {
             return NotFound();
         }
 

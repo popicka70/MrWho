@@ -25,31 +25,38 @@ public sealed class AuditQueryService : IAuditQueryService
         pageSize = Math.Clamp(pageSize, 1, 500);
 
         var q = _db.SecurityAuditEvents.AsNoTracking();
-        if (fromUtc.HasValue) {
+        if (fromUtc.HasValue)
+        {
             q = q.Where(e => e.TimestampUtc >= fromUtc.Value);
         }
 
-        if (toUtc.HasValue) {
+        if (toUtc.HasValue)
+        {
             q = q.Where(e => e.TimestampUtc <= toUtc.Value);
         }
 
-        if (!string.IsNullOrWhiteSpace(category)) {
+        if (!string.IsNullOrWhiteSpace(category))
+        {
             q = q.Where(e => e.Category == category);
         }
 
-        if (!string.IsNullOrWhiteSpace(eventType)) {
+        if (!string.IsNullOrWhiteSpace(eventType))
+        {
             q = q.Where(e => e.EventType == eventType);
         }
 
-        if (!string.IsNullOrWhiteSpace(actorUserId)) {
+        if (!string.IsNullOrWhiteSpace(actorUserId))
+        {
             q = q.Where(e => e.ActorUserId == actorUserId);
         }
 
-        if (!string.IsNullOrWhiteSpace(actorClientId)) {
+        if (!string.IsNullOrWhiteSpace(actorClientId))
+        {
             q = q.Where(e => e.ActorClientId == actorClientId);
         }
 
-        if (!string.IsNullOrWhiteSpace(level)) {
+        if (!string.IsNullOrWhiteSpace(level))
+        {
             q = q.Where(e => e.Level == level);
         }
 

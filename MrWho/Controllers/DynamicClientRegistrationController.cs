@@ -37,12 +37,14 @@ public class DynamicClientRegistrationController : ControllerBase
     [Produces("application/json")]
     public async Task<IActionResult> Register([FromBody] DynamicClientRegistrationRequest request, CancellationToken ct)
     {
-        if (request == null) {
+        if (request == null)
+        {
             return BadRequest(new { error = "invalid_request", error_description = "Missing body" });
         }
 
         var (ok, error) = DynamicClientRegistrationValidation.Validate(request);
-        if (!ok) {
+        if (!ok)
+        {
             return BadRequest(new { error = "invalid_client_metadata", error_description = error });
         }
 

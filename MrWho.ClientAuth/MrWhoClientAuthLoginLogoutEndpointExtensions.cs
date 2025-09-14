@@ -22,14 +22,16 @@ public static class MrWhoClientAuthLoginLogoutEndpointExtensions
         string pattern = "/login")
     {
         ArgumentNullException.ThrowIfNull(endpoints);
-        if (string.IsNullOrWhiteSpace(pattern)) {
+        if (string.IsNullOrWhiteSpace(pattern))
+        {
             pattern = "/login";
         }
 
         return endpoints.MapGet(pattern, async context =>
         {
             var returnUrl = context.Request.Query["returnUrl"].ToString();
-            if (string.IsNullOrWhiteSpace(returnUrl) || !Uri.IsWellFormedUriString(returnUrl, UriKind.Relative)) {
+            if (string.IsNullOrWhiteSpace(returnUrl) || !Uri.IsWellFormedUriString(returnUrl, UriKind.Relative))
+            {
                 returnUrl = "/";
             }
 
@@ -63,14 +65,16 @@ public static class MrWhoClientAuthLoginLogoutEndpointExtensions
         string pattern = "/logout")
     {
         ArgumentNullException.ThrowIfNull(endpoints);
-        if (string.IsNullOrWhiteSpace(pattern)) {
+        if (string.IsNullOrWhiteSpace(pattern))
+        {
             pattern = "/logout";
         }
 
         async Task Handle(HttpContext context)
         {
             var returnUrl = context.Request.Query["returnUrl"].ToString();
-            if (string.IsNullOrWhiteSpace(returnUrl) || !Uri.IsWellFormedUriString(returnUrl, UriKind.Relative)) {
+            if (string.IsNullOrWhiteSpace(returnUrl) || !Uri.IsWellFormedUriString(returnUrl, UriKind.Relative))
+            {
                 returnUrl = "/";
             }
 

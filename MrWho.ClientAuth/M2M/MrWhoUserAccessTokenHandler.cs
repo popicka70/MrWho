@@ -118,11 +118,13 @@ internal sealed class MrWhoUserAccessTokenHandler : DelegatingHandler
                 ["grant_type"] = "refresh_token",
                 ["refresh_token"] = refreshToken
             };
-            if (!string.IsNullOrEmpty(oidc.ClientId)) {
+            if (!string.IsNullOrEmpty(oidc.ClientId))
+            {
                 form["client_id"] = oidc.ClientId;
             }
 
-            if (!string.IsNullOrEmpty(oidc.ClientSecret)) {
+            if (!string.IsNullOrEmpty(oidc.ClientSecret))
+            {
                 form["client_secret"] = oidc.ClientSecret;
             }
 

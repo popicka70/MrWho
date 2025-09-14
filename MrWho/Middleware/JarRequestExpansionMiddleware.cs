@@ -113,7 +113,8 @@ public class JarRequestExpansionMiddleware
 
                 var dict = req.Query.ToDictionary(k => k.Key, v => v.Value.ToString(), StringComparer.OrdinalIgnoreCase);
                 dict.Remove("request");
-                foreach (var kv in result.Parameters!) {
+                foreach (var kv in result.Parameters!)
+                {
                     dict[kv.Key] = kv.Value;
                 }
 

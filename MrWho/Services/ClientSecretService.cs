@@ -26,7 +26,8 @@ public sealed class ClientSecretService : IClientSecretService
     public async Task<(ClientSecretHistory record, string? plainSecret)> SetNewSecretAsync(string clientId, string? providedPlaintext = null, DateTime? expiresAt = null, bool markOldAsRetired = true, CancellationToken ct = default)
     {
         var client = await _db.Clients.FirstOrDefaultAsync(c => c.Id == clientId || c.ClientId == clientId, ct);
-        if (client is null) {
+        if (client is null)
+        {
             throw new InvalidOperationException($"Client '{clientId}' not found");
         }
 
@@ -95,7 +96,8 @@ public sealed class ClientSecretService : IClientSecretService
     public async Task<bool> VerifyAsync(string clientPublicIdOrDbId, string presentedSecret, CancellationToken ct = default)
     {
         var client = await _db.Clients.FirstOrDefaultAsync(c => c.Id == clientPublicIdOrDbId || c.ClientId == clientPublicIdOrDbId, ct);
-        if (client is null) {
+        if (client is null)
+        {
             return false;
         }
 
@@ -120,7 +122,8 @@ public sealed class ClientSecretService : IClientSecretService
     public async Task<string?> GetActivePlaintextAsync(string clientPublicIdOrDbId, CancellationToken ct = default)
     {
         var client = await _db.Clients.FirstOrDefaultAsync(c => c.Id == clientPublicIdOrDbId || c.ClientId == clientPublicIdOrDbId, ct);
-        if (client is null) {
+        if (client is null)
+        {
             return null;
         }
 
@@ -128,7 +131,8 @@ public sealed class ClientSecretService : IClientSecretService
             .Where(s => s.ClientId == client.Id && s.Status == ClientSecretStatus.Active && (!s.ExpiresAt.HasValue || s.ExpiresAt > DateTime.UtcNow))
             .OrderByDescending(s => s.CreatedAt)
             .FirstOrDefaultAsync(ct);
-        if (rec?.EncryptedSecret == null) {
+        if (rec?.EncryptedSecret == null)
+        {
             return null; // legacy or none
         }
 

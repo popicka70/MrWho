@@ -232,7 +232,8 @@ public class DynamicCookieService : IDynamicCookieService
 
     private string ConvertToFriendlyName(string input)
     {
-        if (string.IsNullOrEmpty(input)) {
+        if (string.IsNullOrEmpty(input))
+        {
             return "Unknown User";
         }
 
@@ -249,7 +250,8 @@ public class DynamicCookieService : IDynamicCookieService
 
     private string ConvertToDisplayName(string input)
     {
-        if (string.IsNullOrEmpty(input)) {
+        if (string.IsNullOrEmpty(input))
+        {
             return "Unknown User";
         }
 

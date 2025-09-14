@@ -15,12 +15,14 @@ public sealed class SymmetricSecretPolicy : ISymmetricSecretPolicy
 
     public SymmetricSecretValidationResult ValidateForAlgorithm(string algorithm, string? secret)
     {
-        if (string.IsNullOrWhiteSpace(algorithm)) {
+        if (string.IsNullOrWhiteSpace(algorithm))
+        {
             return SymmetricSecretValidationResult.Fail("algorithm_missing");
         }
 
         algorithm = algorithm.ToUpperInvariant();
-        if (secret == null) {
+        if (secret == null)
+        {
             return SymmetricSecretValidationResult.Fail("secret_missing");
         }
 
@@ -32,11 +34,13 @@ public sealed class SymmetricSecretPolicy : ISymmetricSecretPolicy
             "HS512" => _options.HS512MinBytes,
             _ => 0
         };
-        if (required == 0) {
+        if (required == 0)
+        {
             return SymmetricSecretValidationResult.Ok(); // not an enforced alg
         }
 
-        if (length < required) {
+        if (length < required)
+        {
             return SymmetricSecretValidationResult.Fail($"secret_length_insufficient:{algorithm}", required, length);
         }
 
@@ -45,15 +49,18 @@ public sealed class SymmetricSecretPolicy : ISymmetricSecretPolicy
 
     public SymmetricSecretValidationResult ValidateClientMutation(Client client)
     {
-        if (!_options.EnforceOnClientMutation) {
+        if (!_options.EnforceOnClientMutation)
+        {
             return SymmetricSecretValidationResult.Ok();
         }
 
-        if (client is null) {
+        if (client is null)
+        {
             return SymmetricSecretValidationResult.Fail("client_null");
         }
 
-        if (string.IsNullOrWhiteSpace(client.ClientSecret)) {
+        if (string.IsNullOrWhiteSpace(client.ClientSecret))
+        {
             return SymmetricSecretValidationResult.Ok(); // allow empty; other validators decide requirement
         }
 
@@ -66,7 +73,8 @@ public sealed class SymmetricSecretPolicy : ISymmetricSecretPolicy
                 if (alg.StartsWith("HS", StringComparison.OrdinalIgnoreCase))
                 {
                     var res = ValidateForAlgorithm(alg, client.ClientSecret);
-                    if (!res.Success) {
+                    if (!res.Success)
+                    {
                         return res;
                     }
                 }

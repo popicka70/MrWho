@@ -26,7 +26,8 @@ public class DeviceCodeFlowTests
             ["scope"] = "openid profile"
         });
         var root = deviceDoc.RootElement;
-        if (root.TryGetProperty("error", out var err)) {
+        if (root.TryGetProperty("error", out var err))
+        {
             Assert.Inconclusive($"Device endpoint error: {err.GetString()} {root}");
         }
 

@@ -25,16 +25,19 @@ public class DeviceAuthorizationController : Controller
     [EnableRateLimiting("rl.device")] // rate limit device authorization initiation
     public async Task<IActionResult> CreateDeviceAuthorization([FromForm] string client_id, [FromForm] string? scope = null)
     {
-        if (string.IsNullOrWhiteSpace(client_id)) {
+        if (string.IsNullOrWhiteSpace(client_id))
+        {
             return BadRequest(new { error = "invalid_request", error_description = "client_id required" });
         }
 
         var client = await _db.Clients.Include(c => c.Scopes).FirstOrDefaultAsync(c => c.ClientId == client_id && c.IsEnabled);
-        if (client == null) {
+        if (client == null)
+        {
             return BadRequest(new { error = "invalid_client" });
         }
 
-        if (!client.AllowDeviceCodeFlow) {
+        if (!client.AllowDeviceCodeFlow)
+        {
             return BadRequest(new { error = "unauthorized_client" });
         }
 
@@ -211,12 +214,14 @@ public class DeviceAuthorizationController : Controller
         // 8 char base32 groups like XXXX-XXXX
         const string alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no 0/O/I/1
         Span<char> chars = stackalloc char[9];
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < 4; i++)
+        {
             chars[i] = alphabet[Random.Shared.Next(alphabet.Length)];
         }
 
         chars[4] = '-';
-        for (int i = 5; i < 9; i++) {
+        for (int i = 5; i < 9; i++)
+        {
             chars[i] = alphabet[Random.Shared.Next(alphabet.Length)];
         }
 

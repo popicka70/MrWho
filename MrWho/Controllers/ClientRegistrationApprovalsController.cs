@@ -31,11 +31,13 @@ public class ClientRegistrationApprovalsController : ControllerBase
     [HttpGet("pending")]
     public async Task<ActionResult<IEnumerable<object>>> GetPending([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
     {
-        if (page < 1) {
+        if (page < 1)
+        {
             page = 1;
         }
 
-        if (pageSize < 1 || pageSize > 100) {
+        if (pageSize < 1 || pageSize > 100)
+        {
             pageSize = 20;
         }
 
@@ -61,7 +63,8 @@ public class ClientRegistrationApprovalsController : ControllerBase
     public async Task<ActionResult<object>> Get(string id)
     {
         var rec = await _db.PendingClientRegistrations.FirstOrDefaultAsync(x => x.Id == id);
-        if (rec == null) {
+        if (rec == null)
+        {
             return NotFound();
         }
 
@@ -87,11 +90,13 @@ public class ClientRegistrationApprovalsController : ControllerBase
     public async Task<ActionResult> Approve(string id)
     {
         var rec = await _db.PendingClientRegistrations.FirstOrDefaultAsync(x => x.Id == id);
-        if (rec == null) {
+        if (rec == null)
+        {
             return NotFound();
         }
 
-        if (rec.Status != ClientRegistrationStatus.Pending) {
+        if (rec.Status != ClientRegistrationStatus.Pending)
+        {
             return Conflict("Registration already processed");
         }
 
@@ -141,7 +146,8 @@ public class ClientRegistrationApprovalsController : ControllerBase
         {
             foreach (var uri in request.RedirectUris.Distinct())
             {
-                if (Uri.IsWellFormedUriString(uri, UriKind.Absolute)) {
+                if (Uri.IsWellFormedUriString(uri, UriKind.Absolute))
+                {
                     _db.ClientRedirectUris.Add(new ClientRedirectUri { ClientId = client.Id, Uri = uri });
                 }
             }
@@ -150,7 +156,8 @@ public class ClientRegistrationApprovalsController : ControllerBase
         {
             foreach (var uri in request.PostLogoutRedirectUris.Distinct())
             {
-                if (Uri.IsWellFormedUriString(uri, UriKind.Absolute)) {
+                if (Uri.IsWellFormedUriString(uri, UriKind.Absolute))
+                {
                     _db.ClientPostLogoutUris.Add(new ClientPostLogoutUri { ClientId = client.Id, Uri = uri });
                 }
             }
@@ -203,11 +210,13 @@ public class ClientRegistrationApprovalsController : ControllerBase
     public async Task<ActionResult> Reject(string id, [FromBody] RejectRequest? body)
     {
         var rec = await _db.PendingClientRegistrations.FirstOrDefaultAsync(x => x.Id == id);
-        if (rec == null) {
+        if (rec == null)
+        {
             return NotFound();
         }
 
-        if (rec.Status != ClientRegistrationStatus.Pending) {
+        if (rec.Status != ClientRegistrationStatus.Pending)
+        {
             return Conflict("Registration already processed");
         }
 

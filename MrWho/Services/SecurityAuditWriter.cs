@@ -25,11 +25,13 @@ public sealed class SecurityAuditWriter : ISecurityAuditWriter
     public async Task<SecurityAuditEvent> WriteAsync(string category, string eventType, object? data = null,
         string? level = null, string? actorUserId = null, string? actorClientId = null, string? ip = null, CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(category)) {
+        if (string.IsNullOrWhiteSpace(category))
+        {
             category = "general";
         }
 
-        if (string.IsNullOrWhiteSpace(eventType)) {
+        if (string.IsNullOrWhiteSpace(eventType))
+        {
             eventType = "unknown";
         }
 

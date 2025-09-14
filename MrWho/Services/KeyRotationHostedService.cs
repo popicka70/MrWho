@@ -40,7 +40,8 @@ public class KeyRotationHostedService : BackgroundService
     {
         try
         {
-            if (!_options.Value.Enabled) {
+            if (!_options.Value.Enabled)
+            {
                 return;
             }
 

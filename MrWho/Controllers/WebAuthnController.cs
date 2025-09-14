@@ -65,7 +65,8 @@ public class WebAuthnController : Controller
         var fromConfig = config.GetSection("WebAuthn:Origins").Get<string[]>() ?? Array.Empty<string>();
         foreach (var o in fromConfig)
         {
-            if (!string.IsNullOrWhiteSpace(o)) {
+            if (!string.IsNullOrWhiteSpace(o))
+            {
                 origins.Add(o);
             }
         }
@@ -91,7 +92,8 @@ public class WebAuthnController : Controller
     public async Task<IActionResult> GetRegisterOptions([FromQuery] string? nickname = null)
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user == null) {
+        if (user == null)
+        {
             return Unauthorized();
         }
 
@@ -134,11 +136,13 @@ public class WebAuthnController : Controller
     public async Task<IActionResult> PostRegisterVerify([FromBody] AuthenticatorAttestationRawResponse attestationResponse)
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user == null) {
+        if (user == null)
+        {
             return Unauthorized();
         }
 
-        if (!_attestationOptions.TryGetValue(user.Id, out var options)) {
+        if (!_attestationOptions.TryGetValue(user.Id, out var options))
+        {
             return BadRequest("No options for user");
         }
 
@@ -242,7 +246,8 @@ public class WebAuthnController : Controller
     public async Task<IActionResult> PostLoginVerify([FromBody] AuthenticatorAssertionRawResponse clientResponse, [FromQuery] string? returnUrl = null, [FromQuery] string? clientId = null)
     {
         var key = HttpContext.Session.Id;
-        if (!_assertionOptions.TryGetValue(key, out var options)) {
+        if (!_assertionOptions.TryGetValue(key, out var options))
+        {
             return BadRequest("No assertion options in session");
         }
 
@@ -251,7 +256,8 @@ public class WebAuthnController : Controller
             // 1) Find the credential by id
             var credentialId = clientResponse.Id;
             var cred = await _db.WebAuthnCredentials.FirstOrDefaultAsync(c => c.CredentialId == credentialId);
-            if (cred == null) {
+            if (cred == null)
+            {
                 throw new InvalidOperationException("Unknown credential");
             }
 
@@ -285,7 +291,8 @@ public class WebAuthnController : Controller
             var credId = clientResponse.Id;
             var cred = await _db.WebAuthnCredentials.FirstAsync(c => c.CredentialId == credId);
             var user = await _userManager.FindByIdAsync(cred.UserId);
-            if (user == null) {
+            if (user == null)
+            {
                 return Unauthorized();
             }
 
@@ -356,7 +363,8 @@ public class WebAuthnController : Controller
 
             if (!string.IsNullOrEmpty(returnUrl))
             {
-                if (Url.IsLocalUrl(returnUrl) || returnUrl.Contains("/connect/authorize", StringComparison.OrdinalIgnoreCase)) {
+                if (Url.IsLocalUrl(returnUrl) || returnUrl.Contains("/connect/authorize", StringComparison.OrdinalIgnoreCase))
+                {
                     return Redirect(returnUrl);
                 }
             }

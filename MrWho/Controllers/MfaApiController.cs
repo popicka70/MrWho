@@ -42,7 +42,8 @@ public class MfaApiController : ControllerBase
     public async Task<ActionResult<MfaSetupResponse>> GetSetup()
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user is null) {
+        if (user is null)
+        {
             return Unauthorized();
         }
 
@@ -76,12 +77,14 @@ public class MfaApiController : ControllerBase
     [HttpPost("verify")] // POST api/mfa/verify
     public async Task<ActionResult<MfaVerifyResponse>> PostVerify([FromBody] MfaVerifyRequest request)
     {
-        if (!ModelState.IsValid) {
+        if (!ModelState.IsValid)
+        {
             return ValidationProblem(ModelState);
         }
 
         var user = await _userManager.GetUserAsync(User);
-        if (user is null) {
+        if (user is null)
+        {
             return Unauthorized();
         }
 
@@ -130,11 +133,13 @@ public class MfaApiController : ControllerBase
     public async Task<ActionResult<MfaRecoveryCodesResponse>> PostNewRecoveryCodes()
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user is null) {
+        if (user is null)
+        {
             return Unauthorized();
         }
 
-        if (!user.TwoFactorEnabled) {
+        if (!user.TwoFactorEnabled)
+        {
             return BadRequest("MFA not enabled");
         }
 
@@ -149,7 +154,8 @@ public class MfaApiController : ControllerBase
     public async Task<ActionResult<MfaDisableResponse>> PostDisable()
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user is null) {
+        if (user is null)
+        {
             return Unauthorized();
         }
 

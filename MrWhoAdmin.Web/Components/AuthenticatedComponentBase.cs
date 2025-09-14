@@ -19,7 +19,8 @@ public abstract class AuthenticatedComponentBase : ComponentBase, IDisposable
 
     protected override async Task OnInitializedAsync()
     {
-        if (_disposed) {
+        if (_disposed)
+        {
             return;
         }
 
@@ -53,7 +54,8 @@ public abstract class AuthenticatedComponentBase : ComponentBase, IDisposable
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (_disposed) {
+        if (_disposed)
+        {
             return;
         }
 
@@ -72,7 +74,8 @@ public abstract class AuthenticatedComponentBase : ComponentBase, IDisposable
     /// </summary>
     protected virtual async Task CheckAuthenticationAsync()
     {
-        if (_disposed) {
+        if (_disposed)
+        {
             return;
         }
 
@@ -133,7 +136,8 @@ public abstract class AuthenticatedComponentBase : ComponentBase, IDisposable
     /// </summary>
     protected async Task TriggerReauthenticationAsync()
     {
-        if (_disposed) {
+        if (_disposed)
+        {
             return;
         }
 
@@ -171,7 +175,8 @@ public abstract class AuthenticatedComponentBase : ComponentBase, IDisposable
     /// </summary>
     protected void ClearAuthError()
     {
-        if (_disposed) {
+        if (_disposed)
+        {
             return;
         }
 
@@ -192,7 +197,8 @@ public abstract class AuthenticatedComponentBase : ComponentBase, IDisposable
     /// </summary>
     protected RenderFragment RenderAuthenticationStatus() => builder =>
     {
-        if (_disposed) {
+        if (_disposed)
+        {
             return;
         }
 

@@ -49,19 +49,23 @@ public sealed class RegisterPostHandler : IRequestHandler<MrWho.Endpoints.Auth.R
             {
                 ["RecaptchaSiteKey"] = _loginHelper.GetRecaptchaSiteKey()
             };
-            if (string.IsNullOrWhiteSpace(input.Email)) {
+            if (string.IsNullOrWhiteSpace(input.Email))
+            {
                 vd.ModelState.AddModelError("Email", "Email is required.");
             }
 
-            if (string.IsNullOrWhiteSpace(input.Password)) {
+            if (string.IsNullOrWhiteSpace(input.Password))
+            {
                 vd.ModelState.AddModelError("Password", "Password is required.");
             }
 
-            if (string.IsNullOrWhiteSpace(input.FirstName)) {
+            if (string.IsNullOrWhiteSpace(input.FirstName))
+            {
                 vd.ModelState.AddModelError("FirstName", "First name is required.");
             }
 
-            if (string.IsNullOrWhiteSpace(input.LastName)) {
+            if (string.IsNullOrWhiteSpace(input.LastName))
+            {
                 vd.ModelState.AddModelError("LastName", "Last name is required.");
             }
 
@@ -94,13 +98,16 @@ public sealed class RegisterPostHandler : IRequestHandler<MrWho.Endpoints.Auth.R
                 foreach (var error in createResult.Errors)
                 {
                     var code = error.Code ?? string.Empty;
-                    if (code.Contains("Password", StringComparison.OrdinalIgnoreCase)) {
+                    if (code.Contains("Password", StringComparison.OrdinalIgnoreCase))
+                    {
                         vd.ModelState.AddModelError("Password", error.Description);
                     }
-                    else if (code.Contains("Email", StringComparison.OrdinalIgnoreCase) || code.Contains("UserName", StringComparison.OrdinalIgnoreCase)) {
+                    else if (code.Contains("Email", StringComparison.OrdinalIgnoreCase) || code.Contains("UserName", StringComparison.OrdinalIgnoreCase))
+                    {
                         vd.ModelState.AddModelError("Email", error.Description);
                     }
-                    else {
+                    else
+                    {
                         vd.ModelState.AddModelError(string.Empty, error.Description);
                     }
                 }

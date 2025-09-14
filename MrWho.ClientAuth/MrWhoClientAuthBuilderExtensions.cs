@@ -59,12 +59,14 @@ public static class MrWhoClientAuthBuilderExtensions
             oidc.CallbackPath = options.CallbackPath;
             oidc.SignedOutCallbackPath = options.SignedOutCallbackPath;
             oidc.RemoteSignOutPath = options.RemoteSignOutPath;
-            if (!string.IsNullOrWhiteSpace(options.SignedOutRedirectUri)) {
+            if (!string.IsNullOrWhiteSpace(options.SignedOutRedirectUri))
+            {
                 oidc.SignedOutRedirectUri = options.SignedOutRedirectUri;
             }
 
             oidc.TokenValidationParameters = new TokenValidationParameters { NameClaimType = "name", RoleClaimType = "role" };
-            oidc.Scope.Clear(); foreach (var s in options.Scopes) {
+            oidc.Scope.Clear(); foreach (var s in options.Scopes)
+            {
                 oidc.Scope.Add(s);
             }
 
@@ -81,7 +83,8 @@ public static class MrWhoClientAuthBuilderExtensions
             oidc.ConfigurationManager = new ConfigurationManager<OpenIdConnectConfiguration>(metadata, new OpenIdConnectConfigurationRetriever(), httpRetriever);
 
             oidc.ClaimActions.Clear();
-            foreach (var claim in new[] { "iss", "aud", "exp", "iat", "nonce", "at_hash", "azp", "oi_au_id", "oi_tbn_id" }) {
+            foreach (var claim in new[] { "iss", "aud", "exp", "iat", "nonce", "at_hash", "azp", "oi_au_id", "oi_tbn_id" })
+            {
                 oidc.ClaimActions.DeleteClaim(claim);
             }
 
@@ -106,7 +109,8 @@ public static class MrWhoClientAuthBuilderExtensions
                     if (!string.IsNullOrEmpty(authority))
                     {
                         var desiredAuthorize = $"{authority}/connect/authorize";
-                        if (!string.Equals(ctx.ProtocolMessage.IssuerAddress, desiredAuthorize, StringComparison.OrdinalIgnoreCase)) {
+                        if (!string.Equals(ctx.ProtocolMessage.IssuerAddress, desiredAuthorize, StringComparison.OrdinalIgnoreCase))
+                        {
                             ctx.ProtocolMessage.IssuerAddress = desiredAuthorize;
                         }
                     }
@@ -140,7 +144,8 @@ public static class MrWhoClientAuthBuilderExtensions
                                     UseBasicAuth = true // prefer client_secret_basic
                                 };
                                 // Preserve response_mode (e.g. jwt for JARM)
-                                if (!string.IsNullOrEmpty(ctx.ProtocolMessage.ResponseMode)) {
+                                if (!string.IsNullOrEmpty(ctx.ProtocolMessage.ResponseMode))
+                                {
                                     authReq.Extra["response_mode"] = ctx.ProtocolMessage.ResponseMode;
                                 }
 
@@ -152,11 +157,13 @@ public static class MrWhoClientAuthBuilderExtensions
                                     ctx.ProtocolMessage.Parameters.Clear();
                                     ctx.ProtocolMessage.ClientId = authReq.ClientId;
                                     ctx.ProtocolMessage.SetParameter("request_uri", result.RequestUri);
-                                    if (!string.IsNullOrEmpty(state)) {
+                                    if (!string.IsNullOrEmpty(state))
+                                    {
                                         ctx.ProtocolMessage.State = state;
                                     }
 
-                                    if (!string.IsNullOrEmpty(responseMode)) {
+                                    if (!string.IsNullOrEmpty(responseMode))
+                                    {
                                         ctx.ProtocolMessage.ResponseMode = responseMode;
                                     }
 
@@ -210,11 +217,13 @@ public static class MrWhoClientAuthBuilderExtensions
                                     ctx.ProtocolMessage.ClientId = jarReq.ClientId;
                                     ctx.ProtocolMessage.RedirectUri = jarReq.RedirectUri;
                                     ctx.ProtocolMessage.ResponseType = jarReq.ResponseType;
-                                    if (!string.IsNullOrEmpty(state)) {
+                                    if (!string.IsNullOrEmpty(state))
+                                    {
                                         ctx.ProtocolMessage.State = state;
                                     }
 
-                                    if (!string.IsNullOrEmpty(jarReq.Scope)) {
+                                    if (!string.IsNullOrEmpty(jarReq.Scope))
+                                    {
                                         ctx.ProtocolMessage.Scope = jarReq.Scope;
                                     }
 
@@ -233,7 +242,8 @@ public static class MrWhoClientAuthBuilderExtensions
                     if (identity != null && !identity.HasClaim(c => c.Type == "name"))
                     {
                         var value = identity.FindFirst("preferred_username")?.Value ?? identity.FindFirst("email")?.Value ?? identity.FindFirst("sub")?.Value;
-                        if (!string.IsNullOrWhiteSpace(value)) {
+                        if (!string.IsNullOrWhiteSpace(value))
+                        {
                             identity.AddClaim(new Claim("name", value));
                         }
                     }

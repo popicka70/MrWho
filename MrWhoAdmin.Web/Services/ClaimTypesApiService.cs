@@ -39,7 +39,8 @@ public class ClaimTypesApiService : IClaimTypesApiService
         {
             var req = new { claimType.Type, DisplayName = claimType.DisplayName, Description = description ?? claimType.Description, Category = category, IsEnabled = isEnabled, IsObsolete = isObsolete, SortOrder = sortOrder };
             var resp = await _http.PostAsJsonAsync("api/claimtypes", req);
-            if (!resp.IsSuccessStatusCode) {
+            if (!resp.IsSuccessStatusCode)
+            {
                 return null;
             }
 
@@ -54,7 +55,8 @@ public class ClaimTypesApiService : IClaimTypesApiService
         {
             var req = new { claimType.Type, DisplayName = claimType.DisplayName, Description = description ?? claimType.Description, Category = category, IsEnabled = isEnabled, IsObsolete = isObsolete, SortOrder = sortOrder };
             var resp = await _http.PutAsJsonAsync($"api/claimtypes/{Uri.EscapeDataString(claimType.Type)}", req);
-            if (!resp.IsSuccessStatusCode) {
+            if (!resp.IsSuccessStatusCode)
+            {
                 return null;
             }
 

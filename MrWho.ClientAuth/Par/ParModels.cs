@@ -32,7 +32,8 @@ public sealed class AuthorizationRequest
             CodeChallengeMethod = jar.CodeChallengeMethod,
             Nonce = jar.Nonce // NEW
         };
-        foreach (var kv in jar.Extra) {
+        foreach (var kv in jar.Extra)
+        {
             ar.Extra[kv.Key] = kv.Value;
         }
 

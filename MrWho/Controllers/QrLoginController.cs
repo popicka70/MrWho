@@ -75,7 +75,8 @@ public class QrLoginController : Controller
     [AllowAnonymous]
     public IActionResult QrPng([FromQuery] string token, [FromQuery] bool persistent = false)
     {
-        if (string.IsNullOrWhiteSpace(token)) {
+        if (string.IsNullOrWhiteSpace(token))
+        {
             return BadRequest();
         }
 
@@ -194,7 +195,8 @@ public class QrLoginController : Controller
     public async Task<IActionResult> ApprovePost([FromForm] string token, [FromForm] string action)
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user == null) {
+        if (user == null)
+        {
             return Challenge();
         }
 
@@ -262,7 +264,8 @@ public class QrLoginController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Complete([FromForm] string token)
     {
-        if (string.IsNullOrEmpty(token)) {
+        if (string.IsNullOrEmpty(token))
+        {
             return BadRequest();
         }
 

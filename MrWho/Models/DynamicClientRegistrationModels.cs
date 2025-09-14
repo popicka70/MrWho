@@ -48,35 +48,42 @@ public static class DynamicClientRegistrationValidation
 
     public static (bool ok, string? error) Validate(DynamicClientRegistrationRequest req)
     {
-        if (req == null) {
+        if (req == null)
+        {
             return (false, "invalid_request");
         }
         // Require authorization_code or client_credentials at least one
         var grants = req.GrantTypes ?? new List<string>();
-        if (grants.Count == 0) {
+        if (grants.Count == 0)
+        {
             return (false, "At least one grant_type required");
         }
 
-        if (grants.Any(g => !SupportedGrantTypes.Contains(g))) {
+        if (grants.Any(g => !SupportedGrantTypes.Contains(g)))
+        {
             return (false, "Unsupported grant_type");
         }
 
         if (grants.Contains("authorization_code", StringComparer.OrdinalIgnoreCase))
         {
-            if (req.RedirectUris is null || req.RedirectUris.Count == 0) {
+            if (req.RedirectUris is null || req.RedirectUris.Count == 0)
+            {
                 return (false, "redirect_uris required for authorization_code grant");
             }
 
             var responses = req.ResponseTypes ?? new List<string> { "code" };
-            if (responses.Any(r => !SupportedResponseTypes.Contains(r))) {
+            if (responses.Any(r => !SupportedResponseTypes.Contains(r)))
+            {
                 return (false, "Unsupported response_type");
             }
         }
-        if (req.GrantTypes?.Contains("password", StringComparer.OrdinalIgnoreCase) == true) {
+        if (req.GrantTypes?.Contains("password", StringComparer.OrdinalIgnoreCase) == true)
+        {
             return (false, "password grant not allowed");
         }
 
-        if (!string.IsNullOrWhiteSpace(req.Scope) && req.Scope!.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length > 50) {
+        if (!string.IsNullOrWhiteSpace(req.Scope) && req.Scope!.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length > 50)
+        {
             return (false, "Too many scopes requested");
         }
 

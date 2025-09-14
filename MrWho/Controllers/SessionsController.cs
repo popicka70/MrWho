@@ -61,7 +61,8 @@ public class SessionsController : ControllerBase
             foreach (var authorization in authorizations)
             {
                 var status = await _authorizationManager.GetStatusAsync(authorization);
-                if (status != OpenIddictConstants.Statuses.Valid) {
+                if (status != OpenIddictConstants.Statuses.Valid)
+                {
                     continue;
                 }
 
@@ -102,7 +103,8 @@ public class SessionsController : ControllerBase
             foreach (var authorization in authorizations)
             {
                 var status = await _authorizationManager.GetStatusAsync(authorization);
-                if (status != OpenIddictConstants.Statuses.Valid) {
+                if (status != OpenIddictConstants.Statuses.Valid)
+                {
                     continue;
                 }
 
@@ -155,7 +157,8 @@ public class SessionsController : ControllerBase
             foreach (var authorization in authorizations)
             {
                 var status = await _authorizationManager.GetStatusAsync(authorization);
-                if (status != OpenIddictConstants.Statuses.Valid) {
+                if (status != OpenIddictConstants.Statuses.Valid)
+                {
                     continue;
                 }
 
@@ -244,7 +247,8 @@ public class SessionsController : ControllerBase
             foreach (var authorization in authorizations)
             {
                 var status = await _authorizationManager.GetStatusAsync(authorization);
-                if (status != OpenIddictConstants.Statuses.Valid) {
+                if (status != OpenIddictConstants.Statuses.Valid)
+                {
                     continue;
                 }
 
@@ -310,7 +314,8 @@ public class SessionsController : ControllerBase
             foreach (var authorization in authorizations)
             {
                 var status = await _authorizationManager.GetStatusAsync(authorization);
-                if (status != OpenIddictConstants.Statuses.Valid) {
+                if (status != OpenIddictConstants.Statuses.Valid)
+                {
                     continue;
                 }
 
@@ -370,7 +375,8 @@ public class SessionsController : ControllerBase
             foreach (var authorization in authorizations)
             {
                 var status = await _authorizationManager.GetStatusAsync(authorization);
-                if (status != OpenIddictConstants.Statuses.Valid) {
+                if (status != OpenIddictConstants.Statuses.Valid)
+                {
                     continue;
                 }
 
@@ -403,19 +409,23 @@ public class SessionsController : ControllerBase
                 var creationDate = await _authorizationManager.GetCreationDateAsync(authorization);
                 if (creationDate.HasValue)
                 {
-                    if (oldestSession == null || creationDate < oldestSession) {
+                    if (oldestSession == null || creationDate < oldestSession)
+                    {
                         oldestSession = creationDate;
                     }
 
-                    if (newestSession == null || creationDate > newestSession) {
+                    if (newestSession == null || creationDate > newestSession)
+                    {
                         newestSession = creationDate;
                     }
 
-                    if (creationDate.Value.DateTime >= todayStart) {
+                    if (creationDate.Value.DateTime >= todayStart)
+                    {
                         stats.SessionsToday++;
                     }
 
-                    if (creationDate.Value.DateTime >= weekStart) {
+                    if (creationDate.Value.DateTime >= weekStart)
+                    {
                         stats.SessionsThisWeek++;
                     }
                 }
@@ -465,19 +475,22 @@ public class SessionsController : ControllerBase
             var scopes = await _authorizationManager.GetScopesAsync(authorization);
             var creationDate = await _authorizationManager.GetCreationDateAsync(authorization);
 
-            if (string.IsNullOrEmpty(subject) || string.IsNullOrEmpty(applicationId)) {
+            if (string.IsNullOrEmpty(subject) || string.IsNullOrEmpty(applicationId))
+            {
                 return null;
             }
 
             // Get user information
             var user = await _userManager.FindByIdAsync(subject);
-            if (user == null) {
+            if (user == null)
+            {
                 return null;
             }
 
             // Get application information
             var application = await _applicationManager.FindByIdAsync(applicationId);
-            if (application == null) {
+            if (application == null)
+            {
                 return null;
             }
 

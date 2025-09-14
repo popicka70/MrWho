@@ -31,11 +31,13 @@ public sealed class CorrelationContextAccessor : ICorrelationContextAccessor
         get
         {
             var http = _http.HttpContext;
-            if (http == null) {
+            if (http == null)
+            {
                 return _empty;
             }
 
-            if (http.Items.TryGetValue(ItemKey, out var value) && value is CorrelationContext ctx) {
+            if (http.Items.TryGetValue(ItemKey, out var value) && value is CorrelationContext ctx)
+            {
                 return ctx;
             }
 

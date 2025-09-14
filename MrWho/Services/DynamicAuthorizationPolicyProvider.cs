@@ -90,14 +90,16 @@ public class DynamicAuthorizationPolicyProvider : IAuthorizationPolicyProvider
                     .RequireAssertion(ctx =>
                     {
                         var user = ctx.User;
-                        if (user?.Identity?.IsAuthenticated != true) {
+                        if (user?.Identity?.IsAuthenticated != true)
+                        {
                             return false;
                         }
 
                         bool hasMrWhoUse = user.FindAll("scope")
                             .Any(c => c.Value.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                                               .Contains(StandardScopes.MrWhoUse));
-                        if (!hasMrWhoUse) {
+                        if (!hasMrWhoUse)
+                        {
                             return false;
                         }
 
@@ -106,12 +108,14 @@ public class DynamicAuthorizationPolicyProvider : IAuthorizationPolicyProvider
                         const string testM2MClientId = "mrwho_tests_m2m";  // legacy test-only client (optional)
 
                         bool isAdminClient = user.HasClaim(c => (c.Type == "azp" || c.Type == "client_id") && c.Value == adminClientId);
-                        if (isAdminClient) {
+                        if (isAdminClient)
+                        {
                             return true;
                         }
 
                         bool isServiceClient = user.HasClaim(c => (c.Type == "azp" || c.Type == "client_id") && c.Value == serviceClientId);
-                        if (isServiceClient) {
+                        if (isServiceClient)
+                        {
                             return true;
                         }
 
@@ -120,7 +124,8 @@ public class DynamicAuthorizationPolicyProvider : IAuthorizationPolicyProvider
                         if (isTesting)
                         {
                             bool isLegacyTestClient = user.HasClaim(c => (c.Type == "azp" || c.Type == "client_id") && c.Value == testM2MClientId);
-                            if (isLegacyTestClient) {
+                            if (isLegacyTestClient)
+                            {
                                 return true;
                             }
                         }

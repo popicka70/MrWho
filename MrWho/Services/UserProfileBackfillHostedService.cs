@@ -28,7 +28,8 @@ public sealed class UserProfileBackfillHostedService : IHostedService
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             var userManager = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
 
-            if (!await db.Database.CanConnectAsync(cancellationToken)) {
+            if (!await db.Database.CanConnectAsync(cancellationToken))
+            {
                 return;
             }
 
@@ -67,11 +68,13 @@ public sealed class UserProfileBackfillHostedService : IHostedService
 
     private static string BuildDisplayName(string source)
     {
-        if (string.IsNullOrWhiteSpace(source)) {
+        if (string.IsNullOrWhiteSpace(source))
+        {
             return "New User";
         }
 
-        if (source.Contains('@')) {
+        if (source.Contains('@'))
+        {
             source = source.Split('@')[0];
         }
 

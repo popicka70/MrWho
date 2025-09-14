@@ -176,7 +176,8 @@ public class BasicApiReadTests
     {
         using var client = await CreateAuthorizedClientAsync();
         var (id, _) = await GetFirstItemAsync(client, "api/realms?page=1&pageSize=1");
-        if (string.IsNullOrEmpty(id)) {
+        if (string.IsNullOrEmpty(id))
+        {
             return; // no realms yet
         }
 
@@ -193,7 +194,8 @@ public class BasicApiReadTests
     {
         using var client = await CreateAuthorizedClientAsync();
         var (id, _) = await GetFirstItemAsync(client, "api/clients?page=1&pageSize=1");
-        if (string.IsNullOrEmpty(id)) {
+        if (string.IsNullOrEmpty(id))
+        {
             return; // no clients yet
         }
 
@@ -208,7 +210,8 @@ public class BasicApiReadTests
     {
         using var client = await CreateAuthorizedClientAsync();
         var (id, _) = await GetFirstItemAsync(client, "api/apiresources?page=1&pageSize=1");
-        if (string.IsNullOrEmpty(id)) {
+        if (string.IsNullOrEmpty(id))
+        {
             return; // none
         }
 
@@ -221,7 +224,8 @@ public class BasicApiReadTests
     {
         using var client = await CreateAuthorizedClientAsync();
         var (id, _) = await GetFirstItemAsync(client, "api/identityresources?page=1&pageSize=1");
-        if (string.IsNullOrEmpty(id)) {
+        if (string.IsNullOrEmpty(id))
+        {
             return; // none
         }
 

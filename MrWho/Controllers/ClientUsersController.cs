@@ -28,7 +28,8 @@ public class ClientUsersController : ControllerBase
     private async Task<Client?> FindClientByIdOrPublicIdAsync(string clientId)
     {
         var client = await _context.Clients.FirstOrDefaultAsync(c => c.Id == clientId);
-        if (client != null) {
+        if (client != null)
+        {
             return client;
         }
 
@@ -39,7 +40,8 @@ public class ClientUsersController : ControllerBase
     public async Task<ActionResult<ClientUsersListDto>> GetAssignedUsers(string clientId)
     {
         var client = await _context.Clients.FirstOrDefaultAsync(c => c.Id == clientId || c.ClientId == clientId);
-        if (client == null) {
+        if (client == null)
+        {
             return NotFound($"Client '{clientId}' not found");
         }
 
@@ -74,12 +76,14 @@ public class ClientUsersController : ControllerBase
     public async Task<ActionResult<ClientUserDto>> AssignUser(string clientId, [FromBody] AssignClientUserRequest request)
     {
         var client = await FindClientByIdOrPublicIdAsync(clientId);
-        if (client == null) {
+        if (client == null)
+        {
             return NotFound($"Client '{clientId}' not found");
         }
 
         var user = await _userManager.FindByIdAsync(request.UserId) ?? await _userManager.FindByNameAsync(request.UserId);
-        if (user == null) {
+        if (user == null)
+        {
             return NotFound($"User '{request.UserId}' not found");
         }
 
@@ -118,12 +122,14 @@ public class ClientUsersController : ControllerBase
     public async Task<IActionResult> RemoveUser(string clientId, string userId)
     {
         var client = await FindClientByIdOrPublicIdAsync(clientId);
-        if (client == null) {
+        if (client == null)
+        {
             return NotFound($"Client '{clientId}' not found");
         }
 
         var assignment = await _context.ClientUsers.FirstOrDefaultAsync(cu => cu.ClientId == client.Id && cu.UserId == userId);
-        if (assignment == null) {
+        if (assignment == null)
+        {
             return NotFound("Assignment not found");
         }
 

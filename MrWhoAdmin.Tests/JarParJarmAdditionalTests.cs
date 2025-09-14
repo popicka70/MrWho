@@ -72,7 +72,8 @@ public class JarParJarmAdditionalTests
         {
             var pad = new byte[required];
             Array.Copy(bytes, pad, bytes.Length);
-            for (int i = bytes.Length; i < required; i++) {
+            for (int i = bytes.Length; i < required; i++)
+            {
                 pad[i] = (byte)'!';
             }
 
@@ -99,7 +100,8 @@ public class JarParJarmAdditionalTests
             ["code_challenge"] = challenge,
             ["code_challenge_method"] = "S256"
         };
-        if (includeJti) {
+        if (includeJti)
+        {
             claims["jti"] = Guid.NewGuid().ToString("n");
         }
 

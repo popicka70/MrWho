@@ -45,7 +45,8 @@ public class DeviceManagementController : ControllerBase
     public async Task<ActionResult<UserDeviceDto>> RegisterDevice([FromBody] RegisterDeviceApiRequest request)
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user == null) {
+        if (user == null)
+        {
             return Unauthorized();
         }
 
@@ -87,7 +88,8 @@ public class DeviceManagementController : ControllerBase
     public async Task<ActionResult<List<UserDeviceDto>>> GetUserDevices([FromQuery] bool activeOnly = true)
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user == null) {
+        if (user == null)
+        {
             return Unauthorized();
         }
 
@@ -102,12 +104,14 @@ public class DeviceManagementController : ControllerBase
     public async Task<ActionResult<UserDeviceDto>> GetDevice(string deviceId)
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user == null) {
+        if (user == null)
+        {
             return Unauthorized();
         }
 
         var device = await _deviceService.GetDeviceAsync(user.Id, deviceId);
-        if (device == null) {
+        if (device == null)
+        {
             return NotFound();
         }
 
@@ -121,13 +125,15 @@ public class DeviceManagementController : ControllerBase
     public async Task<ActionResult> UpdateDevice(string deviceId, [FromBody] UpdateDeviceApiRequest request)
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user == null) {
+        if (user == null)
+        {
             return Unauthorized();
         }
 
         // Verify device belongs to user
         var device = await _deviceService.GetDeviceAsync(user.Id, deviceId);
-        if (device == null) {
+        if (device == null)
+        {
             return NotFound();
         }
 
@@ -145,7 +151,8 @@ public class DeviceManagementController : ControllerBase
         };
 
         var success = await _deviceService.UpdateDeviceAsync(deviceId, updateRequest);
-        if (!success) {
+        if (!success)
+        {
             return NotFound();
         }
 
@@ -160,12 +167,14 @@ public class DeviceManagementController : ControllerBase
     public async Task<ActionResult> RevokeDevice(string deviceId)
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user == null) {
+        if (user == null)
+        {
             return Unauthorized();
         }
 
         var success = await _deviceService.RevokeDeviceAsync(user.Id, deviceId);
-        if (!success) {
+        if (!success)
+        {
             return NotFound();
         }
 
@@ -180,12 +189,14 @@ public class DeviceManagementController : ControllerBase
     public async Task<ActionResult> SetDeviceTrusted(string deviceId, [FromBody] SetTrustedRequest request)
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user == null) {
+        if (user == null)
+        {
             return Unauthorized();
         }
 
         var success = await _deviceService.SetDeviceTrustedAsync(user.Id, deviceId, request.IsTrusted);
-        if (!success) {
+        if (!success)
+        {
             return NotFound();
         }
 
@@ -269,14 +280,16 @@ public class DeviceManagementController : ControllerBase
     public async Task<ActionResult> ApproveQrSession(string token, [FromBody] ApproveQrRequest request)
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user == null) {
+        if (user == null)
+        {
             return Unauthorized();
         }
 
         try
         {
             var success = await _qrService.ApproveQrAsync(token, user.Id, request.DeviceId);
-            if (!success) {
+            if (!success)
+            {
                 return BadRequest(new { error = "Failed to approve QR session. Session may be expired or device invalid." });
             }
 
@@ -299,14 +312,16 @@ public class DeviceManagementController : ControllerBase
     public async Task<ActionResult> RejectQrSession(string token, [FromBody] RejectQrRequest request)
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user == null) {
+        if (user == null)
+        {
             return Unauthorized();
         }
 
         try
         {
             var success = await _qrService.RejectPersistentQrAsync(token, user.Id, request.DeviceId);
-            if (!success) {
+            if (!success)
+            {
                 return BadRequest(new { error = "Failed to reject QR session. Session may be expired or device invalid." });
             }
 
@@ -333,13 +348,15 @@ public class DeviceManagementController : ControllerBase
     public async Task<ActionResult<List<DeviceActivityDto>>> GetDeviceActivity(string deviceId, [FromQuery] int count = 50)
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user == null) {
+        if (user == null)
+        {
             return Unauthorized();
         }
 
         // Verify device belongs to user
         var device = await _deviceService.GetDeviceAsync(user.Id, deviceId);
-        if (device == null) {
+        if (device == null)
+        {
             return NotFound();
         }
 
@@ -354,7 +371,8 @@ public class DeviceManagementController : ControllerBase
     public async Task<ActionResult<List<DeviceActivityDto>>> GetUserDeviceActivity([FromQuery] int count = 100)
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user == null) {
+        if (user == null)
+        {
             return Unauthorized();
         }
 
@@ -369,13 +387,15 @@ public class DeviceManagementController : ControllerBase
     public async Task<ActionResult> MarkDeviceCompromised(string deviceId, [FromBody] MarkCompromisedRequest request)
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user == null) {
+        if (user == null)
+        {
             return Unauthorized();
         }
 
         // Verify device belongs to user
         var device = await _deviceService.GetDeviceAsync(user.Id, deviceId);
-        if (device == null) {
+        if (device == null)
+        {
             return NotFound();
         }
 

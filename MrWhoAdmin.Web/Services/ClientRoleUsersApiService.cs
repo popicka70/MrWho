@@ -14,7 +14,8 @@ public class ClientRoleUsersApiService : IClientRoleUsersApiService
         try
         {
             var resp = await _httpClient.GetAsync($"api/clientroles/{Uri.EscapeDataString(clientId)}/roles/{Uri.EscapeDataString(roleName)}/users");
-            if (!resp.IsSuccessStatusCode) {
+            if (!resp.IsSuccessStatusCode)
+            {
                 return new();
             }
 

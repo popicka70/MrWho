@@ -55,7 +55,8 @@ public class RegistrationsController : ControllerBase
     public async Task<IActionResult> Approve(string id)
     {
         var profile = await _context.UserProfiles.FirstOrDefaultAsync(p => p.UserId == id);
-        if (profile == null) {
+        if (profile == null)
+        {
             return NotFound("User profile not found");
         }
 
@@ -72,7 +73,8 @@ public class RegistrationsController : ControllerBase
     public async Task<IActionResult> Reject(string id)
     {
         var profile = await _context.UserProfiles.FirstOrDefaultAsync(p => p.UserId == id);
-        if (profile == null) {
+        if (profile == null)
+        {
             return NotFound("User profile not found");
         }
 

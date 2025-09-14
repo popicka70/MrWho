@@ -138,7 +138,8 @@ public class TokenHandler : ITokenHandler
         try
         {
             var client = await _db.Clients.Include(c => c.Realm).FirstOrDefaultAsync(c => c.ClientId == clientId);
-            if (client == null) {
+            if (client == null)
+            {
                 return;
             }
 
@@ -160,19 +161,23 @@ public class TokenHandler : ITokenHandler
     private RoleInclusion ResolveRoleInclusion(IEnumerable<string> scopes)
     {
         var set = scopes.ToHashSet(StringComparer.OrdinalIgnoreCase);
-        if (set.Contains("roles.all") || (set.Contains("roles.global") && set.Contains("roles.client"))) {
+        if (set.Contains("roles.all") || (set.Contains("roles.global") && set.Contains("roles.client")))
+        {
             return RoleInclusion.GlobalAndClient;
         }
 
-        if (set.Contains("roles.client")) {
+        if (set.Contains("roles.client"))
+        {
             return RoleInclusion.ClientOnly;
         }
 
-        if (set.Contains("roles.global")) {
+        if (set.Contains("roles.global"))
+        {
             return RoleInclusion.GlobalOnly;
         }
 
-        if (set.Contains(Scopes.Roles)) {
+        if (set.Contains(Scopes.Roles))
+        {
             return RoleInclusion.GlobalAndClient;
         }
 
@@ -234,7 +239,8 @@ public class TokenHandler : ITokenHandler
                 .Include(r => r.UserClaims)
                 .Where(r => r.IsEnabled && scopeSet.Contains(r.Name))
                 .ToListAsync();
-            if (idResources.Count == 0) {
+            if (idResources.Count == 0)
+            {
                 return;
             }
 
@@ -248,11 +254,13 @@ public class TokenHandler : ITokenHandler
 
             foreach (var claimType in idResources.SelectMany(r => r.UserClaims.Select(uc => uc.ClaimType)).Distinct(StringComparer.OrdinalIgnoreCase))
             {
-                if (existingTypes.Contains(claimType)) {
+                if (existingTypes.Contains(claimType))
+                {
                     continue; // already added elsewhere (e.g., sub, email, name)
                 }
 
-                if (!userClaimLookup.TryGetValue(claimType, out var value) || string.IsNullOrWhiteSpace(value)) {
+                if (!userClaimLookup.TryGetValue(claimType, out var value) || string.IsNullOrWhiteSpace(value))
+                {
                     continue;
                 }
 
@@ -284,7 +292,8 @@ public class TokenHandler : ITokenHandler
         try
         {
             var requested = scopes.ToHashSet(StringComparer.OrdinalIgnoreCase);
-            if (requested.Count == 0) {
+            if (requested.Count == 0)
+            {
                 return;
             }
 
@@ -293,7 +302,8 @@ public class TokenHandler : ITokenHandler
                 .Include(r => r.Scopes)
                 .Where(r => r.IsEnabled && r.Scopes.Any(s => requested.Contains(s.Scope)))
                 .ToListAsync();
-            if (apiResources.Count == 0) {
+            if (apiResources.Count == 0)
+            {
                 return;
             }
 
@@ -304,14 +314,16 @@ public class TokenHandler : ITokenHandler
 
             static string[] ParseDestinations(string? json, ILogger logger, string apiName)
             {
-                if (string.IsNullOrWhiteSpace(json)) {
+                if (string.IsNullOrWhiteSpace(json))
+                {
                     return new[] { Destinations.AccessToken };
                 }
 
                 try
                 {
                     var arr = System.Text.Json.JsonSerializer.Deserialize<string[]>(json);
-                    if (arr == null || arr.Length == 0) {
+                    if (arr == null || arr.Length == 0)
+                    {
                         return new[] { Destinations.AccessToken };
                     }
                     // Filter only supported known values
@@ -336,11 +348,13 @@ public class TokenHandler : ITokenHandler
                 var destinations = ParseDestinations(api.ClaimDestinationsJson, _logger, api.Name);
                 foreach (var claimType in api.UserClaims.Select(c => c.ClaimType).Distinct(StringComparer.OrdinalIgnoreCase))
                 {
-                    if (existingTypes.Contains(claimType)) {
+                    if (existingTypes.Contains(claimType))
+                    {
                         continue; // do not duplicate
                     }
 
-                    if (!userClaimLookup.TryGetValue(claimType, out var value) || string.IsNullOrWhiteSpace(value)) {
+                    if (!userClaimLookup.TryGetValue(claimType, out var value) || string.IsNullOrWhiteSpace(value))
+                    {
                         continue;
                     }
 
@@ -475,7 +489,10 @@ public class TokenHandler : ITokenHandler
         var clientId = request.ClientId!;
         ClaimsPrincipal? authPrincipal = null;
         var cookieScheme = _cookieService.GetCookieSchemeForClient(clientId);
-        try { var cookieResult = await context.AuthenticateAsync(cookieScheme); if (cookieResult.Succeeded && cookieResult.Principal?.Identity?.IsAuthenticated == true) {
+        try
+        {
+            var cookieResult = await context.AuthenticateAsync(cookieScheme); if (cookieResult.Succeeded && cookieResult.Principal?.Identity?.IsAuthenticated == true)
+            {
                 authPrincipal = cookieResult.Principal;
             }
         }
@@ -485,17 +502,20 @@ public class TokenHandler : ITokenHandler
             var fallback = await context.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
             authPrincipal = fallback.Principal;
         }
-        if (authPrincipal == null) {
+        if (authPrincipal == null)
+        {
             return Results.Forbid(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
         }
 
         var sub = authPrincipal.FindFirst(OpenIddictConstants.Claims.Subject)?.Value;
-        if (string.IsNullOrWhiteSpace(sub)) {
+        if (string.IsNullOrWhiteSpace(sub))
+        {
             return Results.Forbid(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
         }
 
         var user = await _userManager.FindByIdAsync(sub);
-        if (user == null) {
+        if (user == null)
+        {
             return Results.Forbid(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
         }
 
@@ -506,11 +526,13 @@ public class TokenHandler : ITokenHandler
         var existingTypes = identity.Claims.Select(c => c.Type).ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var c in authPrincipal.Claims)
         {
-            if (existingTypes.Contains(c.Type)) {
+            if (existingTypes.Contains(c.Type))
+            {
                 continue; // skip duplicates
             }
 
-            if (c.Type is OpenIddictConstants.Claims.Subject or OpenIddictConstants.Claims.Email or OpenIddictConstants.Claims.Name or OpenIddictConstants.Claims.PreferredUsername) {
+            if (c.Type is OpenIddictConstants.Claims.Subject or OpenIddictConstants.Claims.Email or OpenIddictConstants.Claims.Name or OpenIddictConstants.Claims.PreferredUsername)
+            {
                 continue; // already set with destinations
             }
 
@@ -540,21 +562,25 @@ public class TokenHandler : ITokenHandler
     {
         var authenticateResult = await context.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
         var principal = authenticateResult.Principal;
-        if (principal == null) {
+        if (principal == null)
+        {
             return Results.Forbid(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
         }
 
         var sub = principal.FindFirst(OpenIddictConstants.Claims.Subject)?.Value;
-        if (string.IsNullOrWhiteSpace(sub)) {
+        if (string.IsNullOrWhiteSpace(sub))
+        {
             return Results.Forbid(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
         }
 
         var user = await _userManager.FindByIdAsync(sub);
-        if (user == null) {
+        if (user == null)
+        {
             return Results.Forbid(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
         }
 
-        if (!user.EmailConfirmed && _userManager.Options.SignIn.RequireConfirmedEmail) {
+        if (!user.EmailConfirmed && _userManager.Options.SignIn.RequireConfirmedEmail)
+        {
             return Results.Forbid(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
         }
 
@@ -749,7 +775,8 @@ public class TokenHandler : ITokenHandler
     /// </summary>
     private string ConvertToFriendlyName(string input)
     {
-        if (string.IsNullOrEmpty(input)) {
+        if (string.IsNullOrEmpty(input))
+        {
             return "Unknown User";
         }
 
@@ -769,7 +796,8 @@ public class TokenHandler : ITokenHandler
     /// </summary>
     private string ConvertToDisplayName(string input)
     {
-        if (string.IsNullOrEmpty(input)) {
+        if (string.IsNullOrEmpty(input))
+        {
             return "Unknown User";
         }
 
@@ -792,13 +820,15 @@ public class TokenHandler : ITokenHandler
     {
         try
         {
-            if (string.IsNullOrWhiteSpace(clientId)) {
+            if (string.IsNullOrWhiteSpace(clientId))
+            {
                 return new(false);
             }
 
             var scopeSet = requestedScopes?.ToHashSet(StringComparer.OrdinalIgnoreCase) ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var client = await _db.Clients.Include(c => c.Audiences).Include(c => c.Realm).FirstOrDefaultAsync(c => c.ClientId == clientId);
-            if (client == null) {
+            if (client == null)
+            {
                 return new(false);
             }
 
@@ -807,7 +837,8 @@ public class TokenHandler : ITokenHandler
             var explicitRequired = client.RequireExplicitAudienceScope ?? client.Realm?.RequireExplicitAudienceScope ?? false;
             var primary = client.PrimaryAudience ?? client.Realm?.PrimaryAudience;
             var configured = client.Audiences.Select(a => a.Audience).Where(a => !string.IsNullOrWhiteSpace(a)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-            if (configured.Count == 0 || mode == AudienceMode.None) {
+            if (configured.Count == 0 || mode == AudienceMode.None)
+            {
                 return new(false);
             }
 
@@ -823,19 +854,23 @@ public class TokenHandler : ITokenHandler
                 case AudienceMode.RequestedOrAll:
                     result = intersection.Count > 0 ? intersection : configured; break;
                 case AudienceMode.RequestedOrPrimary:
-                    if (intersection.Count > 0) {
+                    if (intersection.Count > 0)
+                    {
                         result = intersection;
                     }
-                    else if (!string.IsNullOrWhiteSpace(primary) && configured.Contains(primary, StringComparer.OrdinalIgnoreCase)) {
+                    else if (!string.IsNullOrWhiteSpace(primary) && configured.Contains(primary, StringComparer.OrdinalIgnoreCase))
+                    {
                         result = new() { primary! };
                     }
-                    else {
+                    else
+                    {
                         result = new() { configured.First() };
                     }
 
                     break;
                 case AudienceMode.ErrorIfUnrequested:
-                    if (intersection.Count == 0) {
+                    if (intersection.Count == 0)
+                    {
                         return new(true, "Required audience scope missing");
                     }
 
@@ -850,11 +885,13 @@ public class TokenHandler : ITokenHandler
                 return new(true, "Explicit audience scope required");
             }
 
-            if (result.Count == 0) {
+            if (result.Count == 0)
+            {
                 return new(false);
             }
 
-            if (principal.HasClaim(c => c.Type == Claims.Audience)) {
+            if (principal.HasClaim(c => c.Type == Claims.Audience))
+            {
                 return new(false);
             }
 

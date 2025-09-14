@@ -39,7 +39,8 @@ public class ApiResourcesApiService : IApiResourcesApiService
                 $"pageSize={pageSize}"
             };
 
-            if (!string.IsNullOrWhiteSpace(search)) {
+            if (!string.IsNullOrWhiteSpace(search))
+            {
                 queryParams.Add($"search={Uri.EscapeDataString(search)}");
             }
 

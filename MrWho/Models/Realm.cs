@@ -119,7 +119,8 @@ public class Realm
 
     public List<string> GetAllowedMfaMethods()
     {
-        if (string.IsNullOrEmpty(DefaultAllowedMfaMethods)) {
+        if (string.IsNullOrEmpty(DefaultAllowedMfaMethods))
+        {
             return new List<string> { "totp", "sms" };
         }
 

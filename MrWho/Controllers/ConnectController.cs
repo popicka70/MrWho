@@ -51,16 +51,19 @@ public class ConnectController : Controller
         }
 
         var props = new AuthenticationProperties { RedirectUri = "/connect/external/callback" };
-        if (!string.IsNullOrWhiteSpace(returnUrl)) {
+        if (!string.IsNullOrWhiteSpace(returnUrl))
+        {
             props.Items["returnUrl"] = returnUrl;
         }
 
-        if (!string.IsNullOrWhiteSpace(clientId)) {
+        if (!string.IsNullOrWhiteSpace(clientId))
+        {
             props.Items["clientId"] = clientId;
         }
 
         props.Items["extRegistrationId"] = registration.RegistrationId;
-        if (!string.IsNullOrWhiteSpace(registration.ProviderName)) {
+        if (!string.IsNullOrWhiteSpace(registration.ProviderName))
+        {
             props.Items["extProviderName"] = registration.ProviderName;
         }
 
@@ -79,7 +82,8 @@ public class ConnectController : Controller
     public IActionResult ExternalSignOut()
     {
         var regId = HttpContext.Session.GetString("ExternalRegistrationId") ?? User?.FindFirst("ext_reg_id")?.Value;
-        if (string.IsNullOrWhiteSpace(regId)) {
+        if (string.IsNullOrWhiteSpace(regId))
+        {
             return NoContent();
         }
 

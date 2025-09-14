@@ -33,7 +33,8 @@ public class BackChannelLogoutServiceTests
         public bool SimulateTimeout;
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            if (SimulateTimeout) {
+            if (SimulateTimeout)
+            {
                 throw new TaskCanceledException("timeout");
             }
 
@@ -172,7 +173,8 @@ public class BackChannelLogoutServiceTests
         {
             lock (listenerValues)
             {
-                if (!listenerValues.ContainsKey(inst.Name)) {
+                if (!listenerValues.ContainsKey(inst.Name))
+                {
                     listenerValues[inst.Name] = 0;
                 }
 

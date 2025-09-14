@@ -32,7 +32,8 @@ internal sealed class PushedAuthorizationService : IPushedAuthorizationService
     public async Task<(ParResult? Result, ParError? Error)> PushAsync(AuthorizationRequest request, CancellationToken ct = default)
     {
         // Ensure nonce exists (OIDC best practice) prior to JAR/PAR
-        if (string.IsNullOrWhiteSpace(request.Nonce)) {
+        if (string.IsNullOrWhiteSpace(request.Nonce))
+        {
             request.Nonce = GenerateNonce();
         }
 
@@ -50,7 +51,8 @@ internal sealed class PushedAuthorizationService : IPushedAuthorizationService
                 CodeChallengeMethod = request.CodeChallengeMethod ?? "S256",
                 Nonce = request.Nonce
             };
-            foreach (var kv in request.Extra) {
+            foreach (var kv in request.Extra)
+            {
                 jarReq.Extra[kv.Key] = kv.Value;
             }
 
@@ -74,15 +76,18 @@ internal sealed class PushedAuthorizationService : IPushedAuthorizationService
             new("redirect_uri", request.RedirectUri),
             new("response_type", request.ResponseType)
         };
-        if (!string.IsNullOrWhiteSpace(request.Scope)) {
+        if (!string.IsNullOrWhiteSpace(request.Scope))
+        {
             form.Add(new("scope", request.Scope));
         }
 
-        if (!string.IsNullOrWhiteSpace(request.State)) {
+        if (!string.IsNullOrWhiteSpace(request.State))
+        {
             form.Add(new("state", request.State));
         }
 
-        if (!string.IsNullOrWhiteSpace(request.Nonce)) {
+        if (!string.IsNullOrWhiteSpace(request.Nonce))
+        {
             form.Add(new("nonce", request.Nonce)); // add nonce to PAR payload
         }
 
@@ -91,13 +96,15 @@ internal sealed class PushedAuthorizationService : IPushedAuthorizationService
             form.Add(new("code_challenge", request.CodeChallenge));
             form.Add(new("code_challenge_method", request.CodeChallengeMethod ?? "S256"));
         }
-        if (!string.IsNullOrWhiteSpace(request.RequestObjectJwt)) {
+        if (!string.IsNullOrWhiteSpace(request.RequestObjectJwt))
+        {
             form.Add(new("request", request.RequestObjectJwt));
         }
 
         foreach (var kv in request.Extra)
         {
-            if (kv.Key is "client_secret_for_par_auth" or "client_secret") {
+            if (kv.Key is "client_secret_for_par_auth" or "client_secret")
+            {
                 continue;
             }
 
@@ -135,7 +142,8 @@ internal sealed class PushedAuthorizationService : IPushedAuthorizationService
                 var root = doc.RootElement;
                 var requestUri = root.GetProperty("request_uri").GetString();
                 var expiresIn = root.GetProperty("expires_in").GetInt32();
-                if (string.IsNullOrWhiteSpace(requestUri)) {
+                if (string.IsNullOrWhiteSpace(requestUri))
+                {
                     throw new InvalidOperationException("Missing request_uri");
                 }
 
@@ -174,7 +182,8 @@ internal sealed class PushedAuthorizationService : IPushedAuthorizationService
     public async Task<Uri> BuildAuthorizeUrlAsync(AuthorizationRequest request, CancellationToken ct = default)
     {
         // Ensure nonce pre-populated for front-channel fallback
-        if (string.IsNullOrWhiteSpace(request.Nonce)) {
+        if (string.IsNullOrWhiteSpace(request.Nonce))
+        {
             request.Nonce = GenerateNonce();
         }
 
@@ -188,13 +197,15 @@ internal sealed class PushedAuthorizationService : IPushedAuthorizationService
         }
         var directQuery = BuildDirectQuery(request);
         bool mustPush = _options.AutoPushQueryLengthThreshold > 0 && directQuery.Length > _options.AutoPushQueryLengthThreshold;
-        if (request.Extra.TryGetValue("use_par", out var flag) && (flag == "1" || flag.Equals("true", StringComparison.OrdinalIgnoreCase))) {
+        if (request.Extra.TryGetValue("use_par", out var flag) && (flag == "1" || flag.Equals("true", StringComparison.OrdinalIgnoreCase)))
+        {
             mustPush = true;
         }
 
         if (!mustPush && _options.AutoJar && _jarSigner != null && string.IsNullOrEmpty(request.RequestObjectJwt))
         {
-            if (request.Extra.TryGetValue("auto_jar", out var v) && (v == "1" || v.Equals("true", StringComparison.OrdinalIgnoreCase))) {
+            if (request.Extra.TryGetValue("auto_jar", out var v) && (v == "1" || v.Equals("true", StringComparison.OrdinalIgnoreCase)))
+            {
                 mustPush = true;
             }
         }
@@ -227,7 +238,8 @@ internal sealed class PushedAuthorizationService : IPushedAuthorizationService
                 CodeChallengeMethod = request.CodeChallengeMethod ?? "S256",
                 Nonce = request.Nonce
             };
-            foreach (var kv in request.Extra) {
+            foreach (var kv in request.Extra)
+            {
                 jarReq.Extra[kv.Key] = kv.Value;
             }
 
@@ -243,15 +255,18 @@ internal sealed class PushedAuthorizationService : IPushedAuthorizationService
         qb["client_id"] = req.ClientId;
         qb["redirect_uri"] = req.RedirectUri;
         qb["response_type"] = req.ResponseType;
-        if (!string.IsNullOrWhiteSpace(req.Scope)) {
+        if (!string.IsNullOrWhiteSpace(req.Scope))
+        {
             qb["scope"] = req.Scope;
         }
 
-        if (!string.IsNullOrWhiteSpace(req.State)) {
+        if (!string.IsNullOrWhiteSpace(req.State))
+        {
             qb["state"] = req.State;
         }
 
-        if (!string.IsNullOrWhiteSpace(req.Nonce)) {
+        if (!string.IsNullOrWhiteSpace(req.Nonce))
+        {
             qb["nonce"] = req.Nonce; // ensure nonce appears in direct authorization URL
         }
 
@@ -260,13 +275,15 @@ internal sealed class PushedAuthorizationService : IPushedAuthorizationService
             qb["code_challenge"] = req.CodeChallenge;
             qb["code_challenge_method"] = req.CodeChallengeMethod ?? "S256";
         }
-        if (!string.IsNullOrWhiteSpace(req.RequestObjectJwt)) {
+        if (!string.IsNullOrWhiteSpace(req.RequestObjectJwt))
+        {
             qb["request"] = req.RequestObjectJwt;
         }
 
         foreach (var kv in req.Extra)
         {
-            if (qb[kv.Key] != null) {
+            if (qb[kv.Key] != null)
+            {
                 continue;
             }
 

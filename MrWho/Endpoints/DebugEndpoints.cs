@@ -35,13 +35,15 @@ internal static class DebugUrlHelper
     {
         foreach (var uri in client.RedirectUris.Select(r => r.Uri))
         {
-            if (TryGetBase(uri, out var b)) {
+            if (TryGetBase(uri, out var b))
+            {
                 return b;
             }
         }
         foreach (var uri in client.PostLogoutUris.Select(r => r.Uri))
         {
-            if (TryGetBase(uri, out var b)) {
+            if (TryGetBase(uri, out var b))
+            {
                 return b;
             }
         }
@@ -71,7 +73,8 @@ internal static class DebugUrlHelper
     {
         var preferred = client.PostLogoutUris.Select(p => p.Uri)
             .FirstOrDefault(u => u.Contains("signout-callback-oidc", StringComparison.OrdinalIgnoreCase));
-        if (!string.IsNullOrEmpty(preferred)) {
+        if (!string.IsNullOrEmpty(preferred))
+        {
             return preferred;
         }
 

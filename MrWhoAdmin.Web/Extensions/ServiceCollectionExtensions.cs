@@ -49,18 +49,21 @@ internal sealed class AdminProfileService : IAdminProfileService
     public AdminProfile? GetCurrentProfile(HttpContext? context = null)
     {
         context ??= _http.HttpContext;
-        if (context == null) {
+        if (context == null)
+        {
             return _profiles.FirstOrDefault();
         }
 
-        if (context.Items.TryGetValue(typeof(AdminProfile), out var obj) && obj is AdminProfile cached) {
+        if (context.Items.TryGetValue(typeof(AdminProfile), out var obj) && obj is AdminProfile cached)
+        {
             return cached;
         }
 
         if (context.Request.Cookies.TryGetValue(ProfileCookie, out var name))
         {
             var prof = _profiles.FirstOrDefault(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
-            if (prof != null) {
+            if (prof != null)
+            {
                 context.Items[typeof(AdminProfile)] = prof;
             }
 
@@ -74,7 +77,8 @@ internal sealed class AdminProfileService : IAdminProfileService
     public void SetCurrentProfile(HttpContext context, string name)
     {
         var profile = Find(name);
-        if (profile == null) {
+        if (profile == null)
+        {
             return;
         }
 

@@ -25,7 +25,8 @@ public class ClaimTypeSeederService : IClaimTypeSeederService
     public async Task SeedClaimTypesAsync()
     {
         // Ensure database reachable
-        if (!await _context.Database.CanConnectAsync()) {
+        if (!await _context.Database.CanConnectAsync())
+        {
             return;
         }
 
@@ -62,7 +63,8 @@ public class ClaimTypeSeederService : IClaimTypeSeederService
 
         foreach (var type in referenced)
         {
-            if (string.IsNullOrWhiteSpace(type)) {
+            if (string.IsNullOrWhiteSpace(type))
+            {
                 continue;
             }
 

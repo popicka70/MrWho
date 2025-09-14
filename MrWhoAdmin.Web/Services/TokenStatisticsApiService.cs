@@ -140,7 +140,8 @@ public class TokenStatisticsApiService : ITokenStatisticsApiService
             if (response.IsSuccessStatusCode)
             {
                 var json = await response.Content.ReadAsStringAsync(ct);
-                if (int.TryParse(json, out var removed)) {
+                if (int.TryParse(json, out var removed))
+                {
                     return removed;
                 }
             }

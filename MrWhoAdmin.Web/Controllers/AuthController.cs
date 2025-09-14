@@ -59,7 +59,8 @@ public class AuthController : Controller
         if (schemes == null)
         {
             // multi-profile but no selection – go pick one
-            if (_profiles.GetProfiles().Count > 1) {
+            if (_profiles.GetProfiles().Count > 1)
+            {
                 return Redirect("/login");
             }
         }
@@ -68,7 +69,8 @@ public class AuthController : Controller
         {
             RedirectUri = !string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl) ? returnUrl : "/"
         };
-        if (force) {
+        if (force)
+        {
             properties.Items["force"] = "1";
         }
 
@@ -152,11 +154,13 @@ public class AuthController : Controller
         try
         {
             var refreshResult = await _tokenRefreshService.RefreshTokenWithReauthAsync(HttpContext, force: true);
-            if (refreshResult.Success) {
+            if (refreshResult.Success)
+            {
                 return Redirect(LocalRedirectUrl(returnUrl));
             }
 
-            if (refreshResult.RequiresReauth) {
+            if (refreshResult.RequiresReauth)
+            {
                 return await _tokenRefreshService.TriggerReauthenticationAsync(HttpContext, returnUrl);
             }
 

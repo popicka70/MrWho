@@ -545,11 +545,13 @@ public class UsersController : ControllerBase
         [FromQuery] int pageSize = 10,
         [FromQuery] string? search = null)
     {
-        if (page < 1) {
+        if (page < 1)
+        {
             page = 1;
         }
 
-        if (pageSize < 1 || pageSize > 100) {
+        if (pageSize < 1 || pageSize > 100)
+        {
             pageSize = 10;
         }
 
@@ -701,7 +703,8 @@ public class UsersController : ControllerBase
     public async Task<ActionResult<UserEditContextDto>> GetUserEditContext(string id)
     {
         var user = await _userManager.FindByIdAsync(id);
-        if (user == null) {
+        if (user == null)
+        {
             return NotFound($"User with ID '{id}' not found.");
         }
 
@@ -826,11 +829,13 @@ public class UsersController : ControllerBase
 
     private static string BuildDisplayName(string source)
     {
-        if (string.IsNullOrWhiteSpace(source)) {
+        if (string.IsNullOrWhiteSpace(source))
+        {
             return "New User";
         }
 
-        if (source.Contains('@')) {
+        if (source.Contains('@'))
+        {
             source = source.Split('@')[0];
         }
 
@@ -858,7 +863,8 @@ public static class StringExtensions
 {
     public static string ToTitleCase(this string input)
     {
-        if (string.IsNullOrEmpty(input)) {
+        if (string.IsNullOrEmpty(input))
+        {
             return input;
         }
 

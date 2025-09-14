@@ -176,7 +176,8 @@ public class ClientCookieConfigurationService : IClientCookieConfigurationServic
             foreach (var client in clients)
             {
                 var id = client.ClientId;
-                if (string.IsNullOrWhiteSpace(id)) {
+                if (string.IsNullOrWhiteSpace(id))
+                {
                     continue;
                 }
 

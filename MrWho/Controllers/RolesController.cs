@@ -36,11 +36,13 @@ public class RolesController : ControllerBase
         [FromQuery] int pageSize = 10,
         [FromQuery] string? search = null)
     {
-        if (page < 1) {
+        if (page < 1)
+        {
             page = 1;
         }
 
-        if (pageSize < 1 || pageSize > 100) {
+        if (pageSize < 1 || pageSize > 100)
+        {
             pageSize = 10;
         }
 
@@ -397,11 +399,13 @@ public class RolesController : ControllerBase
         [FromQuery] int pageSize = 10,
         [FromQuery] string? search = null)
     {
-        if (page < 1) {
+        if (page < 1)
+        {
             page = 1;
         }
 
-        if (pageSize < 1 || pageSize > 100) {
+        if (pageSize < 1 || pageSize > 100)
+        {
             pageSize = 10;
         }
 

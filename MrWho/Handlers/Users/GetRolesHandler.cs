@@ -16,11 +16,13 @@ public class GetRolesHandler : IGetRolesHandler
 
     public async Task<PagedResult<RoleDto>> HandleAsync(int page, int pageSize, string? search)
     {
-        if (page < 1) {
+        if (page < 1)
+        {
             page = 1;
         }
 
-        if (pageSize < 1 || pageSize > 100) {
+        if (pageSize < 1 || pageSize > 100)
+        {
             pageSize = 10;
         }
 

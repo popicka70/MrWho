@@ -142,15 +142,18 @@ public class ExternalAuthController : ControllerBase
             var given = principal.FindFirst("given_name")?.Value;
             var family = principal.FindFirst("family_name")?.Value;
             var claims = new List<Claim>();
-            if (!string.IsNullOrWhiteSpace(name)) {
+            if (!string.IsNullOrWhiteSpace(name))
+            {
                 claims.Add(new Claim("name", name));
             }
 
-            if (!string.IsNullOrWhiteSpace(given)) {
+            if (!string.IsNullOrWhiteSpace(given))
+            {
                 claims.Add(new Claim("given_name", given));
             }
 
-            if (!string.IsNullOrWhiteSpace(family)) {
+            if (!string.IsNullOrWhiteSpace(family))
+            {
                 claims.Add(new Claim("family_name", family));
             }
 
@@ -335,15 +338,18 @@ public class ExternalAuthController : ControllerBase
 
         // Build additional per-session claims to remember external provider for cascade sign-out
         var sessionClaims = new List<Claim>();
-        if (!string.IsNullOrWhiteSpace(regId)) {
+        if (!string.IsNullOrWhiteSpace(regId))
+        {
             sessionClaims.Add(new Claim("ext_reg_id", regId));
         }
 
-        if (!string.IsNullOrWhiteSpace(providerName)) {
+        if (!string.IsNullOrWhiteSpace(providerName))
+        {
             sessionClaims.Add(new Claim("ext_provider", providerName));
         }
 
-        if (!string.IsNullOrWhiteSpace(subject)) {
+        if (!string.IsNullOrWhiteSpace(subject))
+        {
             sessionClaims.Add(new Claim("ext_sub", subject));
         }
 
@@ -417,12 +423,14 @@ public class ExternalAuthController : ControllerBase
 
     private static string BuildDisplayNameFromEmailOrUserName(string? input)
     {
-        if (string.IsNullOrWhiteSpace(input)) {
+        if (string.IsNullOrWhiteSpace(input))
+        {
             return "New User";
         }
 
         var source = input;
-        if (source.Contains('@')) {
+        if (source.Contains('@'))
+        {
             source = source.Split('@')[0];
         }
 

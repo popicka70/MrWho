@@ -59,7 +59,8 @@ public class BackChannelLogoutRetryScheduler : BackgroundService, IBackChannelLo
     public void ReportAttemptOutcome(string clientId, string subject, string sessionId, int attempt, bool success, string? status, string? error)
     {
         var list = _attempts.GetOrAdd(Key(clientId, sessionId), _ => new List<AttemptRecord>());
-        lock (list) {
+        lock (list)
+        {
             list.Add(new AttemptRecord(attempt, success, status, error, DateTime.UtcNow));
         }
 
@@ -93,12 +94,14 @@ public class BackChannelLogoutRetryScheduler : BackgroundService, IBackChannelLo
     private void EmitAggregate(string clientId, string sessionId, string subject, bool exhausted = false)
     {
         var key = Key(clientId, sessionId);
-        if (!_attempts.TryGetValue(key, out var list)) {
+        if (!_attempts.TryGetValue(key, out var list))
+        {
             return;
         }
 
         List<AttemptRecord> snapshot;
-        lock (list) {
+        lock (list)
+        {
             snapshot = list.ToList();
         }
 
@@ -143,7 +146,8 @@ public class BackChannelLogoutRetryScheduler : BackgroundService, IBackChannelLo
                         }
                     }
                 }
-                foreach (var d in due) {
+                foreach (var d in due)
+                {
                     _queue.Enqueue(d);
                 }
 

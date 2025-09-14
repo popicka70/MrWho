@@ -57,15 +57,18 @@ public class JarmModeEnforcementTests
     {
         // Ensure absolute
         Uri absolute;
-        if (Uri.TryCreate(fullUrlOrPath, UriKind.Absolute, out var abs)) {
+        if (Uri.TryCreate(fullUrlOrPath, UriKind.Absolute, out var abs))
+        {
             absolute = abs;
         }
-        else {
+        else
+        {
             absolute = new Uri(baseAddress, fullUrlOrPath.StartsWith('/') ? fullUrlOrPath : "/" + fullUrlOrPath);
         }
 
         var idx = absolute.ToString().IndexOf('?');
-        if (idx < 0) {
+        if (idx < 0)
+        {
             return null;
         }
 
@@ -124,10 +127,12 @@ public class JarmModeEnforcementTests
             if (loc.Contains("/connect/authorize", StringComparison.OrdinalIgnoreCase) && loc.Contains("request_uri=", StringComparison.OrdinalIgnoreCase))
             {
                 // Follow one hop
-                string next; if (loc.StartsWith("http", StringComparison.OrdinalIgnoreCase)) {
+                string next; if (loc.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+                {
                     next = loc;
                 }
-                else {
+                else
+                {
                     next = new Uri(authClient.BaseAddress!, loc).ToString();
                 }
 

@@ -29,11 +29,13 @@ public class ClientRolesController : ControllerBase
     public async Task<ActionResult<IEnumerable<ClientRoleDto>>> GetRoles([FromQuery] string? clientId, [FromQuery] string? search = null)
     {
         var query = _db.ClientRoles.AsQueryable();
-        if (!string.IsNullOrWhiteSpace(clientId)) {
+        if (!string.IsNullOrWhiteSpace(clientId))
+        {
             query = query.Where(r => r.ClientId == clientId);
         }
 
-        if (!string.IsNullOrWhiteSpace(search)) {
+        if (!string.IsNullOrWhiteSpace(search))
+        {
             query = query.Where(r => r.Name.Contains(search));
         }
 
@@ -52,13 +54,15 @@ public class ClientRolesController : ControllerBase
     public async Task<ActionResult<ClientRoleDto>> Create([FromBody] CreateClientRoleRequest request)
     {
         var client = await _db.Clients.FirstOrDefaultAsync(c => c.ClientId == request.ClientId);
-        if (client == null) {
+        if (client == null)
+        {
             return NotFound("Client not found");
         }
 
         var normalized = request.Name.Trim().ToUpperInvariant();
         var exists = await _db.ClientRoles.AnyAsync(r => r.ClientId == request.ClientId && r.NormalizedName == normalized);
-        if (exists) {
+        if (exists)
+        {
             return Conflict("Role already exists");
         }
 
@@ -73,11 +77,13 @@ public class ClientRolesController : ControllerBase
     {
         var normalized = request.Name.Trim().ToUpperInvariant();
         var role = await _db.ClientRoles.Include(r => r.UserClientRoles).FirstOrDefaultAsync(r => r.ClientId == request.ClientId && r.NormalizedName == normalized);
-        if (role == null) {
+        if (role == null)
+        {
             return NotFound();
         }
 
-        if (role.UserClientRoles.Count > 0) {
+        if (role.UserClientRoles.Count > 0)
+        {
             return Conflict("Role has assigned users");
         }
 
@@ -90,12 +96,14 @@ public class ClientRolesController : ControllerBase
     public async Task<ActionResult<IEnumerable<string>>> GetUserClientRoles(string clientId, string userId)
     {
         var client = await _db.Clients.AnyAsync(c => c.ClientId == clientId);
-        if (!client) {
+        if (!client)
+        {
             return NotFound("Client not found");
         }
 
         var user = await _userManager.FindByIdAsync(userId);
-        if (user == null) {
+        if (user == null)
+        {
             return NotFound("User not found");
         }
 
@@ -107,12 +115,14 @@ public class ClientRolesController : ControllerBase
     public async Task<IActionResult> Assign([FromBody] AssignClientRoleRequest request)
     {
         var user = await _userManager.FindByIdAsync(request.UserId);
-        if (user == null) {
+        if (user == null)
+        {
             return NotFound("User not found");
         }
 
         var client = await _db.Clients.AnyAsync(c => c.ClientId == request.ClientId);
-        if (!client) {
+        if (!client)
+        {
             return NotFound("Client not found");
         }
 
@@ -125,12 +135,14 @@ public class ClientRolesController : ControllerBase
     public async Task<IActionResult> Remove([FromBody] RemoveClientRoleRequest request)
     {
         var user = await _userManager.FindByIdAsync(request.UserId);
-        if (user == null) {
+        if (user == null)
+        {
             return NotFound("User not found");
         }
 
         var client = await _db.Clients.AnyAsync(c => c.ClientId == request.ClientId);
-        if (!client) {
+        if (!client)
+        {
             return NotFound("Client not found");
         }
 
@@ -142,13 +154,15 @@ public class ClientRolesController : ControllerBase
     [HttpGet("{clientId}/roles/{roleName}/users")]
     public async Task<ActionResult<IEnumerable<object>>> GetUsersForRole(string clientId, string roleName)
     {
-        if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(roleName)) {
+        if (string.IsNullOrWhiteSpace(clientId) || string.IsNullOrWhiteSpace(roleName))
+        {
             return BadRequest();
         }
 
         var normalized = roleName.Trim().ToUpperInvariant();
         var role = await _db.ClientRoles.FirstOrDefaultAsync(r => r.ClientId == clientId && r.NormalizedName == normalized);
-        if (role == null) {
+        if (role == null)
+        {
             return NotFound("Role not found");
         }
 

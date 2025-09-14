@@ -57,7 +57,8 @@ public class JarTests
         {
             var padded = new byte[requiredLen];
             Array.Copy(keyBytes, padded, keyBytes.Length);
-            for (int i = keyBytes.Length; i < requiredLen; i++) {
+            for (int i = keyBytes.Length; i < requiredLen; i++)
+            {
                 padded[i] = (byte)'!';
             }
 
@@ -99,7 +100,8 @@ public class JarTests
         }
         if (extraClaims != null)
         {
-            foreach (var kv in extraClaims) {
+            foreach (var kv in extraClaims)
+            {
                 claims[kv.Key] = kv.Value;
             }
         }
@@ -126,7 +128,8 @@ public class JarTests
 
     private static bool IsAcceptableAuthRedirect(HttpResponseMessage resp)
     {
-        if ((int)resp.StatusCode < 300 || (int)resp.StatusCode > 399) {
+        if ((int)resp.StatusCode < 300 || (int)resp.StatusCode > 399)
+        {
             return false;
         }
 

@@ -25,11 +25,13 @@ public class SecurityAuditController : ControllerBase
     public async Task<IActionResult> Verify([FromQuery] long? startId = null, [FromQuery] long? endId = null)
     {
         var query = _db.SecurityAuditEvents.AsNoTracking().OrderBy(e => e.Id).AsQueryable();
-        if (startId.HasValue) {
+        if (startId.HasValue)
+        {
             query = query.Where(e => e.Id >= startId.Value);
         }
 
-        if (endId.HasValue) {
+        if (endId.HasValue)
+        {
             query = query.Where(e => e.Id <= endId.Value);
         }
 

@@ -279,7 +279,8 @@ public class DynamicClientCookieService : IHostedService
 
     private static string Sanitize(string name)
     {
-        if (string.IsNullOrWhiteSpace(name)) {
+        if (string.IsNullOrWhiteSpace(name))
+        {
             return "Default";
         }
 

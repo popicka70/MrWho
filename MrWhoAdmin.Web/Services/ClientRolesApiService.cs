@@ -23,7 +23,8 @@ public class ClientRolesApiService : IClientRolesApiService
         {
             var url = string.IsNullOrWhiteSpace(clientId) ? "api/clientroles" : $"api/clientroles?clientId={Uri.EscapeDataString(clientId)}";
             var resp = await _httpClient.GetAsync(url);
-            if (!resp.IsSuccessStatusCode) {
+            if (!resp.IsSuccessStatusCode)
+            {
                 return null;
             }
 
@@ -38,7 +39,8 @@ public class ClientRolesApiService : IClientRolesApiService
         try
         {
             var resp = await _httpClient.GetAsync($"api/clientroles/{Uri.EscapeDataString(clientId)}/users/{Uri.EscapeDataString(userId)}");
-            if (!resp.IsSuccessStatusCode) {
+            if (!resp.IsSuccessStatusCode)
+            {
                 return null;
             }
 
@@ -54,7 +56,8 @@ public class ClientRolesApiService : IClientRolesApiService
         {
             var json = JsonSerializer.Serialize(request, _jsonOptions);
             var resp = await _httpClient.PostAsync("api/clientroles", new StringContent(json, Encoding.UTF8, "application/json"));
-            if (!resp.IsSuccessStatusCode) {
+            if (!resp.IsSuccessStatusCode)
+            {
                 return null;
             }
 

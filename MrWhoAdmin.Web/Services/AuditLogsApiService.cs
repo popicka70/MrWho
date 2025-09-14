@@ -35,23 +35,28 @@ public class AuditLogsApiService : IAuditLogsApiService
                 $"page={page}",
                 $"pageSize={pageSize}"
             };
-            if (!string.IsNullOrWhiteSpace(search)) {
+            if (!string.IsNullOrWhiteSpace(search))
+            {
                 query.Add($"search={Uri.EscapeDataString(search)}");
             }
 
-            if (!string.IsNullOrWhiteSpace(entityType)) {
+            if (!string.IsNullOrWhiteSpace(entityType))
+            {
                 query.Add($"entityType={Uri.EscapeDataString(entityType)}");
             }
 
-            if (!string.IsNullOrWhiteSpace(action)) {
+            if (!string.IsNullOrWhiteSpace(action))
+            {
                 query.Add($"action={Uri.EscapeDataString(action)}");
             }
 
-            if (fromUtc.HasValue) {
+            if (fromUtc.HasValue)
+            {
                 query.Add($"fromUtc={Uri.EscapeDataString(fromUtc.Value.ToString("O"))}");
             }
 
-            if (toUtc.HasValue) {
+            if (toUtc.HasValue)
+            {
                 query.Add($"toUtc={Uri.EscapeDataString(toUtc.Value.ToString("O"))}");
             }
 

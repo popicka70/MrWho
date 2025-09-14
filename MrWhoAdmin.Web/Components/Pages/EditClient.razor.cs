@@ -506,7 +506,8 @@ namespace MrWhoAdmin.Web.Components.Pages
 
         internal async Task AddIdentityLink()
         {
-            if (!IsEdit || string.IsNullOrEmpty(selectedProviderId)) {
+            if (!IsEdit || string.IsNullOrEmpty(selectedProviderId))
+            {
                 return;
             }
 
@@ -564,7 +565,8 @@ namespace MrWhoAdmin.Web.Components.Pages
 
         internal bool IsMethodSelected(string method)
         {
-            if (string.IsNullOrEmpty(model.AllowedMfaMethods)) {
+            if (string.IsNullOrEmpty(model.AllowedMfaMethods))
+            {
                 return false;
             }
 
@@ -584,7 +586,8 @@ namespace MrWhoAdmin.Web.Components.Pages
                 try
                 {
                     var existing = System.Text.Json.JsonSerializer.Deserialize<string[]>(model.AllowedMfaMethods);
-                    if (existing != null) {
+                    if (existing != null)
+                    {
                         methods.AddRange(existing);
                     }
                 }
@@ -592,7 +595,8 @@ namespace MrWhoAdmin.Web.Components.Pages
             }
             if (selected)
             {
-                if (!methods.Contains(method)) {
+                if (!methods.Contains(method))
+                {
                     methods.Add(method);
                 }
             }
@@ -606,7 +610,8 @@ namespace MrWhoAdmin.Web.Components.Pages
         private bool ValidateSymmetricSecretPolicy()
         {
             // Skip if JAR disabled explicitly
-            if (model.JarMode == JarMode.Disabled) {
+            if (model.JarMode == JarMode.Disabled)
+            {
                 return true;
             }
 
@@ -622,17 +627,20 @@ namespace MrWhoAdmin.Web.Components.Pages
             {
                 foreach (var a in algCsv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
                 {
-                    if (a.StartsWith("HS", StringComparison.OrdinalIgnoreCase)) {
+                    if (a.StartsWith("HS", StringComparison.OrdinalIgnoreCase))
+                    {
                         hsAlgs.Add(a.ToUpperInvariant());
                     }
                 }
             }
-            if (hsAlgs.Count == 0) {
+            if (hsAlgs.Count == 0)
+            {
                 return true; // only asymmetric
             }
 
             // If secret not supplied during create, allow (server will validate requirement if needed)
-            if (IsEdit && string.IsNullOrWhiteSpace(model.ClientSecret)) {
+            if (IsEdit && string.IsNullOrWhiteSpace(model.ClientSecret))
+            {
                 return true; // updating without changing secret
             }
 
@@ -643,13 +651,16 @@ namespace MrWhoAdmin.Web.Components.Pages
             }
             var secretBytes = Encoding.UTF8.GetByteCount(model.ClientSecret);
             int required = 0;
-            if (hsAlgs.Contains("HS512")) {
+            if (hsAlgs.Contains("HS512"))
+            {
                 required = 64;
             }
-            else if (hsAlgs.Contains("HS384")) {
+            else if (hsAlgs.Contains("HS384"))
+            {
                 required = 48;
             }
-            else if (hsAlgs.Contains("HS256")) {
+            else if (hsAlgs.Contains("HS256"))
+            {
                 required = 32;
             }
 
@@ -663,7 +674,8 @@ namespace MrWhoAdmin.Web.Components.Pages
 
         private async Task OnSave(CreateClientRequest args)
         {
-            if (!ValidateSymmetricSecretPolicy()) {
+            if (!ValidateSymmetricSecretPolicy())
+            {
                 return; // block
             }
 
@@ -776,13 +788,15 @@ namespace MrWhoAdmin.Web.Components.Pages
         internal void ToggleScopeSelection(string scopeName, bool selected)
         {
             var item = scopeItems.FirstOrDefault(i => i.Name == scopeName);
-            if (item != null) {
+            if (item != null)
+            {
                 item.Selected = selected;
             }
 
             if (selected)
             {
-                if (!selectedScopes.Contains(scopeName)) {
+                if (!selectedScopes.Contains(scopeName))
+                {
                     selectedScopes.Add(scopeName);
                 }
             }
@@ -799,7 +813,8 @@ namespace MrWhoAdmin.Web.Components.Pages
                 item.Selected = select;
                 if (select)
                 {
-                    if (!selectedScopes.Contains(item.Name)) {
+                    if (!selectedScopes.Contains(item.Name))
+                    {
                         selectedScopes.Add(item.Name);
                     }
                 }

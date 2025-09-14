@@ -21,11 +21,13 @@ public sealed class AuditIntegrityWriter : IAuditIntegrityWriter
 
     public async Task<AuditIntegrityRecord> WriteAsync(AuditIntegrityWriteRequest request, CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(request.Category)) {
+        if (string.IsNullOrWhiteSpace(request.Category))
+        {
             throw new ArgumentException("Category required", nameof(request));
         }
 
-        if (string.IsNullOrWhiteSpace(request.Action)) {
+        if (string.IsNullOrWhiteSpace(request.Action))
+        {
             throw new ArgumentException("Action required", nameof(request));
         }
 

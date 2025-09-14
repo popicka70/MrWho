@@ -58,7 +58,8 @@ public class MfaController : Controller
     public async Task<IActionResult> Setup([FromQuery] string? returnUrl = null)
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user is null) {
+        if (user is null)
+        {
             return Challenge();
         }
 
@@ -96,7 +97,8 @@ public class MfaController : Controller
         }
 
         var user = await _userManager.GetUserAsync(User);
-        if (user is null) {
+        if (user is null)
+        {
             return Challenge();
         }
 
@@ -124,7 +126,8 @@ public class MfaController : Controller
     private async Task<IActionResult> RebuildSetupViewAsync()
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user is null) {
+        if (user is null)
+        {
             return Challenge();
         }
 
@@ -153,7 +156,8 @@ public class MfaController : Controller
     public async Task<IActionResult> RecoveryCodes()
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user is null) {
+        if (user is null)
+        {
             return Challenge();
         }
 
@@ -166,7 +170,8 @@ public class MfaController : Controller
     public async Task<IActionResult> Disable()
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user is null) {
+        if (user is null)
+        {
             return Challenge();
         }
 
@@ -189,7 +194,8 @@ public class MfaController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> ChallengeMfaPost([FromForm] VerifyMfaInput input)
     {
-        if (!ModelState.IsValid) {
+        if (!ModelState.IsValid)
+        {
             return View("Challenge", input);
         }
 
@@ -300,7 +306,8 @@ public class MfaController : Controller
 
         if (!string.IsNullOrEmpty(input.ReturnUrl))
         {
-            if (Url.IsLocalUrl(input.ReturnUrl) || input.ReturnUrl.Contains("/connect/authorize", StringComparison.OrdinalIgnoreCase)) {
+            if (Url.IsLocalUrl(input.ReturnUrl) || input.ReturnUrl.Contains("/connect/authorize", StringComparison.OrdinalIgnoreCase))
+            {
                 return Redirect(input.ReturnUrl);
             }
         }

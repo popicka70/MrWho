@@ -223,7 +223,8 @@ public class BackChannelLogoutService : IBackChannelLogoutService
 
     private string? GetBackChannelLogoutUri(Models.Client client)
     {
-        if (!string.IsNullOrWhiteSpace(client.BackChannelLogoutUri)) {
+        if (!string.IsNullOrWhiteSpace(client.BackChannelLogoutUri))
+        {
             return client.BackChannelLogoutUri;
         }
 

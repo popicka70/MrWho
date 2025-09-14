@@ -26,17 +26,20 @@ public class AuditApiService : IAuditApiService
             var qs = new List<string> { $"page={page}", $"pageSize={pageSize}" };
             void add(string name, string? value) { if (!string.IsNullOrWhiteSpace(value)) { qs.Add($"{name}={Uri.EscapeDataString(value)}"); } }
             add("category", category); add("eventType", eventType); add("level", level); add("actorUserId", actorUserId); add("actorClientId", actorClientId);
-            if (fromUtc.HasValue) {
+            if (fromUtc.HasValue)
+            {
                 add("fromUtc", fromUtc.Value.ToString("o"));
             }
 
-            if (toUtc.HasValue) {
+            if (toUtc.HasValue)
+            {
                 add("toUtc", toUtc.Value.ToString("o"));
             }
 
             var url = "debug/audit-chain/query?" + string.Join('&', qs);
             var resp = await _http.GetAsync(url);
-            if (!resp.IsSuccessStatusCode) {
+            if (!resp.IsSuccessStatusCode)
+            {
                 return null;
             }
 
@@ -52,7 +55,8 @@ public class AuditApiService : IAuditApiService
         try
         {
             var resp = await _http.GetAsync($"debug/audit-chain/latest?count={count}");
-            if (!resp.IsSuccessStatusCode) {
+            if (!resp.IsSuccessStatusCode)
+            {
                 return null;
             }
 
@@ -67,17 +71,20 @@ public class AuditApiService : IAuditApiService
         try
         {
             var qs = new List<string>();
-            if (startId.HasValue) {
+            if (startId.HasValue)
+            {
                 qs.Add("startId=" + startId.Value);
             }
 
-            if (endId.HasValue) {
+            if (endId.HasValue)
+            {
                 qs.Add("endId=" + endId.Value);
             }
 
             var url = "debug/audit-chain" + (qs.Count > 0 ? ("?" + string.Join('&', qs)) : string.Empty);
             var resp = await _http.GetAsync(url);
-            if (!resp.IsSuccessStatusCode) {
+            if (!resp.IsSuccessStatusCode)
+            {
                 return null;
             }
 

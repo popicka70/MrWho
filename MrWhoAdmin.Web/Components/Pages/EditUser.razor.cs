@@ -133,7 +133,8 @@ public partial class EditUser
     internal async Task SetProfileState(string state)
     {
         var ok = await DialogService.Confirm($"Set profile state to '{state}'?", "Change Profile State", new ConfirmOptions() { OkButtonText = "Confirm", CancelButtonText = "Cancel" });
-        if (ok != true) {
+        if (ok != true)
+        {
             return;
         }
 
@@ -144,7 +145,8 @@ public partial class EditUser
                 NotificationService.Notify(NotificationSeverity.Success, "Updated", $"Profile state set to {state}");
                 await LoadProfileState();
             }
-            else {
+            else
+            {
                 NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to update profile state");
             }
         }
@@ -174,7 +176,8 @@ public partial class EditUser
 
     internal async Task<bool> SetClientAssignment(string clientDbId, bool assign)
     {
-        if (currentUser == null) {
+        if (currentUser == null)
+        {
             return false;
         }
 
@@ -226,7 +229,8 @@ public partial class EditUser
         isSaving = true;
         try
         {
-            if (string.IsNullOrWhiteSpace(userModel.UserName)) {
+            if (string.IsNullOrWhiteSpace(userModel.UserName))
+            {
                 userModel.UserName = userModel.Email;
             }
 
@@ -264,7 +268,8 @@ public partial class EditUser
                     NotificationService.Notify(NotificationSeverity.Success, "Success", "User created");
                     Navigation.NavigateTo($"/users/edit/{created.Id}");
                 }
-                else {
+                else
+                {
                     NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to create user");
                 }
             }
@@ -279,7 +284,8 @@ public partial class EditUser
 
     internal async Task AddClaim()
     {
-        if (string.IsNullOrWhiteSpace(newClaimType) || string.IsNullOrWhiteSpace(newClaimValue)) {
+        if (string.IsNullOrWhiteSpace(newClaimType) || string.IsNullOrWhiteSpace(newClaimValue))
+        {
             return;
         }
 
@@ -293,7 +299,8 @@ public partial class EditUser
                 newClaimType = newClaimValue = string.Empty;
                 NotificationService.Notify(NotificationSeverity.Success, "Success", "Claim added");
             }
-            else {
+            else
+            {
                 NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to add claim");
             }
         }
@@ -304,7 +311,8 @@ public partial class EditUser
     internal async Task RemoveClaim(UserClaimDto claim)
     {
         var ok = await DialogService.Confirm($"Remove claim '{claim.ClaimType}'?", "Remove Claim", new ConfirmOptions() { OkButtonText = "Remove", CancelButtonText = "Cancel" });
-        if (ok != true) {
+        if (ok != true)
+        {
             return;
         }
 
@@ -315,7 +323,8 @@ public partial class EditUser
                 userClaims.Remove(claim);
                 NotificationService.Notify(NotificationSeverity.Success, "Success", "Claim removed");
             }
-            else {
+            else
+            {
                 NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to remove claim");
             }
         }
@@ -324,7 +333,8 @@ public partial class EditUser
 
     internal async Task AssignRole()
     {
-        if (string.IsNullOrWhiteSpace(selectedRoleId)) {
+        if (string.IsNullOrWhiteSpace(selectedRoleId))
+        {
             return;
         }
 
@@ -343,7 +353,8 @@ public partial class EditUser
                     NotificationService.Notify(NotificationSeverity.Success, "Success", "Role assigned");
                 }
             }
-            else {
+            else
+            {
                 NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to assign role");
             }
         }
@@ -353,12 +364,14 @@ public partial class EditUser
 
     internal async Task RemoveRole(string roleId)
     {
-        var role = userRoles.FirstOrDefault(r => r.Id == roleId); if (role == null) {
+        var role = userRoles.FirstOrDefault(r => r.Id == roleId); if (role == null)
+        {
             return;
         }
 
         var ok = await DialogService.Confirm($"Remove role '{role.Name}'?", "Remove Role", new ConfirmOptions() { OkButtonText = "Remove", CancelButtonText = "Cancel" });
-        if (ok != true) {
+        if (ok != true)
+        {
             return;
         }
 
@@ -369,7 +382,8 @@ public partial class EditUser
                 userRoles.Remove(role); availableRoles.Add(role);
                 NotificationService.Notify(NotificationSeverity.Success, "Success", "Role removed");
             }
-            else {
+            else
+            {
                 NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to remove role");
             }
         }
@@ -378,7 +392,8 @@ public partial class EditUser
 
     internal async Task AssignClient()
     {
-        if (string.IsNullOrWhiteSpace(selectedClientId) || currentUser == null) {
+        if (string.IsNullOrWhiteSpace(selectedClientId) || currentUser == null)
+        {
             return;
         }
 
@@ -391,7 +406,8 @@ public partial class EditUser
                 NotificationService.Notify(NotificationSeverity.Success, "Assigned", $"Assigned to '{res.ClientName}'");
                 await LoadUserClients(); await LoadAvailableClients(); selectedClientId = null;
             }
-            else {
+            else
+            {
                 NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to assign client");
             }
         }
@@ -401,7 +417,8 @@ public partial class EditUser
 
     internal async Task RemoveClient(UserClientDto c)
     {
-        if (currentUser == null) {
+        if (currentUser == null)
+        {
             return;
         }
 
@@ -409,7 +426,8 @@ public partial class EditUser
         {
             if (await ClientUsersApi.RemoveUserAsync(c.ClientId, currentUser.Id))
             { NotificationService.Notify(NotificationSeverity.Success, "Removed", $"Removed from '{c.ClientName}'"); await LoadUserClients(); await LoadAvailableClients(); }
-            else {
+            else
+            {
                 NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to remove client");
             }
         }
@@ -421,7 +439,8 @@ public partial class EditUser
     internal async Task LockUser()
     {
         var ok = await DialogService.Confirm("Lock user account?", "Lock Account", new ConfirmOptions() { OkButtonText = "Lock", CancelButtonText = "Cancel" });
-        if (ok != true) {
+        if (ok != true)
+        {
             return;
         }
 
@@ -430,7 +449,8 @@ public partial class EditUser
         {
             var end = DateTimeOffset.UtcNow.AddYears(100);
             if (await UsersApiService.SetLockoutAsync(Id!, end)) { if (currentUser != null) { currentUser.LockoutEnd = end; } NotificationService.Notify(NotificationSeverity.Success, "Success", "User locked"); }
-            else {
+            else
+            {
                 NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to lock user");
             }
         }
@@ -441,7 +461,8 @@ public partial class EditUser
     internal async Task UnlockUser()
     {
         var ok = await DialogService.Confirm("Unlock user account?", "Unlock Account", new ConfirmOptions() { OkButtonText = "Unlock", CancelButtonText = "Cancel" });
-        if (ok != true) {
+        if (ok != true)
+        {
             return;
         }
 
@@ -449,7 +470,8 @@ public partial class EditUser
         try
         {
             if (await UsersApiService.SetLockoutAsync(Id!, null)) { if (currentUser != null) { currentUser.LockoutEnd = null; } NotificationService.Notify(NotificationSeverity.Success, "Success", "User unlocked"); }
-            else {
+            else
+            {
                 NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to unlock user");
             }
         }
@@ -460,7 +482,8 @@ public partial class EditUser
     internal async Task ResetPassword()
     {
         var ok = await DialogService.Confirm("Reset password and generate temporary one?", "Reset Password", new ConfirmOptions() { OkButtonText = "Reset", CancelButtonText = "Cancel" });
-        if (ok != true) {
+        if (ok != true)
+        {
             return;
         }
 
@@ -470,7 +493,8 @@ public partial class EditUser
             var newPwd = GenerateTemporaryPassword();
             if (await UsersApiService.ResetPasswordAsync(Id!, newPwd))
             { await DialogService.Alert($"Temporary password: {newPwd}\nProvide securely.", "Password Reset"); NotificationService.Notify(NotificationSeverity.Success, "Success", "Password reset"); }
-            else {
+            else
+            {
                 NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to reset password");
             }
         }
@@ -481,17 +505,20 @@ public partial class EditUser
     internal async Task ForceLogout()
     {
         var ok = await DialogService.Confirm("Force logout all sessions?", "Force Logout", new ConfirmOptions() { OkButtonText = "Force Logout", CancelButtonText = "Cancel" });
-        if (ok != true) {
+        if (ok != true)
+        {
             return;
         }
 
         isForcingLogout = true;
         try
         {
-            if (await UsersApiService.ForceLogoutAsync(Id!)) {
+            if (await UsersApiService.ForceLogoutAsync(Id!))
+            {
                 NotificationService.Notify(NotificationSeverity.Success, "Success", "Sessions terminated");
             }
-            else {
+            else
+            {
                 NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to force logout");
             }
         }
@@ -502,7 +529,8 @@ public partial class EditUser
     internal async Task DeleteUser()
     {
         var ok = await DialogService.Confirm($"Delete user '{currentUser?.UserName}'?", "Delete User", new ConfirmOptions() { OkButtonText = "Delete", CancelButtonText = "Cancel" });
-        if (ok != true) {
+        if (ok != true)
+        {
             return;
         }
 
@@ -510,7 +538,8 @@ public partial class EditUser
         try
         {
             if (await UsersApiService.DeleteUserAsync(Id!)) { NotificationService.Notify(NotificationSeverity.Success, "Success", "User deleted"); Navigation.NavigateTo("/users"); }
-            else {
+            else
+            {
                 NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to delete user");
             }
         }

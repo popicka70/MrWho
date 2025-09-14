@@ -94,11 +94,13 @@ public class CreateUserHandler : ICreateUserHandler
 
     private static string BuildDisplayName(string source)
     {
-        if (string.IsNullOrWhiteSpace(source)) {
+        if (string.IsNullOrWhiteSpace(source))
+        {
             return "New User";
         }
 
-        if (source.Contains('@')) {
+        if (source.Contains('@'))
+        {
             source = source.Split('@')[0];
         }
 

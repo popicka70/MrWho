@@ -99,7 +99,8 @@ public sealed class LoginPostHandler : IRequestHandler<MrWho.Endpoints.Auth.Logi
         {
             _logger.LogDebug("Login ModelState invalid");
             var vd = NewViewData();
-            foreach (var err in modelStateErrors) {
+            foreach (var err in modelStateErrors)
+            {
                 vd.ModelState.AddModelError(err.Key, err.Value);
             }
 
@@ -175,10 +176,12 @@ public sealed class LoginPostHandler : IRequestHandler<MrWho.Endpoints.Auth.Logi
 
             if (!string.IsNullOrEmpty(returnUrl))
             {
-                if (returnUrl.Contains("/connect/authorize")) {
+                if (returnUrl.Contains("/connect/authorize"))
+                {
                     return new RedirectResult(returnUrl);
                 }
-                else if (_loginHelper.IsLocalUrl(returnUrl)) {
+                else if (_loginHelper.IsLocalUrl(returnUrl))
+                {
                     return new RedirectResult(returnUrl);
                 }
             }
@@ -234,10 +237,12 @@ public sealed class LoginPostHandler : IRequestHandler<MrWho.Endpoints.Auth.Logi
 
             if (!string.IsNullOrEmpty(returnUrl))
             {
-                if (returnUrl.Contains("/connect/authorize")) {
+                if (returnUrl.Contains("/connect/authorize"))
+                {
                     return new RedirectResult(returnUrl);
                 }
-                else if (_loginHelper.IsLocalUrl(returnUrl)) {
+                else if (_loginHelper.IsLocalUrl(returnUrl))
+                {
                     return new RedirectResult(returnUrl);
                 }
             }
@@ -268,21 +273,25 @@ public sealed class LoginPostHandler : IRequestHandler<MrWho.Endpoints.Auth.Logi
         if (model is null) { errors.Add(new("", "Invalid model")); return false; }
         if (!model.UseCode)
         {
-            if (string.IsNullOrWhiteSpace(model.Email)) {
+            if (string.IsNullOrWhiteSpace(model.Email))
+            {
                 errors.Add(new("Email", "The Email field is required."));
             }
 
-            if (string.IsNullOrWhiteSpace(model.Password)) {
+            if (string.IsNullOrWhiteSpace(model.Password))
+            {
                 errors.Add(new("Password", "The Password field is required."));
             }
         }
         else
         {
-            if (string.IsNullOrWhiteSpace(model.Email)) {
+            if (string.IsNullOrWhiteSpace(model.Email))
+            {
                 errors.Add(new("Email", "The Email field is required."));
             }
 
-            if (string.IsNullOrWhiteSpace(model.Code)) {
+            if (string.IsNullOrWhiteSpace(model.Code))
+            {
                 errors.Add(new("Code", "The Code field is required."));
             }
         }

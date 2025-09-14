@@ -37,7 +37,8 @@ public class DeviceManagementWebController : Controller
     public async Task<IActionResult> Index()
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user == null) {
+        if (user == null)
+        {
             return Challenge();
         }
 
@@ -65,7 +66,8 @@ public class DeviceManagementWebController : Controller
             }
 
             var user = await _userManager.GetUserAsync(User);
-            if (user == null) {
+            if (user == null)
+            {
                 return Challenge();
             }
 
@@ -98,7 +100,8 @@ public class DeviceManagementWebController : Controller
     public async Task<IActionResult> ApprovePersistentPost(string token, [FromForm] string deviceId, [FromForm] string action)
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user == null) {
+        if (user == null)
+        {
             return Challenge();
         }
 
@@ -157,7 +160,8 @@ public class DeviceManagementWebController : Controller
     public async Task<IActionResult> Register([FromForm] string deviceName, [FromForm] string deviceId, [FromForm] bool isTrusted = false)
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user == null) {
+        if (user == null)
+        {
             return Challenge();
         }
 
@@ -196,7 +200,8 @@ public class DeviceManagementWebController : Controller
     public async Task<IActionResult> Activity()
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user == null) {
+        if (user == null)
+        {
             return Challenge();
         }
 
@@ -212,7 +217,8 @@ public class DeviceManagementWebController : Controller
     public async Task<IActionResult> RevokeDevice(string deviceId)
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user == null) {
+        if (user == null)
+        {
             return Challenge();
         }
 

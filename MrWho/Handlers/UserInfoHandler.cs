@@ -31,7 +31,8 @@ public sealed class CustomUserInfoHandler : IOpenIddictServerHandler<HandleUserI
 
     public async ValueTask HandleAsync(HandleUserInfoRequestContext context)
     {
-        if (context.IsRequestHandled || context.IsRejected) {
+        if (context.IsRequestHandled || context.IsRejected)
+        {
             return;
         }
 
@@ -116,7 +117,8 @@ public sealed class CustomUserInfoHandler : IOpenIddictServerHandler<HandleUserI
     private async Task<List<IdentityResource>> GetIdentityResourcesForScopesAsync(IEnumerable<string> scopes)
     {
         var set = scopes.Select(s => s.Trim()).ToHashSet(StringComparer.OrdinalIgnoreCase);
-        if (set.Count == 0) {
+        if (set.Count == 0)
+        {
             return new();
         }
 
@@ -132,7 +134,8 @@ public sealed class CustomUserInfoHandler : IOpenIddictServerHandler<HandleUserI
         {
             ["sub"] = user.Id
         };
-        if (idResources.Count == 0) {
+        if (idResources.Count == 0)
+        {
             return dict;
         }
 
@@ -142,7 +145,8 @@ public sealed class CustomUserInfoHandler : IOpenIddictServerHandler<HandleUserI
         {
             foreach (var uc in res.UserClaims)
             {
-                if (dict.ContainsKey(uc.ClaimType)) {
+                if (dict.ContainsKey(uc.ClaimType))
+                {
                     continue;
                 }
 
@@ -167,7 +171,8 @@ public sealed class CustomUserInfoHandler : IOpenIddictServerHandler<HandleUserI
     {
         async Task Add(string type)
         {
-            if (onlyIfMissing && userInfo.ContainsKey(type)) {
+            if (onlyIfMissing && userInfo.ContainsKey(type))
+            {
                 return;
             }
 
@@ -184,7 +189,8 @@ public sealed class CustomUserInfoHandler : IOpenIddictServerHandler<HandleUserI
                 if (!userInfo.ContainsKey("role"))
                 {
                     var roles = await GetRolesAsync(user);
-                    if (roles.Length > 0) {
+                    if (roles.Length > 0)
+                    {
                         userInfo["role"] = roles;
                     }
                 }
@@ -195,12 +201,14 @@ public sealed class CustomUserInfoHandler : IOpenIddictServerHandler<HandleUserI
 
     private async Task AddClaimIfPresent(Dictionary<string, object> userInfo, IdentityUser user, string type)
     {
-        if (userInfo.ContainsKey(type)) {
+        if (userInfo.ContainsKey(type))
+        {
             return;
         }
 
         var val = await GetClaimValueAsync(user, type);
-        if (val == null) {
+        if (val == null)
+        {
             return;
         }
 
@@ -242,7 +250,8 @@ public sealed class CustomUserInfoHandler : IOpenIddictServerHandler<HandleUserI
 
     private string GetDisplayName(IdentityUser user)
     {
-        if (string.IsNullOrWhiteSpace(user.UserName)) {
+        if (string.IsNullOrWhiteSpace(user.UserName))
+        {
             return "Unknown User";
         }
 

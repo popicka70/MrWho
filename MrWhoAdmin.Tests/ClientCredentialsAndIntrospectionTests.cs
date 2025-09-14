@@ -78,7 +78,8 @@ public class ClientCredentialsAndIntrospectionTests
 
         bool TryBool(string name, out bool value)
         {
-            value = false; if (!doc.RootElement.TryGetProperty(name, out var prop)) {
+            value = false; if (!doc.RootElement.TryGetProperty(name, out var prop))
+            {
                 return false;
             }
 

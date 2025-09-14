@@ -119,7 +119,8 @@ public sealed class MrWhoClientAuthOptions
     // Internal helper to resolve metadata address.
     internal string ResolveMetadataAddress()
     {
-        if (!string.IsNullOrWhiteSpace(MetadataAddress)) {
+        if (!string.IsNullOrWhiteSpace(MetadataAddress))
+        {
             return MetadataAddress!;
         }
 

@@ -17,7 +17,8 @@ public sealed class Mediator : IMediator
 
     public Task<TResponse> Send<TResponse>(IRequest<TResponse> request, CancellationToken cancellationToken = default)
     {
-        if (request is null) {
+        if (request is null)
+        {
             throw new ArgumentNullException(nameof(request));
         }
 

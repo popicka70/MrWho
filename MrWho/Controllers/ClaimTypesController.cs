@@ -42,7 +42,8 @@ public class ClaimTypesController : ControllerBase
     public async Task<ActionResult<ClaimTypeInfo>> GetClaimType(string type)
     {
         var ct = await _context.ClaimTypes.AsNoTracking().FirstOrDefaultAsync(c => c.Type == type);
-        if (ct == null) {
+        if (ct == null)
+        {
             return NotFound();
         }
 
@@ -78,7 +79,8 @@ public class ClaimTypesController : ControllerBase
     public async Task<ActionResult<ClaimTypeInfo>> Update(string type, [FromBody] UpsertClaimTypeRequest request)
     {
         var entity = await _context.ClaimTypes.FirstOrDefaultAsync(c => c.Type == type);
-        if (entity == null) {
+        if (entity == null)
+        {
             return NotFound();
         }
 
@@ -98,7 +100,8 @@ public class ClaimTypesController : ControllerBase
     public async Task<IActionResult> Delete(string type)
     {
         var entity = await _context.ClaimTypes.FirstOrDefaultAsync(c => c.Type == type);
-        if (entity == null) {
+        if (entity == null)
+        {
             return NotFound();
         }
 

@@ -30,7 +30,8 @@ public class ApiUsageApiService : IApiUsageApiService
         {
             await SetAuthorizationHeaderAsync();
             var resp = await _httpClient.GetAsync("api/monitoring/usage/overview", ct);
-            if (!resp.IsSuccessStatusCode) {
+            if (!resp.IsSuccessStatusCode)
+            {
                 return null;
             }
 
@@ -50,7 +51,8 @@ public class ApiUsageApiService : IApiUsageApiService
         {
             await SetAuthorizationHeaderAsync();
             var resp = await _httpClient.GetAsync($"api/monitoring/usage/top-clients?take={take}", ct);
-            if (!resp.IsSuccessStatusCode) {
+            if (!resp.IsSuccessStatusCode)
+            {
                 return new();
             }
 
@@ -70,7 +72,8 @@ public class ApiUsageApiService : IApiUsageApiService
         {
             await SetAuthorizationHeaderAsync();
             var resp = await _httpClient.GetAsync($"api/monitoring/usage/top-endpoints?take={take}", ct);
-            if (!resp.IsSuccessStatusCode) {
+            if (!resp.IsSuccessStatusCode)
+            {
                 return new();
             }
 
@@ -90,7 +93,8 @@ public class ApiUsageApiService : IApiUsageApiService
         {
             await SetAuthorizationHeaderAsync();
             var resp = await _httpClient.GetAsync($"api/monitoring/usage/timeseries?days={days}", ct);
-            if (!resp.IsSuccessStatusCode) {
+            if (!resp.IsSuccessStatusCode)
+            {
                 return new();
             }
 
@@ -107,7 +111,8 @@ public class ApiUsageApiService : IApiUsageApiService
     private async Task SetAuthorizationHeaderAsync()
     {
         var context = _httpContextAccessor.HttpContext;
-        if (context == null) {
+        if (context == null)
+        {
             return;
         }
 

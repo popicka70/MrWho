@@ -29,7 +29,8 @@ public sealed class ProfileSelectionMiddleware
                 if (HttpMethods.IsGet(context.Request.Method) && !context.Request.Path.HasValue || context.Request.Path.Value != "/favicon.ico")
                 {
                     var relative = context.Request.Path + context.Request.QueryString.ToUriComponent();
-                    if (string.IsNullOrWhiteSpace(relative)) {
+                    if (string.IsNullOrWhiteSpace(relative))
+                    {
                         relative = "/";
                     }
 

@@ -66,7 +66,8 @@ public static class CookieSchemeNaming
     /// </summary>
     public static string Sanitize(string? value)
     {
-        if (string.IsNullOrWhiteSpace(value)) {
+        if (string.IsNullOrWhiteSpace(value))
+        {
             return "Default";
         }
 

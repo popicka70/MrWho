@@ -334,7 +334,8 @@ public static partial class ServiceCollectionExtensions
             })
             .AddServer(options =>
             {
-                var issuer = configuration["OpenIddict:Issuer"]; if (!string.IsNullOrWhiteSpace(issuer)) {
+                var issuer = configuration["OpenIddict:Issuer"]; if (!string.IsNullOrWhiteSpace(issuer))
+                {
                     options.SetIssuer(new Uri(issuer, UriKind.Absolute));
                 }
 
@@ -348,13 +349,15 @@ public static partial class ServiceCollectionExtensions
                        .SetIntrospectionEndpointUris("/connect/introspect");
                 options.AllowAuthorizationCodeFlow().AllowClientCredentialsFlow().AllowRefreshTokenFlow();
                 var enablePassword = string.Equals(Environment.GetEnvironmentVariable("MRWHO_TESTS"), "1", StringComparison.OrdinalIgnoreCase) || environment.IsEnvironment("Testing");
-                if (enablePassword) {
+                if (enablePassword)
+                {
                     options.AllowPasswordFlow();
                 }
 
                 options.RequireProofKeyForCodeExchange();
                 options.SetAccessTokenLifetime(TimeSpan.FromMinutes(60)).SetRefreshTokenLifetime(TimeSpan.FromDays(14));
-                if (environment.IsDevelopment()) {
+                if (environment.IsDevelopment())
+                {
                     options.DisableRollingRefreshTokens();
                 }
 

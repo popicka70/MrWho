@@ -91,7 +91,8 @@ public sealed class ExternalIdpClientOptionsConfigurator : IConfigureOptions<Ope
         try
         {
             // Ensure we can connect
-            if (!db.Database.CanConnect()) {
+            if (!db.Database.CanConnect())
+            {
                 return false;
             }
 
@@ -129,7 +130,8 @@ public sealed class ExternalIdpClientOptionsConfigurator : IConfigureOptions<Ope
 
     private static IEnumerable<string> ParseScopes(string? raw)
     {
-        if (string.IsNullOrWhiteSpace(raw)) {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
             yield break;
         }
 
@@ -147,7 +149,8 @@ public sealed class ExternalIdpClientOptionsConfigurator : IConfigureOptions<Ope
                 foreach (var s in arr)
                 {
                     var v = s?.Trim();
-                    if (!string.IsNullOrWhiteSpace(v)) {
+                    if (!string.IsNullOrWhiteSpace(v))
+                    {
                         yield return v;
                     }
                 }

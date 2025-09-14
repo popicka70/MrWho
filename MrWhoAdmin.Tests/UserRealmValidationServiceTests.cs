@@ -50,7 +50,8 @@ public class UserRealmValidationServiceTests
                 new UpperInvariantLookupNormalizer(), new IdentityErrorDescriber(), new ServiceCollection().BuildServiceProvider(), new LoggerFactory().CreateLogger<UserManager<IdentityUser>>());
 
             var res = UserManager.CreateAsync(User, "Pass123$!").GetAwaiter().GetResult();
-            if (!res.Succeeded) {
+            if (!res.Succeeded)
+            {
                 throw new InvalidOperationException("Failed to create user: " + string.Join(',', res.Errors.Select(e => e.Description)));
             }
 

@@ -76,7 +76,8 @@ public sealed class LoginGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Login
                 if (application != null)
                 {
                     clientName = await _applicationManager.GetDisplayNameAsync(application);
-                    if (string.IsNullOrEmpty(clientName)) {
+                    if (string.IsNullOrEmpty(clientName))
+                    {
                         clientName = clientId;
                     }
                 }
@@ -193,7 +194,8 @@ public sealed class LoginGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Login
 
         var useCode = string.Equals(mode, "code", StringComparison.OrdinalIgnoreCase);
         // If code mode is not allowed, force to password
-        if (!allowCode) {
+        if (!allowCode)
+        {
             useCode = false;
         }
 

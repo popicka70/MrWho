@@ -25,7 +25,8 @@ public class ApiResourcesController : ControllerBase
 
     private static List<string> ParseDestinations(string? json)
     {
-        if (string.IsNullOrWhiteSpace(json)) {
+        if (string.IsNullOrWhiteSpace(json))
+        {
             return new List<string>();
         }
 
@@ -40,12 +41,14 @@ public class ApiResourcesController : ControllerBase
 
     private static string? SerializeDestinations(IEnumerable<string>? list)
     {
-        if (list == null) {
+        if (list == null)
+        {
             return null;
         }
 
         var filtered = list.Where(l => !string.IsNullOrWhiteSpace(l)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-        if (filtered.Count == 0) {
+        if (filtered.Count == 0)
+        {
             return null;
         }
 
@@ -316,19 +319,23 @@ public class ApiResourcesController : ControllerBase
             var userName = User.Identity?.Name ?? "Unknown";
 
             // Update basic properties
-            if (request.DisplayName != null) {
+            if (request.DisplayName != null)
+            {
                 apiResource.DisplayName = request.DisplayName;
             }
 
-            if (request.Description != null) {
+            if (request.Description != null)
+            {
                 apiResource.Description = request.Description;
             }
 
-            if (request.IsEnabled.HasValue) {
+            if (request.IsEnabled.HasValue)
+            {
                 apiResource.IsEnabled = request.IsEnabled.Value;
             }
 
-            if (request.ClaimDestinations != null) {
+            if (request.ClaimDestinations != null)
+            {
                 apiResource.ClaimDestinationsJson = SerializeDestinations(request.ClaimDestinations);
             }
 

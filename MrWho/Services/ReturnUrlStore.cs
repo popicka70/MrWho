@@ -51,11 +51,13 @@ public class ReturnUrlStore : IReturnUrlStore
     public async Task<string?> ResolveAsync(string id, CancellationToken ct = default)
     {
         var item = await _db.ReturnUrlEntries.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
-        if (item == null) {
+        if (item == null)
+        {
             return null;
         }
 
-        if (item.ExpiresAt <= DateTime.UtcNow) {
+        if (item.ExpiresAt <= DateTime.UtcNow)
+        {
             return null;
         }
 
@@ -66,7 +68,8 @@ public class ReturnUrlStore : IReturnUrlStore
     {
         var now = DateTime.UtcNow;
         var expired = await _db.ReturnUrlEntries.Where(x => x.ExpiresAt <= now).ToListAsync(ct);
-        if (expired.Count == 0) {
+        if (expired.Count == 0)
+        {
             return 0;
         }
 

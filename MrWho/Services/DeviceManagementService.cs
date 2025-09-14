@@ -64,7 +64,8 @@ public class DeviceManagementService : IDeviceManagementService
     public async Task<UserDevice> RegisterDeviceAsync(string userId, RegisterDeviceRequest request)
     {
         var user = await _userManager.FindByIdAsync(userId);
-        if (user == null) {
+        if (user == null)
+        {
             throw new ArgumentException($"User {userId} not found", nameof(userId));
         }
 
@@ -144,7 +145,8 @@ public class DeviceManagementService : IDeviceManagementService
         var query = _context.UserDevices
             .Where(d => d.UserId == userId);
 
-        if (activeOnly) {
+        if (activeOnly)
+        {
             query = query.Where(d => d.IsActive);
         }
 
@@ -158,43 +160,53 @@ public class DeviceManagementService : IDeviceManagementService
         var device = await _context.UserDevices
             .FirstOrDefaultAsync(d => d.DeviceId == deviceId && d.IsActive);
 
-        if (device == null) {
+        if (device == null)
+        {
             return false;
         }
 
-        if (!string.IsNullOrEmpty(request.DeviceName)) {
+        if (!string.IsNullOrEmpty(request.DeviceName))
+        {
             device.DeviceName = request.DeviceName;
         }
 
-        if (request.DeviceType.HasValue) {
+        if (request.DeviceType.HasValue)
+        {
             device.DeviceType = request.DeviceType.Value;
         }
 
-        if (!string.IsNullOrEmpty(request.OperatingSystem)) {
+        if (!string.IsNullOrEmpty(request.OperatingSystem))
+        {
             device.OperatingSystem = request.OperatingSystem;
         }
 
-        if (!string.IsNullOrEmpty(request.UserAgent)) {
+        if (!string.IsNullOrEmpty(request.UserAgent))
+        {
             device.UserAgent = request.UserAgent;
         }
 
-        if (!string.IsNullOrEmpty(request.PushToken)) {
+        if (!string.IsNullOrEmpty(request.PushToken))
+        {
             device.PushToken = request.PushToken;
         }
 
-        if (!string.IsNullOrEmpty(request.PublicKey)) {
+        if (!string.IsNullOrEmpty(request.PublicKey))
+        {
             device.PublicKey = request.PublicKey;
         }
 
-        if (request.CanApproveLogins.HasValue) {
+        if (request.CanApproveLogins.HasValue)
+        {
             device.CanApproveLogins = request.CanApproveLogins.Value;
         }
 
-        if (request.ExpiresAt.HasValue) {
+        if (request.ExpiresAt.HasValue)
+        {
             device.ExpiresAt = request.ExpiresAt.Value;
         }
 
-        if (request.Metadata != null) {
+        if (request.Metadata != null)
+        {
             device.Metadata = JsonSerializer.Serialize(request.Metadata);
         }
 
@@ -213,7 +225,8 @@ public class DeviceManagementService : IDeviceManagementService
         var device = await _context.UserDevices
             .FirstOrDefaultAsync(d => d.UserId == userId && d.DeviceId == deviceId);
 
-        if (device == null) {
+        if (device == null)
+        {
             return false;
         }
 
@@ -233,7 +246,8 @@ public class DeviceManagementService : IDeviceManagementService
         var device = await _context.UserDevices
             .FirstOrDefaultAsync(d => d.UserId == userId && d.DeviceId == deviceId && d.IsActive);
 
-        if (device == null) {
+        if (device == null)
+        {
             return false;
         }
 
@@ -289,14 +303,16 @@ public class DeviceManagementService : IDeviceManagementService
         var session = await _context.PersistentQrSessions
             .FirstOrDefaultAsync(q => q.Token == token && q.Status == QrSessionStatus.Pending && q.ExpiresAt > DateTime.UtcNow);
 
-        if (session == null) {
+        if (session == null)
+        {
             return false;
         }
 
         var device = await _context.UserDevices
             .FirstOrDefaultAsync(d => d.UserId == userId && d.DeviceId == deviceId && d.IsActive && d.CanApproveLogins);
 
-        if (device == null) {
+        if (device == null)
+        {
             return false;
         }
 
@@ -324,14 +340,16 @@ public class DeviceManagementService : IDeviceManagementService
         var session = await _context.PersistentQrSessions
             .FirstOrDefaultAsync(q => q.Token == token && q.Status == QrSessionStatus.Pending && q.ExpiresAt > DateTime.UtcNow);
 
-        if (session == null) {
+        if (session == null)
+        {
             return false;
         }
 
         var device = await _context.UserDevices
             .FirstOrDefaultAsync(d => d.UserId == userId && d.DeviceId == deviceId && d.IsActive);
 
-        if (device == null) {
+        if (device == null)
+        {
             return false;
         }
 
@@ -354,7 +372,8 @@ public class DeviceManagementService : IDeviceManagementService
         var session = await _context.PersistentQrSessions
             .FirstOrDefaultAsync(q => q.Token == token && q.Status == QrSessionStatus.Approved);
 
-        if (session == null) {
+        if (session == null)
+        {
             return false;
         }
 
@@ -441,7 +460,8 @@ public class DeviceManagementService : IDeviceManagementService
         var compromisedLog = await _context.DeviceAuthenticationLogs
             .AnyAsync(l => l.DeviceId == deviceId && l.ActivityType == DeviceAuthActivity.DeviceCompromised);
 
-        if (compromisedLog) {
+        if (compromisedLog)
+        {
             return true;
         }
 
@@ -456,7 +476,8 @@ public class DeviceManagementService : IDeviceManagementService
         var device = await _context.UserDevices
             .FirstOrDefaultAsync(d => d.DeviceId == deviceId);
 
-        if (device == null) {
+        if (device == null)
+        {
             return;
         }
 

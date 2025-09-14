@@ -57,7 +57,8 @@ public class ClientRoleServiceTests
 
             // Create user
             var createResult = UserManager.CreateAsync(User, "Pass123$!").GetAwaiter().GetResult();
-            if (!createResult.Succeeded) {
+            if (!createResult.Succeeded)
+            {
                 throw new InvalidOperationException("Failed creating test user: " + string.Join(',', createResult.Errors.Select(e => e.Description)));
             }
 

@@ -712,24 +712,28 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
             {
                 SetPropertyIfExists(entry, nameof(Client.CreatedAt), now);
                 SetPropertyIfExists(entry, nameof(Client.UpdatedAt), now);
-                if (!string.IsNullOrEmpty(userId)) {
+                if (!string.IsNullOrEmpty(userId))
+                {
                     SetPropertyIfExists(entry, nameof(Client.CreatedBy), userId);
                 }
 
-                if (!string.IsNullOrEmpty(userId)) {
+                if (!string.IsNullOrEmpty(userId))
+                {
                     SetPropertyIfExists(entry, nameof(Client.UpdatedBy), userId);
                 }
             }
             else if (entry.State == EntityState.Modified)
             {
                 SetPropertyIfExists(entry, nameof(Client.UpdatedAt), now);
-                if (!string.IsNullOrEmpty(userId)) {
+                if (!string.IsNullOrEmpty(userId))
+                {
                     SetPropertyIfExists(entry, nameof(Client.UpdatedBy), userId);
                 }
             }
 
             // Build audit log for entity if not AuditLog itself
-            if (entry.Entity is AuditLog) {
+            if (entry.Entity is AuditLog)
+            {
                 continue;
             }
 
@@ -818,7 +822,8 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
     private static string GetPrimaryKeyValue(Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry entry)
     {
         var key = entry.Metadata.FindPrimaryKey();
-        if (key == null) {
+        if (key == null)
+        {
             return string.Empty;
         }
 

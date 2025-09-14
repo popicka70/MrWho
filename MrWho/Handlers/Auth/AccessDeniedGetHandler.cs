@@ -130,15 +130,18 @@ public sealed class AccessDeniedGetHandler : IRequestHandler<MrWho.Endpoints.Aut
                 themeName = _mrWhoOptions.Value.DefaultThemeName;
             }
 
-            if (!string.IsNullOrWhiteSpace(themeName)) {
+            if (!string.IsNullOrWhiteSpace(themeName))
+            {
                 vd["ThemeName"] = themeName;
             }
 
-            if (!string.IsNullOrWhiteSpace(customCssUrl)) {
+            if (!string.IsNullOrWhiteSpace(customCssUrl))
+            {
                 vd["CustomCssUrl"] = customCssUrl;
             }
 
-            if (!string.IsNullOrWhiteSpace(logoUri)) {
+            if (!string.IsNullOrWhiteSpace(logoUri))
+            {
                 vd["LogoUri"] = logoUri;
             }
         }

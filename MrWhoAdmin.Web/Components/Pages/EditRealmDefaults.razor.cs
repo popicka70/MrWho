@@ -172,7 +172,8 @@ public partial class EditRealmDefaults
 
     internal bool IsMethodSelected(string method)
     {
-        if (string.IsNullOrWhiteSpace(model.DefaultAllowedMfaMethods)) {
+        if (string.IsNullOrWhiteSpace(model.DefaultAllowedMfaMethods))
+        {
             return false;
         }
 
@@ -192,7 +193,8 @@ public partial class EditRealmDefaults
             try
             {
                 var existing = System.Text.Json.JsonSerializer.Deserialize<string[]>(model.DefaultAllowedMfaMethods);
-                if (existing != null) {
+                if (existing != null)
+                {
                     list.AddRange(existing);
                 }
             }
@@ -200,11 +202,13 @@ public partial class EditRealmDefaults
         }
         if (selected)
         {
-            if (!list.Contains(method)) {
+            if (!list.Contains(method))
+            {
                 list.Add(method);
             }
         }
-        else {
+        else
+        {
             list.Remove(method);
         }
 
@@ -221,7 +225,8 @@ public partial class EditRealmDefaults
                 NotificationService.Notify(NotificationSeverity.Success, "Success", "Realm defaults saved");
                 Navigation.NavigateTo($"/realms/edit/{Id}");
             }
-            else {
+            else
+            {
                 NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to save realm defaults");
             }
         }
@@ -235,7 +240,8 @@ public partial class EditRealmDefaults
     internal async Task ResetToSystemDefaults()
     {
         var ok = await DialogService.Confirm("Reset all realm defaults to system-wide defaults?", "Reset to System Defaults", new ConfirmOptions() { OkButtonText = "Reset", CancelButtonText = "Cancel" });
-        if (ok != true) {
+        if (ok != true)
+        {
             return;
         }
         // Token lifetimes

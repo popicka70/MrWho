@@ -44,7 +44,8 @@ public class TokenStatisticsSnapshotHostedService : BackgroundService
             var nextHour = DateTimeOffset.UtcNow.AddHours(1);
             nextHour = new DateTimeOffset(nextHour.Year, nextHour.Month, nextHour.Day, nextHour.Hour, 0, 0, TimeSpan.Zero);
             var delay = nextHour - DateTimeOffset.UtcNow;
-            if (delay < TimeSpan.FromMinutes(1)) {
+            if (delay < TimeSpan.FromMinutes(1))
+            {
                 delay = TimeSpan.FromMinutes(1);
             }
 

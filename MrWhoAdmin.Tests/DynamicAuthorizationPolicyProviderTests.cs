@@ -115,7 +115,8 @@ public class DynamicAuthorizationPolicyProviderTests
         services.AddLogging();
         services.AddSingleton<IAuthorizationPolicyProvider>(provider);
         services.AddAuthorization();
-        foreach (var svc in sp.GetServices<IAuthenticationSchemeProvider>()) {
+        foreach (var svc in sp.GetServices<IAuthenticationSchemeProvider>())
+        {
             services.AddSingleton(svc);
         }
 

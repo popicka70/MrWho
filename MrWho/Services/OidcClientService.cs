@@ -67,15 +67,18 @@ public partial class OidcClientService : IOidcClientService
                 foreach (var c in clients)
                 {
                     var isMachine = c.ClientType == ClientType.Machine || (c.AllowClientCredentialsFlow && !c.AllowAuthorizationCodeFlow && !c.AllowPasswordFlow);
-                    if (c.AllowAccessToUserInfoEndpoint == null) {
+                    if (c.AllowAccessToUserInfoEndpoint == null)
+                    {
                         c.AllowAccessToUserInfoEndpoint = !isMachine;
                     }
 
-                    if (c.AllowAccessToRevocationEndpoint == null) {
+                    if (c.AllowAccessToRevocationEndpoint == null)
+                    {
                         c.AllowAccessToRevocationEndpoint = true;
                     }
 
-                    if (c.AllowAccessToIntrospectionEndpoint == null) {
+                    if (c.AllowAccessToIntrospectionEndpoint == null)
+                    {
                         c.AllowAccessToIntrospectionEndpoint = isMachine;
                     }
 
@@ -111,7 +114,8 @@ public partial class OidcClientService : IOidcClientService
 
     private async Task BackfillClientSecretHistoriesAsync()
     {
-        if (_clientSecretService == null) {
+        if (_clientSecretService == null)
+        {
             return; // not available in some minimal test setups
         }
 
@@ -128,7 +132,8 @@ public partial class OidcClientService : IOidcClientService
             foreach (var c in confidentials)
             {
                 bool hasHistory = await _context.ClientSecretHistories.AnyAsync(h => h.ClientId == c.Id && h.Status == ClientSecretStatus.Active && (h.ExpiresAt == null || h.ExpiresAt > DateTime.UtcNow));
-                if (hasHistory) {
+                if (hasHistory)
+                {
                     continue;
                 }
 
@@ -149,7 +154,8 @@ public partial class OidcClientService : IOidcClientService
                     _logger.LogWarning(ex, "Failed backfilling secret history for client {ClientId}", c.ClientId);
                 }
             }
-            if (created > 0) {
+            if (created > 0)
+            {
                 _logger.LogInformation("Backfilled secret history for {Count} clients", created);
             }
         }
@@ -194,15 +200,18 @@ public partial class OidcClientService : IOidcClientService
             descriptor.Permissions.Add(OpenIddictConstants.Permissions.Endpoints.Authorization);
             descriptor.Permissions.Add(OpenIddictConstants.Permissions.ResponseTypes.Code);
         }
-        if (client.AllowClientCredentialsFlow) {
+        if (client.AllowClientCredentialsFlow)
+        {
             descriptor.Permissions.Add(OpenIddictConstants.Permissions.GrantTypes.ClientCredentials);
         }
 
-        if (client.AllowPasswordFlow) {
+        if (client.AllowPasswordFlow)
+        {
             descriptor.Permissions.Add(OpenIddictConstants.Permissions.GrantTypes.Password);
         }
 
-        if (client.AllowRefreshTokenFlow) {
+        if (client.AllowRefreshTokenFlow)
+        {
             descriptor.Permissions.Add(OpenIddictConstants.Permissions.GrantTypes.RefreshToken);
         }
 
@@ -219,48 +228,58 @@ public partial class OidcClientService : IOidcClientService
         }
 
         var (hasOpenId, scopePerms) = BuildScopePermissions(client.Scopes.Select(s => s.Scope));
-        foreach (var p in scopePerms) {
+        foreach (var p in scopePerms)
+        {
             descriptor.Permissions.Add(p);
         }
 
-        if (hasOpenId) {
+        if (hasOpenId)
+        {
             descriptor.Permissions.Add(OpenIddictConstants.Permissions.Endpoints.EndSession);
         }
 
         // endpoint access
-        if (client.AllowAccessToUserInfoEndpoint == true && hasOpenId) {
+        if (client.AllowAccessToUserInfoEndpoint == true && hasOpenId)
+        {
             descriptor.Permissions.Add(UserInfoEndpointPermission);
         }
 
-        if (client.AllowAccessToRevocationEndpoint == true) {
+        if (client.AllowAccessToRevocationEndpoint == true)
+        {
             descriptor.Permissions.Add(RevocationEndpointPermission);
         }
 
-        if (client.AllowAccessToIntrospectionEndpoint == true) {
+        if (client.AllowAccessToIntrospectionEndpoint == true)
+        {
             descriptor.Permissions.Add(IntrospectionEndpointPermission);
         }
 
         foreach (var permission in client.Permissions.Select(p => p.Permission))
         {
-            if (permission.StartsWith("scp:") || permission.StartsWith("oidc:scope:")) {
+            if (permission.StartsWith("scp:") || permission.StartsWith("oidc:scope:"))
+            {
                 continue;
             }
 
             if (permission is "endpoints:userinfo" or "endpoints:revocation" or "endpoints:introspection" ||
-                permission is "endpoints/userinfo" or "endpoints/revocation" or "endpoints/introspection") {
+                permission is "endpoints/userinfo" or "endpoints/revocation" or "endpoints/introspection")
+            {
                 continue;
             }
 
-            if (!descriptor.Permissions.Contains(permission)) {
+            if (!descriptor.Permissions.Contains(permission))
+            {
                 descriptor.Permissions.Add(permission);
             }
         }
 
-        foreach (var redirect in client.RedirectUris) {
+        foreach (var redirect in client.RedirectUris)
+        {
             descriptor.RedirectUris.Add(new Uri(redirect.Uri));
         }
 
-        foreach (var postLogout in client.PostLogoutUris) {
+        foreach (var postLogout in client.PostLogoutUris)
+        {
             descriptor.PostLogoutRedirectUris.Add(new Uri(postLogout.Uri));
         }
 
@@ -352,7 +371,8 @@ public partial class OidcClientService : IOidcClientService
 
         // Load configured URIs for admin client strictly from options (no hardcoded defaults)
         var cfgAdmin = _clientOptions.Value.Admin ?? new OidcClientsOptions.ClientOptions();
-        if (string.IsNullOrWhiteSpace(cfgAdmin.ClientId)) {
+        if (string.IsNullOrWhiteSpace(cfgAdmin.ClientId))
+        {
             cfgAdmin.ClientId = "mrwho_admin_web";
         }
 
@@ -388,17 +408,20 @@ public partial class OidcClientService : IOidcClientService
             _context.Clients.Add(adminClient);
             await _context.SaveChangesAsync();
 
-            foreach (var uri in adminConfiguredRedirects) {
+            foreach (var uri in adminConfiguredRedirects)
+            {
                 _context.ClientRedirectUris.Add(new ClientRedirectUri { ClientId = adminClient.Id, Uri = uri });
             }
 
-            foreach (var uri in adminConfiguredPostLogout) {
+            foreach (var uri in adminConfiguredPostLogout)
+            {
                 _context.ClientPostLogoutUris.Add(new ClientPostLogoutUri { ClientId = adminClient.Id, Uri = uri });
             }
 
             // NOTE: Intentionally NOT seeding offline_access for admin web to avoid refresh tokens + MFA on first login
             var scopes = new[] { StandardScopes.OpenId, StandardScopes.Email, StandardScopes.Profile, StandardScopes.Roles, StandardScopes.ApiRead, StandardScopes.ApiWrite, StandardScopes.MrWhoUse };
-            foreach (var scope in scopes) {
+            foreach (var scope in scopes)
+            {
                 _context.ClientScopes.Add(new ClientScope { ClientId = adminClient.Id, Scope = scope });
             }
 
@@ -415,7 +438,8 @@ public partial class OidcClientService : IOidcClientService
             {
                 basePermissions.Add(OpenIddictConstants.Permissions.GrantTypes.Password);
             }
-            foreach (var p in basePermissions) {
+            foreach (var p in basePermissions)
+            {
                 _context.ClientPermissions.Add(new ClientPermission { ClientId = adminClient.Id, Permission = p });
             }
 
@@ -507,7 +531,8 @@ public partial class OidcClientService : IOidcClientService
             .FirstOrDefaultAsync(c => c.ClientId == "mrwho_demo1");
 
         var cfgDemo1 = _clientOptions.Value.Demo1 ?? new OidcClientsOptions.ClientOptions();
-        if (string.IsNullOrWhiteSpace(cfgDemo1.ClientId)) {
+        if (string.IsNullOrWhiteSpace(cfgDemo1.ClientId))
+        {
             cfgDemo1.ClientId = "mrwho_demo1";
         }
 
@@ -543,31 +568,39 @@ public partial class OidcClientService : IOidcClientService
             _context.Clients.Add(demo1Client);
             await _context.SaveChangesAsync();
 
-            foreach (var uri in demo1ConfiguredRedirects) {
+            foreach (var uri in demo1ConfiguredRedirects)
+            {
                 _context.ClientRedirectUris.Add(new ClientRedirectUri { ClientId = demo1Client.Id, Uri = uri });
             }
             // EXTRA: include NuGet demo app redirects
-            foreach (var uri in new[] { "https://localhost:64820/signin-oidc", "https://localhost:64820/callback" }) {
-                if (!demo1ConfiguredRedirects.Contains(uri, StringComparer.OrdinalIgnoreCase)) {
+            foreach (var uri in new[] { "https://localhost:64820/signin-oidc", "https://localhost:64820/callback" })
+            {
+                if (!demo1ConfiguredRedirects.Contains(uri, StringComparer.OrdinalIgnoreCase))
+                {
                     _context.ClientRedirectUris.Add(new ClientRedirectUri { ClientId = demo1Client.Id, Uri = uri });
                 }
             }
 
-            foreach (var uri in demo1ConfiguredPostLogout) {
+            foreach (var uri in demo1ConfiguredPostLogout)
+            {
                 _context.ClientPostLogoutUris.Add(new ClientPostLogoutUri { ClientId = demo1Client.Id, Uri = uri });
             }
             // EXTRA: include NuGet demo app post-logout redirects
-            foreach (var uri in new[] { "https://localhost:64820/", "https://localhost:64820/signout-callback-oidc" }) {
-                if (!demo1ConfiguredPostLogout.Contains(uri, StringComparer.OrdinalIgnoreCase)) {
+            foreach (var uri in new[] { "https://localhost:64820/", "https://localhost:64820/signout-callback-oidc" })
+            {
+                if (!demo1ConfiguredPostLogout.Contains(uri, StringComparer.OrdinalIgnoreCase))
+                {
                     _context.ClientPostLogoutUris.Add(new ClientPostLogoutUri { ClientId = demo1Client.Id, Uri = uri });
                 }
             }
 
-            foreach (var scope in new[] { StandardScopes.OpenId, StandardScopes.Email, StandardScopes.Profile, StandardScopes.Roles, StandardScopes.OfflineAccess, StandardScopes.ApiRead, StandardScopes.ApiWrite }) {
+            foreach (var scope in new[] { StandardScopes.OpenId, StandardScopes.Email, StandardScopes.Profile, StandardScopes.Roles, StandardScopes.OfflineAccess, StandardScopes.ApiRead, StandardScopes.ApiWrite })
+            {
                 _context.ClientScopes.Add(new ClientScope { ClientId = demo1Client.Id, Scope = scope });
             }
 
-            foreach (var p in new[] { OpenIddictConstants.Permissions.Endpoints.Authorization, OpenIddictConstants.Permissions.Endpoints.Token, OpenIddictConstants.Permissions.Endpoints.EndSession, OpenIddictConstants.Permissions.GrantTypes.AuthorizationCode, OpenIddictConstants.Permissions.GrantTypes.RefreshToken, OpenIddictConstants.Permissions.ResponseTypes.Code }) {
+            foreach (var p in new[] { OpenIddictConstants.Permissions.Endpoints.Authorization, OpenIddictConstants.Permissions.Endpoints.Token, OpenIddictConstants.Permissions.Endpoints.EndSession, OpenIddictConstants.Permissions.GrantTypes.AuthorizationCode, OpenIddictConstants.Permissions.GrantTypes.RefreshToken, OpenIddictConstants.Permissions.ResponseTypes.Code })
+            {
                 _context.ClientPermissions.Add(new ClientPermission { ClientId = demo1Client.Id, Permission = p });
             }
 
@@ -673,11 +706,13 @@ public partial class OidcClientService : IOidcClientService
             };
             _context.Clients.Add(m2mClient);
             await _context.SaveChangesAsync();
-            foreach (var scope in new[] { StandardScopes.ApiRead, StandardScopes.ApiWrite }) {
+            foreach (var scope in new[] { StandardScopes.ApiRead, StandardScopes.ApiWrite })
+            {
                 _context.ClientScopes.Add(new ClientScope { ClientId = m2mClient.Id, Scope = scope });
             }
 
-            foreach (var p in new[] { OpenIddictConstants.Permissions.Endpoints.Token, OpenIddictConstants.Permissions.GrantTypes.ClientCredentials }) {
+            foreach (var p in new[] { OpenIddictConstants.Permissions.Endpoints.Token, OpenIddictConstants.Permissions.GrantTypes.ClientCredentials })
+            {
                 _context.ClientPermissions.Add(new ClientPermission { ClientId = m2mClient.Id, Permission = p });
             }
 
@@ -708,7 +743,8 @@ public partial class OidcClientService : IOidcClientService
         else
         {
             var adminClaims = await _userManager.GetClaimsAsync(adminUser);
-            if (!adminClaims.Any(c => c.Type == "realm")) {
+            if (!adminClaims.Any(c => c.Type == "realm"))
+            {
                 await _userManager.AddClaimAsync(adminUser, new System.Security.Claims.Claim("realm", "admin"));
             }
         }
@@ -731,16 +767,19 @@ public partial class OidcClientService : IOidcClientService
         else
         {
             var demoClaims = await _userManager.GetClaimsAsync(demo1User);
-            if (!demoClaims.Any(c => c.Type == "realm")) {
+            if (!demoClaims.Any(c => c.Type == "realm"))
+            {
                 await _userManager.AddClaimAsync(demo1User, new System.Security.Claims.Claim("realm", "demo"));
             }
         }
 
-        if (adminClient != null && adminUser != null && !await _context.ClientUsers.AnyAsync(cu => cu.ClientId == adminClient.Id && cu.UserId == adminUser.Id)) {
+        if (adminClient != null && adminUser != null && !await _context.ClientUsers.AnyAsync(cu => cu.ClientId == adminClient.Id && cu.UserId == adminUser.Id))
+        {
             _context.ClientUsers.Add(new ClientUser { ClientId = adminClient.Id, UserId = adminUser.Id, CreatedAt = DateTime.UtcNow, CreatedBy = "System" });
         }
 
-        if (demo1Client != null && demo1User != null && !await _context.ClientUsers.AnyAsync(cu => cu.ClientId == demo1Client.Id && cu.UserId == demo1User.Id)) {
+        if (demo1Client != null && demo1User != null && !await _context.ClientUsers.AnyAsync(cu => cu.ClientId == demo1Client.Id && cu.UserId == demo1User.Id))
+        {
             _context.ClientUsers.Add(new ClientUser { ClientId = demo1Client.Id, UserId = demo1User.Id, CreatedAt = DateTime.UtcNow, CreatedBy = "System" });
         }
 
@@ -850,7 +889,8 @@ public partial class OidcClientService : IOidcClientService
             .FirstOrDefaultAsync(c => c.ClientId == "mrwho_demo_nuget");
 
         var cfgNuget = _clientOptions.Value.Nuget ?? new OidcClientsOptions.ClientOptions();
-        if (string.IsNullOrWhiteSpace(cfgNuget.ClientId)) {
+        if (string.IsNullOrWhiteSpace(cfgNuget.ClientId))
+        {
             cfgNuget.ClientId = "mrwho_demo_nuget";
         }
 
@@ -883,15 +923,18 @@ public partial class OidcClientService : IOidcClientService
             _context.Clients.Add(nugetClient);
             await _context.SaveChangesAsync();
 
-            foreach (var uri in nugetConfiguredRedirects) {
+            foreach (var uri in nugetConfiguredRedirects)
+            {
                 _context.ClientRedirectUris.Add(new ClientRedirectUri { ClientId = nugetClient.Id, Uri = uri });
             }
 
-            foreach (var uri in nugetConfiguredPostLogout) {
+            foreach (var uri in nugetConfiguredPostLogout)
+            {
                 _context.ClientPostLogoutUris.Add(new ClientPostLogoutUri { ClientId = nugetClient.Id, Uri = uri });
             }
 
-            foreach (var scope in new[] { StandardScopes.OpenId, StandardScopes.Email, StandardScopes.Profile, StandardScopes.Roles, StandardScopes.OfflineAccess, StandardScopes.ApiRead }) {
+            foreach (var scope in new[] { StandardScopes.OpenId, StandardScopes.Email, StandardScopes.Profile, StandardScopes.Roles, StandardScopes.OfflineAccess, StandardScopes.ApiRead })
+            {
                 _context.ClientScopes.Add(new ClientScope { ClientId = nugetClient.Id, Scope = scope });
             }
 
@@ -903,7 +946,8 @@ public partial class OidcClientService : IOidcClientService
                 OpenIddictConstants.Permissions.GrantTypes.AuthorizationCode,
                 OpenIddictConstants.Permissions.GrantTypes.RefreshToken,
                 OpenIddictConstants.Permissions.ResponseTypes.Code
-            }) {
+            })
+            {
                 _context.ClientPermissions.Add(new ClientPermission { ClientId = nugetClient.Id, Permission = p });
             }
 
@@ -922,15 +966,19 @@ public partial class OidcClientService : IOidcClientService
             }
 
             var existingNugetRedirects = nugetClient.RedirectUris.Select(r => r.Uri).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            foreach (var uri in nugetConfiguredRedirects) {
-                if (!existingNugetRedirects.Contains(uri)) {
+            foreach (var uri in nugetConfiguredRedirects)
+            {
+                if (!existingNugetRedirects.Contains(uri))
+                {
                     _context.ClientRedirectUris.Add(new ClientRedirectUri { ClientId = nugetClient.Id, Uri = uri });
                 }
             }
 
             var existingNugetPostLogout = nugetClient.PostLogoutUris.Select(r => r.Uri).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            foreach (var uri in nugetConfiguredPostLogout) {
-                if (!existingNugetPostLogout.Contains(uri)) {
+            foreach (var uri in nugetConfiguredPostLogout)
+            {
+                if (!existingNugetPostLogout.Contains(uri))
+                {
                     _context.ClientPostLogoutUris.Add(new ClientPostLogoutUri { ClientId = nugetClient.Id, Uri = uri });
                 }
             }
@@ -947,7 +995,8 @@ public partial class OidcClientService : IOidcClientService
             .FirstOrDefaultAsync(c => c.ClientId == "postman_client");
 
         var cfgDefault = _clientOptions.Value.Default ?? new OidcClientsOptions.ClientOptions();
-        if (string.IsNullOrWhiteSpace(cfgDefault.ClientId)) {
+        if (string.IsNullOrWhiteSpace(cfgDefault.ClientId))
+        {
             cfgDefault.ClientId = "postman_client";
         }
 
@@ -981,15 +1030,18 @@ public partial class OidcClientService : IOidcClientService
             _context.Clients.Add(defaultClient);
             await _context.SaveChangesAsync();
 
-            foreach (var uri in new[] { "https://localhost:7001/callback", "http://localhost:5001/callback", "https://localhost:7002/", "https://localhost:7002/callback", "https://localhost:7002/signin-oidc" }) {
+            foreach (var uri in new[] { "https://localhost:7001/callback", "http://localhost:5001/callback", "https://localhost:7002/", "https://localhost:7002/callback", "https://localhost:7002/signin-oidc" })
+            {
                 _context.ClientRedirectUris.Add(new ClientRedirectUri { ClientId = defaultClient.Id, Uri = uri });
             }
 
-            foreach (var uri in new[] { "https://localhost:7001/", "http://localhost:5001/", "https://localhost:7002/", "https://localhost:7002/signout-callback-oidc" }) {
+            foreach (var uri in new[] { "https://localhost:7001/", "http://localhost:5001/", "https://localhost:7002/", "https://localhost:7002/signout-callback-oidc" })
+            {
                 _context.ClientPostLogoutUris.Add(new ClientPostLogoutUri { ClientId = defaultClient.Id, Uri = uri });
             }
 
-            foreach (var scope in new[] { StandardScopes.OpenId, StandardScopes.Email, StandardScopes.Profile, StandardScopes.Roles }) {
+            foreach (var scope in new[] { StandardScopes.OpenId, StandardScopes.Email, StandardScopes.Profile, StandardScopes.Roles })
+            {
                 _context.ClientScopes.Add(new ClientScope { ClientId = defaultClient.Id, Scope = scope });
             }
 
@@ -1003,7 +1055,8 @@ public partial class OidcClientService : IOidcClientService
                 OpenIddictConstants.Permissions.GrantTypes.Password,
                 OpenIddictConstants.Permissions.GrantTypes.RefreshToken,
                 OpenIddictConstants.Permissions.ResponseTypes.Code
-            }) {
+            })
+            {
                 _context.ClientPermissions.Add(new ClientPermission { ClientId = defaultClient.Id, Permission = permission });
             }
 
@@ -1037,15 +1090,19 @@ public partial class OidcClientService : IOidcClientService
 
             // Ensure configured redirects/post-logout exist
             var existingDefaultRedirects = defaultClient.RedirectUris.Select(r => r.Uri).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            foreach (var uri in defaultRedirects) {
-                if (!existingDefaultRedirects.Contains(uri)) {
+            foreach (var uri in defaultRedirects)
+            {
+                if (!existingDefaultRedirects.Contains(uri))
+                {
                     _context.ClientRedirectUris.Add(new ClientRedirectUri { ClientId = defaultClient.Id, Uri = uri });
                 }
             }
 
             var existingDefaultPostLogout = defaultClient.PostLogoutUris.Select(r => r.Uri).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            foreach (var uri in defaultPostLogout) {
-                if (!existingDefaultPostLogout.Contains(uri)) {
+            foreach (var uri in defaultPostLogout)
+            {
+                if (!existingDefaultPostLogout.Contains(uri))
+                {
                     _context.ClientPostLogoutUris.Add(new ClientPostLogoutUri { ClientId = defaultClient.Id, Uri = uri });
                 }
             }
@@ -1103,7 +1160,8 @@ public partial class OidcClientService : IOidcClientService
                     .FirstOrDefaultAsync(c => c.Id == client.Id || c.ClientId == client.ClientId);
                 if (dbClient != null)
                 {
-                    if (dbClient.ClientSecret == "{HASHED}") {
+                    if (dbClient.ClientSecret == "{HASHED}")
+                    {
                         dbClient.ClientSecret = null; // placeholder
                     }
 

@@ -78,7 +78,8 @@ public sealed class OidcLogoutHandler : IRequestHandler<MrWho.Endpoints.OidcLogo
             }
 
             await _dynamicCookieService.SignOutFromClientAsync(clientId);
-            if (audit != null) {
+            if (audit != null)
+            {
                 await audit.WriteAsync("auth.security", "logout.client", new { clientId }, "info", actorClientId: clientId, ip: context.Connection.RemoteIpAddress?.ToString());
             }
 
@@ -87,7 +88,8 @@ public sealed class OidcLogoutHandler : IRequestHandler<MrWho.Endpoints.OidcLogo
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error processing OIDC logout");
-            if (audit != null) {
+            if (audit != null)
+            {
                 await audit.WriteAsync("auth.security", "logout.error", new { ex = ex.Message }, "error", ip: context.Connection.RemoteIpAddress?.ToString());
             }
 

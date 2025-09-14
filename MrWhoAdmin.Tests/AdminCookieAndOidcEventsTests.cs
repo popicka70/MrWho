@@ -31,17 +31,21 @@ public class AdminCookieAndOidcEventsTests
                     };
                     foreach (var prop in root.EnumerateObject())
                     {
-                        if (known.Contains(prop.Name)) {
+                        if (known.Contains(prop.Name))
+                        {
                             continue;
                         }
 
-                        if (prop.Value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined) {
+                        if (prop.Value.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+                        {
                             continue;
                         }
 
                         bool Already(string type, string val) => identity.HasClaim(c => c.Type == type && c.Value == val);
                         void Add(string type, string val)
-                        { if (!string.IsNullOrWhiteSpace(val) && !Already(type, val)) {
+                        {
+                            if (!string.IsNullOrWhiteSpace(val) && !Already(type, val))
+                            {
                                 identity.AddClaim(new Claim(type, val));
                             }
                         }
@@ -52,10 +56,12 @@ public class AdminCookieAndOidcEventsTests
                             case JsonValueKind.True or JsonValueKind.False:
                                 Add(prop.Name, prop.Value.GetBoolean().ToString()); break;
                             case JsonValueKind.Number:
-                                if (prop.Value.TryGetInt64(out var l)) {
+                                if (prop.Value.TryGetInt64(out var l))
+                                {
                                     Add(prop.Name, l.ToString());
                                 }
-                                else if (prop.Value.TryGetDouble(out var d)) {
+                                else if (prop.Value.TryGetDouble(out var d))
+                                {
                                     Add(prop.Name, d.ToString(CultureInfo.InvariantCulture));
                                 }
 
@@ -63,10 +69,12 @@ public class AdminCookieAndOidcEventsTests
                             case JsonValueKind.Array:
                                 foreach (var e in prop.Value.EnumerateArray())
                                 {
-                                    if (e.ValueKind == JsonValueKind.String) {
+                                    if (e.ValueKind == JsonValueKind.String)
+                                    {
                                         Add(prop.Name, e.GetString()!);
                                     }
-                                    else if (e.ValueKind is JsonValueKind.True or JsonValueKind.False) {
+                                    else if (e.ValueKind is JsonValueKind.True or JsonValueKind.False)
+                                    {
                                         Add(prop.Name, e.GetBoolean().ToString());
                                     }
                                 }

@@ -61,12 +61,15 @@ public class JarNegativeAndEdgeTests
             ["exp"] = exp.ToUnixTimeSeconds(),
             ["jti"] = jti ?? Guid.NewGuid().ToString("n")
         };
-        if (padBytes > 0) {
+        if (padBytes > 0)
+        {
             claims["padding"] = new string('A', padBytes);
         }
 
-        if (extraClaims != null) {
-            foreach (var kv in extraClaims) {
+        if (extraClaims != null)
+        {
+            foreach (var kv in extraClaims)
+            {
                 claims[kv.Key] = kv.Value;
             }
         }
@@ -101,7 +104,8 @@ public class JarNegativeAndEdgeTests
     {
         var (_, challenge) = CreatePkcePair();
         var url = $"connect/authorize?client_id={Uri.EscapeDataString(clientId)}&response_type=code&redirect_uri={Uri.EscapeDataString(RedirectUri)}&scope={Uri.EscapeDataString(Scope)}&state=test_state&code_challenge={challenge}&code_challenge_method=S256&request={Uri.EscapeDataString(jar)}";
-        if (!string.IsNullOrEmpty(extraQuery)) {
+        if (!string.IsNullOrEmpty(extraQuery))
+        {
             url += "&" + extraQuery;
         }
 
@@ -201,7 +205,8 @@ public class JarNegativeAndEdgeTests
         async Task<bool> PerformTestSigninAsync()
         {
             var respSignin = await http.PostAsync($"debug/test-signin?userEmail=demo1@example.com&clientId={ephemeralClientId}", new StringContent(string.Empty));
-            if (!respSignin.IsSuccessStatusCode) {
+            if (!respSignin.IsSuccessStatusCode)
+            {
                 return false;
             }
             // Heuristic: a redirect to / or 200 OK is fine; cookie presence can't be directly asserted here.
@@ -297,7 +302,8 @@ public class JarNegativeAndEdgeTests
         var realmJson = await realmResp.Content.ReadAsStringAsync();
         using var realmDoc = JsonDocument.Parse(realmJson);
         var realmItems = realmDoc.RootElement.GetProperty("items").EnumerateArray().ToList();
-        if (!realmItems.Any()) {
+        if (!realmItems.Any())
+        {
             throw new InvalidOperationException("No realm found");
         }
 

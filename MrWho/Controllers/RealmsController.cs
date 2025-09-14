@@ -27,16 +27,19 @@ public class RealmsController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<PagedResult<RealmDto>>> GetRealms(int page = 1, int pageSize = 10, string? search = null)
     {
-        if (page < 1) {
+        if (page < 1)
+        {
             page = 1;
         }
 
-        if (pageSize < 1 || pageSize > 100) {
+        if (pageSize < 1 || pageSize > 100)
+        {
             pageSize = 10;
         }
 
         var query = _context.Realms.AsQueryable();
-        if (!string.IsNullOrWhiteSpace(search)) {
+        if (!string.IsNullOrWhiteSpace(search))
+        {
             query = query.Where(r => r.Name.Contains(search) || (r.Description != null && r.Description.Contains(search)));
         }
 
@@ -75,7 +78,8 @@ public class RealmsController : ControllerBase
     public async Task<ActionResult<RealmDto>> GetRealmById(string id)
     {
         var realm = await _context.Realms.FirstOrDefaultAsync(r => r.Id == id);
-        if (realm == null) {
+        if (realm == null)
+        {
             return NotFound();
         }
 
@@ -137,7 +141,8 @@ public class RealmsController : ControllerBase
     public async Task<ActionResult<RealmExportDto>> ExportRealm(string id)
     {
         var realm = await _context.Realms.FirstOrDefaultAsync(r => r.Id == id);
-        if (realm == null) {
+        if (realm == null)
+        {
             return NotFound();
         }
 
@@ -316,7 +321,8 @@ public class RealmsController : ControllerBase
             // Find realm claim for user
             var uClaims = await _context.UserClaims.Where(c => c.UserId == u.Id).ToListAsync();
             var realmClaim = uClaims.FirstOrDefault(c => c.ClaimType == "realm");
-            if (realmClaim?.ClaimValue != realm.Name) {
+            if (realmClaim?.ClaimValue != realm.Name)
+            {
                 continue;
             }
 
@@ -355,7 +361,8 @@ public class RealmsController : ControllerBase
     [HttpPost("import")]
     public async Task<ActionResult<RealmDto>> ImportRealm([FromBody] RealmExportDto dto, [FromServices] UserManager<IdentityUser> userManager, [FromServices] RoleManager<IdentityRole> roleManager)
     {
-        if (string.IsNullOrWhiteSpace(dto.Name)) {
+        if (string.IsNullOrWhiteSpace(dto.Name))
+        {
             return ValidationProblem("Realm name is required");
         }
 
@@ -388,7 +395,8 @@ public class RealmsController : ControllerBase
                 {
                     foreach (var s in dto.Scopes)
                     {
-                        if (string.IsNullOrWhiteSpace(s.Name)) {
+                        if (string.IsNullOrWhiteSpace(s.Name))
+                        {
                             continue;
                         }
 
@@ -417,7 +425,8 @@ public class RealmsController : ControllerBase
                         scope.UpdatedBy = userName;
 
                         // Replace claims
-                        if (scope.Claims?.Count > 0) {
+                        if (scope.Claims?.Count > 0)
+                        {
                             _context.ScopeClaims.RemoveRange(scope.Claims);
                         }
 
@@ -439,7 +448,8 @@ public class RealmsController : ControllerBase
                 {
                     foreach (var r in dto.Roles)
                     {
-                        if (string.IsNullOrWhiteSpace(r.Name)) {
+                        if (string.IsNullOrWhiteSpace(r.Name))
+                        {
                             continue;
                         }
 
@@ -448,7 +458,8 @@ public class RealmsController : ControllerBase
                         {
                             role = new IdentityRole(r.Name);
                             var created = await roleManager.CreateAsync(role);
-                            if (!created.Succeeded) {
+                            if (!created.Succeeded)
+                            {
                                 throw new InvalidOperationException($"Failed to create role {r.Name}: {string.Join(", ", created.Errors.Select(e => e.Description))}");
                             }
                         }
@@ -474,7 +485,8 @@ public class RealmsController : ControllerBase
                 {
                     foreach (var u in dto.Users)
                     {
-                        if (string.IsNullOrWhiteSpace(u.UserName)) {
+                        if (string.IsNullOrWhiteSpace(u.UserName))
+                        {
                             continue;
                         }
 
@@ -494,7 +506,8 @@ public class RealmsController : ControllerBase
                             };
 
                             var created = await userManager.CreateAsync(user, string.IsNullOrWhiteSpace(u.TempPassword) ? Guid.NewGuid().ToString("N") + "!aA1" : u.TempPassword);
-                            if (!created.Succeeded) {
+                            if (!created.Succeeded)
+                            {
                                 throw new InvalidOperationException($"Failed to create user {u.UserName}: {string.Join(", ", created.Errors.Select(e => e.Description))}");
                             }
                         }
@@ -509,7 +522,8 @@ public class RealmsController : ControllerBase
                             user.LockoutEnabled = u.LockoutEnabled;
                             user.LockoutEnd = u.LockoutEnd;
                             var update = await userManager.UpdateAsync(user);
-                            if (!update.Succeeded) {
+                            if (!update.Succeeded)
+                            {
                                 throw new InvalidOperationException($"Failed to update user {u.UserName}: {string.Join(", ", update.Errors.Select(e => e.Description))}");
                             }
                         }
@@ -537,7 +551,8 @@ public class RealmsController : ControllerBase
                         if (currentRoles.Count > 0)
                         {
                             var remove = await userManager.RemoveFromRolesAsync(user, currentRoles);
-                            if (!remove.Succeeded) {
+                            if (!remove.Succeeded)
+                            {
                                 throw new InvalidOperationException($"Failed to clear roles for user {u.UserName}: {string.Join(", ", remove.Errors.Select(e => e.Description))}");
                             }
                         }
@@ -552,13 +567,15 @@ public class RealmsController : ControllerBase
                                 {
                                     role = new IdentityRole(rn);
                                     var created = await roleManager.CreateAsync(role);
-                                    if (!created.Succeeded) {
+                                    if (!created.Succeeded)
+                                    {
                                         throw new InvalidOperationException($"Failed to create role {rn}: {string.Join(", ", created.Errors.Select(e => e.Description))}");
                                     }
                                 }
 
                                 var added = await userManager.AddToRoleAsync(user, rn);
-                                if (!added.Succeeded) {
+                                if (!added.Succeeded)
+                                {
                                     throw new InvalidOperationException($"Failed to add role {rn} to user {u.UserName}: {string.Join(", ", added.Errors.Select(e => e.Description))}");
                                 }
                             }
@@ -608,7 +625,8 @@ public class RealmsController : ControllerBase
     [HttpPost]
     public async Task<ActionResult<RealmDto>> CreateRealm([FromBody] CreateRealmRequest request)
     {
-        if (!ModelState.IsValid) {
+        if (!ModelState.IsValid)
+        {
             return ValidationProblem(ModelState);
         }
 
@@ -626,7 +644,8 @@ public class RealmsController : ControllerBase
     [HttpPut("{id}")]
     public async Task<ActionResult<RealmDto>> UpdateRealm(string id, [FromBody] CreateRealmRequest request)
     {
-        var realm = await _context.Realms.FirstOrDefaultAsync(r => r.Id == id); if (realm == null) {
+        var realm = await _context.Realms.FirstOrDefaultAsync(r => r.Id == id); if (realm == null)
+        {
             return NotFound();
         }
 
@@ -641,11 +660,13 @@ public class RealmsController : ControllerBase
     [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteRealm(string id)
     {
-        var realm = await _context.Realms.FirstOrDefaultAsync(r => r.Id == id); if (realm == null) {
+        var realm = await _context.Realms.FirstOrDefaultAsync(r => r.Id == id); if (realm == null)
+        {
             return NotFound();
         }
 
-        if (await _context.Clients.AnyAsync(c => c.RealmId == realm.Id)) {
+        if (await _context.Clients.AnyAsync(c => c.RealmId == realm.Id))
+        {
             return Conflict(new { message = "Cannot delete a realm that has clients." });
         }
 
@@ -659,7 +680,8 @@ public class RealmsController : ControllerBase
     [HttpPost("{id}/toggle")]
     public async Task<ActionResult<RealmDto>> ToggleRealm(string id)
     {
-        var realm = await _context.Realms.FirstOrDefaultAsync(r => r.Id == id); if (realm == null) {
+        var realm = await _context.Realms.FirstOrDefaultAsync(r => r.Id == id); if (realm == null)
+        {
             return NotFound();
         }
 
@@ -674,7 +696,8 @@ public class RealmsController : ControllerBase
     [HttpPut("{id}/defaults")]
     public async Task<ActionResult<RealmDto>> UpdateDefaults(string id, [FromBody] UpdateRealmDefaultsRequest request)
     {
-        var realm = await _context.Realms.FirstOrDefaultAsync(r => r.Id == id); if (realm == null) {
+        var realm = await _context.Realms.FirstOrDefaultAsync(r => r.Id == id); if (realm == null)
+        {
             return NotFound();
         }
 

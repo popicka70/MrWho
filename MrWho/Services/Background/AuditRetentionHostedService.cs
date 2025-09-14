@@ -53,7 +53,8 @@ public sealed class AuditRetentionHostedService : BackgroundService
             .Select(e => e.Id)
             .ToListAsync(ct); // IDs older than the kept set
 
-        if (newestIdsToKeep.Count == 0) {
+        if (newestIdsToKeep.Count == 0)
+        {
             return; // nothing extra beyond floor
         }
 

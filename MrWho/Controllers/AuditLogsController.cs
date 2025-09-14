@@ -32,11 +32,13 @@ public class AuditLogsController : ControllerBase
         [FromQuery] DateTime? fromUtc = null,
         [FromQuery] DateTime? toUtc = null)
     {
-        if (page < 1) {
+        if (page < 1)
+        {
             page = 1;
         }
 
-        if (pageSize < 1 || pageSize > 200) {
+        if (pageSize < 1 || pageSize > 200)
+        {
             pageSize = 25;
         }
 
