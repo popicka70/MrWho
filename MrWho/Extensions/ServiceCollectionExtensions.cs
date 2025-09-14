@@ -26,7 +26,7 @@ using MrWho.Services.Background;
 
 namespace MrWho.Extensions;
 
-public static class ServiceCollectionExtensions
+public static partial class ServiceCollectionExtensions
 {
     private static string GetRemoteIp(HttpContext context) => context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
 
@@ -85,7 +85,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IDeleteUserHandler, DeleteUserHandler>();
 
         // Register authorization, token and userinfo handlers
-        services.AddScoped<IOidcAuthorizationHandler, OidcAuthorizationHandler>();
+        services.AddScoped<IOidcAuthorizationHandler, OidcAuthorizationHandler>
+        ();
         services.AddScoped<ITokenHandler, TokenHandler>();
 
         // Register back-channel logout service
@@ -329,90 +330,34 @@ public static class ServiceCollectionExtensions
         services.AddOpenIddict()
             .AddCore(options =>
             {
-                options.UseEntityFrameworkCore()
-                       .UseDbContext<ApplicationDbContext>();
+                options.UseEntityFrameworkCore().UseDbContext<ApplicationDbContext>();
             })
             .AddServer(options =>
             {
-                // Issuer
-                var issuer = configuration["OpenIddict:Issuer"];
-                if (!string.IsNullOrWhiteSpace(issuer))
-                {
-                    options.SetIssuer(new Uri(issuer, UriKind.Absolute));
-                }
-
-                // Custom UserInfo handler descriptor (uses IUserInfoHandler)
+                var issuer = configuration["OpenIddict:Issuer"]; if (!string.IsNullOrWhiteSpace(issuer)) options.SetIssuer(new Uri(issuer, UriKind.Absolute));
                 options.AddEventHandler(CustomUserInfoHandler.Descriptor);
-
-                // Endpoints (custom PAR implemented in ParController)
-                options
-                    .SetAuthorizationEndpointUris("/connect/authorize")
-                    .SetTokenEndpointUris("/connect/token")
-                    .SetEndSessionEndpointUris("/connect/logout")
-                    .SetUserInfoEndpointUris("/connect/userinfo")
-                    .SetRevocationEndpointUris("/connect/revocation")
-                    .SetIntrospectionEndpointUris("/connect/introspect"); // removed SetPushedAuthorizationEndpointUris - custom controller will implement PAR
-
-                // Flows
-                options.AllowAuthorizationCodeFlow()
-                       .AllowClientCredentialsFlow()
-                       .AllowRefreshTokenFlow();
-
-                // Password grant only for tests
-                var enablePassword = string.Equals(Environment.GetEnvironmentVariable("MRWHO_TESTS"), "1", StringComparison.OrdinalIgnoreCase) ||
-                                     environment.IsEnvironment("Testing");
-                if (enablePassword)
-                {
-                    options.AllowPasswordFlow();
-                }
-
-                // Security/policy
+                options.SetAuthorizationEndpointUris("/connect/authorize")
+                       .SetPushedAuthorizationEndpointUris("/connect/par")
+                       .SetTokenEndpointUris("/connect/token")
+                       .SetEndSessionEndpointUris("/connect/logout")
+                       .SetUserInfoEndpointUris("/connect/userinfo")
+                       .SetRevocationEndpointUris("/connect/revocation")
+                       .SetIntrospectionEndpointUris("/connect/introspect");
+                options.AllowAuthorizationCodeFlow().AllowClientCredentialsFlow().AllowRefreshTokenFlow();
+                var enablePassword = string.Equals(Environment.GetEnvironmentVariable("MRWHO_TESTS"), "1", StringComparison.OrdinalIgnoreCase) || environment.IsEnvironment("Testing");
+                if (enablePassword) options.AllowPasswordFlow();
                 options.RequireProofKeyForCodeExchange();
-
-                // Token lifetimes
-                options.SetAccessTokenLifetime(TimeSpan.FromMinutes(60))
-                       .SetRefreshTokenLifetime(TimeSpan.FromDays(14));
-
-                if (environment.IsDevelopment())
-                {
-                    options.DisableRollingRefreshTokens();
-                }
-
-                // Scopes
-                options.RegisterScopes(
-                    StandardScopes.OpenId,
-                    OpenIddictConstants.Scopes.Email,
-                    OpenIddictConstants.Scopes.Profile,
-                    OpenIddictConstants.Scopes.Roles,
-                    OpenIddictConstants.Scopes.OfflineAccess,
-                    StandardScopes.ApiRead,
-                    StandardScopes.ApiWrite,
-                    StandardScopes.MrWhoUse,
-                    "roles.global",
-                    "roles.client",
-                    "roles.all");
-
-                // JAR/JARM/PAR related: enable authorization request caching so large/signed requests can be handled
-                options.EnableAuthorizationRequestCaching();
-
-                // ASP.NET Core integration
-                options.UseAspNetCore()
-                       .EnableAuthorizationEndpointPassthrough()
-                       .EnableTokenEndpointPassthrough()
-                       .EnableEndSessionEndpointPassthrough();
-
-                // Register JAR/JARM custom handlers
+                options.SetAccessTokenLifetime(TimeSpan.FromMinutes(60)).SetRefreshTokenLifetime(TimeSpan.FromDays(14));
+                if (environment.IsDevelopment()) options.DisableRollingRefreshTokens();
+                options.RegisterScopes(StandardScopes.OpenId, OpenIddictConstants.Scopes.Email, OpenIddictConstants.Scopes.Profile, OpenIddictConstants.Scopes.Roles, OpenIddictConstants.Scopes.OfflineAccess, StandardScopes.ApiRead, StandardScopes.ApiWrite, StandardScopes.MrWhoUse, "roles.global", "roles.client", "roles.all");
+                options.UseAspNetCore().EnableAuthorizationEndpointPassthrough().EnableTokenEndpointPassthrough().EnableEndSessionEndpointPassthrough();
+                // JAR/JARM handlers remain
                 options.AddEventHandler(JarJarmServerEventHandlers.ConfigurationHandlerDescriptor);
                 options.AddEventHandler(JarJarmServerEventHandlers.ExtractNormalizeJarmResponseModeDescriptor);
                 options.AddEventHandler(JarJarmServerEventHandlers.NormalizeJarmResponseModeDescriptor);
                 options.AddEventHandler(JarJarmServerEventHandlers.ApplyAuthorizationResponseDescriptor);
             })
-            .AddValidation(options =>
-            {
-                options.UseLocalServer();
-                options.UseAspNetCore();
-            });
-
+            .AddValidation(options => { options.UseLocalServer(); options.UseAspNetCore(); });
         return services;
     }
 
