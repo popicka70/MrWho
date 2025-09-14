@@ -1,17 +1,18 @@
+@using MrWho.Shared.Constants
 @model MrWho.Shared.Models.RegisterUserRequest
 @{
     ViewData["Title"] = "Create an account";
-    var success = TempData["RegistrationSuccess"] as bool? ?? false;
-    var recaptchaSiteKey = ViewData["RecaptchaSiteKey"] as string; // Provided by controller
-    var logoUri = ViewData["LogoUri"] as string;
-    var clientName = ViewData["ClientName"] as string;
-    var backReturnUrl = ViewData["ReturnUrl"] as string;
-    var backClientId = ViewData["ClientId"] as string;
+    var success = TempData[ViewDataKeys.RegistrationSuccess] as bool? ?? false;
+    var recaptchaSiteKey = ViewData[ViewDataKeys.RecaptchaSiteKey] as string; // Provided by controller
+    var logoUri = ViewData[ViewDataKeys.LogoUri] as string;
+    var clientName = ViewData[ViewDataKeys.ClientName] as string;
+    var backReturnUrl = ViewData[ViewDataKeys.ReturnUrl] as string;
+    var backClientId = ViewData[ViewDataKeys.ClientId] as string;
     var loginHref = "/connect/login";
     {
         var parts = new List<string>();
-        if (!string.IsNullOrEmpty(backReturnUrl)) parts.Add("returnUrl=" + Uri.EscapeDataString(backReturnUrl));
-        if (!string.IsNullOrEmpty(backClientId)) parts.Add("clientId=" + Uri.EscapeDataString(backClientId));
+        if (!string.IsNullOrEmpty(backReturnUrl)) parts.Add($"{QueryParameterNames.ReturnUrl}=" + Uri.EscapeDataString(backReturnUrl));
+        if (!string.IsNullOrEmpty(backClientId)) parts.Add($"{QueryParameterNames.ClientId}=" + Uri.EscapeDataString(backClientId));
         if (parts.Count > 0) loginHref += "?" + string.Join("&", parts);
     }
 }
@@ -44,13 +45,13 @@
                     <form id="registerForm" method="post" action="/connect/register">
                         @Html.AntiForgeryToken()
                         <input type="hidden" id="recaptchaToken" name="recaptchaToken" />
-                        @if (!string.IsNullOrEmpty(ViewData["ReturnUrl"] as string))
+                        @if (!string.IsNullOrEmpty(ViewData[ViewDataKeys.ReturnUrl] as string))
                         {
-                            <input type="hidden" name="returnUrl" value="@ViewData["ReturnUrl"]" />
+                            <input type="hidden" name="@FormFieldNames.ReturnUrl" value="@ViewData[ViewDataKeys.ReturnUrl]" />
                         }
-                        @if (!string.IsNullOrEmpty(ViewData["ClientId"] as string))
+                        @if (!string.IsNullOrEmpty(ViewData[ViewDataKeys.ClientId] as string))
                         {
-                            <input type="hidden" name="clientId" value="@ViewData["ClientId"]" />
+                            <input type="hidden" name="@FormFieldNames.ClientId" value="@ViewData[ViewDataKeys.ClientId]" />
                         }
                         <div class="mb-3">
                             <label class="form-label">Email</label>
@@ -101,7 +102,6 @@
                 const form = document.getElementById('registerForm');
                 if(!form || !window.grecaptcha) return;
                 form.addEventListener('submit', function(e){
-                    // If token already present (e.g., re-submit), let it go
                     const existing = document.getElementById('recaptchaToken').value;
                     if(existing) return;
                     e.preventDefault();

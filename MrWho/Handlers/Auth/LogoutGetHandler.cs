@@ -14,6 +14,7 @@ using MrWho.Data;
 using MrWho.Options;
 using MrWho.Services;
 using MrWho.Services.Mediator;
+using MrWho.Shared.Constants; // added
 using OpenIddict.Abstractions;
 using OpenIddict.Client.AspNetCore;
 using OpenIddict.Server.AspNetCore;
@@ -42,7 +43,6 @@ public sealed class LogoutGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Logo
     public async Task<IActionResult> Handle(MrWho.Endpoints.Auth.LogoutGetRequest request, CancellationToken cancellationToken)
     {
         var http = request.HttpContext;
-        // helper local functions
         static bool HasSession(HttpContext ctx) => ctx.Features.Get<ISessionFeature>()?.Session != null;
         string? SafeSessionGet(HttpContext ctx, string key)
         {
@@ -78,7 +78,6 @@ public sealed class LogoutGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Logo
             return await ProcessLogoutInternalAsync(http, clientId, postUri, cancellationToken);
         }
 
-        // Try session first, then durable claim on principal for direct (non-OIDC) logout
         var externalRegId = SafeSessionGet(http, "ExternalRegistrationId");
         if (string.IsNullOrWhiteSpace(externalRegId))
         {
@@ -109,11 +108,10 @@ public sealed class LogoutGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Logo
             await _logoutHelper.SignOutClientOnlyAsync(http, clientId);
         }
 
-        // Themed LoggedOut page
         var vd = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary())
         {
-            ["ClientId"] = clientId,
-            ["ReturnUrl"] = postUri
+            [ViewDataKeys.ClientId] = clientId,
+            [ViewDataKeys.ReturnUrl] = postUri
         };
         try
         {
@@ -149,30 +147,28 @@ public sealed class LogoutGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Logo
 
             if (!string.IsNullOrWhiteSpace(themeName))
             {
-                vd["ThemeName"] = themeName;
+                vd[ViewDataKeys.ThemeName] = themeName;
             }
 
             if (!string.IsNullOrWhiteSpace(customCssUrl))
             {
-                vd["CustomCssUrl"] = customCssUrl;
+                vd[ViewDataKeys.CustomCssUrl] = customCssUrl;
             }
 
             if (!string.IsNullOrWhiteSpace(logoUri))
             {
-                vd["LogoUri"] = logoUri;
+                vd[ViewDataKeys.LogoUri] = logoUri;
             }
 
             if (!string.IsNullOrWhiteSpace(clientName))
             {
-                vd["ClientName"] = clientName;
+                vd[ViewDataKeys.ClientName] = clientName;
             }
         }
         catch { }
 
-        // after themed LoggedOut page ViewData assembled but before return, enumerate front-channel logout iframes
         try
         {
-            // Only emit if user principal had sid and we have any clients with FrontChannelLogoutUri
             if (!string.IsNullOrEmpty(sid))
             {
                 var iframeUrls = await _db.Clients.AsNoTracking()
@@ -182,7 +178,6 @@ public sealed class LogoutGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Logo
                 var list = new List<string>();
                 foreach (var c in iframeUrls)
                 {
-                    // Build query: iss & sid & client_id
                     try
                     {
                         var sep = c.FrontChannelLogoutUri!.Contains('?') ? '&' : '?';
@@ -228,11 +223,9 @@ public sealed class LogoutGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Logo
         }
         else
         {
-            // IMPORTANT: For OIDC logout, only sign the initiating client out locally to avoid impacting other clients.
             await _logoutHelper.SignOutClientOnlyAsync(http, detectedClientId);
         }
 
-        // Enumerate front-channel logout iframes across all enabled clients having FrontChannelLogoutUri
         try
         {
             if (!string.IsNullOrEmpty(sid))
@@ -258,7 +251,7 @@ public sealed class LogoutGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Logo
                 }
                 if (list.Count > 0)
                 {
-                    http.Items["FrontChannelLogoutIframes"] = list; // downstream page/view can render hidden iframes
+                    http.Items["FrontChannelLogoutIframes"] = list;
                 }
             }
         }
@@ -267,7 +260,6 @@ public sealed class LogoutGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Logo
             _logger.LogDebug(ex, "Error enumerating OIDC front-channel logout iframes");
         }
 
-        // Delegate end-session redirect/sign-out to OpenIddict
         _logoutHelper.DeleteCookieAcrossDomains(http, ".AspNetCore.Identity.Application");
         return new SignOutResult(new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
     }

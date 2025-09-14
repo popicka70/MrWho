@@ -8,6 +8,7 @@ using Microsoft.Extensions.Hosting;
 using MrWho.Data;
 using MrWho.Services;
 using MrWho.Services.Mediator;
+using MrWho.Shared.Constants; // added
 
 namespace MrWho.Handlers.Auth;
 
@@ -56,9 +57,9 @@ public sealed class LoginPostHandler : IRequestHandler<MrWho.Endpoints.Auth.Logi
             if (!recaptchaOk)
             {
                 var vd = NewViewData();
-                vd["ReturnUrl"] = returnUrl;
-                vd["ClientId"] = clientId;
-                vd["RecaptchaSiteKey"] = _loginHelper.GetRecaptchaSiteKey();
+                vd[ViewDataKeys.ReturnUrl] = returnUrl;
+                vd[ViewDataKeys.ClientId] = clientId;
+                vd[ViewDataKeys.RecaptchaSiteKey] = _loginHelper.GetRecaptchaSiteKey();
                 vd.ModelState.AddModelError(string.Empty, "reCAPTCHA verification failed. Please try again.");
                 return new ViewResult { ViewName = "Login", ViewData = viewDataWithModel(vd, model) };
             }
@@ -75,9 +76,9 @@ public sealed class LoginPostHandler : IRequestHandler<MrWho.Endpoints.Auth.Logi
         }
 
         var viewData = NewViewData();
-        viewData["ReturnUrl"] = returnUrl;
-        viewData["ClientId"] = clientId;
-        viewData["RecaptchaSiteKey"] = _loginHelper.GetRecaptchaSiteKey();
+        viewData[ViewDataKeys.ReturnUrl] = returnUrl;
+        viewData[ViewDataKeys.ClientId] = clientId;
+        viewData[ViewDataKeys.RecaptchaSiteKey] = _loginHelper.GetRecaptchaSiteKey();
 
         string? clientName = null;
         if (!string.IsNullOrEmpty(clientId))
@@ -89,7 +90,7 @@ public sealed class LoginPostHandler : IRequestHandler<MrWho.Endpoints.Auth.Logi
             }
             catch { }
         }
-        viewData["ClientName"] = clientName;
+        viewData[ViewDataKeys.ClientName] = clientName;
 
         _logger.LogDebug("Login POST: Email={Email}, ReturnUrl={ReturnUrl}, ClientId={ClientId}", model.Email, returnUrl, clientId);
 
@@ -104,8 +105,8 @@ public sealed class LoginPostHandler : IRequestHandler<MrWho.Endpoints.Auth.Logi
                 vd.ModelState.AddModelError(err.Key, err.Value);
             }
 
-            vd["ReturnUrl"] = returnUrl; vd["ClientId"] = clientId; vd["RecaptchaSiteKey"] = viewData["RecaptchaSiteKey"];
-            vd["ClientName"] = clientName;
+            vd[ViewDataKeys.ReturnUrl] = returnUrl; vd[ViewDataKeys.ClientId] = clientId; vd[ViewDataKeys.RecaptchaSiteKey] = viewData[ViewDataKeys.RecaptchaSiteKey];
+            vd[ViewDataKeys.ClientName] = clientName;
             return new ViewResult { ViewName = "Login", ViewData = viewDataWithModel(vd, model) };
         }
 
@@ -115,7 +116,7 @@ public sealed class LoginPostHandler : IRequestHandler<MrWho.Endpoints.Auth.Logi
             {
                 var vd = NewViewData();
                 vd.ModelState.AddModelError(string.Empty, "Email and code are required.");
-                vd["ReturnUrl"] = returnUrl; vd["ClientId"] = clientId; vd["RecaptchaSiteKey"] = viewData["RecaptchaSiteKey"]; vd["ClientName"] = clientName;
+                vd[ViewDataKeys.ReturnUrl] = returnUrl; vd[ViewDataKeys.ClientId] = clientId; vd[ViewDataKeys.RecaptchaSiteKey] = viewData[ViewDataKeys.RecaptchaSiteKey]; vd[ViewDataKeys.ClientName] = clientName;
                 return new ViewResult { ViewName = "Login", ViewData = viewDataWithModel(vd, model) };
             }
 
@@ -123,14 +124,14 @@ public sealed class LoginPostHandler : IRequestHandler<MrWho.Endpoints.Auth.Logi
             if (user == null)
             {
                 var vd = NewViewData(); vd.ModelState.AddModelError(string.Empty, "Invalid login attempt.");
-                vd["ReturnUrl"] = returnUrl; vd["ClientId"] = clientId; vd["RecaptchaSiteKey"] = viewData["RecaptchaSiteKey"]; vd["ClientName"] = clientName;
+                vd[ViewDataKeys.ReturnUrl] = returnUrl; vd[ViewDataKeys.ClientId] = clientId; vd[ViewDataKeys.RecaptchaSiteKey] = viewData[ViewDataKeys.RecaptchaSiteKey]; vd[ViewDataKeys.ClientName] = clientName;
                 return new ViewResult { ViewName = "Login", ViewData = viewDataWithModel(vd, model) };
             }
 
             if (!await _userManager.GetTwoFactorEnabledAsync(user))
             {
                 var vd = NewViewData(); vd.ModelState.AddModelError(string.Empty, "This account does not allow code-only sign in.");
-                vd["ReturnUrl"] = returnUrl; vd["ClientId"] = clientId; vd["RecaptchaSiteKey"] = viewData["RecaptchaSiteKey"]; vd["ClientName"] = clientName;
+                vd[ViewDataKeys.ReturnUrl] = returnUrl; vd[ViewDataKeys.ClientId] = clientId; vd[ViewDataKeys.RecaptchaSiteKey] = viewData[ViewDataKeys.RecaptchaSiteKey]; vd[ViewDataKeys.ClientName] = clientName;
                 return new ViewResult { ViewName = "Login", ViewData = viewDataWithModel(vd, model) };
             }
 
@@ -139,7 +140,7 @@ public sealed class LoginPostHandler : IRequestHandler<MrWho.Endpoints.Auth.Logi
             if (!isValid)
             {
                 var vd = NewViewData(); vd.ModelState.AddModelError(string.Empty, "Invalid code.");
-                vd["ReturnUrl"] = returnUrl; vd["ClientId"] = clientId; vd["RecaptchaSiteKey"] = viewData["RecaptchaSiteKey"]; vd["ClientName"] = clientName;
+                vd[ViewDataKeys.ReturnUrl] = returnUrl; vd[ViewDataKeys.ClientId] = clientId; vd[ViewDataKeys.RecaptchaSiteKey] = viewData[ViewDataKeys.RecaptchaSiteKey]; vd[ViewDataKeys.ClientName] = clientName;
                 return new ViewResult { ViewName = "Login", ViewData = viewDataWithModel(vd, model) };
             }
 
@@ -202,7 +203,7 @@ public sealed class LoginPostHandler : IRequestHandler<MrWho.Endpoints.Auth.Logi
             if (user == null)
             {
                 var vd = NewViewData(); vd.ModelState.AddModelError(string.Empty, "Authentication error occurred.");
-                vd["ReturnUrl"] = returnUrl; vd["ClientId"] = clientId; vd["RecaptchaSiteKey"] = viewData["RecaptchaSiteKey"]; vd["ClientName"] = clientName;
+                vd[ViewDataKeys.ReturnUrl] = returnUrl; vd[ViewDataKeys.ClientId] = clientId; vd[ViewDataKeys.RecaptchaSiteKey] = viewData[ViewDataKeys.RecaptchaSiteKey]; vd[ViewDataKeys.ClientName] = clientName;
                 return new ViewResult { ViewName = "Login", ViewData = viewDataWithModel(vd, model) };
             }
 
@@ -251,7 +252,7 @@ public sealed class LoginPostHandler : IRequestHandler<MrWho.Endpoints.Auth.Logi
         else
         {
             var vd = NewViewData(); vd.ModelState.AddModelError(string.Empty, "Invalid login attempt.");
-            vd["ReturnUrl"] = returnUrl; vd["ClientId"] = clientId; vd["RecaptchaSiteKey"] = viewData["RecaptchaSiteKey"]; vd["ClientName"] = clientName;
+            vd[ViewDataKeys.ReturnUrl] = returnUrl; vd[ViewDataKeys.ClientId] = clientId; vd[ViewDataKeys.RecaptchaSiteKey] = viewData[ViewDataKeys.RecaptchaSiteKey]; vd[ViewDataKeys.ClientName] = clientName;
             return new ViewResult { ViewName = "Login", ViewData = viewDataWithModel(vd, model) };
         }
     }

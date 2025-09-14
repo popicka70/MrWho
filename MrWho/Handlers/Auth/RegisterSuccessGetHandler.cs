@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using MrWho.Data;
 using MrWho.Options;
 using MrWho.Services.Mediator;
+using MrWho.Shared.Constants; // added
 
 namespace MrWho.Handlers.Auth;
 
@@ -21,16 +22,15 @@ public sealed class RegisterSuccessGetHandler : IRequestHandler<MrWho.Endpoints.
     public async Task<IActionResult> Handle(MrWho.Endpoints.Auth.RegisterSuccessGetRequest request, CancellationToken cancellationToken)
     {
         var http = request.HttpContext;
-        var returnUrl = http.Request.Query["returnUrl"].ToString();
-        var clientId = http.Request.Query["clientId"].ToString();
+        var returnUrl = http.Request.Query[QueryParameterNames.ReturnUrl].ToString();
+        var clientId = http.Request.Query[QueryParameterNames.ClientId].ToString();
 
         var vd = new Microsoft.AspNetCore.Mvc.ViewFeatures.ViewDataDictionary(new Microsoft.AspNetCore.Mvc.ModelBinding.EmptyModelMetadataProvider(), new Microsoft.AspNetCore.Mvc.ModelBinding.ModelStateDictionary())
         {
-            ["ReturnUrl"] = returnUrl,
-            ["ClientId"] = clientId
+            [ViewDataKeys.ReturnUrl] = returnUrl,
+            [ViewDataKeys.ClientId] = clientId
         };
 
-        // Compute theme with client/realm precedence
         try
         {
             string? themeName = null;
@@ -69,22 +69,22 @@ public sealed class RegisterSuccessGetHandler : IRequestHandler<MrWho.Endpoints.
 
             if (!string.IsNullOrWhiteSpace(themeName))
             {
-                vd["ThemeName"] = themeName;
+                vd[ViewDataKeys.ThemeName] = themeName;
             }
 
             if (!string.IsNullOrWhiteSpace(customCssUrl))
             {
-                vd["CustomCssUrl"] = customCssUrl;
+                vd[ViewDataKeys.CustomCssUrl] = customCssUrl;
             }
 
             if (!string.IsNullOrWhiteSpace(logoUri))
             {
-                vd["LogoUri"] = logoUri;
+                vd[ViewDataKeys.LogoUri] = logoUri;
             }
 
             if (!string.IsNullOrWhiteSpace(clientName))
             {
-                vd["ClientName"] = clientName;
+                vd[ViewDataKeys.ClientName] = clientName;
             }
         }
         catch { }

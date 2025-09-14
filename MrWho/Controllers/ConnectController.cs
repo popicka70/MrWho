@@ -10,6 +10,7 @@ using MrWho.Models; // added for PushedAuthorizationRequest
 using MrWho.Services; // added for ISecurityAuditWriter & SecurityAudit
 using MrWho.Services.Mediator;
 using MrWho.Shared; // added for PushedAuthorizationMode
+using MrWho.Shared.Constants; // added
 using OpenIddict.Abstractions; // added for OpenIddictConstants
 using OpenIddict.Client;
 using OpenIddict.Client.AspNetCore;
@@ -53,12 +54,12 @@ public class ConnectController : Controller
         var props = new AuthenticationProperties { RedirectUri = "/connect/external/callback" };
         if (!string.IsNullOrWhiteSpace(returnUrl))
         {
-            props.Items["returnUrl"] = returnUrl;
+            props.Items[ViewDataKeys.ReturnUrl] = returnUrl; // reuse constant (stored temporarily in auth properties)
         }
 
         if (!string.IsNullOrWhiteSpace(clientId))
         {
-            props.Items["clientId"] = clientId;
+            props.Items[ViewDataKeys.ClientId] = clientId;
         }
 
         props.Items["extRegistrationId"] = registration.RegistrationId;
@@ -70,8 +71,8 @@ public class ConnectController : Controller
         props.Items[OpenIddictClientAspNetCoreConstants.Properties.RegistrationId] = registration.RegistrationId;
         if (!string.IsNullOrEmpty(force) && (force == "1" || force.Equals("true", StringComparison.OrdinalIgnoreCase)))
         {
-            props.Parameters["prompt"] = "login";
-            props.Parameters["max_age"] = 0;
+            props.Parameters[QueryParameterNames.Prompt] = "login";
+            props.Parameters[QueryParameterNames.MaxAge] = 0;
         }
         return Challenge(props, OpenIddictClientAspNetCoreDefaults.AuthenticationScheme);
     }

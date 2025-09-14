@@ -1,18 +1,18 @@
+@using MrWho.Shared.Constants
 @{
     ViewData["Title"] = "Access Denied";
-    var clientId = ViewData["ClientId"] as string;
-    var clientName = ViewData["ClientName"] as string;
-    var returnUrl = ViewData["ReturnUrl"] as string;
-    var logoUri = ViewData["LogoUri"] as string; // themed logo like login
-    // Build a route value dictionary preserving existing query params
+    var clientId = ViewData[ViewDataKeys.ClientId] as string;
+    var clientName = ViewData[ViewDataKeys.ClientName] as string;
+    var returnUrl = ViewData[ViewDataKeys.ReturnUrl] as string;
+    var logoUri = ViewData[ViewDataKeys.LogoUri] as string; // themed logo like login
     var routeParams = new System.Collections.Generic.Dictionary<string, string?>(System.StringComparer.OrdinalIgnoreCase);
     if (!string.IsNullOrEmpty(returnUrl))
     {
-        routeParams["returnUrl"] = returnUrl;
+        routeParams[QueryParameterNames.ReturnUrl] = returnUrl;
     }
     if (!string.IsNullOrEmpty(clientId))
     {
-        routeParams["clientId"] = clientId;
+        routeParams[QueryParameterNames.ClientId] = clientId;
     }
     var query = Context?.Request?.Query;
     if (query != null)
@@ -21,10 +21,9 @@
         {
             var key = kvp.Key;
             if (string.IsNullOrEmpty(key)) { continue; }
-            if (string.Equals(key, "returnUrl", System.StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(key, "clientId", System.StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(key, QueryParameterNames.ReturnUrl, System.StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(key, QueryParameterNames.ClientId, System.StringComparison.OrdinalIgnoreCase))
             {
-                // Already handled explicitly above
                 continue;
             }
             var value = kvp.Value.ToString();
@@ -111,4 +110,4 @@
     .text-break {
         word-break: break-all;
     }
-</style>
+</style></style>

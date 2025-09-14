@@ -10,6 +10,7 @@ using MrWho.Data;
 using MrWho.Options;
 using MrWho.Services;
 using MrWho.Services.Mediator;
+using MrWho.Shared.Constants; // added
 using OpenIddict.Abstractions;
 
 namespace MrWho.Handlers.Auth;
@@ -62,9 +63,9 @@ public sealed class LoginGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Login
         }
 
         var viewData = NewViewData();
-        viewData["ReturnUrl"] = returnUrl;
-        viewData["ClientId"] = clientId;
-        viewData["RecaptchaSiteKey"] = _loginHelper.GetRecaptchaSiteKey();
+        viewData[ViewDataKeys.ReturnUrl] = returnUrl;
+        viewData[ViewDataKeys.ClientId] = clientId;
+        viewData[ViewDataKeys.RecaptchaSiteKey] = _loginHelper.GetRecaptchaSiteKey();
 
         string? clientName = null;
         bool allowLocal = true, allowPasskey = true, allowQrQuick = true, allowQrSecure = true, allowCode = true;
@@ -87,7 +88,7 @@ public sealed class LoginGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Login
                 _logger.LogWarning(ex, "Failed to retrieve client information for clientId: {ClientId}", clientId);
             }
         }
-        viewData["ClientName"] = clientName;
+        viewData[ViewDataKeys.ClientName] = clientName;
 
         try
         {
@@ -106,11 +107,11 @@ public sealed class LoginGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Login
                 allowQrSecure = client.AllowQrLoginSecure ?? true;
                 allowCode = client.AllowCodeLogin ?? true;
             }
-            viewData["AllowLocalLogin"] = allowLocal;
-            viewData["AllowPasskeyLogin"] = allowPasskey;
-            viewData["AllowQrLoginQuick"] = allowQrQuick;
-            viewData["AllowQrLoginSecure"] = allowQrSecure;
-            viewData["AllowCodeLogin"] = allowCode;
+            viewData[ViewDataKeys.AllowLocalLogin] = allowLocal;
+            viewData[ViewDataKeys.AllowPasskeyLogin] = allowPasskey;
+            viewData[ViewDataKeys.AllowQrLoginQuick] = allowQrQuick;
+            viewData[ViewDataKeys.AllowQrLoginSecure] = allowQrSecure;
+            viewData[ViewDataKeys.AllowCodeLogin] = allowCode;
 
             // Compute theme and custom CSS with precedence: client > realm > server
             string? themeName = null;
@@ -126,11 +127,11 @@ public sealed class LoginGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Login
             }
             if (!string.IsNullOrWhiteSpace(themeName))
             {
-                viewData["ThemeName"] = themeName;
+                viewData[ViewDataKeys.ThemeName] = themeName;
             }
             if (!string.IsNullOrWhiteSpace(customCssUrl))
             {
-                viewData["CustomCssUrl"] = customCssUrl;
+                viewData[ViewDataKeys.CustomCssUrl] = customCssUrl;
             }
 
             // Compute logo URI if available (client-level preferred, realm-level fallback)
@@ -158,7 +159,7 @@ public sealed class LoginGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Login
                     _logger.LogDebug(ex, "Failed to compute client/realm logo for client {ClientId}", clientId);
                 }
 
-                viewData["LogoUri"] = logoUri; // may be null -> view will fallback to default logo
+                viewData[ViewDataKeys.LogoUri] = logoUri; // may be null -> view will fallback to default logo
 
                 // External providers filtered by client assignment
                 var query = _db.IdentityProviders.Include(p => p.ClientLinks)
@@ -176,20 +177,20 @@ public sealed class LoginGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Login
                 {
                     providers = providers.Where(p => p.ClientLinks.Any(cl => cl.ClientId == client?.Id)).ToList();
                 }
-                viewData["ExternalProviders"] = providers;
+                viewData[ViewDataKeys.ExternalProviders] = providers;
             }
             else
             {
                 _logger.LogWarning("No client found for clientId: {ClientId}", clientId);
-                viewData["ExternalProviders"] = Array.Empty<object>();
-                viewData["LogoUri"] = null; // ensure not set
+                viewData[ViewDataKeys.ExternalProviders] = Array.Empty<object>();
+                viewData[ViewDataKeys.LogoUri] = null; // ensure not set
             }
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to load external identity providers for login page");
-            viewData["ExternalProviders"] = Array.Empty<object>();
-            viewData["LogoUri"] = null;
+            viewData[ViewDataKeys.ExternalProviders] = Array.Empty<object>();
+            viewData[ViewDataKeys.LogoUri] = null;
         }
 
         var useCode = string.Equals(mode, "code", StringComparison.OrdinalIgnoreCase);

@@ -1,31 +1,32 @@
+@using MrWho.Shared.Constants
 @{
     ViewData["Title"] = "Logged Out";
     Layout = "_Layout";
-    var clientName = ViewData["ClientName"] as string;
-    var returnUrl = ViewData["ReturnUrl"] as string;
-    var error = ViewData["LogoutError"] as string;
+    var clientName = ViewData[ViewDataKeys.ClientName] as string;
+    var returnUrl = ViewData[ViewDataKeys.ReturnUrl] as string;
+    var error = ViewData["LogoutError"] as string; // keep existing key until constant defined if needed
 
     // Build a Sign In Again link that preserves context
     var effectiveReturnUrl = returnUrl;
     if (string.IsNullOrEmpty(effectiveReturnUrl))
     {
         // Fallback to query string if not provided via ViewData
-        var qsReturn = Context.Request.Query["returnUrl"].ToString();
+        var qsReturn = Context.Request.Query[QueryParameterNames.ReturnUrl].ToString();
         if (!string.IsNullOrEmpty(qsReturn)) effectiveReturnUrl = qsReturn;
     }
 
-    var effectiveClientId = (ViewData["ClientId"] as string) ?? Context.Request.Query["clientId"].ToString();
+    var effectiveClientId = (ViewData[ViewDataKeys.ClientId] as string) ?? Context.Request.Query[QueryParameterNames.ClientId].ToString();
     if (string.IsNullOrEmpty(effectiveClientId))
     {
         // Also try OIDC-style parameter name
-        var oidcClient = Context.Request.Query["client_id"].ToString();
+        var oidcClient = Context.Request.Query[QueryParameterNames.OidcClientId].ToString();
         if (!string.IsNullOrEmpty(oidcClient)) effectiveClientId = oidcClient;
     }
 
     var signInAgainHref = "/connect/login";
     var queryParts = new List<string>();
-    if (!string.IsNullOrEmpty(effectiveReturnUrl)) queryParts.Add("returnUrl=" + Uri.EscapeDataString(effectiveReturnUrl));
-    if (!string.IsNullOrEmpty(effectiveClientId)) queryParts.Add("clientId=" + Uri.EscapeDataString(effectiveClientId));
+    if (!string.IsNullOrEmpty(effectiveReturnUrl)) queryParts.Add($"{QueryParameterNames.ReturnUrl}=" + Uri.EscapeDataString(effectiveReturnUrl));
+    if (!string.IsNullOrEmpty(effectiveClientId)) queryParts.Add($"{QueryParameterNames.ClientId}=" + Uri.EscapeDataString(effectiveClientId));
     if (queryParts.Count > 0) signInAgainHref += "?" + string.Join("&", queryParts);
 
     var frontChannelClients = Context.Items["FrontChannelLogoutIframes"] as List<string> ?? new List<string>();

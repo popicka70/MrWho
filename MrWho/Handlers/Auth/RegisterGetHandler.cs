@@ -8,6 +8,7 @@ using Microsoft.Extensions.Options;
 using MrWho.Data;
 using MrWho.Options;
 using MrWho.Services.Mediator;
+using MrWho.Shared.Constants; // added
 using MrWho.Shared.Models;
 
 namespace MrWho.Handlers.Auth;
@@ -32,8 +33,8 @@ public sealed class RegisterGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Re
         var http = request.HttpContext;
 
         // Capture context so the form can POST it back
-        var returnUrl = http.Request.Query["returnUrl"].ToString();
-        var clientId = http.Request.Query["clientId"].ToString();
+        var returnUrl = http.Request.Query[QueryParameterNames.ReturnUrl].ToString();
+        var clientId = http.Request.Query[QueryParameterNames.ClientId].ToString();
         if (string.IsNullOrEmpty(clientId) && !string.IsNullOrEmpty(returnUrl))
         {
             clientId = TryExtractClientIdFromReturnUrl(returnUrl) ?? clientId;
@@ -41,9 +42,9 @@ public sealed class RegisterGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Re
 
         var vd = new ViewDataDictionary(new EmptyModelMetadataProvider(), new ModelStateDictionary())
         {
-            ["RecaptchaSiteKey"] = ShouldUseRecaptcha() ? _configuration["GoogleReCaptcha:SiteKey"] : null,
-            ["ReturnUrl"] = returnUrl,
-            ["ClientId"] = clientId
+            [ViewDataKeys.RecaptchaSiteKey] = ShouldUseRecaptcha() ? _configuration["GoogleReCaptcha:SiteKey"] : null,
+            [ViewDataKeys.ReturnUrl] = returnUrl,
+            [ViewDataKeys.ClientId] = clientId
         };
 
         // Compute theme and logo similar to Login
@@ -93,22 +94,22 @@ public sealed class RegisterGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Re
 
             if (!string.IsNullOrWhiteSpace(themeName))
             {
-                vd["ThemeName"] = themeName;
+                vd[ViewDataKeys.ThemeName] = themeName;
             }
 
             if (!string.IsNullOrWhiteSpace(customCssUrl))
             {
-                vd["CustomCssUrl"] = customCssUrl;
+                vd[ViewDataKeys.CustomCssUrl] = customCssUrl;
             }
 
             if (!string.IsNullOrWhiteSpace(logoUri))
             {
-                vd["LogoUri"] = logoUri;
+                vd[ViewDataKeys.LogoUri] = logoUri;
             }
 
             if (!string.IsNullOrWhiteSpace(clientName))
             {
-                vd["ClientName"] = clientName;
+                vd[ViewDataKeys.ClientName] = clientName;
             }
         }
         catch { /* ignore theme errors */ }
@@ -146,7 +147,7 @@ public sealed class RegisterGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Re
             if (Uri.TryCreate(returnUrl, UriKind.Absolute, out var absUri))
             {
                 var query = System.Web.HttpUtility.ParseQueryString(absUri.Query);
-                return query["client_id"];
+                return query[QueryParameterNames.OidcClientId];
             }
             else
             {
@@ -154,7 +155,7 @@ public sealed class RegisterGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Re
                 if (idx >= 0 && idx < returnUrl.Length - 1)
                 {
                     var query = System.Web.HttpUtility.ParseQueryString(returnUrl.Substring(idx));
-                    return query["client_id"];
+                    return query[QueryParameterNames.OidcClientId];
                 }
             }
         }

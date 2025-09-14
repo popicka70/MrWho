@@ -13,6 +13,7 @@ using Microsoft.EntityFrameworkCore;
 using MrWho.Data;
 using MrWho.Models;
 using MrWho.Services;
+using MrWho.Shared.Constants; // added
 
 namespace MrWho.Controllers;
 
@@ -65,12 +66,8 @@ public class WebAuthnController : Controller
         var fromConfig = config.GetSection("WebAuthn:Origins").Get<string[]>() ?? Array.Empty<string>();
         foreach (var o in fromConfig)
         {
-            if (!string.IsNullOrWhiteSpace(o))
-            {
-                origins.Add(o);
-            }
+            if (!string.IsNullOrWhiteSpace(o)) origins.Add(o);
         }
-        // sensible dev defaults
         origins.Add("https://localhost:7113");
         origins.Add("http://localhost:7113");
         return origins;
@@ -81,8 +78,8 @@ public class WebAuthnController : Controller
     [AllowAnonymous]
     public IActionResult Login([FromQuery] string? returnUrl = null, [FromQuery] string? clientId = null)
     {
-        ViewData["ReturnUrl"] = returnUrl;
-        ViewData["ClientId"] = clientId;
+        ViewData[ViewDataKeys.ReturnUrl] = returnUrl;
+        ViewData[ViewDataKeys.ClientId] = clientId;
         return View("Login");
     }
 
@@ -92,13 +89,9 @@ public class WebAuthnController : Controller
     public async Task<IActionResult> GetRegisterOptions([FromQuery] string? nickname = null)
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user == null)
-        {
-            return Unauthorized();
-        }
+        if (user == null) return Unauthorized();
 
         var userId = Encoding.UTF8.GetBytes(user.Id);
-
         // Exclude already-registered credentials
         var creds = await _db.WebAuthnCredentials.Where(c => c.UserId == user.Id).ToListAsync();
         var exclude = creds.Select(c => new PublicKeyCredentialDescriptor(WebEncoders.Base64UrlDecode(c.CredentialId))).ToList();
@@ -120,11 +113,7 @@ public class WebAuthnController : Controller
         CredentialCreateOptions options;
         dynamic f = _fido2;
         try { options = f.RequestNewCredential(fidoUser, exclude, authSel, AttestationConveyancePreference.None, null); }
-        catch
-        {
-            try { options = f.RequestNewCredential(fidoUser, exclude, authSel, AttestationConveyancePreference.None); }
-            catch { options = f.RequestNewCredential(fidoUser, exclude); }
-        }
+        catch { try { options = f.RequestNewCredential(fidoUser, exclude, authSel, AttestationConveyancePreference.None); } catch { options = f.RequestNewCredential(fidoUser, exclude); } }
 
         _attestationOptions[user.Id] = options;
         return Json(options);
@@ -136,15 +125,9 @@ public class WebAuthnController : Controller
     public async Task<IActionResult> PostRegisterVerify([FromBody] AuthenticatorAttestationRawResponse attestationResponse)
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user == null)
-        {
-            return Unauthorized();
-        }
+        if (user == null) return Unauthorized();
 
-        if (!_attestationOptions.TryGetValue(user.Id, out var options))
-        {
-            return BadRequest("No options for user");
-        }
+        if (!_attestationOptions.TryGetValue(user.Id, out var options)) return BadRequest("No options for user");
 
         dynamic res;
         var f = (dynamic)_fido2;
@@ -181,11 +164,7 @@ public class WebAuthnController : Controller
             var resResult = res?.Result;
             if (resResult != null)
             {
-                try
-                {
-                    aaGuid = (resResult.Aaguid is Guid g) ? g.ToString() : resResult.Aaguid?.ToString();
-                }
-                catch { }
+                try { aaGuid = (resResult.Aaguid is Guid g) ? g.ToString() : resResult.Aaguid?.ToString(); } catch { }
                 try { fmt = resResult.Fmt?.ToString(); } catch { }
             }
         }
@@ -209,7 +188,6 @@ public class WebAuthnController : Controller
         }
         _db.WebAuthnCredentials.Add(cred);
         await _db.SaveChangesAsync();
-
         _attestationOptions.Remove(user.Id);
         return Json(new { ok = true });
     }
@@ -220,7 +198,7 @@ public class WebAuthnController : Controller
     public async Task<IActionResult> GetLoginOptions([FromQuery] string? email = null)
     {
         // If email provided and user has non-discoverable credentials, set allowCredentials; otherwise allow discoverable
-        List<PublicKeyCredentialDescriptor> allowCredentials = new List<PublicKeyCredentialDescriptor>();
+        List<PublicKeyCredentialDescriptor> allowCredentials = new();
         if (!string.IsNullOrEmpty(email))
         {
             var user = await _userManager.FindByNameAsync(email) ?? await _userManager.FindByEmailAsync(email);
@@ -246,20 +224,14 @@ public class WebAuthnController : Controller
     public async Task<IActionResult> PostLoginVerify([FromBody] AuthenticatorAssertionRawResponse clientResponse, [FromQuery] string? returnUrl = null, [FromQuery] string? clientId = null)
     {
         var key = HttpContext.Session.Id;
-        if (!_assertionOptions.TryGetValue(key, out var options))
-        {
-            return BadRequest("No assertion options in session");
-        }
+        if (!_assertionOptions.TryGetValue(key, out var options)) return BadRequest("No assertion options in session");
 
         async Task<dynamic> VerifyAsync()
         {
             // 1) Find the credential by id
             var credentialId = clientResponse.Id;
             var cred = await _db.WebAuthnCredentials.FirstOrDefaultAsync(c => c.CredentialId == credentialId);
-            if (cred == null)
-            {
-                throw new InvalidOperationException("Unknown credential");
-            }
+            if (cred == null) throw new InvalidOperationException("Unknown credential");
 
             // 2) Get stored public key and counter
             var storedPublicKey = WebEncoders.Base64UrlDecode(cred.PublicKey);
@@ -291,10 +263,7 @@ public class WebAuthnController : Controller
             var credId = clientResponse.Id;
             var cred = await _db.WebAuthnCredentials.FirstAsync(c => c.CredentialId == credId);
             var user = await _userManager.FindByIdAsync(cred.UserId);
-            if (user == null)
-            {
-                return Unauthorized();
-            }
+            if (user == null) return Unauthorized();
 
             // Eligibility validation BEFORE sign-in or client cookie
             if (!string.IsNullOrEmpty(clientId))
@@ -320,7 +289,6 @@ public class WebAuthnController : Controller
             // Passwordless sign-in with amr=fido2
             await HttpContext.SignOutAsync(IdentityConstants.TwoFactorUserIdScheme); // ensure clean
             await HttpContext.SignOutAsync(IdentityConstants.ApplicationScheme);
-
             await _userManager.UpdateSecurityStampAsync(user);
             await HttpContext.SignInAsync(IdentityConstants.ApplicationScheme, await BuildPrincipalAsync(user, "fido2"));
 
@@ -385,7 +353,6 @@ public class WebAuthnController : Controller
             new Claim(ClaimTypes.Name, user.UserName ?? user.Email ?? user.Id),
             new Claim("amr", authenticationMethod)
         };
-
         var identity = new ClaimsIdentity(claims, IdentityConstants.ApplicationScheme);
         var principal = new ClaimsPrincipal(identity);
         await Task.CompletedTask;
@@ -398,8 +365,8 @@ public class WebAuthnController : Controller
         var cid = !string.IsNullOrEmpty(clientId) ? Uri.EscapeDataString(clientId) : string.Empty;
         var url = "/connect/access-denied";
         var hasQuery = false;
-        if (!string.IsNullOrEmpty(ret)) { url += $"?returnUrl={ret}"; hasQuery = true; }
-        if (!string.IsNullOrEmpty(cid)) { url += hasQuery ? $"&clientId={cid}" : $"?clientId={cid}"; }
+        if (!string.IsNullOrEmpty(ret)) { url += $"?{QueryParameterNames.ReturnUrl}={ret}"; hasQuery = true; }
+        if (!string.IsNullOrEmpty(cid)) { url += hasQuery ? $"&{QueryParameterNames.ClientId}={cid}" : $"?{QueryParameterNames.ClientId}={cid}"; }
         return url;
     }
 }
