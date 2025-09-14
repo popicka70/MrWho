@@ -15,6 +15,8 @@ public sealed class AuthorizationRequest
     public string? CodeChallengeMethod { get; set; } = "S256";
     public string? RequestObjectJwt { get; set; } // optional JAR value ("request" param)
     public string? Nonce { get; set; } // NEW
+    public string? ClientSecret { get; set; } // NEW: for confidential clients
+    public bool UseBasicAuth { get; set; } = true; // NEW: prefer client_secret_basic by default when secret provided
     public Dictionary<string,string> Extra { get; } = new(StringComparer.OrdinalIgnoreCase);
     // Helper to copy from JAR model
     public static AuthorizationRequest FromJar(Jar.JarRequest jar)

@@ -1,9 +1,10 @@
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using MrWho.Models;
-using Microsoft.AspNetCore.Http;
+using OpenIddict.EntityFrameworkCore.Models;
 using System.Text.Json;
 
 namespace MrWho.Data;
