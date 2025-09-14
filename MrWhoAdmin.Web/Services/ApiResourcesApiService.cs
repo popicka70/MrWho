@@ -39,8 +39,9 @@ public class ApiResourcesApiService : IApiResourcesApiService
                 $"pageSize={pageSize}"
             };
 
-            if (!string.IsNullOrWhiteSpace(search))
+            if (!string.IsNullOrWhiteSpace(search)) {
                 queryParams.Add($"search={Uri.EscapeDataString(search)}");
+            }
 
             var queryString = string.Join("&", queryParams);
             var response = await _httpClient.GetAsync($"api/apiresources?{queryString}");

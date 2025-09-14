@@ -142,9 +142,18 @@ public class ExternalAuthController : ControllerBase
             var given = principal.FindFirst("given_name")?.Value;
             var family = principal.FindFirst("family_name")?.Value;
             var claims = new List<Claim>();
-            if (!string.IsNullOrWhiteSpace(name)) claims.Add(new Claim("name", name));
-            if (!string.IsNullOrWhiteSpace(given)) claims.Add(new Claim("given_name", given));
-            if (!string.IsNullOrWhiteSpace(family)) claims.Add(new Claim("family_name", family));
+            if (!string.IsNullOrWhiteSpace(name)) {
+                claims.Add(new Claim("name", name));
+            }
+
+            if (!string.IsNullOrWhiteSpace(given)) {
+                claims.Add(new Claim("given_name", given));
+            }
+
+            if (!string.IsNullOrWhiteSpace(family)) {
+                claims.Add(new Claim("family_name", family));
+            }
+
             if (claims.Count > 0)
             {
                 await _userManager.AddClaimsAsync(user, claims);
@@ -326,9 +335,17 @@ public class ExternalAuthController : ControllerBase
 
         // Build additional per-session claims to remember external provider for cascade sign-out
         var sessionClaims = new List<Claim>();
-        if (!string.IsNullOrWhiteSpace(regId)) sessionClaims.Add(new Claim("ext_reg_id", regId));
-        if (!string.IsNullOrWhiteSpace(providerName)) sessionClaims.Add(new Claim("ext_provider", providerName));
-        if (!string.IsNullOrWhiteSpace(subject)) sessionClaims.Add(new Claim("ext_sub", subject));
+        if (!string.IsNullOrWhiteSpace(regId)) {
+            sessionClaims.Add(new Claim("ext_reg_id", regId));
+        }
+
+        if (!string.IsNullOrWhiteSpace(providerName)) {
+            sessionClaims.Add(new Claim("ext_provider", providerName));
+        }
+
+        if (!string.IsNullOrWhiteSpace(subject)) {
+            sessionClaims.Add(new Claim("ext_sub", subject));
+        }
 
         await _signInManager.SignInWithClaimsAsync(user, isPersistent: false, sessionClaims);
 
@@ -400,9 +417,15 @@ public class ExternalAuthController : ControllerBase
 
     private static string BuildDisplayNameFromEmailOrUserName(string? input)
     {
-        if (string.IsNullOrWhiteSpace(input)) return "New User";
+        if (string.IsNullOrWhiteSpace(input)) {
+            return "New User";
+        }
+
         var source = input;
-        if (source.Contains('@')) source = source.Split('@')[0];
+        if (source.Contains('@')) {
+            source = source.Split('@')[0];
+        }
+
         var friendly = source.Replace('.', ' ').Replace('_', ' ').Replace('-', ' ');
         var words = friendly.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         return string.Join(' ', words.Select(w => char.ToUpper(w[0]) + w.Substring(1).ToLower()));

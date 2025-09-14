@@ -91,7 +91,9 @@ public sealed class ExternalIdpClientOptionsConfigurator : IConfigureOptions<Ope
         try
         {
             // Ensure we can connect
-            if (!db.Database.CanConnect()) return false;
+            if (!db.Database.CanConnect()) {
+                return false;
+            }
 
             // Use the context-managed connection but don't dispose it here
             var connection = db.Database.GetDbConnection();
@@ -127,7 +129,10 @@ public sealed class ExternalIdpClientOptionsConfigurator : IConfigureOptions<Ope
 
     private static IEnumerable<string> ParseScopes(string? raw)
     {
-        if (string.IsNullOrWhiteSpace(raw)) yield break;
+        if (string.IsNullOrWhiteSpace(raw)) {
+            yield break;
+        }
+
         raw = raw.Trim();
         if (raw.StartsWith("["))
         {
@@ -142,7 +147,9 @@ public sealed class ExternalIdpClientOptionsConfigurator : IConfigureOptions<Ope
                 foreach (var s in arr)
                 {
                     var v = s?.Trim();
-                    if (!string.IsNullOrWhiteSpace(v)) yield return v;
+                    if (!string.IsNullOrWhiteSpace(v)) {
+                        yield return v;
+                    }
                 }
                 yield break;
             }

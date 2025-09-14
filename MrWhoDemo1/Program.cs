@@ -277,8 +277,9 @@ app.MapGet("/call-mrwho-realms", async () =>
         accessToken = doc.RootElement.GetProperty("access_token").GetString();
     }
     catch { }
-    if (string.IsNullOrEmpty(accessToken))
+    if (string.IsNullOrEmpty(accessToken)) {
         return Results.Json(new { stage = "token-parse", ok = false, body = tokenJson });
+    }
 
     // Call protected realms endpoint on identity server API
     var apiClient = new HttpClient { BaseAddress = new Uri("https://localhost:7113/") };

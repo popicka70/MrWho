@@ -78,7 +78,11 @@ public class ClientCredentialsAndIntrospectionTests
 
         bool TryBool(string name, out bool value)
         {
-            value = false; if (!doc.RootElement.TryGetProperty(name, out var prop)) return false; value = prop.GetBoolean(); return true;
+            value = false; if (!doc.RootElement.TryGetProperty(name, out var prop)) {
+                return false;
+            }
+
+            value = prop.GetBoolean(); return true;
         }
 
         Assert.IsTrue(TryBool("allowAccessToIntrospectionEndpoint", out var introspectFlag));

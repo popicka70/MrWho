@@ -59,10 +59,14 @@ public static class MrWhoClientAuthBuilderExtensions
             oidc.CallbackPath = options.CallbackPath;
             oidc.SignedOutCallbackPath = options.SignedOutCallbackPath;
             oidc.RemoteSignOutPath = options.RemoteSignOutPath;
-            if (!string.IsNullOrWhiteSpace(options.SignedOutRedirectUri)) oidc.SignedOutRedirectUri = options.SignedOutRedirectUri;
+            if (!string.IsNullOrWhiteSpace(options.SignedOutRedirectUri)) {
+                oidc.SignedOutRedirectUri = options.SignedOutRedirectUri;
+            }
 
             oidc.TokenValidationParameters = new TokenValidationParameters { NameClaimType = "name", RoleClaimType = "role" };
-            oidc.Scope.Clear(); foreach (var s in options.Scopes) oidc.Scope.Add(s);
+            oidc.Scope.Clear(); foreach (var s in options.Scopes) {
+                oidc.Scope.Add(s);
+            }
 
             var metadata = options.ResolveMetadataAddress();
             var httpRetriever = new HttpDocumentRetriever { RequireHttps = requireHttps };
@@ -77,7 +81,10 @@ public static class MrWhoClientAuthBuilderExtensions
             oidc.ConfigurationManager = new ConfigurationManager<OpenIdConnectConfiguration>(metadata, new OpenIdConnectConfigurationRetriever(), httpRetriever);
 
             oidc.ClaimActions.Clear();
-            foreach (var claim in new[] { "iss", "aud", "exp", "iat", "nonce", "at_hash", "azp", "oi_au_id", "oi_tbn_id" }) oidc.ClaimActions.DeleteClaim(claim);
+            foreach (var claim in new[] { "iss", "aud", "exp", "iat", "nonce", "at_hash", "azp", "oi_au_id", "oi_tbn_id" }) {
+                oidc.ClaimActions.DeleteClaim(claim);
+            }
+
             oidc.ClaimActions.MapJsonKey("sub", "sub");
             oidc.ClaimActions.MapJsonKey("name", "name");
             oidc.ClaimActions.MapJsonKey("given_name", "given_name");
@@ -99,8 +106,9 @@ public static class MrWhoClientAuthBuilderExtensions
                     if (!string.IsNullOrEmpty(authority))
                     {
                         var desiredAuthorize = $"{authority}/connect/authorize";
-                        if (!string.Equals(ctx.ProtocolMessage.IssuerAddress, desiredAuthorize, StringComparison.OrdinalIgnoreCase))
+                        if (!string.Equals(ctx.ProtocolMessage.IssuerAddress, desiredAuthorize, StringComparison.OrdinalIgnoreCase)) {
                             ctx.ProtocolMessage.IssuerAddress = desiredAuthorize;
+                        }
                     }
 
                     // JARM
@@ -132,8 +140,10 @@ public static class MrWhoClientAuthBuilderExtensions
                                     UseBasicAuth = true // prefer client_secret_basic
                                 };
                                 // Preserve response_mode (e.g. jwt for JARM)
-                                if (!string.IsNullOrEmpty(ctx.ProtocolMessage.ResponseMode))
+                                if (!string.IsNullOrEmpty(ctx.ProtocolMessage.ResponseMode)) {
                                     authReq.Extra["response_mode"] = ctx.ProtocolMessage.ResponseMode;
+                                }
+
                                 var (result, error) = await parService.PushAsync(authReq, ctx.HttpContext.RequestAborted);
                                 if (result != null)
                                 {
@@ -142,8 +152,14 @@ public static class MrWhoClientAuthBuilderExtensions
                                     ctx.ProtocolMessage.Parameters.Clear();
                                     ctx.ProtocolMessage.ClientId = authReq.ClientId;
                                     ctx.ProtocolMessage.SetParameter("request_uri", result.RequestUri);
-                                    if (!string.IsNullOrEmpty(state)) ctx.ProtocolMessage.State = state;
-                                    if (!string.IsNullOrEmpty(responseMode)) ctx.ProtocolMessage.ResponseMode = responseMode;
+                                    if (!string.IsNullOrEmpty(state)) {
+                                        ctx.ProtocolMessage.State = state;
+                                    }
+
+                                    if (!string.IsNullOrEmpty(responseMode)) {
+                                        ctx.ProtocolMessage.ResponseMode = responseMode;
+                                    }
+
                                     logger?.LogDebug("[PAR] request_uri={ReqUri} stateDup={HasState} rm={RM}", result.RequestUri, !string.IsNullOrEmpty(state), responseMode);
                                     externalConfigure?.Invoke(ctx.Options);
                                     return; // done
@@ -194,8 +210,14 @@ public static class MrWhoClientAuthBuilderExtensions
                                     ctx.ProtocolMessage.ClientId = jarReq.ClientId;
                                     ctx.ProtocolMessage.RedirectUri = jarReq.RedirectUri;
                                     ctx.ProtocolMessage.ResponseType = jarReq.ResponseType;
-                                    if (!string.IsNullOrEmpty(state)) ctx.ProtocolMessage.State = state;
-                                    if (!string.IsNullOrEmpty(jarReq.Scope)) ctx.ProtocolMessage.Scope = jarReq.Scope;
+                                    if (!string.IsNullOrEmpty(state)) {
+                                        ctx.ProtocolMessage.State = state;
+                                    }
+
+                                    if (!string.IsNullOrEmpty(jarReq.Scope)) {
+                                        ctx.ProtocolMessage.Scope = jarReq.Scope;
+                                    }
+
                                     ctx.ProtocolMessage.SetParameter("request", jwt);
                                 }
                             }
@@ -211,7 +233,9 @@ public static class MrWhoClientAuthBuilderExtensions
                     if (identity != null && !identity.HasClaim(c => c.Type == "name"))
                     {
                         var value = identity.FindFirst("preferred_username")?.Value ?? identity.FindFirst("email")?.Value ?? identity.FindFirst("sub")?.Value;
-                        if (!string.IsNullOrWhiteSpace(value)) identity.AddClaim(new Claim("name", value));
+                        if (!string.IsNullOrWhiteSpace(value)) {
+                            identity.AddClaim(new Claim("name", value));
+                        }
                     }
                     return Task.CompletedTask;
                 }

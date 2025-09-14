@@ -90,28 +90,39 @@ public class DynamicAuthorizationPolicyProvider : IAuthorizationPolicyProvider
                     .RequireAssertion(ctx =>
                     {
                         var user = ctx.User;
-                        if (user?.Identity?.IsAuthenticated != true) return false;
+                        if (user?.Identity?.IsAuthenticated != true) {
+                            return false;
+                        }
+
                         bool hasMrWhoUse = user.FindAll("scope")
                             .Any(c => c.Value.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                                               .Contains(StandardScopes.MrWhoUse));
-                        if (!hasMrWhoUse) return false;
+                        if (!hasMrWhoUse) {
+                            return false;
+                        }
 
                         string adminClientId = MrWhoConstants.AdminClientId; // mrwho_admin_web
                         const string serviceClientId = "mrwho_m2m";        // standard service M2M
                         const string testM2MClientId = "mrwho_tests_m2m";  // legacy test-only client (optional)
 
                         bool isAdminClient = user.HasClaim(c => (c.Type == "azp" || c.Type == "client_id") && c.Value == adminClientId);
-                        if (isAdminClient) return true;
+                        if (isAdminClient) {
+                            return true;
+                        }
 
                         bool isServiceClient = user.HasClaim(c => (c.Type == "azp" || c.Type == "client_id") && c.Value == serviceClientId);
-                        if (isServiceClient) return true;
+                        if (isServiceClient) {
+                            return true;
+                        }
 
                         var isTesting = string.Equals(Environment.GetEnvironmentVariable("MRWHO_TESTS"), "1", StringComparison.OrdinalIgnoreCase) ||
                                          string.Equals(Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT"), "Testing", StringComparison.OrdinalIgnoreCase);
                         if (isTesting)
                         {
                             bool isLegacyTestClient = user.HasClaim(c => (c.Type == "azp" || c.Type == "client_id") && c.Value == testM2MClientId);
-                            if (isLegacyTestClient) return true;
+                            if (isLegacyTestClient) {
+                                return true;
+                            }
                         }
                         return false;
                     })

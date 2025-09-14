@@ -92,7 +92,12 @@ var rpId = builder.Configuration["WebAuthn:RelyingPartyId"] ?? new Uri(builder.C
 var rpName = builder.Configuration["WebAuthn:RelyingPartyName"] ?? "MrWho";
 var origins = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "https://localhost:7113", "http://localhost:7113" };
 var fromConfig = builder.Configuration.GetSection("WebAuthn:Origins").Get<string[]>() ?? Array.Empty<string>();
-foreach (var o in fromConfig) if (!string.IsNullOrWhiteSpace(o)) origins.Add(o);
+foreach (var o in fromConfig) {
+    if (!string.IsNullOrWhiteSpace(o)) {
+        origins.Add(o);
+    }
+}
+
 builder.Services.AddSingleton(new Fido2(new Fido2Configuration
 {
     ServerDomain = rpId,

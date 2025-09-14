@@ -99,7 +99,10 @@ public sealed class LoginPostHandler : IRequestHandler<MrWho.Endpoints.Auth.Logi
         {
             _logger.LogDebug("Login ModelState invalid");
             var vd = NewViewData();
-            foreach (var err in modelStateErrors) vd.ModelState.AddModelError(err.Key, err.Value);
+            foreach (var err in modelStateErrors) {
+                vd.ModelState.AddModelError(err.Key, err.Value);
+            }
+
             vd["ReturnUrl"] = returnUrl; vd["ClientId"] = clientId; vd["RecaptchaSiteKey"] = viewData["RecaptchaSiteKey"];
             vd["ClientName"] = clientName;
             return new ViewResult { ViewName = "Login", ViewData = viewDataWithModel(vd, model) };
@@ -172,8 +175,12 @@ public sealed class LoginPostHandler : IRequestHandler<MrWho.Endpoints.Auth.Logi
 
             if (!string.IsNullOrEmpty(returnUrl))
             {
-                if (returnUrl.Contains("/connect/authorize")) return new RedirectResult(returnUrl);
-                else if (_loginHelper.IsLocalUrl(returnUrl)) return new RedirectResult(returnUrl);
+                if (returnUrl.Contains("/connect/authorize")) {
+                    return new RedirectResult(returnUrl);
+                }
+                else if (_loginHelper.IsLocalUrl(returnUrl)) {
+                    return new RedirectResult(returnUrl);
+                }
             }
             return new RedirectToActionResult("Index", "Home", null);
         }
@@ -227,8 +234,12 @@ public sealed class LoginPostHandler : IRequestHandler<MrWho.Endpoints.Auth.Logi
 
             if (!string.IsNullOrEmpty(returnUrl))
             {
-                if (returnUrl.Contains("/connect/authorize")) return new RedirectResult(returnUrl);
-                else if (_loginHelper.IsLocalUrl(returnUrl)) return new RedirectResult(returnUrl);
+                if (returnUrl.Contains("/connect/authorize")) {
+                    return new RedirectResult(returnUrl);
+                }
+                else if (_loginHelper.IsLocalUrl(returnUrl)) {
+                    return new RedirectResult(returnUrl);
+                }
             }
             return new RedirectToActionResult("Index", "Home", null);
         }
@@ -257,13 +268,23 @@ public sealed class LoginPostHandler : IRequestHandler<MrWho.Endpoints.Auth.Logi
         if (model is null) { errors.Add(new("", "Invalid model")); return false; }
         if (!model.UseCode)
         {
-            if (string.IsNullOrWhiteSpace(model.Email)) errors.Add(new("Email", "The Email field is required."));
-            if (string.IsNullOrWhiteSpace(model.Password)) errors.Add(new("Password", "The Password field is required."));
+            if (string.IsNullOrWhiteSpace(model.Email)) {
+                errors.Add(new("Email", "The Email field is required."));
+            }
+
+            if (string.IsNullOrWhiteSpace(model.Password)) {
+                errors.Add(new("Password", "The Password field is required."));
+            }
         }
         else
         {
-            if (string.IsNullOrWhiteSpace(model.Email)) errors.Add(new("Email", "The Email field is required."));
-            if (string.IsNullOrWhiteSpace(model.Code)) errors.Add(new("Code", "The Code field is required."));
+            if (string.IsNullOrWhiteSpace(model.Email)) {
+                errors.Add(new("Email", "The Email field is required."));
+            }
+
+            if (string.IsNullOrWhiteSpace(model.Code)) {
+                errors.Add(new("Code", "The Code field is required."));
+            }
         }
         return errors.Count == 0;
     }

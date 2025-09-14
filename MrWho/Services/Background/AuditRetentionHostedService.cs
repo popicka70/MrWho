@@ -53,7 +53,10 @@ public sealed class AuditRetentionHostedService : BackgroundService
             .Select(e => e.Id)
             .ToListAsync(ct); // IDs older than the kept set
 
-        if (newestIdsToKeep.Count == 0) return; // nothing extra beyond floor
+        if (newestIdsToKeep.Count == 0) {
+            return; // nothing extra beyond floor
+        }
+
         var maxIdToDelete = newestIdsToKeep.Max();
 
         var batch = opts.BatchSize;

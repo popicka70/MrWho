@@ -32,7 +32,9 @@ public static class MrWhoClientAuthEndpointExtensions
         string pattern = "/signout-backchannel")
     {
         ArgumentNullException.ThrowIfNull(endpoints);
-        if (string.IsNullOrWhiteSpace(pattern)) pattern = "/signout-backchannel";
+        if (string.IsNullOrWhiteSpace(pattern)) {
+            pattern = "/signout-backchannel";
+        }
 
         return endpoints.MapPost(pattern, async context =>
         {
@@ -92,8 +94,13 @@ public static class MrWhoClientAuthEndpointExtensions
                     {
                         using var doc = JsonDocument.Parse(logoutToken);
                         var root = doc.RootElement;
-                        if (root.TryGetProperty("sub", out var subEl)) subject = subEl.GetString();
-                        if (root.TryGetProperty("sid", out var sidEl)) sessionId = sidEl.GetString();
+                        if (root.TryGetProperty("sub", out var subEl)) {
+                            subject = subEl.GetString();
+                        }
+
+                        if (root.TryGetProperty("sid", out var sidEl)) {
+                            sessionId = sidEl.GetString();
+                        }
                     }
                     catch (Exception jsonEx)
                     {
@@ -119,8 +126,9 @@ public static class MrWhoClientAuthEndpointExtensions
                     };
 
                     cache.Set($"logout_{subject}", logoutInfo, TimeSpan.FromHours(1));
-                    if (!string.IsNullOrWhiteSpace(sessionId))
+                    if (!string.IsNullOrWhiteSpace(sessionId)) {
                         cache.Set($"logout_session_{sessionId}", logoutInfo, TimeSpan.FromHours(1));
+                    }
                 }
 
                 // Clear local authentication using default schemes
@@ -146,8 +154,13 @@ public static class MrWhoClientAuthEndpointExtensions
                         if (session.IsAvailable)
                         {
                             session.SetString("logout_notification", DateTime.UtcNow.ToString("O"));
-                            if (!string.IsNullOrWhiteSpace(subject)) session.SetString("logout_subject", subject);
-                            if (!string.IsNullOrWhiteSpace(sessionId)) session.SetString("logout_session_id", sessionId);
+                            if (!string.IsNullOrWhiteSpace(subject)) {
+                                session.SetString("logout_subject", subject);
+                            }
+
+                            if (!string.IsNullOrWhiteSpace(sessionId)) {
+                                session.SetString("logout_session_id", sessionId);
+                            }
                         }
                     }
                 }

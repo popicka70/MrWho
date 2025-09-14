@@ -232,8 +232,9 @@ public class DynamicCookieService : IDynamicCookieService
 
     private string ConvertToFriendlyName(string input)
     {
-        if (string.IsNullOrEmpty(input))
+        if (string.IsNullOrEmpty(input)) {
             return "Unknown User";
+        }
 
         // If username is an email, extract the local part and convert to friendly name
         if (input.Contains('@'))
@@ -248,8 +249,9 @@ public class DynamicCookieService : IDynamicCookieService
 
     private string ConvertToDisplayName(string input)
     {
-        if (string.IsNullOrEmpty(input))
+        if (string.IsNullOrEmpty(input)) {
             return "Unknown User";
+        }
 
         // Replace common separators with spaces
         var friendlyName = input.Replace('.', ' ')

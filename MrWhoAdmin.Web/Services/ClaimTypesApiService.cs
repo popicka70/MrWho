@@ -39,7 +39,10 @@ public class ClaimTypesApiService : IClaimTypesApiService
         {
             var req = new { claimType.Type, DisplayName = claimType.DisplayName, Description = description ?? claimType.Description, Category = category, IsEnabled = isEnabled, IsObsolete = isObsolete, SortOrder = sortOrder };
             var resp = await _http.PostAsJsonAsync("api/claimtypes", req);
-            if (!resp.IsSuccessStatusCode) return null;
+            if (!resp.IsSuccessStatusCode) {
+                return null;
+            }
+
             return await resp.Content.ReadFromJsonAsync<ClaimTypeInfo>();
         }
         catch (Exception ex) { _logger.LogError(ex, "Create claim type failed"); return null; }
@@ -51,7 +54,10 @@ public class ClaimTypesApiService : IClaimTypesApiService
         {
             var req = new { claimType.Type, DisplayName = claimType.DisplayName, Description = description ?? claimType.Description, Category = category, IsEnabled = isEnabled, IsObsolete = isObsolete, SortOrder = sortOrder };
             var resp = await _http.PutAsJsonAsync($"api/claimtypes/{Uri.EscapeDataString(claimType.Type)}", req);
-            if (!resp.IsSuccessStatusCode) return null;
+            if (!resp.IsSuccessStatusCode) {
+                return null;
+            }
+
             return await resp.Content.ReadFromJsonAsync<ClaimTypeInfo>();
         }
         catch (Exception ex) { _logger.LogError(ex, "Update claim type failed"); return null; }

@@ -40,8 +40,10 @@ public class KeyRotationHostedService : BackgroundService
     {
         try
         {
-            if (!_options.Value.Enabled)
+            if (!_options.Value.Enabled) {
                 return;
+            }
+
             await _kms.EnsureInitializedAsync(ct);
         }
         catch (Exception ex)

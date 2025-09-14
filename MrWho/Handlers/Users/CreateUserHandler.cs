@@ -94,8 +94,14 @@ public class CreateUserHandler : ICreateUserHandler
 
     private static string BuildDisplayName(string source)
     {
-        if (string.IsNullOrWhiteSpace(source)) return "New User";
-        if (source.Contains('@')) source = source.Split('@')[0];
+        if (string.IsNullOrWhiteSpace(source)) {
+            return "New User";
+        }
+
+        if (source.Contains('@')) {
+            source = source.Split('@')[0];
+        }
+
         var friendly = source.Replace('.', ' ').Replace('_', ' ').Replace('-', ' ');
         var words = friendly.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         return string.Join(' ', words.Select(w => char.ToUpper(w[0]) + w[1..].ToLower()));

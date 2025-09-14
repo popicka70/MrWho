@@ -29,8 +29,9 @@ public sealed class ClientRoleService : IClientRoleService
     public async Task<IReadOnlyList<string>> GetClientRolesAsync(string userId, string clientId, CancellationToken ct = default)
     {
         var key = ($"clientroles:{userId}:{clientId}");
-        if (_cache.TryGetValue(key, out IReadOnlyList<string>? cached) && cached != null)
+        if (_cache.TryGetValue(key, out IReadOnlyList<string>? cached) && cached != null) {
             return cached;
+        }
 
         var roles = await _db.UserClientRoles
             .Where(ucr => ucr.UserId == userId && ucr.ClientRole.ClientId == clientId)
@@ -90,7 +91,9 @@ public sealed class ClientRoleService : IClientRoleService
     {
         var normalized = roleName.Trim().ToUpperInvariant();
         var role = await _db.ClientRoles.FirstOrDefaultAsync(r => r.ClientId == clientId && r.NormalizedName == normalized, ct);
-        if (role == null) return;
+        if (role == null) {
+            return;
+        }
 
         var link = await _db.UserClientRoles.FirstOrDefaultAsync(u => u.UserId == userId && u.ClientRoleId == role.Id, ct);
         if (link != null)

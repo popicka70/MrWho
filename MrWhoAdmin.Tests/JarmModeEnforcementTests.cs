@@ -57,10 +57,18 @@ public class JarmModeEnforcementTests
     {
         // Ensure absolute
         Uri absolute;
-        if (Uri.TryCreate(fullUrlOrPath, UriKind.Absolute, out var abs)) absolute = abs;
-        else absolute = new Uri(baseAddress, fullUrlOrPath.StartsWith('/') ? fullUrlOrPath : "/" + fullUrlOrPath);
+        if (Uri.TryCreate(fullUrlOrPath, UriKind.Absolute, out var abs)) {
+            absolute = abs;
+        }
+        else {
+            absolute = new Uri(baseAddress, fullUrlOrPath.StartsWith('/') ? fullUrlOrPath : "/" + fullUrlOrPath);
+        }
+
         var idx = absolute.ToString().IndexOf('?');
-        if (idx < 0) return null;
+        if (idx < 0) {
+            return null;
+        }
+
         var query = absolute.ToString().Substring(idx);
         var parsed = QueryHelpers.ParseQuery(query);
         return parsed.TryGetValue(key, out var values) ? values.ToString() : null;
@@ -116,7 +124,13 @@ public class JarmModeEnforcementTests
             if (loc.Contains("/connect/authorize", StringComparison.OrdinalIgnoreCase) && loc.Contains("request_uri=", StringComparison.OrdinalIgnoreCase))
             {
                 // Follow one hop
-                string next; if (loc.StartsWith("http", StringComparison.OrdinalIgnoreCase)) next = loc; else next = new Uri(authClient.BaseAddress!, loc).ToString();
+                string next; if (loc.StartsWith("http", StringComparison.OrdinalIgnoreCase)) {
+                    next = loc;
+                }
+                else {
+                    next = new Uri(authClient.BaseAddress!, loc).ToString();
+                }
+
                 var relative = next.StartsWith(authClient.BaseAddress!.ToString(), StringComparison.OrdinalIgnoreCase)
                     ? next.Substring(authClient.BaseAddress!.ToString().Length).TrimStart('/')
                     : next;

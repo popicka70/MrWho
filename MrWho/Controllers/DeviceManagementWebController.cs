@@ -37,8 +37,9 @@ public class DeviceManagementWebController : Controller
     public async Task<IActionResult> Index()
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user == null)
+        if (user == null) {
             return Challenge();
+        }
 
         var devices = await _deviceService.GetUserDevicesAsync(user.Id);
         return View(devices);
@@ -64,8 +65,9 @@ public class DeviceManagementWebController : Controller
             }
 
             var user = await _userManager.GetUserAsync(User);
-            if (user == null)
+            if (user == null) {
                 return Challenge();
+            }
 
             // Get user's devices that can approve logins
             var devices = await _deviceService.GetUserDevicesAsync(user.Id);
@@ -96,8 +98,9 @@ public class DeviceManagementWebController : Controller
     public async Task<IActionResult> ApprovePersistentPost(string token, [FromForm] string deviceId, [FromForm] string action)
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user == null)
+        if (user == null) {
             return Challenge();
+        }
 
         try
         {
@@ -154,8 +157,9 @@ public class DeviceManagementWebController : Controller
     public async Task<IActionResult> Register([FromForm] string deviceName, [FromForm] string deviceId, [FromForm] bool isTrusted = false)
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user == null)
+        if (user == null) {
             return Challenge();
+        }
 
         try
         {
@@ -192,8 +196,9 @@ public class DeviceManagementWebController : Controller
     public async Task<IActionResult> Activity()
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user == null)
+        if (user == null) {
             return Challenge();
+        }
 
         var activity = await _deviceService.GetUserDeviceActivityAsync(user.Id, 50);
         return View(activity);
@@ -207,8 +212,9 @@ public class DeviceManagementWebController : Controller
     public async Task<IActionResult> RevokeDevice(string deviceId)
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user == null)
+        if (user == null) {
             return Challenge();
+        }
 
         var success = await _deviceService.RevokeDeviceAsync(user.Id, deviceId);
 

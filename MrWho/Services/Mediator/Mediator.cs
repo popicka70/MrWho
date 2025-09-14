@@ -17,7 +17,9 @@ public sealed class Mediator : IMediator
 
     public Task<TResponse> Send<TResponse>(IRequest<TResponse> request, CancellationToken cancellationToken = default)
     {
-        if (request is null) throw new ArgumentNullException(nameof(request));
+        if (request is null) {
+            throw new ArgumentNullException(nameof(request));
+        }
 
         var handlerType = typeof(IRequestHandler<,>).MakeGenericType(request.GetType(), typeof(TResponse));
         var handler = _services.GetService(handlerType);

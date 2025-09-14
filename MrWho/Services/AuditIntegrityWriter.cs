@@ -21,8 +21,13 @@ public sealed class AuditIntegrityWriter : IAuditIntegrityWriter
 
     public async Task<AuditIntegrityRecord> WriteAsync(AuditIntegrityWriteRequest request, CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(request.Category)) throw new ArgumentException("Category required", nameof(request));
-        if (string.IsNullOrWhiteSpace(request.Action)) throw new ArgumentException("Action required", nameof(request));
+        if (string.IsNullOrWhiteSpace(request.Category)) {
+            throw new ArgumentException("Category required", nameof(request));
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Action)) {
+            throw new ArgumentException("Action required", nameof(request));
+        }
 
         // Get last record hash
         var prev = await _db.AuditIntegrityRecords.AsNoTracking()

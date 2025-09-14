@@ -51,10 +51,19 @@ public class ConnectController : Controller
         }
 
         var props = new AuthenticationProperties { RedirectUri = "/connect/external/callback" };
-        if (!string.IsNullOrWhiteSpace(returnUrl)) props.Items["returnUrl"] = returnUrl;
-        if (!string.IsNullOrWhiteSpace(clientId)) props.Items["clientId"] = clientId;
+        if (!string.IsNullOrWhiteSpace(returnUrl)) {
+            props.Items["returnUrl"] = returnUrl;
+        }
+
+        if (!string.IsNullOrWhiteSpace(clientId)) {
+            props.Items["clientId"] = clientId;
+        }
+
         props.Items["extRegistrationId"] = registration.RegistrationId;
-        if (!string.IsNullOrWhiteSpace(registration.ProviderName)) props.Items["extProviderName"] = registration.ProviderName;
+        if (!string.IsNullOrWhiteSpace(registration.ProviderName)) {
+            props.Items["extProviderName"] = registration.ProviderName;
+        }
+
         props.Items[OpenIddictClientAspNetCoreConstants.Properties.RegistrationId] = registration.RegistrationId;
         if (!string.IsNullOrEmpty(force) && (force == "1" || force.Equals("true", StringComparison.OrdinalIgnoreCase)))
         {
@@ -70,7 +79,10 @@ public class ConnectController : Controller
     public IActionResult ExternalSignOut()
     {
         var regId = HttpContext.Session.GetString("ExternalRegistrationId") ?? User?.FindFirst("ext_reg_id")?.Value;
-        if (string.IsNullOrWhiteSpace(regId)) return NoContent();
+        if (string.IsNullOrWhiteSpace(regId)) {
+            return NoContent();
+        }
+
         var props = new AuthenticationProperties { RedirectUri = "/connect/external/signout-callback" };
         props.Items[OpenIddictClientAspNetCoreConstants.Properties.RegistrationId] = regId;
         return SignOut(props, OpenIddictClientAspNetCoreDefaults.AuthenticationScheme);

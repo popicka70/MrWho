@@ -33,7 +33,9 @@ public class UserClientsController : ControllerBase
             // Allow lookup by username/email as convenience
             user = await _userManager.FindByNameAsync(userId) ?? await _userManager.FindByEmailAsync(userId);
         }
-        if (user == null) return NotFound($"User '{userId}' not found");
+        if (user == null) {
+            return NotFound($"User '{userId}' not found");
+        }
 
         var assignments = await _context.ClientUsers
             .Where(cu => cu.UserId == user.Id)

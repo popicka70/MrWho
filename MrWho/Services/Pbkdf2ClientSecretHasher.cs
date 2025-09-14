@@ -26,10 +26,19 @@ public sealed class Pbkdf2ClientSecretHasher : IClientSecretHasher
         {
             // Format: PBKDF2$sha256$iter$salt$hash
             var parts = storedHash.Split('$');
-            if (parts.Length != 5) return false;
-            if (!string.Equals(parts[0], "PBKDF2", StringComparison.OrdinalIgnoreCase)) return false;
+            if (parts.Length != 5) {
+                return false;
+            }
+
+            if (!string.Equals(parts[0], "PBKDF2", StringComparison.OrdinalIgnoreCase)) {
+                return false;
+            }
+
             var algo = parts[1];
-            if (!int.TryParse(parts[2], out var iter)) return false;
+            if (!int.TryParse(parts[2], out var iter)) {
+                return false;
+            }
+
             var salt = Convert.FromBase64String(parts[3]);
             var hash = Convert.FromBase64String(parts[4]);
 

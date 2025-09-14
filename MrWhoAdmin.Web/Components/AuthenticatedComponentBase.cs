@@ -19,7 +19,9 @@ public abstract class AuthenticatedComponentBase : ComponentBase, IDisposable
 
     protected override async Task OnInitializedAsync()
     {
-        if (_disposed) return;
+        if (_disposed) {
+            return;
+        }
 
         // During prerendering, we'll assume authentication is OK
         // and perform the real check after the component becomes interactive
@@ -51,7 +53,9 @@ public abstract class AuthenticatedComponentBase : ComponentBase, IDisposable
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (_disposed) return;
+        if (_disposed) {
+            return;
+        }
 
         if (firstRender)
         {
@@ -68,7 +72,9 @@ public abstract class AuthenticatedComponentBase : ComponentBase, IDisposable
     /// </summary>
     protected virtual async Task CheckAuthenticationAsync()
     {
-        if (_disposed) return;
+        if (_disposed) {
+            return;
+        }
 
         try
         {
@@ -127,7 +133,9 @@ public abstract class AuthenticatedComponentBase : ComponentBase, IDisposable
     /// </summary>
     protected async Task TriggerReauthenticationAsync()
     {
-        if (_disposed) return;
+        if (_disposed) {
+            return;
+        }
 
         try
         {
@@ -163,7 +171,9 @@ public abstract class AuthenticatedComponentBase : ComponentBase, IDisposable
     /// </summary>
     protected void ClearAuthError()
     {
-        if (_disposed) return;
+        if (_disposed) {
+            return;
+        }
 
         AuthErrorMessage = null;
         StateHasChanged();
@@ -182,7 +192,9 @@ public abstract class AuthenticatedComponentBase : ComponentBase, IDisposable
     /// </summary>
     protected RenderFragment RenderAuthenticationStatus() => builder =>
     {
-        if (_disposed) return;
+        if (_disposed) {
+            return;
+        }
 
         if (IsLoading)
         {

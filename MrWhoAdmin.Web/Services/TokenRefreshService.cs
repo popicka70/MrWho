@@ -311,13 +311,15 @@ public class TokenRefreshService : ITokenRefreshService
     /// </summary>
     private static bool IsLocalUrl(HttpContext httpContext, string url)
     {
-        if (string.IsNullOrEmpty(url))
+        if (string.IsNullOrEmpty(url)) {
             return false;
+        }
 
         // Must be a relative URL (not absolute with protocol)
         if (url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
-            url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            url.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) {
             return false;
+        }
 
         // Must start with / but not //
         return url.StartsWith("/") && !url.StartsWith("//");

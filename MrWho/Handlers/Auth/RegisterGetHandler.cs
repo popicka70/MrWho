@@ -91,10 +91,21 @@ public sealed class RegisterGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Re
                 themeName = _mrWhoOptions.Value.DefaultThemeName;
             }
 
-            if (!string.IsNullOrWhiteSpace(themeName)) vd["ThemeName"] = themeName;
-            if (!string.IsNullOrWhiteSpace(customCssUrl)) vd["CustomCssUrl"] = customCssUrl;
-            if (!string.IsNullOrWhiteSpace(logoUri)) vd["LogoUri"] = logoUri;
-            if (!string.IsNullOrWhiteSpace(clientName)) vd["ClientName"] = clientName;
+            if (!string.IsNullOrWhiteSpace(themeName)) {
+                vd["ThemeName"] = themeName;
+            }
+
+            if (!string.IsNullOrWhiteSpace(customCssUrl)) {
+                vd["CustomCssUrl"] = customCssUrl;
+            }
+
+            if (!string.IsNullOrWhiteSpace(logoUri)) {
+                vd["LogoUri"] = logoUri;
+            }
+
+            if (!string.IsNullOrWhiteSpace(clientName)) {
+                vd["ClientName"] = clientName;
+            }
         }
         catch { /* ignore theme errors */ }
 
@@ -103,18 +114,26 @@ public sealed class RegisterGetHandler : IRequestHandler<MrWho.Endpoints.Auth.Re
 
     private bool ShouldUseRecaptcha()
     {
-        if (_env.IsDevelopment()) return false;
+        if (_env.IsDevelopment()) {
+            return false;
+        }
+
         var site = _configuration["GoogleReCaptcha:SiteKey"];
         var secret = _configuration["GoogleReCaptcha:SecretKey"];
         var enabledFlag = _configuration["GoogleReCaptcha:Enabled"];
-        if (!string.IsNullOrWhiteSpace(enabledFlag) && bool.TryParse(enabledFlag, out var enabled) && !enabled)
+        if (!string.IsNullOrWhiteSpace(enabledFlag) && bool.TryParse(enabledFlag, out var enabled) && !enabled) {
             return false;
+        }
+
         return !string.IsNullOrWhiteSpace(site) && !string.IsNullOrWhiteSpace(secret);
     }
 
     private static string? TryExtractClientIdFromReturnUrl(string? returnUrl)
     {
-        if (string.IsNullOrEmpty(returnUrl)) return null;
+        if (string.IsNullOrEmpty(returnUrl)) {
+            return null;
+        }
+
         try
         {
             if (Uri.TryCreate(returnUrl, UriKind.Absolute, out var absUri))

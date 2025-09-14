@@ -23,7 +23,10 @@ public class ClientRolesApiService : IClientRolesApiService
         {
             var url = string.IsNullOrWhiteSpace(clientId) ? "api/clientroles" : $"api/clientroles?clientId={Uri.EscapeDataString(clientId)}";
             var resp = await _httpClient.GetAsync(url);
-            if (!resp.IsSuccessStatusCode) return null;
+            if (!resp.IsSuccessStatusCode) {
+                return null;
+            }
+
             var json = await resp.Content.ReadAsStringAsync();
             return JsonSerializer.Deserialize<List<ClientRoleDto>>(json, _jsonOptions);
         }
@@ -35,7 +38,10 @@ public class ClientRolesApiService : IClientRolesApiService
         try
         {
             var resp = await _httpClient.GetAsync($"api/clientroles/{Uri.EscapeDataString(clientId)}/users/{Uri.EscapeDataString(userId)}");
-            if (!resp.IsSuccessStatusCode) return null;
+            if (!resp.IsSuccessStatusCode) {
+                return null;
+            }
+
             var json = await resp.Content.ReadAsStringAsync();
             return JsonSerializer.Deserialize<List<string>>(json, _jsonOptions);
         }
@@ -48,7 +54,10 @@ public class ClientRolesApiService : IClientRolesApiService
         {
             var json = JsonSerializer.Serialize(request, _jsonOptions);
             var resp = await _httpClient.PostAsync("api/clientroles", new StringContent(json, Encoding.UTF8, "application/json"));
-            if (!resp.IsSuccessStatusCode) return null;
+            if (!resp.IsSuccessStatusCode) {
+                return null;
+            }
+
             var body = await resp.Content.ReadAsStringAsync();
             return JsonSerializer.Deserialize<ClientRoleDto>(body, _jsonOptions);
         }

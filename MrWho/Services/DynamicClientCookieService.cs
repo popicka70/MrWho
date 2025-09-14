@@ -279,7 +279,10 @@ public class DynamicClientCookieService : IHostedService
 
     private static string Sanitize(string name)
     {
-        if (string.IsNullOrWhiteSpace(name)) return "Default";
+        if (string.IsNullOrWhiteSpace(name)) {
+            return "Default";
+        }
+
         Span<char> buffer = stackalloc char[name.Length];
         var i = 0;
         foreach (var ch in name)

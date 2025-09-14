@@ -113,8 +113,10 @@ public class JarRequestExpansionMiddleware
 
                 var dict = req.Query.ToDictionary(k => k.Key, v => v.Value.ToString(), StringComparer.OrdinalIgnoreCase);
                 dict.Remove("request");
-                foreach (var kv in result.Parameters!)
+                foreach (var kv in result.Parameters!) {
                     dict[kv.Key] = kv.Value;
+                }
+
                 dict["_jar_expanded"] = "1";
                 var newQuery = string.Join('&', dict.Select(kvp => Uri.EscapeDataString(kvp.Key) + "=" + Uri.EscapeDataString(kvp.Value)));
                 context.Request.QueryString = new QueryString("?" + newQuery);

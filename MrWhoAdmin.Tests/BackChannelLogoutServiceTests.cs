@@ -33,7 +33,10 @@ public class BackChannelLogoutServiceTests
         public bool SimulateTimeout;
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            if (SimulateTimeout) throw new TaskCanceledException("timeout");
+            if (SimulateTimeout) {
+                throw new TaskCanceledException("timeout");
+            }
+
             LastRequest = request;
             return Task.FromResult(new HttpResponseMessage(Status) { Content = new StringContent("ok", Encoding.UTF8, "text/plain") });
         }
@@ -164,12 +167,15 @@ public class BackChannelLogoutServiceTests
     {
         var listenerValues = new Dictionary<string, long>();
         using var listener = new MeterListener();
-        listener.InstrumentPublished = (inst, l) => { if (inst.Meter.Name == "MrWho.Logout") l.EnableMeasurementEvents(inst); };
+        listener.InstrumentPublished = (inst, l) => { if (inst.Meter.Name == "MrWho.Logout") { l.EnableMeasurementEvents(inst); } };
         listener.SetMeasurementEventCallback<long>((inst, value, tags, state) =>
         {
             lock (listenerValues)
             {
-                if (!listenerValues.ContainsKey(inst.Name)) listenerValues[inst.Name] = 0;
+                if (!listenerValues.ContainsKey(inst.Name)) {
+                    listenerValues[inst.Name] = 0;
+                }
+
                 listenerValues[inst.Name] += value;
             }
         });

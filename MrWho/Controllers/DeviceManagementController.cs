@@ -45,8 +45,9 @@ public class DeviceManagementController : ControllerBase
     public async Task<ActionResult<UserDeviceDto>> RegisterDevice([FromBody] RegisterDeviceApiRequest request)
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user == null)
+        if (user == null) {
             return Unauthorized();
+        }
 
         try
         {
@@ -86,8 +87,9 @@ public class DeviceManagementController : ControllerBase
     public async Task<ActionResult<List<UserDeviceDto>>> GetUserDevices([FromQuery] bool activeOnly = true)
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user == null)
+        if (user == null) {
             return Unauthorized();
+        }
 
         var devices = await _deviceService.GetUserDevicesAsync(user.Id, activeOnly);
         return Ok(devices.Select(MapToDto).ToList());
@@ -100,12 +102,14 @@ public class DeviceManagementController : ControllerBase
     public async Task<ActionResult<UserDeviceDto>> GetDevice(string deviceId)
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user == null)
+        if (user == null) {
             return Unauthorized();
+        }
 
         var device = await _deviceService.GetDeviceAsync(user.Id, deviceId);
-        if (device == null)
+        if (device == null) {
             return NotFound();
+        }
 
         return Ok(MapToDto(device));
     }
@@ -117,13 +121,15 @@ public class DeviceManagementController : ControllerBase
     public async Task<ActionResult> UpdateDevice(string deviceId, [FromBody] UpdateDeviceApiRequest request)
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user == null)
+        if (user == null) {
             return Unauthorized();
+        }
 
         // Verify device belongs to user
         var device = await _deviceService.GetDeviceAsync(user.Id, deviceId);
-        if (device == null)
+        if (device == null) {
             return NotFound();
+        }
 
         var updateRequest = new UpdateDeviceRequest
         {
@@ -139,8 +145,9 @@ public class DeviceManagementController : ControllerBase
         };
 
         var success = await _deviceService.UpdateDeviceAsync(deviceId, updateRequest);
-        if (!success)
+        if (!success) {
             return NotFound();
+        }
 
         _logger.LogInformation("Device {DeviceId} updated for user {UserId}", deviceId, user.Id);
         return NoContent();
@@ -153,12 +160,14 @@ public class DeviceManagementController : ControllerBase
     public async Task<ActionResult> RevokeDevice(string deviceId)
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user == null)
+        if (user == null) {
             return Unauthorized();
+        }
 
         var success = await _deviceService.RevokeDeviceAsync(user.Id, deviceId);
-        if (!success)
+        if (!success) {
             return NotFound();
+        }
 
         _logger.LogInformation("Device {DeviceId} revoked for user {UserId}", deviceId, user.Id);
         return NoContent();
@@ -171,12 +180,14 @@ public class DeviceManagementController : ControllerBase
     public async Task<ActionResult> SetDeviceTrusted(string deviceId, [FromBody] SetTrustedRequest request)
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user == null)
+        if (user == null) {
             return Unauthorized();
+        }
 
         var success = await _deviceService.SetDeviceTrustedAsync(user.Id, deviceId, request.IsTrusted);
-        if (!success)
+        if (!success) {
             return NotFound();
+        }
 
         _logger.LogInformation("Device {DeviceId} trusted status set to {Trusted} for user {UserId}",
             deviceId, request.IsTrusted, user.Id);
@@ -258,14 +269,16 @@ public class DeviceManagementController : ControllerBase
     public async Task<ActionResult> ApproveQrSession(string token, [FromBody] ApproveQrRequest request)
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user == null)
+        if (user == null) {
             return Unauthorized();
+        }
 
         try
         {
             var success = await _qrService.ApproveQrAsync(token, user.Id, request.DeviceId);
-            if (!success)
+            if (!success) {
                 return BadRequest(new { error = "Failed to approve QR session. Session may be expired or device invalid." });
+            }
 
             _logger.LogInformation("QR session {Token} approved by user {UserId} with device {DeviceId}",
                 token, user.Id, request.DeviceId);
@@ -286,14 +299,16 @@ public class DeviceManagementController : ControllerBase
     public async Task<ActionResult> RejectQrSession(string token, [FromBody] RejectQrRequest request)
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user == null)
+        if (user == null) {
             return Unauthorized();
+        }
 
         try
         {
             var success = await _qrService.RejectPersistentQrAsync(token, user.Id, request.DeviceId);
-            if (!success)
+            if (!success) {
                 return BadRequest(new { error = "Failed to reject QR session. Session may be expired or device invalid." });
+            }
 
             _logger.LogInformation("QR session {Token} rejected by user {UserId} with device {DeviceId}",
                 token, user.Id, request.DeviceId);
@@ -318,13 +333,15 @@ public class DeviceManagementController : ControllerBase
     public async Task<ActionResult<List<DeviceActivityDto>>> GetDeviceActivity(string deviceId, [FromQuery] int count = 50)
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user == null)
+        if (user == null) {
             return Unauthorized();
+        }
 
         // Verify device belongs to user
         var device = await _deviceService.GetDeviceAsync(user.Id, deviceId);
-        if (device == null)
+        if (device == null) {
             return NotFound();
+        }
 
         var activity = await _deviceService.GetDeviceActivityAsync(device.Id, count);
         return Ok(activity.Select(MapActivityToDto).ToList());
@@ -337,8 +354,9 @@ public class DeviceManagementController : ControllerBase
     public async Task<ActionResult<List<DeviceActivityDto>>> GetUserDeviceActivity([FromQuery] int count = 100)
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user == null)
+        if (user == null) {
             return Unauthorized();
+        }
 
         var activity = await _deviceService.GetUserDeviceActivityAsync(user.Id, count);
         return Ok(activity.Select(MapActivityToDto).ToList());
@@ -351,13 +369,15 @@ public class DeviceManagementController : ControllerBase
     public async Task<ActionResult> MarkDeviceCompromised(string deviceId, [FromBody] MarkCompromisedRequest request)
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user == null)
+        if (user == null) {
             return Unauthorized();
+        }
 
         // Verify device belongs to user
         var device = await _deviceService.GetDeviceAsync(user.Id, deviceId);
-        if (device == null)
+        if (device == null) {
             return NotFound();
+        }
 
         await _deviceService.MarkDeviceCompromisedAsync(deviceId, request.Reason);
 

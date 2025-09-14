@@ -334,7 +334,10 @@ public static partial class ServiceCollectionExtensions
             })
             .AddServer(options =>
             {
-                var issuer = configuration["OpenIddict:Issuer"]; if (!string.IsNullOrWhiteSpace(issuer)) options.SetIssuer(new Uri(issuer, UriKind.Absolute));
+                var issuer = configuration["OpenIddict:Issuer"]; if (!string.IsNullOrWhiteSpace(issuer)) {
+                    options.SetIssuer(new Uri(issuer, UriKind.Absolute));
+                }
+
                 options.AddEventHandler(CustomUserInfoHandler.Descriptor);
                 options.SetAuthorizationEndpointUris("/connect/authorize")
                        .SetPushedAuthorizationEndpointUris("/connect/par")
@@ -345,10 +348,16 @@ public static partial class ServiceCollectionExtensions
                        .SetIntrospectionEndpointUris("/connect/introspect");
                 options.AllowAuthorizationCodeFlow().AllowClientCredentialsFlow().AllowRefreshTokenFlow();
                 var enablePassword = string.Equals(Environment.GetEnvironmentVariable("MRWHO_TESTS"), "1", StringComparison.OrdinalIgnoreCase) || environment.IsEnvironment("Testing");
-                if (enablePassword) options.AllowPasswordFlow();
+                if (enablePassword) {
+                    options.AllowPasswordFlow();
+                }
+
                 options.RequireProofKeyForCodeExchange();
                 options.SetAccessTokenLifetime(TimeSpan.FromMinutes(60)).SetRefreshTokenLifetime(TimeSpan.FromDays(14));
-                if (environment.IsDevelopment()) options.DisableRollingRefreshTokens();
+                if (environment.IsDevelopment()) {
+                    options.DisableRollingRefreshTokens();
+                }
+
                 options.RegisterScopes(StandardScopes.OpenId, OpenIddictConstants.Scopes.Email, OpenIddictConstants.Scopes.Profile, OpenIddictConstants.Scopes.Roles, OpenIddictConstants.Scopes.OfflineAccess, StandardScopes.ApiRead, StandardScopes.ApiWrite, StandardScopes.MrWhoUse, "roles.global", "roles.client", "roles.all");
                 options.UseAspNetCore().EnableAuthorizationEndpointPassthrough().EnableTokenEndpointPassthrough().EnableEndSessionEndpointPassthrough();
                 // JAR/JARM handlers remain

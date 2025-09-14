@@ -119,7 +119,10 @@ public class Realm
 
     public List<string> GetAllowedMfaMethods()
     {
-        if (string.IsNullOrEmpty(DefaultAllowedMfaMethods)) return new List<string> { "totp", "sms" };
+        if (string.IsNullOrEmpty(DefaultAllowedMfaMethods)) {
+            return new List<string> { "totp", "sms" };
+        }
+
         try { return System.Text.Json.JsonSerializer.Deserialize<List<string>>(DefaultAllowedMfaMethods) ?? new(); }
         catch { return new List<string> { "totp", "sms" }; }
     }

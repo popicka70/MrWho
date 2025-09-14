@@ -176,7 +176,10 @@ public class ClientCookieConfigurationService : IClientCookieConfigurationServic
             foreach (var client in clients)
             {
                 var id = client.ClientId;
-                if (string.IsNullOrWhiteSpace(id)) continue;
+                if (string.IsNullOrWhiteSpace(id)) {
+                    continue;
+                }
+
                 var scheme = GetCookieSchemeForClient(id);
                 var cookie = GetCookieNameForClient(id);
                 dict[id] = new ClientCookieConfiguration

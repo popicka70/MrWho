@@ -15,8 +15,13 @@ public class GetUsersHandler : IGetUsersHandler
 
     public async Task<PagedResult<UserDto>> HandleAsync(int page, int pageSize, string? search)
     {
-        if (page < 1) page = 1;
-        if (pageSize < 1 || pageSize > 100) pageSize = 10;
+        if (page < 1) {
+            page = 1;
+        }
+
+        if (pageSize < 1 || pageSize > 100) {
+            pageSize = 10;
+        }
 
         var query = _userManager.Users.AsQueryable();
 

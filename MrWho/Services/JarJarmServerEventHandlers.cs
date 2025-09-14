@@ -29,7 +29,7 @@ public sealed class InMemoryJarReplayCache : IJarReplayCache
 {
     private readonly IMemoryCache _cache; public InMemoryJarReplayCache(IMemoryCache cache) => _cache = cache;
     public bool TryAdd(string key, DateTimeOffset expiresUtc)
-    { if (_cache.TryGetValue(key, out _)) return false; var ttl = expiresUtc - DateTimeOffset.UtcNow; if (ttl <= TimeSpan.Zero) ttl = TimeSpan.FromSeconds(1); _cache.Set(key, 1, ttl); return true; }
+    { if (_cache.TryGetValue(key, out _)) { return false; } var ttl = expiresUtc - DateTimeOffset.UtcNow; if (ttl <= TimeSpan.Zero) { ttl = TimeSpan.FromSeconds(1); } _cache.Set(key, 1, ttl); return true; }
 }
 
 // Discovery augmentation handler
@@ -44,7 +44,10 @@ internal sealed class DiscoveryAugmentationHandler : IOpenIddictServerHandler<Ap
     public ValueTask HandleAsync(ApplyConfigurationResponseContext context)
     {
         var resp = context.Response;
-        if (resp is null) return ValueTask.CompletedTask;
+        if (resp is null) {
+            return ValueTask.CompletedTask;
+        }
+
         try
         {
             // Advertise support for both request and request_uri parameters since custom PAR/JAR are implemented.
@@ -96,14 +99,28 @@ internal sealed class DiscoveryAugmentationHandler : IOpenIddictServerHandler<Ap
                     }
                     foreach (var a in list)
                     {
-                        if (a.Equals("HS256", StringComparison.OrdinalIgnoreCase)) hs256 = true;
-                        else if (a.Equals("HS384", StringComparison.OrdinalIgnoreCase)) hs384 = true;
-                        else if (a.Equals("HS512", StringComparison.OrdinalIgnoreCase)) hs512 = true;
+                        if (a.Equals("HS256", StringComparison.OrdinalIgnoreCase)) {
+                            hs256 = true;
+                        }
+                        else if (a.Equals("HS384", StringComparison.OrdinalIgnoreCase)) {
+                            hs384 = true;
+                        }
+                        else if (a.Equals("HS512", StringComparison.OrdinalIgnoreCase)) {
+                            hs512 = true;
+                        }
                     }
                 }
-                if (hs256) algs.Add("HS256");
-                if (hs384) algs.Add("HS384");
-                if (hs512) algs.Add("HS512");
+                if (hs256) {
+                    algs.Add("HS256");
+                }
+
+                if (hs384) {
+                    algs.Add("HS384");
+                }
+
+                if (hs512) {
+                    algs.Add("HS512");
+                }
             }
             catch (Exception ex)
             {
@@ -133,7 +150,9 @@ internal sealed class JarmResponseModeNormalizationHandler : IOpenIddictServerHa
     public ValueTask HandleAsync(ValidateAuthorizationRequestContext context)
     {
         var request = context.Transaction?.Request ?? context.Request;
-        if (request == null) return ValueTask.CompletedTask;
+        if (request == null) {
+            return ValueTask.CompletedTask;
+        }
 
         // Explicit response_mode=jwt request -> normalize
         if (string.Equals(request.ResponseMode, "jwt", StringComparison.OrdinalIgnoreCase))
@@ -146,7 +165,10 @@ internal sealed class JarmResponseModeNormalizationHandler : IOpenIddictServerHa
 
         // Implicit enforcement when client has JarmMode=Required and caller omitted response_mode
         // (don't overwrite if mrwho_jarm already present)
-        if (request.GetParameter("mrwho_jarm") is not null) return ValueTask.CompletedTask;
+        if (request.GetParameter("mrwho_jarm") is not null) {
+            return ValueTask.CompletedTask;
+        }
+
         if (!string.IsNullOrEmpty(request.ClientId))
         {
             try
@@ -183,7 +205,10 @@ internal sealed class JarmAuthorizationResponseHandler : IOpenIddictServerHandle
 
     private static void EnsureKeyId(SecurityKey key, ILogger logger)
     {
-        if (!string.IsNullOrEmpty(key.KeyId)) return; // already has kid
+        if (!string.IsNullOrEmpty(key.KeyId)) {
+            return; // already has kid
+        }
+
         try
         {
             switch (key)
@@ -237,7 +262,9 @@ internal sealed class JarmAuthorizationResponseHandler : IOpenIddictServerHandle
 
             // Collect parameters to embed
             var response = context.Response;
-            if (response is null) return;
+            if (response is null) {
+                return;
+            }
 
             var issuer = response[OpenIddictConstants.Metadata.Issuer]?.ToString()?.TrimEnd('/') ?? string.Empty;
             var clientId = context.Request?.ClientId ?? response[OpenIddictConstants.Parameters.ClientId]?.ToString();
@@ -252,15 +279,23 @@ internal sealed class JarmAuthorizationResponseHandler : IOpenIddictServerHandle
             };
 
             string? codeValue = response[OpenIddictConstants.Parameters.Code]?.ToString();
-            if (!string.IsNullOrEmpty(codeValue)) claims[OpenIddictConstants.Parameters.Code] = codeValue;
+            if (!string.IsNullOrEmpty(codeValue)) {
+                claims[OpenIddictConstants.Parameters.Code] = codeValue;
+            }
+
             string? stateValue = response[OpenIddictConstants.Parameters.State]?.ToString();
-            if (!string.IsNullOrEmpty(stateValue)) claims[OpenIddictConstants.Parameters.State] = stateValue;
+            if (!string.IsNullOrEmpty(stateValue)) {
+                claims[OpenIddictConstants.Parameters.State] = stateValue;
+            }
+
             string? errorValue = response[OpenIddictConstants.Parameters.Error]?.ToString();
             if (!string.IsNullOrEmpty(errorValue))
             {
                 claims[OpenIddictConstants.Parameters.Error] = errorValue;
                 var errDesc = response[OpenIddictConstants.Parameters.ErrorDescription]?.ToString();
-                if (!string.IsNullOrEmpty(errDesc)) claims[OpenIddictConstants.Parameters.ErrorDescription] = errDesc;
+                if (!string.IsNullOrEmpty(errDesc)) {
+                    claims[OpenIddictConstants.Parameters.ErrorDescription] = errDesc;
+                }
             }
 
             // Obtain signing key
@@ -289,7 +324,10 @@ internal sealed class JarmAuthorizationResponseHandler : IOpenIddictServerHandle
             var jwt = handler.CreateToken(descriptor);
 
             // Cleanup original parameters
-            if (!string.IsNullOrEmpty(codeValue)) response[OpenIddictConstants.Parameters.Code] = null;
+            if (!string.IsNullOrEmpty(codeValue)) {
+                response[OpenIddictConstants.Parameters.Code] = null;
+            }
+
             if (!string.IsNullOrEmpty(errorValue))
             {
                 response[OpenIddictConstants.Parameters.Error] = null;

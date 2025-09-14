@@ -35,8 +35,13 @@ public class ScopesController : ControllerBase
         [FromQuery] string? search = null,
         [FromQuery] ScopeType? type = null)
     {
-        if (page < 1) page = 1;
-        if (pageSize < 1 || pageSize > 100) pageSize = 10;
+        if (page < 1) {
+            page = 1;
+        }
+
+        if (pageSize < 1 || pageSize > 100) {
+            pageSize = 10;
+        }
 
         var query = _context.Scopes
             .Include(s => s.Claims)
@@ -247,17 +252,26 @@ public class ScopesController : ControllerBase
         else
         {
             // Update properties
-            if (!string.IsNullOrEmpty(request.DisplayName))
+            if (!string.IsNullOrEmpty(request.DisplayName)) {
                 scope.DisplayName = request.DisplayName;
+            }
+
             scope.Description = request.Description;
-            if (request.IsEnabled.HasValue)
+            if (request.IsEnabled.HasValue) {
                 scope.IsEnabled = request.IsEnabled.Value;
-            if (request.IsRequired.HasValue)
+            }
+
+            if (request.IsRequired.HasValue) {
                 scope.IsRequired = request.IsRequired.Value;
-            if (request.ShowInDiscoveryDocument.HasValue)
+            }
+
+            if (request.ShowInDiscoveryDocument.HasValue) {
                 scope.ShowInDiscoveryDocument = request.ShowInDiscoveryDocument.Value;
-            if (request.Type.HasValue)
+            }
+
+            if (request.Type.HasValue) {
                 scope.Type = request.Type.Value;
+            }
 
             scope.UpdatedAt = DateTime.UtcNow;
             scope.UpdatedBy = User.Identity?.Name;
@@ -466,8 +480,9 @@ public class ScopesController : ControllerBase
 
     private static bool IsValidScopeName(string name)
     {
-        if (string.IsNullOrWhiteSpace(name))
+        if (string.IsNullOrWhiteSpace(name)) {
             return false;
+        }
 
         // Scope names should only contain lowercase letters, numbers, dots, and underscores
         return name.All(c => char.IsLower(c) || char.IsDigit(c) || c == '.' || c == '_');

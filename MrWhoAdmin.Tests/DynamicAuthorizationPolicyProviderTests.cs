@@ -115,7 +115,10 @@ public class DynamicAuthorizationPolicyProviderTests
         services.AddLogging();
         services.AddSingleton<IAuthorizationPolicyProvider>(provider);
         services.AddAuthorization();
-        foreach (var svc in sp.GetServices<IAuthenticationSchemeProvider>()) services.AddSingleton(svc);
+        foreach (var svc in sp.GetServices<IAuthenticationSchemeProvider>()) {
+            services.AddSingleton(svc);
+        }
+
         var authSp = services.BuildServiceProvider();
         var authz = authSp.GetRequiredService<IAuthorizationService>();
         var result = await authz.AuthorizeAsync(principal, null, policy!);

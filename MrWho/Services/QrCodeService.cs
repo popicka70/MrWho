@@ -13,8 +13,9 @@ public sealed class QrCodeService : IQrCodeService
 {
     public string GeneratePngDataUri(string content, int pixelsPerModule = 5)
     {
-        if (string.IsNullOrWhiteSpace(content))
+        if (string.IsNullOrWhiteSpace(content)) {
             throw new ArgumentException("QR content is required", nameof(content));
+        }
 
         using var generator = new QRCodeGenerator();
         using var data = generator.CreateQrCode(content, QRCodeGenerator.ECCLevel.Q);

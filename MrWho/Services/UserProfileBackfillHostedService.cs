@@ -28,7 +28,9 @@ public sealed class UserProfileBackfillHostedService : IHostedService
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             var userManager = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
 
-            if (!await db.Database.CanConnectAsync(cancellationToken)) return;
+            if (!await db.Database.CanConnectAsync(cancellationToken)) {
+                return;
+            }
 
             var userIdsWithProfile = await db.UserProfiles.AsNoTracking().Select(p => p.UserId).ToListAsync(cancellationToken);
             var allUsers = await userManager.Users.Select(u => new { u.Id, u.UserName, u.Email }).ToListAsync(cancellationToken);
@@ -65,8 +67,14 @@ public sealed class UserProfileBackfillHostedService : IHostedService
 
     private static string BuildDisplayName(string source)
     {
-        if (string.IsNullOrWhiteSpace(source)) return "New User";
-        if (source.Contains('@')) source = source.Split('@')[0];
+        if (string.IsNullOrWhiteSpace(source)) {
+            return "New User";
+        }
+
+        if (source.Contains('@')) {
+            source = source.Split('@')[0];
+        }
+
         var friendly = source.Replace('.', ' ').Replace('_', ' ').Replace('-', ' ');
         var words = friendly.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         return string.Join(' ', words.Select(w => char.ToUpper(w[0]) + w[1..].ToLower()));

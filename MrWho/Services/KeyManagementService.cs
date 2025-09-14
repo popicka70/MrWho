@@ -25,8 +25,9 @@ public class KeyManagementService : IKeyManagementService
 
     public async Task EnsureInitializedAsync(CancellationToken ct = default)
     {
-        if (!_options.Value.Enabled)
+        if (!_options.Value.Enabled) {
             return;
+        }
 
         using var scope = _services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
@@ -78,8 +79,12 @@ public class KeyManagementService : IKeyManagementService
                 var rsa = RSA.Create();
                 rsa.ImportFromPem(km.PrivateKeyPem);
                 var key = new RsaSecurityKey(rsa) { KeyId = km.Kid };
-                if (km.Use == "sig") signingKeys.Add(key);
-                else if (km.Use == "enc") encKeys.Add(key);
+                if (km.Use == "sig") {
+                    signingKeys.Add(key);
+                }
+                else if (km.Use == "enc") {
+                    encKeys.Add(key);
+                }
             }
             catch (Exception ex)
             {
@@ -99,7 +104,9 @@ public class KeyManagementService : IKeyManagementService
         {
             var primary = await db.KeyMaterials.Where(k => k.Use == use && k.IsPrimary && k.Status == KeyMaterialStatus.Active)
                 .OrderByDescending(k => k.ActivateAt).FirstOrDefaultAsync(ct);
-            if (primary == null) continue;
+            if (primary == null) {
+                continue;
+            }
 
             if (primary.ActivateAt <= rotateBefore)
             {
@@ -130,8 +137,9 @@ public class KeyManagementService : IKeyManagementService
             {
                 r.Status = KeyMaterialStatus.Retired;
             }
-            if (retiring.Count > 0)
+            if (retiring.Count > 0) {
                 await db.SaveChangesAsync(ct);
+            }
         }
     }
 

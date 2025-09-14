@@ -29,7 +29,10 @@ public sealed class AuditIntegrityVerificationService : IAuditIntegrityVerificat
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
         IQueryable<AuditIntegrityRecord> query = _db.AuditIntegrityRecords.AsNoTracking().OrderBy(r => r.Id);
-        if (max > 0) query = query.Take(max);
+        if (max > 0) {
+            query = query.Take(max);
+        }
+
         var list = await query.ToListAsync(ct);
         string? prev = null;
         string? firstBroken = null;

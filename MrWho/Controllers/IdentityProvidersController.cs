@@ -40,14 +40,20 @@ public class IdentityProvidersController : ControllerBase
     public async Task<ActionResult<IdentityProviderDto>> GetOne(string id)
     {
         var item = await _db.IdentityProviders.FindAsync(id);
-        if (item == null) return NotFound();
+        if (item == null) {
+            return NotFound();
+        }
+
         return Ok(MapToDto(item));
     }
 
     [HttpPost]
     public async Task<ActionResult<IdentityProviderDto>> Create([FromBody] IdentityProviderDto dto)
     {
-        if (string.IsNullOrWhiteSpace(dto.Name)) return ValidationProblem("Name is required");
+        if (string.IsNullOrWhiteSpace(dto.Name)) {
+            return ValidationProblem("Name is required");
+        }
+
         var model = MapFromDto(dto);
         model.Id = Guid.NewGuid().ToString();
         model.CreatedAt = DateTime.UtcNow;
@@ -61,7 +67,9 @@ public class IdentityProvidersController : ControllerBase
     public async Task<ActionResult<IdentityProviderDto>> Update(string id, [FromBody] IdentityProviderDto dto)
     {
         var existing = await _db.IdentityProviders.FindAsync(id);
-        if (existing == null) return NotFound();
+        if (existing == null) {
+            return NotFound();
+        }
 
         // Update selected fields
         existing.Name = dto.Name;
@@ -95,7 +103,9 @@ public class IdentityProvidersController : ControllerBase
     public async Task<IActionResult> Delete(string id)
     {
         var existing = await _db.IdentityProviders.FindAsync(id);
-        if (existing == null) return NotFound();
+        if (existing == null) {
+            return NotFound();
+        }
 
         // Remove links first
         var links = await _db.ClientIdentityProviders.Where(x => x.IdentityProviderId == id).ToListAsync();
@@ -120,8 +130,14 @@ public class IdentityProvidersController : ControllerBase
     [HttpPost("{id}/clients/{clientId}")]
     public async Task<ActionResult<ClientIdentityProviderDto>> LinkToClient(string id, string clientId, [FromBody] ClientIdentityProviderDto? dto)
     {
-        if (!await _db.IdentityProviders.AnyAsync(x => x.Id == id)) return NotFound("IdP not found");
-        if (!await _db.Clients.AnyAsync(x => x.Id == clientId || x.ClientId == clientId)) return NotFound("Client not found");
+        if (!await _db.IdentityProviders.AnyAsync(x => x.Id == id)) {
+            return NotFound("IdP not found");
+        }
+
+        if (!await _db.Clients.AnyAsync(x => x.Id == clientId || x.ClientId == clientId)) {
+            return NotFound("Client not found");
+        }
+
         var client = await _db.Clients.FirstAsync(x => x.Id == clientId || x.ClientId == clientId);
 
         var link = new ClientIdentityProvider
@@ -146,7 +162,10 @@ public class IdentityProvidersController : ControllerBase
     public async Task<IActionResult> UnlinkFromClient(string id, string linkId)
     {
         var link = await _db.ClientIdentityProviders.FirstOrDefaultAsync(x => x.Id == linkId && x.IdentityProviderId == id);
-        if (link == null) return NotFound();
+        if (link == null) {
+            return NotFound();
+        }
+
         _db.ClientIdentityProviders.Remove(link);
         await _db.SaveChangesAsync();
         return NoContent();

@@ -712,18 +712,26 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
             {
                 SetPropertyIfExists(entry, nameof(Client.CreatedAt), now);
                 SetPropertyIfExists(entry, nameof(Client.UpdatedAt), now);
-                if (!string.IsNullOrEmpty(userId)) SetPropertyIfExists(entry, nameof(Client.CreatedBy), userId);
-                if (!string.IsNullOrEmpty(userId)) SetPropertyIfExists(entry, nameof(Client.UpdatedBy), userId);
+                if (!string.IsNullOrEmpty(userId)) {
+                    SetPropertyIfExists(entry, nameof(Client.CreatedBy), userId);
+                }
+
+                if (!string.IsNullOrEmpty(userId)) {
+                    SetPropertyIfExists(entry, nameof(Client.UpdatedBy), userId);
+                }
             }
             else if (entry.State == EntityState.Modified)
             {
                 SetPropertyIfExists(entry, nameof(Client.UpdatedAt), now);
-                if (!string.IsNullOrEmpty(userId)) SetPropertyIfExists(entry, nameof(Client.UpdatedBy), userId);
+                if (!string.IsNullOrEmpty(userId)) {
+                    SetPropertyIfExists(entry, nameof(Client.UpdatedBy), userId);
+                }
             }
 
             // Build audit log for entity if not AuditLog itself
-            if (entry.Entity is AuditLog)
+            if (entry.Entity is AuditLog) {
                 continue;
+            }
 
             var audit = new AuditLog
             {
@@ -810,7 +818,10 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser>, IDataProtec
     private static string GetPrimaryKeyValue(Microsoft.EntityFrameworkCore.ChangeTracking.EntityEntry entry)
     {
         var key = entry.Metadata.FindPrimaryKey();
-        if (key == null) return string.Empty;
+        if (key == null) {
+            return string.Empty;
+        }
+
         var values = key.Properties.Select(p => entry.CurrentValues[p] ?? entry.OriginalValues[p]).ToArray();
         return string.Join("|", values.Select(v => v?.ToString()));
     }

@@ -223,7 +223,10 @@ public class BackChannelLogoutService : IBackChannelLogoutService
 
     private string? GetBackChannelLogoutUri(Models.Client client)
     {
-        if (!string.IsNullOrWhiteSpace(client.BackChannelLogoutUri)) return client.BackChannelLogoutUri;
+        if (!string.IsNullOrWhiteSpace(client.BackChannelLogoutUri)) {
+            return client.BackChannelLogoutUri;
+        }
+
         return client.ClientId switch { "mrwho_demo1" => "https://localhost:7037/signout-backchannel", "mrwho_admin_web" => "https://localhost:7257/signout-backchannel", _ => null };
     }
 }

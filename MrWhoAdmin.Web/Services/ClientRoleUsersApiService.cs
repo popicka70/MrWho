@@ -14,7 +14,10 @@ public class ClientRoleUsersApiService : IClientRoleUsersApiService
         try
         {
             var resp = await _httpClient.GetAsync($"api/clientroles/{Uri.EscapeDataString(clientId)}/roles/{Uri.EscapeDataString(roleName)}/users");
-            if (!resp.IsSuccessStatusCode) return new();
+            if (!resp.IsSuccessStatusCode) {
+                return new();
+            }
+
             var json = await resp.Content.ReadAsStringAsync();
             return JsonSerializer.Deserialize<List<ClientRoleUserDto>>(json, _json) ?? new();
         }

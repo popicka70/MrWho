@@ -545,8 +545,13 @@ public class UsersController : ControllerBase
         [FromQuery] int pageSize = 10,
         [FromQuery] string? search = null)
     {
-        if (page < 1) page = 1;
-        if (pageSize < 1 || pageSize > 100) pageSize = 10;
+        if (page < 1) {
+            page = 1;
+        }
+
+        if (pageSize < 1 || pageSize > 100) {
+            pageSize = 10;
+        }
 
         var query = _roleManager.Roles.AsQueryable();
 
@@ -696,7 +701,9 @@ public class UsersController : ControllerBase
     public async Task<ActionResult<UserEditContextDto>> GetUserEditContext(string id)
     {
         var user = await _userManager.FindByIdAsync(id);
-        if (user == null) return NotFound($"User with ID '{id}' not found.");
+        if (user == null) {
+            return NotFound($"User with ID '{id}' not found.");
+        }
 
         var userRoleNames = await _userManager.GetRolesAsync(user);
         var userClaims = await _userManager.GetClaimsAsync(user);
@@ -819,8 +826,14 @@ public class UsersController : ControllerBase
 
     private static string BuildDisplayName(string source)
     {
-        if (string.IsNullOrWhiteSpace(source)) return "New User";
-        if (source.Contains('@')) source = source.Split('@')[0];
+        if (string.IsNullOrWhiteSpace(source)) {
+            return "New User";
+        }
+
+        if (source.Contains('@')) {
+            source = source.Split('@')[0];
+        }
+
         var friendly = source.Replace('.', ' ').Replace('_', ' ').Replace('-', ' ');
         var words = friendly.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         return string.Join(' ', words.Select(w => char.ToUpper(w[0]) + w[1..].ToLower()));
@@ -845,8 +858,9 @@ public static class StringExtensions
 {
     public static string ToTitleCase(this string input)
     {
-        if (string.IsNullOrEmpty(input))
+        if (string.IsNullOrEmpty(input)) {
             return input;
+        }
 
         return CultureInfo.CurrentCulture.TextInfo.ToTitleCase(input.ToLower());
     }

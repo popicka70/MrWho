@@ -78,13 +78,19 @@ public sealed class OidcLogoutHandler : IRequestHandler<MrWho.Endpoints.OidcLogo
             }
 
             await _dynamicCookieService.SignOutFromClientAsync(clientId);
-            if (audit != null) await audit.WriteAsync("auth.security", "logout.client", new { clientId }, "info", actorClientId: clientId, ip: context.Connection.RemoteIpAddress?.ToString());
+            if (audit != null) {
+                await audit.WriteAsync("auth.security", "logout.client", new { clientId }, "info", actorClientId: clientId, ip: context.Connection.RemoteIpAddress?.ToString());
+            }
+
             return Results.SignOut(authenticationSchemes: new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error processing OIDC logout");
-            if (audit != null) await audit.WriteAsync("auth.security", "logout.error", new { ex = ex.Message }, "error", ip: context.Connection.RemoteIpAddress?.ToString());
+            if (audit != null) {
+                await audit.WriteAsync("auth.security", "logout.error", new { ex = ex.Message }, "error", ip: context.Connection.RemoteIpAddress?.ToString());
+            }
+
             return Results.Problem("Error processing logout");
         }
     }

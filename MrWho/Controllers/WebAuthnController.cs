@@ -65,7 +65,9 @@ public class WebAuthnController : Controller
         var fromConfig = config.GetSection("WebAuthn:Origins").Get<string[]>() ?? Array.Empty<string>();
         foreach (var o in fromConfig)
         {
-            if (!string.IsNullOrWhiteSpace(o)) origins.Add(o);
+            if (!string.IsNullOrWhiteSpace(o)) {
+                origins.Add(o);
+            }
         }
         // sensible dev defaults
         origins.Add("https://localhost:7113");
@@ -89,7 +91,10 @@ public class WebAuthnController : Controller
     public async Task<IActionResult> GetRegisterOptions([FromQuery] string? nickname = null)
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user == null) return Unauthorized();
+        if (user == null) {
+            return Unauthorized();
+        }
+
         var userId = Encoding.UTF8.GetBytes(user.Id);
 
         // Exclude already-registered credentials
@@ -129,8 +134,13 @@ public class WebAuthnController : Controller
     public async Task<IActionResult> PostRegisterVerify([FromBody] AuthenticatorAttestationRawResponse attestationResponse)
     {
         var user = await _userManager.GetUserAsync(User);
-        if (user == null) return Unauthorized();
-        if (!_attestationOptions.TryGetValue(user.Id, out var options)) return BadRequest("No options for user");
+        if (user == null) {
+            return Unauthorized();
+        }
+
+        if (!_attestationOptions.TryGetValue(user.Id, out var options)) {
+            return BadRequest("No options for user");
+        }
 
         dynamic res;
         var f = (dynamic)_fido2;
@@ -232,14 +242,18 @@ public class WebAuthnController : Controller
     public async Task<IActionResult> PostLoginVerify([FromBody] AuthenticatorAssertionRawResponse clientResponse, [FromQuery] string? returnUrl = null, [FromQuery] string? clientId = null)
     {
         var key = HttpContext.Session.Id;
-        if (!_assertionOptions.TryGetValue(key, out var options)) return BadRequest("No assertion options in session");
+        if (!_assertionOptions.TryGetValue(key, out var options)) {
+            return BadRequest("No assertion options in session");
+        }
 
         async Task<dynamic> VerifyAsync()
         {
             // 1) Find the credential by id
             var credentialId = clientResponse.Id;
             var cred = await _db.WebAuthnCredentials.FirstOrDefaultAsync(c => c.CredentialId == credentialId);
-            if (cred == null) throw new InvalidOperationException("Unknown credential");
+            if (cred == null) {
+                throw new InvalidOperationException("Unknown credential");
+            }
 
             // 2) Get stored public key and counter
             var storedPublicKey = WebEncoders.Base64UrlDecode(cred.PublicKey);
@@ -271,7 +285,9 @@ public class WebAuthnController : Controller
             var credId = clientResponse.Id;
             var cred = await _db.WebAuthnCredentials.FirstAsync(c => c.CredentialId == credId);
             var user = await _userManager.FindByIdAsync(cred.UserId);
-            if (user == null) return Unauthorized();
+            if (user == null) {
+                return Unauthorized();
+            }
 
             // Eligibility validation BEFORE sign-in or client cookie
             if (!string.IsNullOrEmpty(clientId))
@@ -340,8 +356,9 @@ public class WebAuthnController : Controller
 
             if (!string.IsNullOrEmpty(returnUrl))
             {
-                if (Url.IsLocalUrl(returnUrl) || returnUrl.Contains("/connect/authorize", StringComparison.OrdinalIgnoreCase))
+                if (Url.IsLocalUrl(returnUrl) || returnUrl.Contains("/connect/authorize", StringComparison.OrdinalIgnoreCase)) {
                     return Redirect(returnUrl);
+                }
             }
             return Redirect("/");
         }

@@ -59,15 +59,19 @@ public class AuthController : Controller
         if (schemes == null)
         {
             // multi-profile but no selection – go pick one
-            if (_profiles.GetProfiles().Count > 1)
+            if (_profiles.GetProfiles().Count > 1) {
                 return Redirect("/login");
+            }
         }
         var (cookieScheme, oidcScheme) = schemes!.Value;
         var properties = new AuthenticationProperties
         {
             RedirectUri = !string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl) ? returnUrl : "/"
         };
-        if (force) properties.Items["force"] = "1";
+        if (force) {
+            properties.Items["force"] = "1";
+        }
+
         _logger.LogInformation("Initiating login using scheme {Scheme} (cookie={Cookie})", oidcScheme, cookieScheme);
         return Challenge(properties, oidcScheme);
     }
@@ -148,10 +152,14 @@ public class AuthController : Controller
         try
         {
             var refreshResult = await _tokenRefreshService.RefreshTokenWithReauthAsync(HttpContext, force: true);
-            if (refreshResult.Success)
+            if (refreshResult.Success) {
                 return Redirect(LocalRedirectUrl(returnUrl));
-            if (refreshResult.RequiresReauth)
+            }
+
+            if (refreshResult.RequiresReauth) {
                 return await _tokenRefreshService.TriggerReauthenticationAsync(HttpContext, returnUrl);
+            }
+
             return Redirect(LocalRedirectUrl(returnUrl) + "?refreshError=true");
         }
         catch (Exception ex)

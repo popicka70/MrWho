@@ -26,7 +26,9 @@ public sealed class ClientSecretService : IClientSecretService
     public async Task<(ClientSecretHistory record, string? plainSecret)> SetNewSecretAsync(string clientId, string? providedPlaintext = null, DateTime? expiresAt = null, bool markOldAsRetired = true, CancellationToken ct = default)
     {
         var client = await _db.Clients.FirstOrDefaultAsync(c => c.Id == clientId || c.ClientId == clientId, ct);
-        if (client is null) throw new InvalidOperationException($"Client '{clientId}' not found");
+        if (client is null) {
+            throw new InvalidOperationException($"Client '{clientId}' not found");
+        }
 
         // Optionally retire previous active secrets
         if (markOldAsRetired)
@@ -93,7 +95,9 @@ public sealed class ClientSecretService : IClientSecretService
     public async Task<bool> VerifyAsync(string clientPublicIdOrDbId, string presentedSecret, CancellationToken ct = default)
     {
         var client = await _db.Clients.FirstOrDefaultAsync(c => c.Id == clientPublicIdOrDbId || c.ClientId == clientPublicIdOrDbId, ct);
-        if (client is null) return false;
+        if (client is null) {
+            return false;
+        }
 
         var secrets = await _db.Set<ClientSecretHistory>()
             .Where(s => s.ClientId == client.Id && s.Status == ClientSecretStatus.Active && (!s.ExpiresAt.HasValue || s.ExpiresAt > DateTime.UtcNow))
@@ -116,12 +120,18 @@ public sealed class ClientSecretService : IClientSecretService
     public async Task<string?> GetActivePlaintextAsync(string clientPublicIdOrDbId, CancellationToken ct = default)
     {
         var client = await _db.Clients.FirstOrDefaultAsync(c => c.Id == clientPublicIdOrDbId || c.ClientId == clientPublicIdOrDbId, ct);
-        if (client is null) return null;
+        if (client is null) {
+            return null;
+        }
+
         var rec = await _db.ClientSecretHistories
             .Where(s => s.ClientId == client.Id && s.Status == ClientSecretStatus.Active && (!s.ExpiresAt.HasValue || s.ExpiresAt > DateTime.UtcNow))
             .OrderByDescending(s => s.CreatedAt)
             .FirstOrDefaultAsync(ct);
-        if (rec?.EncryptedSecret == null) return null; // legacy or none
+        if (rec?.EncryptedSecret == null) {
+            return null; // legacy or none
+        }
+
         try { return _protector.Unprotect(rec.EncryptedSecret); }
         catch (Exception ex) { _logger.LogWarning(ex, "Failed to unprotect secret for client {ClientId}", client.ClientId); return null; }
     }

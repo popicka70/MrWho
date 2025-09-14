@@ -25,7 +25,9 @@ public class ClaimTypeSeederService : IClaimTypeSeederService
     public async Task SeedClaimTypesAsync()
     {
         // Ensure database reachable
-        if (!await _context.Database.CanConnectAsync()) return;
+        if (!await _context.Database.CanConnectAsync()) {
+            return;
+        }
 
         var existing = await _context.ClaimTypes.AsNoTracking().ToListAsync();
         var existingTypes = existing.Select(c => c.Type).ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -60,7 +62,10 @@ public class ClaimTypeSeederService : IClaimTypeSeederService
 
         foreach (var type in referenced)
         {
-            if (string.IsNullOrWhiteSpace(type)) continue;
+            if (string.IsNullOrWhiteSpace(type)) {
+                continue;
+            }
+
             if (!existingTypes.Contains(type) && !CommonClaimTypes.StandardClaims.Any(s => s.Type == type))
             {
                 var display = CultureInfo.CurrentCulture.TextInfo.ToTitleCase(type.Replace("_", " ").ToLowerInvariant());

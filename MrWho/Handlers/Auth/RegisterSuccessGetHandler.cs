@@ -48,8 +48,12 @@ public sealed class RegisterSuccessGetHandler : IRequestHandler<MrWho.Endpoints.
                     customCssUrl = client.CustomCssUrl ?? client.Realm?.RealmCustomCssUrl;
                     var showClientLogo = (bool?)client.GetType().GetProperty("ShowClientLogo")?.GetValue(client) ?? true;
                     var clientLogo = (string?)client.GetType().GetProperty("LogoUri")?.GetValue(client);
-                    if (showClientLogo && !string.IsNullOrWhiteSpace(clientLogo)) logoUri = clientLogo;
-                    else if (!string.IsNullOrWhiteSpace(client.Realm?.RealmLogoUri)) logoUri = client.Realm!.RealmLogoUri;
+                    if (showClientLogo && !string.IsNullOrWhiteSpace(clientLogo)) {
+                        logoUri = clientLogo;
+                    }
+                    else if (!string.IsNullOrWhiteSpace(client.Realm?.RealmLogoUri)) {
+                        logoUri = client.Realm!.RealmLogoUri;
+                    }
                 }
                 else
                 {
@@ -61,10 +65,21 @@ public sealed class RegisterSuccessGetHandler : IRequestHandler<MrWho.Endpoints.
                 themeName = _mrWhoOptions.Value.DefaultThemeName;
             }
 
-            if (!string.IsNullOrWhiteSpace(themeName)) vd["ThemeName"] = themeName;
-            if (!string.IsNullOrWhiteSpace(customCssUrl)) vd["CustomCssUrl"] = customCssUrl;
-            if (!string.IsNullOrWhiteSpace(logoUri)) vd["LogoUri"] = logoUri;
-            if (!string.IsNullOrWhiteSpace(clientName)) vd["ClientName"] = clientName;
+            if (!string.IsNullOrWhiteSpace(themeName)) {
+                vd["ThemeName"] = themeName;
+            }
+
+            if (!string.IsNullOrWhiteSpace(customCssUrl)) {
+                vd["CustomCssUrl"] = customCssUrl;
+            }
+
+            if (!string.IsNullOrWhiteSpace(logoUri)) {
+                vd["LogoUri"] = logoUri;
+            }
+
+            if (!string.IsNullOrWhiteSpace(clientName)) {
+                vd["ClientName"] = clientName;
+            }
         }
         catch { }
 

@@ -22,13 +22,16 @@ public static class MrWhoClientAuthLoginLogoutEndpointExtensions
         string pattern = "/login")
     {
         ArgumentNullException.ThrowIfNull(endpoints);
-        if (string.IsNullOrWhiteSpace(pattern)) pattern = "/login";
+        if (string.IsNullOrWhiteSpace(pattern)) {
+            pattern = "/login";
+        }
 
         return endpoints.MapGet(pattern, async context =>
         {
             var returnUrl = context.Request.Query["returnUrl"].ToString();
-            if (string.IsNullOrWhiteSpace(returnUrl) || !Uri.IsWellFormedUriString(returnUrl, UriKind.Relative))
+            if (string.IsNullOrWhiteSpace(returnUrl) || !Uri.IsWellFormedUriString(returnUrl, UriKind.Relative)) {
                 returnUrl = "/";
+            }
 
             var provider = (IAuthenticationSchemeProvider?)context.RequestServices.GetService(typeof(IAuthenticationSchemeProvider));
             var challengeScheme = provider is null ? null : await provider.GetDefaultChallengeSchemeAsync();
@@ -60,13 +63,16 @@ public static class MrWhoClientAuthLoginLogoutEndpointExtensions
         string pattern = "/logout")
     {
         ArgumentNullException.ThrowIfNull(endpoints);
-        if (string.IsNullOrWhiteSpace(pattern)) pattern = "/logout";
+        if (string.IsNullOrWhiteSpace(pattern)) {
+            pattern = "/logout";
+        }
 
         async Task Handle(HttpContext context)
         {
             var returnUrl = context.Request.Query["returnUrl"].ToString();
-            if (string.IsNullOrWhiteSpace(returnUrl) || !Uri.IsWellFormedUriString(returnUrl, UriKind.Relative))
+            if (string.IsNullOrWhiteSpace(returnUrl) || !Uri.IsWellFormedUriString(returnUrl, UriKind.Relative)) {
                 returnUrl = "/";
+            }
 
             var provider = (IAuthenticationSchemeProvider?)context.RequestServices.GetService(typeof(IAuthenticationSchemeProvider));
             if (provider is null)

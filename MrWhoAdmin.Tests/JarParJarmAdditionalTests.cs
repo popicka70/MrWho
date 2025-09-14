@@ -72,7 +72,10 @@ public class JarParJarmAdditionalTests
         {
             var pad = new byte[required];
             Array.Copy(bytes, pad, bytes.Length);
-            for (int i = bytes.Length; i < required; i++) pad[i] = (byte)'!';
+            for (int i = bytes.Length; i < required; i++) {
+                pad[i] = (byte)'!';
+            }
+
             bytes = pad;
         }
         return new SigningCredentials(new SymmetricSecurityKey(bytes), alg);
@@ -96,7 +99,10 @@ public class JarParJarmAdditionalTests
             ["code_challenge"] = challenge,
             ["code_challenge_method"] = "S256"
         };
-        if (includeJti) claims["jti"] = Guid.NewGuid().ToString("n");
+        if (includeJti) {
+            claims["jti"] = Guid.NewGuid().ToString("n");
+        }
+
         var desc = new SecurityTokenDescriptor
         {
             Issuer = clientId,

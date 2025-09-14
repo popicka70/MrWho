@@ -57,8 +57,9 @@ public class ClientRoleServiceTests
 
             // Create user
             var createResult = UserManager.CreateAsync(User, "Pass123$!").GetAwaiter().GetResult();
-            if (!createResult.Succeeded)
+            if (!createResult.Succeeded) {
                 throw new InvalidOperationException("Failed creating test user: " + string.Join(',', createResult.Errors.Select(e => e.Description)));
+            }
 
             // Create a global role and assign to user so global role retrieval path is exercised
             Db.Roles.Add(new IdentityRole { Name = "globalAdmin", NormalizedName = "GLOBALADMIN" });

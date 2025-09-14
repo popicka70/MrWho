@@ -80,19 +80,34 @@ internal sealed class JarRequestObjectSigner : IJarRequestObjectSigner
             ["exp"] = exp.ToUnixTimeSeconds(),
             ["nbf"] = now.AddSeconds(-_options.ClockSkew.TotalSeconds).ToUnixTimeSeconds()
         };
-        if (!string.IsNullOrWhiteSpace(request.Scope)) claims["scope"] = request.Scope!;
-        if (!string.IsNullOrWhiteSpace(request.State)) claims["state"] = request.State!;
+        if (!string.IsNullOrWhiteSpace(request.Scope)) {
+            claims["scope"] = request.Scope!;
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.State)) {
+            claims["state"] = request.State!;
+        }
+
         if (!string.IsNullOrWhiteSpace(request.CodeChallenge))
         {
             claims["code_challenge"] = request.CodeChallenge;
             claims["code_challenge_method"] = request.CodeChallengeMethod ?? "S256";
         }
-        if (!string.IsNullOrWhiteSpace(request.Nonce)) claims["nonce"] = request.Nonce!; // NEW
-        foreach (var kv in request.Extra)
+        if (!string.IsNullOrWhiteSpace(request.Nonce)) {
+            claims["nonce"] = request.Nonce!; // NEW
+        }
+
+        foreach (var kv in request.Extra) {
             claims[kv.Key] = kv.Value;
-        foreach (var s in _options.StaticClaims)
+        }
+
+        foreach (var s in _options.StaticClaims) {
             claims[s.Key] = s.Value;
-        if (jti != null) claims["jti"] = jti;
+        }
+
+        if (jti != null) {
+            claims["jti"] = jti;
+        }
 
         var handler = new Microsoft.IdentityModel.JsonWebTokens.JsonWebTokenHandler();
         var token = handler.CreateToken(new SecurityTokenDescriptor
@@ -111,8 +126,10 @@ internal sealed class JarRequestObjectSigner : IJarRequestObjectSigner
         if (_options.Algorithm.StartsWith("HS", StringComparison.OrdinalIgnoreCase))
         {
             var secret = _options.ClientSecret;
-            if (string.IsNullOrWhiteSpace(secret) || Encoding.UTF8.GetByteCount(secret) < 32)
+            if (string.IsNullOrWhiteSpace(secret) || Encoding.UTF8.GetByteCount(secret) < 32) {
                 throw new InvalidOperationException("ClientSecret must be >=32 bytes for HS algorithms");
+            }
+
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
             return new SigningCredentials(key, _options.Algorithm);
         }
@@ -120,8 +137,10 @@ internal sealed class JarRequestObjectSigner : IJarRequestObjectSigner
         {
             if (_options.RsaCertificate != null)
             {
-                if (!_options.RsaCertificate.HasPrivateKey)
+                if (!_options.RsaCertificate.HasPrivateKey) {
                     throw new InvalidOperationException("Provided certificate does not contain a private key");
+                }
+
                 return new SigningCredentials(new X509SecurityKey(_options.RsaCertificate), SecurityAlgorithms.RsaSha256);
             }
             if (!string.IsNullOrWhiteSpace(_options.RsaPrivateKeyPem))

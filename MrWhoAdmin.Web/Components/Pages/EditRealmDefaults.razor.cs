@@ -172,7 +172,10 @@ public partial class EditRealmDefaults
 
     internal bool IsMethodSelected(string method)
     {
-        if (string.IsNullOrWhiteSpace(model.DefaultAllowedMfaMethods)) return false;
+        if (string.IsNullOrWhiteSpace(model.DefaultAllowedMfaMethods)) {
+            return false;
+        }
+
         try
         {
             var methods = System.Text.Json.JsonSerializer.Deserialize<string[]>(model.DefaultAllowedMfaMethods);
@@ -189,15 +192,22 @@ public partial class EditRealmDefaults
             try
             {
                 var existing = System.Text.Json.JsonSerializer.Deserialize<string[]>(model.DefaultAllowedMfaMethods);
-                if (existing != null) list.AddRange(existing);
+                if (existing != null) {
+                    list.AddRange(existing);
+                }
             }
             catch { }
         }
         if (selected)
         {
-            if (!list.Contains(method)) list.Add(method);
+            if (!list.Contains(method)) {
+                list.Add(method);
+            }
         }
-        else list.Remove(method);
+        else {
+            list.Remove(method);
+        }
+
         model.DefaultAllowedMfaMethods = list.Any() ? System.Text.Json.JsonSerializer.Serialize(list) : null;
     }
 
@@ -211,7 +221,9 @@ public partial class EditRealmDefaults
                 NotificationService.Notify(NotificationSeverity.Success, "Success", "Realm defaults saved");
                 Navigation.NavigateTo($"/realms/edit/{Id}");
             }
-            else NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to save realm defaults");
+            else {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Failed to save realm defaults");
+            }
         }
         catch (Exception ex)
         {
@@ -223,7 +235,9 @@ public partial class EditRealmDefaults
     internal async Task ResetToSystemDefaults()
     {
         var ok = await DialogService.Confirm("Reset all realm defaults to system-wide defaults?", "Reset to System Defaults", new ConfirmOptions() { OkButtonText = "Reset", CancelButtonText = "Cancel" });
-        if (ok != true) return;
+        if (ok != true) {
+            return;
+        }
         // Token lifetimes
         model.AccessTokenLifetime = MrWho.Shared.MrWhoConstants.TokenLifetimes.AccessToken;
         model.RefreshTokenLifetime = MrWho.Shared.MrWhoConstants.TokenLifetimes.RefreshToken;

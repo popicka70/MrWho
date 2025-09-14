@@ -45,8 +45,9 @@ public class IdentityResourcesController : ControllerBase
     /// </summary>
     private static string ToTitleCase(string input)
     {
-        if (string.IsNullOrEmpty(input))
+        if (string.IsNullOrEmpty(input)) {
             return input;
+        }
 
         return System.Globalization.CultureInfo.CurrentCulture.TextInfo.ToTitleCase(input.ToLower());
     }
@@ -286,18 +287,29 @@ public class IdentityResourcesController : ControllerBase
             var userName = User.Identity?.Name ?? "Unknown";
 
             // Update basic properties
-            if (request.DisplayName != null)
+            if (request.DisplayName != null) {
                 identityResource.DisplayName = request.DisplayName;
-            if (request.Description != null)
+            }
+
+            if (request.Description != null) {
                 identityResource.Description = request.Description;
-            if (request.IsEnabled.HasValue)
+            }
+
+            if (request.IsEnabled.HasValue) {
                 identityResource.IsEnabled = request.IsEnabled.Value;
-            if (request.IsRequired.HasValue)
+            }
+
+            if (request.IsRequired.HasValue) {
                 identityResource.IsRequired = request.IsRequired.Value;
-            if (request.ShowInDiscoveryDocument.HasValue)
+            }
+
+            if (request.ShowInDiscoveryDocument.HasValue) {
                 identityResource.ShowInDiscoveryDocument = request.ShowInDiscoveryDocument.Value;
-            if (request.Emphasize.HasValue)
+            }
+
+            if (request.Emphasize.HasValue) {
                 identityResource.Emphasize = request.Emphasize.Value;
+            }
 
             identityResource.UpdatedAt = DateTime.UtcNow;
             identityResource.UpdatedBy = userName;

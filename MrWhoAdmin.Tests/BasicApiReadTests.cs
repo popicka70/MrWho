@@ -176,7 +176,10 @@ public class BasicApiReadTests
     {
         using var client = await CreateAuthorizedClientAsync();
         var (id, _) = await GetFirstItemAsync(client, "api/realms?page=1&pageSize=1");
-        if (string.IsNullOrEmpty(id)) return; // no realms yet
+        if (string.IsNullOrEmpty(id)) {
+            return; // no realms yet
+        }
+
         var detail = await client.GetAsync($"api/realms/{id}");
         Assert.AreEqual(HttpStatusCode.OK, detail.StatusCode);
         var export = await client.GetAsync($"api/realms/{id}/export");
@@ -190,7 +193,10 @@ public class BasicApiReadTests
     {
         using var client = await CreateAuthorizedClientAsync();
         var (id, _) = await GetFirstItemAsync(client, "api/clients?page=1&pageSize=1");
-        if (string.IsNullOrEmpty(id)) return; // no clients yet
+        if (string.IsNullOrEmpty(id)) {
+            return; // no clients yet
+        }
+
         var detail = await client.GetAsync($"api/clients/{id}");
         Assert.AreEqual(HttpStatusCode.OK, detail.StatusCode);
         var export = await client.GetAsync($"api/clients/{id}/export");
@@ -202,7 +208,10 @@ public class BasicApiReadTests
     {
         using var client = await CreateAuthorizedClientAsync();
         var (id, _) = await GetFirstItemAsync(client, "api/apiresources?page=1&pageSize=1");
-        if (string.IsNullOrEmpty(id)) return; // none
+        if (string.IsNullOrEmpty(id)) {
+            return; // none
+        }
+
         var detail = await client.GetAsync($"api/apiresources/{id}");
         Assert.AreEqual(HttpStatusCode.OK, detail.StatusCode);
     }
@@ -212,7 +221,10 @@ public class BasicApiReadTests
     {
         using var client = await CreateAuthorizedClientAsync();
         var (id, _) = await GetFirstItemAsync(client, "api/identityresources?page=1&pageSize=1");
-        if (string.IsNullOrEmpty(id)) return; // none
+        if (string.IsNullOrEmpty(id)) {
+            return; // none
+        }
+
         var detail = await client.GetAsync($"api/identityresources/{id}");
         Assert.AreEqual(HttpStatusCode.OK, detail.StatusCode);
     }

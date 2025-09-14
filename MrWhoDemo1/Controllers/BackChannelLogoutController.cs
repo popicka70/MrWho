@@ -72,8 +72,13 @@ public class BackChannelLogoutController : ControllerBase
                 {
                     using var doc = JsonDocument.Parse(logout_token);
                     var root = doc.RootElement;
-                    if (root.TryGetProperty("sub", out var subElement)) subject = subElement.GetString();
-                    if (root.TryGetProperty("sid", out var sidElement)) sessionId = sidElement.GetString();
+                    if (root.TryGetProperty("sub", out var subElement)) {
+                        subject = subElement.GetString();
+                    }
+
+                    if (root.TryGetProperty("sid", out var sidElement)) {
+                        sessionId = sidElement.GetString();
+                    }
                 }
                 catch (Exception jsonEx)
                 {
