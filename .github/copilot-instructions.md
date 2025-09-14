@@ -70,7 +70,12 @@ services.AddIsolatedTestDatabase();   // Isolated database per test
 - Follow security best practices for OIDC/OAuth2
 - Use mediator pattern for controllers
 - Private instance fields start with underscore
-
+- Use PascalCase for method names and properties.
+- Prefer `async`/`await` with `ConfigureAwait(false)` for I/O-bound operations.
+- Include XML documentation for public methods.
+- Use `CancellationToken` in async methods.
+- Follow Microsoft .NET naming conventions.
+- 
 ## Development Workflow
 - Use Visual Studio 2022 for development
 - Commands should be executed in Visual Studio 2022 Developer PowerShell

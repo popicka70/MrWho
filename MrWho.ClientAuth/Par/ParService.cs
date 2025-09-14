@@ -3,7 +3,7 @@ using System.Text;
 using System.Text.Json;
 using System.Web;
 using MrWho.ClientAuth.Jar;
-using System.Security.Cryptography; // NEW for nonce
+using System.Security.Cryptography;
 
 namespace MrWho.ClientAuth.Par;
 
@@ -53,10 +53,15 @@ internal sealed class PushedAuthorizationService : IPushedAuthorizationService
             request.RequestObjectJwt = await _jarSigner.CreateRequestObjectAsync(jarReq, ct);
         }
 
+        // Determine Basic vs body secret
         string? secretForBasic = null;
-        if (request.Extra.TryGetValue("client_secret_for_par_auth", out var tmpSecret) && !string.IsNullOrWhiteSpace(tmpSecret))
+        if (!string.IsNullOrWhiteSpace(request.ClientSecret) && request.UseBasicAuth)
         {
-            secretForBasic = tmpSecret;
+            secretForBasic = request.ClientSecret;
+        }
+        else if (request.Extra.TryGetValue("client_secret_for_par_auth", out var tmpSecret) && !string.IsNullOrWhiteSpace(tmpSecret))
+        {
+            secretForBasic = tmpSecret; // legacy support
         }
 
         var form = new List<KeyValuePair<string?, string?>>
@@ -76,13 +81,13 @@ internal sealed class PushedAuthorizationService : IPushedAuthorizationService
         if (!string.IsNullOrWhiteSpace(request.RequestObjectJwt)) form.Add(new("request", request.RequestObjectJwt));
         foreach (var kv in request.Extra)
         {
-            if (kv.Key == "client_secret_for_par_auth") continue; // handled via basic auth header
+            if (kv.Key is "client_secret_for_par_auth" or "client_secret") continue;
             form.Add(new(kv.Key, kv.Value));
         }
         // Optional inline secret (if caller prefers body instead of Basic)
-        if (secretForBasic == null && request.Extra.TryGetValue("client_secret", out var inlineSecret) && !string.IsNullOrWhiteSpace(inlineSecret))
+        if (secretForBasic == null && !string.IsNullOrWhiteSpace(request.ClientSecret) && !request.UseBasicAuth)
         {
-            form.Add(new("client_secret", inlineSecret));
+            form.Add(new("client_secret", request.ClientSecret));
         }
 
         var httpRequest = new HttpRequestMessage(HttpMethod.Post, _options.ParEndpoint)

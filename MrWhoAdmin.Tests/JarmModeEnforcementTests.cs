@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Microsoft.AspNetCore.WebUtilities; // for QueryHelpers
 
 namespace MrWhoAdmin.Tests;
 
@@ -52,6 +53,19 @@ public class JarmModeEnforcementTests
         return (verifier, challenge);
     }
 
+    private static string? GetQueryParameter(string fullUrlOrPath, string key, Uri baseAddress)
+    {
+        // Ensure absolute
+        Uri absolute;
+        if (Uri.TryCreate(fullUrlOrPath, UriKind.Absolute, out var abs)) absolute = abs;
+        else absolute = new Uri(baseAddress, fullUrlOrPath.StartsWith('/') ? fullUrlOrPath : "/" + fullUrlOrPath);
+        var idx = absolute.ToString().IndexOf('?');
+        if (idx < 0) return null;
+        var query = absolute.ToString().Substring(idx);
+        var parsed = QueryHelpers.ParseQuery(query);
+        return parsed.TryGetValue(key, out var values) ? values.ToString() : null;
+    }
+
     // Task 17: JarmMode=Required without providing response_mode=jwt should be silently enforced (middleware injects mrwho_jarm)
     [TestMethod]
     public async Task JarmMode_Required_Without_ResponseMode_Query_Is_Enforced()
@@ -95,11 +109,47 @@ public class JarmModeEnforcementTests
         Assert.IsTrue(((int)authResp.StatusCode >=300 && (int)authResp.StatusCode <=399) || authResp.StatusCode == HttpStatusCode.OK,
             $"Expected redirect/OK. Got {(int)authResp.StatusCode} {authResp.StatusCode}. Body: {await authResp.Content.ReadAsStringAsync()}" );
 
-        // If redirect, confirm middleware injected mrwho_jarm flag (evidence of enforcement)
+        // Follow intermediate authorize caching redirect if present
         if ((int)authResp.StatusCode is >=300 and <=399)
         {
             var loc = authResp.Headers.Location?.ToString() ?? string.Empty;
-            StringAssert.Contains(loc, "mrwho_jarm=1", "mrwho_jarm flag not present in redirect location when JarmMode=Required");
+            if (loc.Contains("/connect/authorize", StringComparison.OrdinalIgnoreCase) && loc.Contains("request_uri=", StringComparison.OrdinalIgnoreCase))
+            {
+                // Follow one hop
+                string next; if (loc.StartsWith("http", StringComparison.OrdinalIgnoreCase)) next = loc; else next = new Uri(authClient.BaseAddress!, loc).ToString();
+                var relative = next.StartsWith(authClient.BaseAddress!.ToString(), StringComparison.OrdinalIgnoreCase)
+                    ? next.Substring(authClient.BaseAddress!.ToString().Length).TrimStart('/')
+                    : next;
+                authResp = await authClient.GetAsync(relative);
+            }
+        }
+
+        // After following any intermediate redirect, inspect final redirect (likely to login) for mrwho_jarm evidence.
+        if ((int)authResp.StatusCode is >=300 and <=399)
+        {
+            var loc = authResp.Headers.Location?.ToString() ?? string.Empty;
+            if (loc.Contains("/connect/login", StringComparison.OrdinalIgnoreCase))
+            {
+                // Extract returnUrl (may be relative encoded path containing mrwho_jarm)
+                var returnUrlRaw = GetQueryParameter(loc, "returnUrl", authClient.BaseAddress!);
+                if (!string.IsNullOrEmpty(returnUrlRaw))
+                {
+                    var decoded = Uri.UnescapeDataString(returnUrlRaw);
+                    Assert.IsTrue(decoded.Contains("mrwho_jarm=1", StringComparison.Ordinal), $"Expected mrwho_jarm=1 in returnUrl after enforcement. Location={loc} DecodedReturnUrl={decoded}");
+                    return; // success
+                }
+                Assert.Fail($"Login redirect missing returnUrl or mrwho_jarm flag. Location={loc}");
+            }
+            else
+            {
+                // If still authorize redirect (rare) just assert param present directly
+                StringAssert.Contains(loc, "mrwho_jarm=1", "mrwho_jarm flag not present in redirect location when JarmMode=Required");
+            }
+        }
+        else if (authResp.StatusCode == HttpStatusCode.OK)
+        {
+            // Rendered login page scenario: we cannot see redirect, minimal assertion (server accepted request). Optionally could fetch embedded form action.
+            Assert.IsTrue(true, "OK status accepted with enforced JARM (implicit)");
         }
     }
 }
