@@ -127,25 +127,24 @@ public static class MrWhoClientAuthBuilderExtensions
                                     State = ctx.ProtocolMessage.State,
                                     CodeChallenge = ctx.ProtocolMessage.GetParameter("code_challenge"),
                                     CodeChallengeMethod = ctx.ProtocolMessage.GetParameter("code_challenge_method"),
-                                    Nonce = ctx.ProtocolMessage.Nonce
+                                    Nonce = ctx.ProtocolMessage.Nonce,
+                                    ClientSecret = options.ClientSecret, // NEW: include secret for confidential clients
+                                    UseBasicAuth = true // prefer client_secret_basic
                                 };
                                 // Preserve response_mode (e.g. jwt for JARM)
                                 if (!string.IsNullOrEmpty(ctx.ProtocolMessage.ResponseMode))
                                     authReq.Extra["response_mode"] = ctx.ProtocolMessage.ResponseMode;
-                                // If caller already put any custom params, replicate (none by default)
                                 var (result, error) = await parService.PushAsync(authReq, ctx.HttpContext.RequestAborted);
                                 if (result != null)
                                 {
-                                    // Replace outgoing parameters with PAR reference
                                     var state = ctx.ProtocolMessage.State; // keep state duplication optional
                                     var responseMode = ctx.ProtocolMessage.ResponseMode;
                                     ctx.ProtocolMessage.Parameters.Clear();
                                     ctx.ProtocolMessage.ClientId = authReq.ClientId;
                                     ctx.ProtocolMessage.SetParameter("request_uri", result.RequestUri);
-                                    if (!string.IsNullOrEmpty(state)) ctx.ProtocolMessage.State = state; // optional (server also has it)
+                                    if (!string.IsNullOrEmpty(state)) ctx.ProtocolMessage.State = state;
                                     if (!string.IsNullOrEmpty(responseMode)) ctx.ProtocolMessage.ResponseMode = responseMode;
                                     logger?.LogDebug("[PAR] request_uri={ReqUri} stateDup={HasState} rm={RM}", result.RequestUri, !string.IsNullOrEmpty(state), responseMode);
-                                    // Skip local JAR since request is now stored server-side (JAR may have been embedded during push if options.AutoJar)
                                     externalConfigure?.Invoke(ctx.Options);
                                     return; // done
                                 }
