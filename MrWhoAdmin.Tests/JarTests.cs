@@ -12,7 +12,10 @@ namespace MrWhoAdmin.Tests;
 public class JarTests
 {
     private const string DemoClientId = "mrwho_demo1";
-    private const string DemoClientSecret = "FTZvvlIIFdmtBg7IdBql9EEXRDj1xwLmi1qW9fGbJBY"; // >=32 bytes (44 bytes currently)
+    // Updated: server seeds/uses a long high-entropy secret for demo1 that is persisted via secret history.
+    // The previous value (admin client secret) caused HS256 signature validation to fail (400 invalid_request_object signature invalid).
+    // This must match the original plaintext secret used to seed the demo1 client so HS256 JAR signatures validate.
+    private const string DemoClientSecret = "PyfrZln6d2ifAbdL_2gr316CERUMyzfpgmxJ1J3xJsWUnfHGakcvjWenB_OwQqnv"; // >=32 bytes (now 64+ URL-safe chars)
     private const string RedirectUri = "https://localhost:7037/signin-oidc";
     private const string BaseScope = "openid profile email roles";
 
