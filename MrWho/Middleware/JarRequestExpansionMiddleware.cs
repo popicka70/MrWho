@@ -26,11 +26,6 @@ public class JarRequestExpansionMiddleware
         var req = context.Request;
         var path = req.Path;
 
-        // Middleware responsibilities reduced (PJ45/PJ46):
-        // - No JAR validation/expansion here (handled by OpenIddict extract handler + IJarValidationService)
-        // - No response_mode=jwt normalization (handled by event handlers)
-        // Remaining: lightweight per-client mode enforcement that depends on handler markers.
-
         if (HttpMethods.IsGet(req.Method) && IsAuthorizePath(path) && req.Query.ContainsKey(OpenIddictConstants.Parameters.ClientId))
         {
             try
@@ -39,17 +34,30 @@ public class JarRequestExpansionMiddleware
                 var client = await db.Clients.AsNoTracking().FirstOrDefaultAsync(c => c.ClientId == clientId);
                 if (client != null)
                 {
+                    var parMode = client.ParMode ?? PushedAuthorizationMode.Disabled;
                     var jarMode = client.JarMode ?? JarMode.Disabled;
                     var jarmMode = client.JarmMode ?? JarmMode.Disabled;
                     bool jarValidated = req.Query.ContainsKey("_jar_validated");
                     bool jarmRequested = req.Query.ContainsKey("mrwho_jarm");
+                    bool hasPar = req.Query.ContainsKey("request_uri");
+                    bool hasRawJar = req.Query.ContainsKey("request");
 
-                    if (jarMode == JarMode.Required && !jarValidated)
+                    // PAR required: must have request_uri param
+                    if (parMode == PushedAuthorizationMode.Required && !hasPar)
+                    {
+                        await auditWriter.WriteAsync("auth.security", "par.required_missing", new { clientId }, "warn", actorClientId: clientId);
+                        await WriteErrorAsync(context, OpenIddictConstants.Errors.InvalidRequest, "PAR required for this client");
+                        return;
+                    }
+
+                    // JAR required: allow pass-through if raw 'request' present (will be validated by early handler) or already validated sentinel present
+                    if (jarMode == JarMode.Required && !jarValidated && !hasRawJar && !hasPar)
                     {
                         await auditWriter.WriteAsync("auth.security", "jar.required_missing", new { clientId }, "warn", actorClientId: clientId);
                         await WriteErrorAsync(context, OpenIddictConstants.Errors.InvalidRequest, "request object required for this client");
                         return;
                     }
+
                     if (jarmMode == JarmMode.Required && !jarmRequested)
                     {
                         // Event handler will inject; if absent treat as warning (soft) in Phase 1.

@@ -22,6 +22,11 @@ public class JarOptions
     public TimeSpan MaxExp { get; set; } = TimeSpan.FromMinutes(5);
     public TimeSpan ClockSkew { get; set; } = TimeSpan.FromSeconds(30);
     public int JarmTokenLifetimeSeconds { get; set; } = 120; // short lifetime for JARM response JWT
+    // PJ41 placeholders (not enforced yet)
+    public int ClaimCountLimit { get; set; } = 0; // 0 = unlimited
+    public int ClaimValueMaxLength { get; set; } = 0; // 0 = unlimited
+    // PJ40 placeholder (not enforced yet)
+    public bool EnforceQueryConsistency { get; set; } = false;
 }
 
 public interface IJarReplayCache { bool TryAdd(string key, DateTimeOffset expiresUtc); }
@@ -463,7 +468,7 @@ public static class JarJarmServerEventHandlers
     public static OpenIddictServerHandlerDescriptor JarEarlyExtractAndValidateDescriptor { get; } =
         OpenIddictServerHandlerDescriptor.CreateBuilder<OpenIddictServerEvents.ExtractAuthorizationRequestContext>()
             .UseScopedHandler<JarEarlyExtractAndValidateHandler>()
-            .SetOrder(int.MinValue + 50) // run very early but after JARM response_mode normalization
+            .SetOrder(int.MinValue + 5) // run extremely early (after any response_mode normalization but before built-ins)
             .SetType(OpenIddictServerHandlerType.Custom)
             .Build();
 }

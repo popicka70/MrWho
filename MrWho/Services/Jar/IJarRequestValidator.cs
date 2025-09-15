@@ -46,7 +46,8 @@ internal sealed class JarRequestValidator : IJarRequestValidator, IJarValidation
         OpenIddict.Abstractions.OpenIddictConstants.Parameters.State,
         OpenIddict.Abstractions.OpenIddictConstants.Parameters.Nonce,
         OpenIddict.Abstractions.OpenIddictConstants.Parameters.CodeChallenge,
-        OpenIddict.Abstractions.OpenIddictConstants.Parameters.CodeChallengeMethod
+        OpenIddict.Abstractions.OpenIddictConstants.Parameters.CodeChallengeMethod,
+        "jti"
     };
 
     public JarRequestValidator(

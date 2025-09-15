@@ -12,50 +12,25 @@ Target Version: Phased (v1.1 – v1.4)
   - PJ6 (Lifetime & skew: exp window, iat/nbf sanity checks)
   - PJ7 (Issuer/Audience binding enforced; tests added)
   - PJ24 (Direct JAR happy path HS256 + RS256)
+  - PJ25 (Initial PAR+JAR+JARM happy paths HS256 + RS256 via new test classes)
   - PJ45 (Middleware JAR expansion removed; stub left for mode enforcement only)
-  - PJ37 (Partial) – CustomExclusive early extract handler preempts built-in by stripping `request` param after validation
-  - Tests updated: oversize, alg=none, issuer mismatch, audience mismatch
+  - PJ19 (Error catalog draft committed)
+  - PJ40/PJ41 scaffolds (JarOptions placeholders) ✅ Scaffolded (no enforcement)
+  - PJ37 (Preemption trace test & functional suppression)
+  - Tests: oversize, alg=none, issuer mismatch, audience mismatch, HS/RS PAR+JAR+JARM, PAR/JAR mode failures, RSA key invalid, secret policy, preemption replay sentinel
 - In Progress (🛠):
-  - PJ25 (PAR+JAR combined path verification) 
-  - PJ19 (Error catalog markdown drafting)
-  - PJ37 (Trace proof of built-in handler suppression)
-- Upcoming (🎯 remainder Sprint 1): PJ25, PJ19, PJ37 trace test, scaffolds for PJ40/PJ41.
+  - Error catalog snapshot stability test (new PJ54) – ensures mapping drift detection
+- Upcoming (🎯 before Sprint 1 close): finalize PJ54 snapshot, summarize coverage gaps, Sprint 1 acceptance sign-off.
 
-(Original backlog follows; statuses will be updated incrementally.)
-
-## 0. Context Snapshot (Current State)
-- PAR: Relying on OpenIddict native pushed authorization endpoint (built-in persistence). Custom `PushedAuthorizationRequest` entity present but NOT wired into live flow.
-- PAR Strategy DECIDED: Adopt Native+Augmentation ("Adapter") approach.
-- JAR: Central validator & early extract handler active (PJ4/5/6/7/37 partial). Legacy middleware expansion removed.
-- JARM: Event handlers active; no new changes this sprint.
-- Mode flags: Basic JarMode=Required enforcement via middleware stub.
-- Replay: jti logic present; full replay test in Phase 2.
-- Discovery: Static; gating pending.
-- Risk: Built-in JAR handlers neutralized.
-
-## 3. Detailed Backlog (Status Updates)
-### Epic E2 – JAR Validation Service (excerpt)
-| ID | Story | Status | Notes |
-|----|-------|--------|-------|
-| PJ4 | Validation service | ✅ | Implemented |
-| PJ5 | Alg/size | ✅ | Enforced per client + max bytes |
-| PJ6 | Lifetime/skew | ✅ Impl | Tests to expand later |
-| PJ7 | Iss/Aud binding | ✅ | Enforcement & tests added |
-| PJ37 | Preemption | Partial | Need trace assertion test |
-| PJ38 | Early merge | ✅ | `_jar_validated=1` sentinel |
-
-### Epic E8 – Testing (excerpt)
-| ID | Story | Status | Notes |
-|----|-------|--------|------|
-| PJ24 | Direct JAR happy path | ✅ | HS256 + RS256 tests |
-| PJ25 | PAR+JAR combined | 🛠 | Implementing PAR push test |
+## Newly Added Story (Sprint 1 Hardening)
+| ID | Story | Description | Acceptance Criteria |
+|----|-------|-------------|---------------------|
+| PJ54 | Error catalog snapshot test | Guard against unintended internal reason drift | (a) Test fails if reasons added/removed without review |
 
 ## 9. Immediate Next Actions (Sprint 1 – Remaining)
-1. PJ25 – Implement PAR+JAR combined path test (native PAR + request_uri + JAR validation).
-2. PJ19 – Commit initial error catalog markdown (map reasons -> OIDC codes).
-3. PJ37 – Add log-based or diagnostic tracing test ensuring built-in handler not invoked (absence of duplicate validation log).
-4. Prep scaffolds for PJ40/PJ41 (config option placeholders) without enforcement.
-5. Update backlog statuses & finalize Sprint 1 acceptance checklist.
+1. PJ54 – Commit snapshot test for error catalog reasons.
+2. Document remaining Phase 2 items (PAR adapter, replay metrics) in backlog summary.
+3. Sprint 1 wrap: update acceptance checklist & mark phase readiness.
 
 ---
-(Backlog truncated above for brevity; unchanged sections remain below)
+(Sections below unchanged.)
