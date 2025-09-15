@@ -295,7 +295,7 @@
             {
                 <RadzenButton Icon="open_in_new" ButtonStyle="ButtonStyle.Light" Text="Test Login" Click="@(async () => await TestLogin())" />
             }
-            <RadzenButton Icon="close" ButtonStyle="ButtonStyle.Secondary" Text="Close" Click="@(async ()=> DialogService.Close(true))" />
+            <RadzenButton Icon="close" ButtonStyle="ButtonStyle.Secondary" Text="Close" Click="DialogService.Close" />
             <RadzenButton Icon="save" ButtonStyle="ButtonStyle.Primary" Text="Save" ButtonType="ButtonType.Submit" />
         </RadzenStack>
     </RadzenTemplateForm>

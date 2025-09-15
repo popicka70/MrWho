@@ -110,7 +110,7 @@ else
                             <RadzenBadge BadgeStyle="BadgeStyle.Info" class="rz-p-2">
                                 <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
                                     <RadzenText>@scope</RadzenText>
-                                    <RadzenButton Click="@(async () => RemoveScope(scope))" Icon="close" Size="ButtonSize.ExtraSmall" ButtonStyle="ButtonStyle.Danger" Variant="Variant.Text" />
+                                    <RadzenButton Click="@(() => RemoveScope(scope))" Icon="close" Size="ButtonSize.ExtraSmall" ButtonStyle="ButtonStyle.Danger" Variant="Variant.Text" />
                                 </RadzenStack>
                             </RadzenBadge>
                         }

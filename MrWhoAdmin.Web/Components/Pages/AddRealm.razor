@@ -2,6 +2,7 @@
 @attribute [Authorize]
 @rendermode InteractiveServer
 @using MrWho.Shared.Models
+@using System.ComponentModel.DataAnnotations
 @inject NavigationManager Navigation
 @inject NotificationService NotificationService
 @inject DialogService DialogService
@@ -24,12 +25,14 @@
 
 <RadzenCard class="rz-my-4">
     <RadzenTemplateForm Data="@form" TItem="RealmForm" Submit="@OnSave">
+        <DataAnnotationsValidator />
         <RadzenStack Gap="1rem">
             <RadzenRow>
                 <RadzenColumn Size="12" SizeMD="6">
                     <RadzenFormField Text="Name" Variant="Variant.Outlined">
                         <ChildContent>
-                            <RadzenTextBox @bind-Value="form.Name" Style="width: 100%;" Placeholder="Enter unique realm name" />
+                            <RadzenTextBox @bind-Value="form.Name" Name="Name" Style="width: 100%;" Placeholder="Enter unique realm name" />
+                            <ValidationMessage For="@(() => form.Name)" />
                         </ChildContent>
                         <Helper>
                             <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
@@ -41,7 +44,8 @@
                 <RadzenColumn Size="12" SizeMD="6">
                     <RadzenFormField Text="Display Name" Variant="Variant.Outlined">
                         <ChildContent>
-                            <RadzenTextBox @bind-Value="form.DisplayName" Style="width: 100%;" Placeholder="Human friendly name" />
+                            <RadzenTextBox @bind-Value="form.DisplayName" Name="DisplayName" Style="width: 100%;" Placeholder="Human friendly name" />
+                            <ValidationMessage For="@(()=> form.DisplayName)" />
                         </ChildContent>
                     </RadzenFormField>
                 </RadzenColumn>
@@ -49,7 +53,8 @@
 
             <RadzenFormField Text="Description" Variant="Variant.Outlined">
                 <ChildContent>
-                    <RadzenTextArea @bind-Value="form.Description" Style="width: 100%; height: 80px;" Placeholder="Optional description" />
+                    <RadzenTextArea @bind-Value="form.Description" Name="Description" Style="width: 100%; height: 80px;" Placeholder="Optional description" />
+                    <ValidationMessage For="@(()=> form.Description)" />
                 </ChildContent>
             </RadzenFormField>
 
@@ -69,7 +74,8 @@
                 <RadzenColumn Size="12" SizeMD="4">
                     <RadzenFormField Text="Access Token Lifetime (minutes)" Variant="Variant.Outlined">
                         <ChildContent>
-                            <RadzenNumeric TValue="int" @bind-Value="form.AccessTokenLifetimeMinutes" Min="1" Max="1440" Style="width: 100%;" />
+                            <RadzenNumeric TValue="int" @bind-Value="form.AccessTokenLifetimeMinutes" Name="AccessTokenLifetimeMinutes" Min="1" Max="1440" Style="width: 100%;" />
+                            <ValidationMessage For="@(()=> form.AccessTokenLifetimeMinutes)" />
                         </ChildContent>
                         <Helper>
                             <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
@@ -81,7 +87,8 @@
                 <RadzenColumn Size="12" SizeMD="4">
                     <RadzenFormField Text="Refresh Token Lifetime (hours)" Variant="Variant.Outlined">
                         <ChildContent>
-                            <RadzenNumeric TValue="int" @bind-Value="form.RefreshTokenLifetimeHours" Min="1" Max="(90 * 24)" Style="width: 100%;" />
+                            <RadzenNumeric TValue="int" @bind-Value="form.RefreshTokenLifetimeHours" Name="RefreshTokenLifetimeHours" Min="1" Max="2160" Style="width: 100%;" />
+                            <ValidationMessage For="@(()=> form.RefreshTokenLifetimeHours)" />
                         </ChildContent>
                         <Helper>
                             <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
@@ -93,7 +100,8 @@
                 <RadzenColumn Size="12" SizeMD="4">
                     <RadzenFormField Text="Authorization Code Lifetime (minutes)" Variant="Variant.Outlined">
                         <ChildContent>
-                            <RadzenNumeric TValue="int" @bind-Value="form.AuthorizationCodeLifetimeMinutes" Min="1" Max="30" Style="width: 100%;" />
+                            <RadzenNumeric TValue="int" @bind-Value="form.AuthorizationCodeLifetimeMinutes" Name="AuthorizationCodeLifetimeMinutes" Min="1" Max="30" Style="width: 100%;" />
+                            <ValidationMessage For="@(()=> form.AuthorizationCodeLifetimeMinutes)" />
                         </ChildContent>
                         <Helper>
                             <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
@@ -134,12 +142,8 @@
     {
         try
         {
-            if (string.IsNullOrWhiteSpace(form.Name))
-            {
-                NotificationService.Notify(NotificationSeverity.Warning, "Validation", "Name is required");
-                return;
-            }
-
+            // DataAnnotations & Radzen validators already enforced before Submit is raised.
+            // Trim & construct request.
             var request = new CreateRealmRequest
             {
                 Name = form.Name!.Trim(),
@@ -174,12 +178,26 @@
 
     private class RealmForm
     {
+        [Required]
+        [MinLength(2)]
+        [MaxLength(100)]
         public string? Name { get; set; }
+
+        [MaxLength(150)]
         public string? DisplayName { get; set; }
+
+        [MaxLength(500)]
         public string? Description { get; set; }
+
         public bool IsEnabled { get; set; } = true;
+
+        [Range(1, 1440)]
         public int AccessTokenLifetimeMinutes { get; set; }
+
+        [Range(1, 2160)] // up to 90 days in hours
         public int RefreshTokenLifetimeHours { get; set; }
+
+        [Range(1, 30)]
         public int AuthorizationCodeLifetimeMinutes { get; set; }
     }
 }
