@@ -43,6 +43,9 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<IJarRequestValidator, JarRequestValidator>();
         services.AddScoped<IJarValidationService, JarRequestValidator>(); // unified validator
 
+        // Protocol metrics (PJ17 JAR replay metrics + JARM outcomes)
+        services.AddSingleton<IProtocolMetrics, InMemoryProtocolMetrics>();
+
         // Register database access layer
         services.AddScoped<ISeedingService, SeedingService>();
         services.AddScoped<IScopeSeederService, ScopeSeederService>
