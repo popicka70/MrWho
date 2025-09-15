@@ -48,10 +48,10 @@ else
 
     <RadzenRow Gap="2rem">
         <RadzenColumn Size="12" SizeMD="6" SizeLG="3">
-            <RadzenCard class="rz-text-align-center rz-p-4" Style="min-height: 150px;">
-                <RadzenIcon Icon="domain" class="rz-color-primary" Style="font-size: 3rem;" />
+            <RadzenCard class="rz-text-align-center rz-p-4 kpi-card kpi-indigo" Style="min-height: 150px;">
+                <RadzenIcon Icon="domain" Style="font-size: 3rem;" />
                 <RadzenText TextStyle="TextStyle.H4" class="rz-mt-2">@totalRealms</RadzenText>
-                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Active Realms</RadzenText>
+                <RadzenText TextStyle="TextStyle.Body2">Active Realms</RadzenText>
                 <RadzenButton Click="@(() => Navigation.NavigateTo("/realms"))" 
                              ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" 
                              Text="Manage" class="rz-mt-2" />
@@ -59,10 +59,10 @@ else
         </RadzenColumn>
         
         <RadzenColumn Size="12" SizeMD="6" SizeLG="3">
-            <RadzenCard class="rz-text-align-center rz-p-4" Style="min-height: 150px;">
-                <RadzenIcon Icon="apps" class="rz-color-success" Style="font-size: 3rem;" />
+            <RadzenCard class="rz-text-align-center rz-p-4 kpi-card kpi-greenblue" Style="min-height: 150px;">
+                <RadzenIcon Icon="apps" Style="font-size: 3rem;" />
                 <RadzenText TextStyle="TextStyle.H4" class="rz-mt-2">@totalClients</RadzenText>
-                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">OIDC Clients</RadzenText>
+                <RadzenText TextStyle="TextStyle.Body2">OIDC Clients</RadzenText>
                 <RadzenButton Click="@(() => Navigation.NavigateTo("/clients"))" 
                              ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" 
                              Text="Manage" class="rz-mt-2" />
@@ -70,10 +70,10 @@ else
         </RadzenColumn>
         
         <RadzenColumn Size="12" SizeMD="6" SizeLG="3">
-            <RadzenCard class="rz-text-align-center rz-p-4" Style="min-height: 150px;">
-                <RadzenIcon Icon="people" class="rz-color-info" Style="font-size: 3rem;" />
+            <RadzenCard class="rz-text-align-center rz-p-4 kpi-card kpi-pink" Style="min-height: 150px;">
+                <RadzenIcon Icon="people" Style="font-size: 3rem;" />
                 <RadzenText TextStyle="TextStyle.H4" class="rz-mt-2">@totalUsers</RadzenText>
-                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">Registered Users</RadzenText>
+                <RadzenText TextStyle="TextStyle.Body2">Registered Users</RadzenText>
                 <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" JustifyContent="JustifyContent.Center" class="rz-mt-2">
                     <RadzenButton Click="@(() => Navigation.NavigateTo("/users"))" 
                                  ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" 
@@ -90,10 +90,10 @@ else
         </RadzenColumn>
         
         <RadzenColumn Size="12" SizeMD="6" SizeLG="3">
-            <RadzenCard class="rz-text-align-center rz-p-4" Style="min-height: 150px;">
-                <RadzenIcon Icon="verified_user" class="rz-color-warning" Style="font-size: 3rem;" />
+            <RadzenCard class="rz-text-align-center rz-p-4 kpi-card kpi-sunset" Style="min-height: 150px;">
+                <RadzenIcon Icon="verified_user" Style="font-size: 3rem;" />
                 <RadzenText TextStyle="TextStyle.H4" class="rz-mt-2">Online</RadzenText>
-                <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary">System Status</RadzenText>
+                <RadzenText TextStyle="TextStyle.Body2">System Status</RadzenText>
                 <RadzenButton Click="@(() => Navigation.NavigateTo("/debug-api"))" 
                              ButtonStyle="ButtonStyle.Light" Size="ButtonSize.Small" 
                              Text="Debug API" class="rz-mt-2" />
