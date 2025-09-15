@@ -420,17 +420,53 @@ internal sealed class JarEarlyExtractAndValidateHandler : IOpenIddictServerHandl
 
 public static class JarJarmServerEventHandlers
 {
-    // NEW: extraction phase handler to normalize response_mode before validation
+    // UPDATED: extraction phase handler now enforces JARM required by injecting mrwho_jarm=1 if client requires it
     private sealed class JarmResponseModeExtractHandler : IOpenIddictServerHandler<ExtractAuthorizationRequestContext>
     {
+        private readonly ApplicationDbContext _db;
+        private readonly ILogger<JarmResponseModeExtractHandler> _logger;
+        public JarmResponseModeExtractHandler(ApplicationDbContext db, ILogger<JarmResponseModeExtractHandler> logger)
+        { _db = db; _logger = logger; }
+
         public ValueTask HandleAsync(ExtractAuthorizationRequestContext context)
         {
             var request = context.Transaction?.Request ?? context.Request;
-            if (request != null && string.Equals(request.ResponseMode, "jwt", StringComparison.OrdinalIgnoreCase))
+            if (request == null)
+                return ValueTask.CompletedTask;
+
+            // Explicit response_mode=jwt provided -> normalize
+            if (string.Equals(request.ResponseMode, "jwt", StringComparison.OrdinalIgnoreCase))
             {
                 request.SetParameter("mrwho_jarm", "1");
-                request.ResponseMode = null;
+                request.ResponseMode = null; // remove so core validator does not reject unknown mode
                 request.SetParameter(OpenIddictConstants.Parameters.ResponseMode, null);
+                return ValueTask.CompletedTask;
+            }
+
+            // If already marked, nothing to do
+            if (request.GetParameter("mrwho_jarm") is not null)
+                return ValueTask.CompletedTask;
+
+            // Early enforcement: if client requires JARM, inject marker so downstream (login redirect) returnUrl includes it
+            var clientId = request.ClientId;
+            if (!string.IsNullOrEmpty(clientId))
+            {
+                try
+                {
+                    var mode = _db.Clients.AsNoTracking()
+                        .Where(c => c.ClientId == clientId)
+                        .Select(c => c.JarmMode)
+                        .FirstOrDefault();
+                    if (mode == JarmMode.Required)
+                    {
+                        request.SetParameter("mrwho_jarm", "1");
+                        _logger.LogDebug("[JARM] Injected mrwho_jarm=1 at extract stage for required client {ClientId}", clientId);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "[JARM] Failed early required mode check for client {ClientId}", clientId);
+                }
             }
             return ValueTask.CompletedTask;
         }
@@ -439,7 +475,7 @@ public static class JarJarmServerEventHandlers
     public static OpenIddictServerHandlerDescriptor ExtractNormalizeJarmResponseModeDescriptor { get; } =
         OpenIddictServerHandlerDescriptor.CreateBuilder<ExtractAuthorizationRequestContext>()
             .UseScopedHandler<JarmResponseModeExtractHandler>()
-            .SetOrder(int.MinValue) // earliest possible to rewrite before built-in extraction rejects
+            .SetOrder(int.MinValue) // earliest possible
             .SetType(OpenIddictServerHandlerType.Custom)
             .Build();
 

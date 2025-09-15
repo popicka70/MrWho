@@ -62,7 +62,6 @@ try
 {
     // Use async run and swallow cancellation to prevent AggregateException(TaskCanceled) on shutdown
     await app.RunAsync();
-
 }
 catch (TaskCanceledException)
 {
