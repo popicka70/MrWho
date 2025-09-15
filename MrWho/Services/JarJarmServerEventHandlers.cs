@@ -372,9 +372,13 @@ internal sealed class JarEarlyExtractAndValidateHandler : IOpenIddictServerHandl
     private readonly IJarValidationService _validator;
     private readonly ILogger<JarEarlyExtractAndValidateHandler> _logger;
     private readonly OidcAdvancedOptions _adv;
+    private readonly JarOptions _jarOptions; // NEW
 
-    public JarEarlyExtractAndValidateHandler(IJarValidationService validator, ILogger<JarEarlyExtractAndValidateHandler> logger, Microsoft.Extensions.Options.IOptions<OidcAdvancedOptions> adv)
-    { _validator = validator; _logger = logger; _adv = adv.Value; }
+    public JarEarlyExtractAndValidateHandler(IJarValidationService validator,
+        ILogger<JarEarlyExtractAndValidateHandler> logger,
+        Microsoft.Extensions.Options.IOptions<OidcAdvancedOptions> adv,
+        Microsoft.Extensions.Options.IOptions<JarOptions> jarOptions)
+    { _validator = validator; _logger = logger; _adv = adv.Value; _jarOptions = jarOptions.Value; }
 
     public async ValueTask HandleAsync(OpenIddictServerEvents.ExtractAuthorizationRequestContext context)
     {
@@ -396,19 +400,64 @@ internal sealed class JarEarlyExtractAndValidateHandler : IOpenIddictServerHandl
                 );
                 return;
             }
+
+            // PJ41 limits
+            if (result.Parameters != null)
+            {
+                if (_jarOptions.ClaimCountLimit > 0 && result.Parameters.Count > _jarOptions.ClaimCountLimit)
+                {
+                    context.Reject(error: OpenIddictConstants.Errors.RequestNotSupported, description: "request object claim count exceeds limit");
+                    return;
+                }
+                if (_jarOptions.ClaimValueMaxLength > 0)
+                {
+                    foreach (var kv in result.Parameters)
+                    {
+                        if (kv.Value is string s && s.Length > _jarOptions.ClaimValueMaxLength)
+                        {
+                            context.Reject(error: OpenIddictConstants.Errors.RequestNotSupported, description: "request object claim value too long");
+                            return;
+                        }
+                    }
+                }
+            }
+
+            // PJ40 conflict detection
+            if (_jarOptions.EnforceQueryConsistency && result.Parameters != null)
+            {
+                foreach (var kv in result.Parameters)
+                {
+                    var existingParam = request.GetParameter(kv.Key);
+                    if (existingParam is null) continue; // only compare overlapping
+                    var existingStr = existingParam.ToString();
+                    var newVal = kv.Value?.ToString() ?? string.Empty;
+                    if (kv.Key == OpenIddictConstants.Parameters.Scope)
+                    {
+                        static string NormalizeScopes(string? v) => string.Join(' ', (v ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).OrderBy(x => x, StringComparer.Ordinal));
+                        if (NormalizeScopes(existingStr) != NormalizeScopes(newVal))
+                        {
+                            context.Reject(error: OpenIddictConstants.Errors.InvalidRequest, description: "conflicting scope parameter between query and request object");
+                            return;
+                        }
+                    }
+                    else if (!string.Equals(existingStr, newVal, StringComparison.Ordinal))
+                    {
+                        context.Reject(error: OpenIddictConstants.Errors.InvalidRequest, description: $"conflicting parameter '{kv.Key}' between query and request object");
+                        return;
+                    }
+                }
+            }
+
             // Merge validated parameters
             if (result.Parameters != null)
             {
                 foreach (var kv in result.Parameters)
                 {
-                    // Override or set
                     request.SetParameter(kv.Key, kv.Value);
                 }
             }
-            // Remove original request object so built-in handlers do not re-validate.
-            request.Request = null;
+            request.Request = null; // strip original
             request.SetParameter(OpenIddictConstants.Parameters.Request, null);
-            // Add sentinel
             request.SetParameter("_jar_validated", "1");
             _logger.LogDebug("[JAR] Early extract validated request object for client {ClientId} alg {Alg} (merged {Count} params)", result.ClientId, result.Algorithm, result.Parameters?.Count ?? 0);
         }
@@ -540,6 +589,54 @@ internal sealed class ParConsumptionHandler : IOpenIddictServerHandler<OpenIddic
     }
 }
 
+// Handler for enforcing ParMode=Required natively (PJ14)
+internal sealed class ParModeEnforcementHandler : IOpenIddictServerHandler<OpenIddictServerEvents.ValidateAuthorizationRequestContext>
+{
+    private readonly ApplicationDbContext _db;
+    private readonly ILogger<ParModeEnforcementHandler> _logger;
+    public ParModeEnforcementHandler(ApplicationDbContext db, ILogger<ParModeEnforcementHandler> logger)
+    { _db = db; _logger = logger; }
+
+    public ValueTask HandleAsync(OpenIddictServerEvents.ValidateAuthorizationRequestContext context)
+    {
+        var request = context.Request;
+        if (request == null) return ValueTask.CompletedTask;
+        var clientId = request.ClientId;
+        if (string.IsNullOrEmpty(clientId)) return ValueTask.CompletedTask; // core validator will handle missing client
+
+        try
+        {
+            // Quick in-memory check via EF (single column) for ParMode
+            var parMode = _db.Clients.AsNoTracking()
+                .Where(c => c.ClientId == clientId)
+                .Select(c => c.ParMode)
+                .FirstOrDefault();
+            if (parMode == MrWho.Shared.PushedAuthorizationMode.Required)
+            {
+                // Must have request_uri AND it must have been resolved earlier (sentinel _par_resolved added by resolution handler)
+                bool hasRequestUri = request.GetParameter(OpenIddictConstants.Parameters.RequestUri) is not null;
+                bool resolved = request.GetParameter("_par_resolved") is not null;
+                if (!hasRequestUri)
+                {
+                    context.Reject(error: OpenIddictConstants.Errors.InvalidRequest, description: "PAR required for this client");
+                    _logger.LogDebug("[PAR] Rejected authorize request missing request_uri (ParMode=Required) client {ClientId}", clientId);
+                }
+                else if (!resolved)
+                {
+                    // request_uri supplied but not successfully resolved (invalid/expired) -> let existing invalid_request_uri logic surface descriptive error
+                    context.Reject(error: OpenIddictConstants.Errors.InvalidRequestUri, description: "invalid or expired request_uri for required PAR");
+                    _logger.LogDebug("[PAR] Rejected authorize request with unresolved request_uri (ParMode=Required) client {ClientId}", clientId);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "[PAR] Native ParMode enforcement skipped due to error for client {ClientId}", clientId);
+        }
+        return ValueTask.CompletedTask;
+    }
+}
+
 public static class JarJarmServerEventHandlers
 {
     // UPDATED: extraction phase handler now enforces JARM required by injecting mrwho_jarm=1 if client requires it
@@ -641,6 +738,13 @@ public static class JarJarmServerEventHandlers
         OpenIddictServerHandlerDescriptor.CreateBuilder<OpenIddictServerEvents.ValidateAuthorizationRequestContext>()
             .UseScopedHandler<ParConsumptionHandler>()
             .SetOrder(int.MinValue + 10) // after normalization + JAR early extract but early in validation
+            .SetType(OpenIddictServerHandlerType.Custom)
+            .Build();
+
+    public static OpenIddictServerHandlerDescriptor ParModeEnforcementDescriptor { get; } =
+        OpenIddictServerHandlerDescriptor.CreateBuilder<OpenIddictServerEvents.ValidateAuthorizationRequestContext>()
+            .UseScopedHandler<ParModeEnforcementHandler>()
+            .SetOrder(int.MinValue + 8) // after resolution (+2) and JAR early extract (+5) but before consumption (+10)
             .SetType(OpenIddictServerHandlerType.Custom)
             .Build();
 }
