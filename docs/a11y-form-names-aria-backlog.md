@@ -12,6 +12,7 @@ Status Legend:
 - [x] Users.razor – Added `Name` to search box and `aria-label` to search button.
 - [x] EditIdentityResourceDialog.razor – Added Names to inputs and aria-labels to delete buttons.
 - [x] EditRealmDefaults.razor – Added Names to numeric/dropdown inputs.
+- [x] EditUserPages/BasicInformation.razor – Added Names and toggle password aria-label.
 
 ## Backlog Items
 ### 1. Users.razor
@@ -24,13 +25,7 @@ Status: [x] Done
 Status: [x] Done
 
 ### 4. EditUserPages/BasicInformation.razor
-Issues:
-- TextBoxes missing `Name` (Email, UserName, Password, ConfirmPassword, PhoneNumber, UserId).
-- Password visibility toggle button is icon-only (no text/aria-label).
-- Password generate button OK (has Text) but may optionally get `Name` for consistency.
-Actions:
-- Add Names; e.g. `Name="Email"`, `UserName`, `Password`, `ConfirmPassword`, `PhoneNumber`, `UserId`.
-- Add `aria-label="Toggle password visibility"` to visibility button.
+Status: [x] Done
 
 ### 5. SessionDetailsDialog.razor
 Issues:
