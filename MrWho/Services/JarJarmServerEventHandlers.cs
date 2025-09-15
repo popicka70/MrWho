@@ -2,10 +2,12 @@ using System.Security.Cryptography; // added for KeyId derivation
 using System.Text.Json; // for JSON array construction
 using Microsoft.EntityFrameworkCore; // added for context queries
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Options; // added for IOptions<>
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens; // signing
 using MrWho.Data; // for ApplicationDbContext
-using MrWho.Options; // for symmetric policy options
+using MrWho.Models; // for PushedAuthorizationRequest
+using MrWho.Options; // for OidcAdvancedOptions
 using MrWho.Shared; // for JarMode enum
 using OpenIddict.Abstractions;
 using OpenIddict.Server; // ensure OpenIddict server types
@@ -418,6 +420,126 @@ internal sealed class JarEarlyExtractAndValidateHandler : IOpenIddictServerHandl
     }
 }
 
+// Handler for resolving PAR request_uri
+internal sealed class ParRequestUriResolutionHandler : IOpenIddictServerHandler<OpenIddictServerEvents.ExtractAuthorizationRequestContext>
+{
+    private readonly ApplicationDbContext _db;
+    private readonly ILogger<ParRequestUriResolutionHandler> _logger;
+    public ParRequestUriResolutionHandler(ApplicationDbContext db, ILogger<ParRequestUriResolutionHandler> logger)
+    { _db = db; _logger = logger; }
+
+    public async ValueTask HandleAsync(OpenIddictServerEvents.ExtractAuthorizationRequestContext context)
+    {
+        if (context?.Request == null) return;
+        var request = context.Request;
+        var requestUri = request.GetParameter(OpenIddictConstants.Parameters.RequestUri)?.ToString();
+        if (string.IsNullOrWhiteSpace(requestUri)) return; // nothing to resolve
+
+        try
+        {
+            // request_uri expected format: urn:ietf:params:oauth:request_uri:{id} OR custom (we just match exact)
+            var par = await _db.PushedAuthorizationRequests.AsNoTracking().FirstOrDefaultAsync(p => p.RequestUri == requestUri);
+            if (par == null)
+            {
+                _logger.LogDebug("[PAR] request_uri not found: {RequestUri}", requestUri);
+                ParMetrics.RecordResolution(success: false); // METRIC miss
+                return; // let downstream produce invalid_request_uri
+            }
+            if (DateTime.UtcNow > par.ExpiresAt)
+            {
+                _logger.LogDebug("[PAR] request_uri expired: {RequestUri}", requestUri);
+                ParMetrics.RecordResolution(success: false); // METRIC expired
+                return; // let downstream reject as expired (will surface generic error)
+            }
+            // Deserialize stored parameters (JSON object of name->value) and apply unless already present
+            if (!string.IsNullOrWhiteSpace(par.ParametersJson))
+            {
+                try
+                {
+                    var dict = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(par.ParametersJson) ?? new();
+                    foreach (var kv in dict)
+                    {
+                        if (kv.Key == OpenIddictConstants.Parameters.RequestUri) continue; // do not re-add
+                        if (kv.Key == OpenIddictConstants.Parameters.Request) // preserve JAR for downstream validator
+                        {
+                            if (string.IsNullOrEmpty(request.Request)) request.Request = kv.Value; // set so JAR handler validates
+                            continue;
+                        }
+                        // Only set if missing from current request to honor spec precedence rules (PAR content authoritative)
+                        if (request.GetParameter(kv.Key) is null)
+                        {
+                            request.SetParameter(kv.Key, kv.Value);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "[PAR] Failed to deserialize stored parameters for {RequestUri}", requestUri);
+                }
+            }
+            // Add sentinel for later enforcement & telemetry
+            request.SetParameter("_par_resolved", "1");
+            ParMetrics.RecordResolution(success: true); // METRIC
+            _logger.LogDebug("[PAR] Resolved request_uri {RequestUri} (expires {ExpiresAt:u})", requestUri, par.ExpiresAt);
+            // Removal of request_uri parameter optional; keep for trace but downstream validators will ignore after resolution
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[PAR] Error resolving request_uri {RequestUri}", requestUri);
+        }
+    }
+}
+
+// Handler for consuming PAR request_uri (PJ49)
+internal sealed class ParConsumptionHandler : IOpenIddictServerHandler<OpenIddictServerEvents.ValidateAuthorizationRequestContext>
+{
+    private readonly ApplicationDbContext _db;
+    private readonly IOptions<OidcAdvancedOptions> _adv;
+    private readonly ILogger<ParConsumptionHandler> _logger;
+    public ParConsumptionHandler(ApplicationDbContext db, IOptions<OidcAdvancedOptions> adv, ILogger<ParConsumptionHandler> logger)
+    { _db = db; _adv = adv; _logger = logger; }
+
+    public async ValueTask HandleAsync(OpenIddictServerEvents.ValidateAuthorizationRequestContext context)
+    {
+        if (context.Request == null) return;
+        var request = context.Request;
+        var requestUri = request.GetParameter(OpenIddictConstants.Parameters.RequestUri)?.ToString();
+        if (string.IsNullOrWhiteSpace(requestUri)) return; // no PAR
+
+        // Only enforce if resolution occurred (we set _par_resolved earlier) to avoid race when unknown request_uri supplied
+        if (request.GetParameter("_par_resolved") is null) return;
+
+        bool singleUse = _adv.Value.ParSingleUseDefault;
+        if (!singleUse) return; // multi-use allowed until expiry
+
+        try
+        {
+            var par = await _db.PushedAuthorizationRequests.FirstOrDefaultAsync(p => p.RequestUri == requestUri);
+            if (par == null)
+            {
+                // Already removed or never existed -> reject
+                context.Reject(error: OpenIddictConstants.Errors.InvalidRequestUri, description: "invalid or unknown request_uri");
+                return;
+            }
+            if (DateTime.UtcNow > par.ExpiresAt)
+            {
+                context.Reject(error: OpenIddictConstants.Errors.InvalidRequestUri, description: "expired request_uri");
+                return;
+            }
+            par.ConsumedAt = DateTime.UtcNow;
+            await _db.SaveChangesAsync(context.CancellationToken);
+            ParMetrics.RecordConsumed(); // METRIC
+            _logger.LogDebug("[PAR] Consumed request_uri {RequestUri} (single-use)", requestUri);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[PAR] Error consuming request_uri {RequestUri}", requestUri);
+            // Fail open (spec may allow) but safer to reject to prevent replay when uncertain
+            context.Reject(error: OpenIddictConstants.Errors.ServerError, description: "failed to mark request_uri consumed");
+        }
+    }
+}
+
 public static class JarJarmServerEventHandlers
 {
     // UPDATED: extraction phase handler now enforces JARM required by injecting mrwho_jarm=1 if client requires it
@@ -505,6 +627,20 @@ public static class JarJarmServerEventHandlers
         OpenIddictServerHandlerDescriptor.CreateBuilder<OpenIddictServerEvents.ExtractAuthorizationRequestContext>()
             .UseScopedHandler<JarEarlyExtractAndValidateHandler>()
             .SetOrder(int.MinValue + 5) // run extremely early (after any response_mode normalization but before built-ins)
+            .SetType(OpenIddictServerHandlerType.Custom)
+            .Build();
+
+    public static OpenIddictServerHandlerDescriptor ParRequestUriResolutionDescriptor { get; } =
+        OpenIddictServerHandlerDescriptor.CreateBuilder<OpenIddictServerEvents.ExtractAuthorizationRequestContext>()
+            .UseScopedHandler<ParRequestUriResolutionHandler>()
+            .SetOrder(int.MinValue + 2) // before Jar extract (which is +5) but after response_mode normalization (min)
+            .SetType(OpenIddictServerHandlerType.Custom)
+            .Build();
+
+    public static OpenIddictServerHandlerDescriptor ParConsumptionDescriptor { get; } =
+        OpenIddictServerHandlerDescriptor.CreateBuilder<OpenIddictServerEvents.ValidateAuthorizationRequestContext>()
+            .UseScopedHandler<ParConsumptionHandler>()
+            .SetOrder(int.MinValue + 10) // after normalization + JAR early extract but early in validation
             .SetType(OpenIddictServerHandlerType.Custom)
             .Build();
 }
