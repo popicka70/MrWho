@@ -16,7 +16,7 @@
         </RadzenStack>
         <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.75rem">
             <RadzenFormField Text="Days" Variant="Variant.Outlined">
-                <RadzenNumeric @bind-Value="days" Min="1" Max="90" Style="width: 120px;" />
+                <RadzenNumeric @bind-Value="days" Min="1" Max="90" Style="width: 120px;" Name="DaysRange" />
             </RadzenFormField>
             <RadzenButton Icon="refresh" Text="Refresh" ButtonStyle="ButtonStyle.Secondary" Click="@(async () => await LoadAsync())" IsBusy="@isLoading" />
         </RadzenStack>
@@ -105,7 +105,7 @@
                             <RadzenButton Icon="history" Text="Capture Hourly Now" ButtonStyle="ButtonStyle.Light" Click="@(async () => await CaptureHourlyNow())" />
                             <RadzenButton Icon="event_available" Text="Capture Daily Now" ButtonStyle="ButtonStyle.Light" Click="@(async () => await CaptureDailyNow())" />
                             <RadzenFormField Text="Keep Days" Variant="Variant.Outlined">
-                                <RadzenNumeric @bind-Value="retainDays" Min="7" Max="3650" Style="width: 120px;" />
+                                <RadzenNumeric @bind-Value="retainDays" Min="7" Max="3650" Style="width: 120px;" Name="RetainDays" />
                             </RadzenFormField>
                             <RadzenButton Icon="delete" Text="Cleanup" ButtonStyle="ButtonStyle.Danger" Click="@(async () => await CleanupSnapshots())" />
                         </RadzenStack>

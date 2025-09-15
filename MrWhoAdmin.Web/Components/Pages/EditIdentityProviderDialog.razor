@@ -20,14 +20,14 @@
                             <RadzenColumn Size="6">
                                 <RadzenFormField Text="Display Name" Variant="Variant.Outlined">
                                     <ChildContent>
-                                        <RadzenTextBox @bind-Value="_model.DisplayName" Style="width:100%" />
+                                        <RadzenTextBox @bind-Value="_model.DisplayName" Style="width:100%" Name="DisplayName" />
                                     </ChildContent>
                                 </RadzenFormField>
                             </RadzenColumn>
                             <RadzenColumn Size="6">
                                 <RadzenFormField Text="System Name (unique)" Variant="Variant.Outlined">
                                     <ChildContent>
-                                        <RadzenTextBox @bind-Value="_model.Name" Style="width:100%" />
+                                        <RadzenTextBox @bind-Value="_model.Name" Style="width:100%" Name="Name" />
                                     </ChildContent>
                                 </RadzenFormField>
                             </RadzenColumn>
@@ -37,17 +37,17 @@
                             <RadzenColumn Size="6">
                                 <RadzenFormField Text="Type" Variant="Variant.Outlined">
                                     <ChildContent>
-                                        <RadzenDropDown TValue="IdentityProviderType" @bind-Value="_model.Type" Data="@_typeOptions" Style="width:100%" Change="@(async _ => await OnTypeChanged())" />
+                                        <RadzenDropDown TValue="IdentityProviderType" @bind-Value="_model.Type" Data="@_typeOptions" Style="width:100%" Change="@(async _ => await OnTypeChanged())" Name="Type" />
                                     </ChildContent>
                                 </RadzenFormField>
                             </RadzenColumn>
                             <RadzenColumn Size="6">
                                 <RadzenFormField Text="Status" Variant="Variant.Outlined">
                                     <Start>
-                                        <RadzenSwitch @bind-Value="_model.IsEnabled" OnLabel="Enabled" OffLabel="Disabled" />
+                                        <RadzenSwitch @bind-Value="_model.IsEnabled" OnLabel="Enabled" OffLabel="Disabled" Name="IsEnabled" />
                                     </Start>
                                     <ChildContent>
-                                        <RadzenLabel Text="Provider is enabled" />
+                                        <RadzenLabel Text="Provider is enabled" Component="IsEnabled" />
                                     </ChildContent>
                                 </RadzenFormField>
                             </RadzenColumn>
@@ -57,14 +57,14 @@
                             <RadzenColumn Size="6">
                                 <RadzenFormField Text="Icon URL" Variant="Variant.Outlined">
                                     <ChildContent>
-                                        <RadzenTextBox @bind-Value="_model.IconUri" Style="width:100%" />
+                                        <RadzenTextBox @bind-Value="_model.IconUri" Style="width:100%" Name="IconUri" />
                                     </ChildContent>
                                 </RadzenFormField>
                             </RadzenColumn>
                             <RadzenColumn Size="6">
                                 <RadzenFormField Text="Order" Variant="Variant.Outlined">
                                     <ChildContent>
-                                        <RadzenNumeric TValue="int" @bind-Value="_model.Order" Style="width:100%" />
+                                        <RadzenNumeric TValue="int" @bind-Value="_model.Order" Style="width:100%" Name="Order" />
                                     </ChildContent>
                                 </RadzenFormField>
                             </RadzenColumn>
@@ -81,7 +81,7 @@
 
                                 <RadzenFormField Text="Authority (Issuer)" Variant="Variant.Outlined">
                                     <ChildContent>
-                                        <RadzenTextBox @bind-Value="_model.Authority" Style="width:100%" Placeholder="https://accounts.google.com" />
+                                        <RadzenTextBox @bind-Value="_model.Authority" Style="width:100%" Placeholder="https://accounts.google.com" Name="Authority" />
                                     </ChildContent>
                                     <Helper>
                                         <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
@@ -94,14 +94,14 @@
                                     <RadzenColumn Size="6">
                                         <RadzenFormField Text="Client ID" Variant="Variant.Outlined">
                                             <ChildContent>
-                                                <RadzenTextBox @bind-Value="_model.ClientId" Style="width:100%" />
+                                                <RadzenTextBox @bind-Value="_model.ClientId" Style="width:100%" Name="ClientId" />
                                             </ChildContent>
                                         </RadzenFormField>
                                     </RadzenColumn>
                                     <RadzenColumn Size="6">
                                         <RadzenFormField Text="Client Secret" Variant="Variant.Outlined">
                                             <ChildContent>
-                                                <RadzenPassword @bind-Value="_model.ClientSecret" Style="width:100%" ToggleMask="true" />
+                                                <RadzenPassword @bind-Value="_model.ClientSecret" Style="width:100%" ToggleMask="true" Name="ClientSecret" />
                                             </ChildContent>
                                         </RadzenFormField>
                                     </RadzenColumn>
@@ -109,7 +109,7 @@
 
                                 <RadzenFormField Text="Scopes" Variant="Variant.Outlined">
                                     <ChildContent>
-                                        <RadzenTextBox @bind-Value="_model.Scopes" Style="width:100%" Placeholder="openid profile email" />
+                                        <RadzenTextBox @bind-Value="_model.Scopes" Style="width:100%" Placeholder="openid profile email" Name="Scopes" />
                                     </ChildContent>
                                     <Helper>
                                         <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
@@ -122,17 +122,17 @@
                                     <RadzenColumn Size="6">
                                         <RadzenFormField Text="Response Type" Variant="Variant.Outlined">
                                             <ChildContent>
-                                                <RadzenTextBox @bind-Value="_model.ResponseType" Style="width:100%" Placeholder="code" />
+                                                <RadzenTextBox @bind-Value="_model.ResponseType" Style="width:100%" Placeholder="code" Name="ResponseType" />
                                             </ChildContent>
                                         </RadzenFormField>
                                     </RadzenColumn>
                                     <RadzenColumn Size="6">
                                         <RadzenFormField Text="PKCE" Variant="Variant.Outlined">
                                             <Start>
-                                                <RadzenSwitch @bind-Value="_usePkce" />
+                                                <RadzenSwitch @bind-Value="_usePkce" Name="UsePkce" />
                                             </Start>
                                             <ChildContent>
-                                                <RadzenLabel Text="Use Proof Key for Code Exchange (recommended)" />
+                                                <RadzenLabel Text="Use Proof Key for Code Exchange (recommended)" Component="UsePkce" />
                                             </ChildContent>
                                         </RadzenFormField>
                                     </RadzenColumn>
@@ -140,16 +140,16 @@
 
                                 <RadzenFormField Text="UserInfo Claims" Variant="Variant.Outlined">
                                     <Start>
-                                        <RadzenSwitch @bind-Value="_getClaimsFromUserInfo" />
+                                        <RadzenSwitch @bind-Value="_getClaimsFromUserInfo" Name="GetClaimsFromUserInfo" />
                                     </Start>
                                     <ChildContent>
-                                        <RadzenLabel Text="Fetch additional claims from UserInfo endpoint" />
+                                        <RadzenLabel Text="Fetch additional claims from UserInfo endpoint" Component="GetClaimsFromUserInfo" />
                                     </ChildContent>
                                 </RadzenFormField>
 
                                 <RadzenFormField Text="Claim Mappings (JSON)" Variant="Variant.Outlined">
                                     <ChildContent>
-                                        <RadzenTextArea @bind-Value="_model.ClaimMappingsJson" Rows="4" Style="width:100%" />
+                                        <RadzenTextArea @bind-Value="_model.ClaimMappingsJson" Rows="4" Style="width:100%" Name="ClaimMappingsJson" />
                                     </ChildContent>
                                 </RadzenFormField>
                             </RadzenCard>
@@ -162,41 +162,41 @@
                                     <RadzenColumn Size="6">
                                         <RadzenFormField Text="Entity ID" Variant="Variant.Outlined">
                                             <ChildContent>
-                                                <RadzenTextBox @bind-Value="_model.SamlEntityId" Style="width:100%" />
+                                                <RadzenTextBox @bind-Value="_model.SamlEntityId" Style="width:100%" Name="SamlEntityId" />
                                             </ChildContent>
                                         </RadzenFormField>
                                     </RadzenColumn>
                                     <RadzenColumn Size="6">
                                         <RadzenFormField Text="SSO URL" Variant="Variant.Outlined">
                                             <ChildContent>
-                                                <RadzenTextBox @bind-Value="_model.SamlSingleSignOnUrl" Style="width:100%" />
+                                                <RadzenTextBox @bind-Value="_model.SamlSingleSignOnUrl" Style="width:100%" Name="SamlSingleSignOnUrl" />
                                             </ChildContent>
                                         </RadzenFormField>
                                     </RadzenColumn>
                                 </RadzenRow>
                                 <RadzenFormField Text="Certificate (PEM)" Variant="Variant.Outlined">
                                     <ChildContent>
-                                        <RadzenTextArea @bind-Value="_model.SamlCertificate" Style="width:100%; min-height:120px;" />
+                                        <RadzenTextArea @bind-Value="_model.SamlCertificate" Style="width:100%; min-height:120px;" Name="SamlCertificate" />
                                     </ChildContent>
                                 </RadzenFormField>
                                 <RadzenRow Gap="1rem">
                                     <RadzenColumn Size="6">
                                         <RadzenFormField Text="Assertions Signed" Variant="Variant.Outlined">
                                             <Start>
-                                                <RadzenSwitch @bind-Value="_samlWantAssertionsSigned" />
+                                                <RadzenSwitch @bind-Value="_samlWantAssertionsSigned" Name="SamlWantAssertionsSigned" />
                                             </Start>
                                             <ChildContent>
-                                                <RadzenLabel Text="Want Assertions Signed" />
+                                                <RadzenLabel Text="Want Assertions Signed" Component="SamlWantAssertionsSigned" />
                                             </ChildContent>
                                         </RadzenFormField>
                                     </RadzenColumn>
                                     <RadzenColumn Size="6">
                                         <RadzenFormField Text="Validate Issuer" Variant="Variant.Outlined">
                                             <Start>
-                                                <RadzenSwitch @bind-Value="_samlValidateIssuer" />
+                                                <RadzenSwitch @bind-Value="_samlValidateIssuer" Name="SamlValidateIssuer" />
                                             </Start>
                                             <ChildContent>
-                                                <RadzenLabel Text="Validate Issuer" />
+                                                <RadzenLabel Text="Validate Issuer" Component="SamlValidateIssuer" />
                                             </ChildContent>
                                         </RadzenFormField>
                                     </RadzenColumn>
@@ -225,14 +225,14 @@
                                         <RadzenFormField Text="Client" Variant="Variant.Outlined">
                                             <ChildContent>
                                                 <RadzenDropDown Data="_clients" @bind-Value="_selectedClientId" Style="width:100%"
-                                                                TextProperty="Name" ValueProperty="Id" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive" AllowClear="true" />
+                                                                TextProperty="Name" ValueProperty="Id" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive" AllowClear="true" Name="LinkClientId" />
                                             </ChildContent>
                                         </RadzenFormField>
                                     </RadzenColumn>
                                     <RadzenColumn Size="12" SizeMD="6">
                                         <RadzenFormField Text="Search Clients" Variant="Variant.Outlined">
                                             <ChildContent>
-                                                <RadzenTextBox @bind-Value="_clientSearch" Style="width:100%" Placeholder="type to search..." Change="@(async _ => await LoadClients())" />
+                                                <RadzenTextBox @bind-Value="_clientSearch" Style="width:100%" Placeholder="type to search..." Change="@(async _ => await LoadClients())" Name="ClientSearch" />
                                             </ChildContent>
                                         </RadzenFormField>
                                     </RadzenColumn>
@@ -241,21 +241,21 @@
                                     <RadzenColumn Size="12" SizeMD="6">
                                         <RadzenFormField Text="Display Name Override" Variant="Variant.Outlined">
                                             <ChildContent>
-                                                <RadzenTextBox @bind-Value="_displayNameOverride" Style="width:100%" />
+                                                <RadzenTextBox @bind-Value="_displayNameOverride" Style="width:100%" Name="LinkDisplayNameOverride" />
                                             </ChildContent>
                                         </RadzenFormField>
                                     </RadzenColumn>
                                     <RadzenColumn Size="12" SizeMD="3">
                                         <RadzenFormField Text="Order" Variant="Variant.Outlined">
                                             <ChildContent>
-                                                <RadzenNumeric TValue="int?" @bind-Value="_order" Style="width:100%" />
+                                                <RadzenNumeric TValue="int?" @bind-Value="_order" Style="width:100%" Name="LinkOrder" />
                                             </ChildContent>
                                         </RadzenFormField>
                                     </RadzenColumn>
                                     <RadzenColumn SizeMD="12">
                                         <RadzenFormField Text="Claim mappings (JSON)" Variant="Variant.Outlined">
                                             <ChildContent>
-                                                <RadzenTextArea @bind-Value="_linkClaimMappingsJson" Style="width:100%; min-height: 120px;" Placeholder='{"external_claim":"local_claim"}' />
+                                                <RadzenTextArea @bind-Value="_linkClaimMappingsJson" Style="width:100%; min-height: 120px;" Placeholder='{"external_claim":"local_claim"}' Name="LinkClaimMappingsJson" />
                                             </ChildContent>
                                             <Helper>
                                                 <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Optional per-client mapping from external claims to local claim types.</RadzenText>

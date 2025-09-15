@@ -19,10 +19,10 @@
 <RadzenCard class="rz-my-4">
     <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" class="rz-mb-4">
         <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem">
-            <RadzenTextBox @bind-Value="@searchTerm" Placeholder="Search clients..." Style="width: 300px;" />
+            <RadzenTextBox @bind-Value="@searchTerm" Name="ClientSearch" Placeholder="Search clients..." Style="width: 300px;" />
             <RadzenDropDown @bind-Value="@selectedRealmId" Data="@realms" TextProperty="DisplayName" ValueProperty="Id" 
-                           Placeholder="Filter by realm..." Style="width: 300px;" AllowClear="true" />
-            <RadzenButton Click="@LoadClients" Icon="search" ButtonStyle="ButtonStyle.Secondary" />
+                           Placeholder="Filter by realm..." Style="width: 300px;" AllowClear="true" Name="RealmFilter" />
+            <RadzenButton Click="@LoadClients" Icon="search" ButtonStyle="ButtonStyle.Secondary" aria-label="Search clients" />
         </RadzenStack>
         <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
             <RadzenButton Click="@(() => Navigation.NavigateTo("/clients/add"))" Icon="add" ButtonStyle="ButtonStyle.Primary" Text="Add Client" />
