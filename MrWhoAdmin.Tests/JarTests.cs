@@ -205,11 +205,36 @@ public class JarTests
         using var http = SharedTestInfrastructure.CreateHttpClient("mrwho", disableRedirects: true);
         using var disco = await GetDiscoveryAsync(http);
         var authz = disco.RootElement.GetProperty("authorization_endpoint").GetString()!;
-        var jar = CreateJar(authz, DemoClientId, DemoClientSecret, RedirectUri, BaseScope, padLength: 6000);
+        var jar = CreateJar(authz, DemoClientId, DemoClientSecret, RedirectUri, BaseScope, padLength: 6000); // > 4096 default limit
         var resp = await SendAuthorizeAsync(http, jar, DemoClientId);
-        if ((int)resp.StatusCode < 400)
-            Console.WriteLine($"[WARN] Oversize JAR not rejected (status {resp.StatusCode}). Adjust MaxRequestObjectBytes or pad length if needed.");
-        else
-            Assert.IsTrue((int)resp.StatusCode >= 400, "Oversize JAR should be rejected with error status");
+        Assert.IsTrue((int)resp.StatusCode >= 400, "Oversize JAR should be rejected with error status");
+    }
+
+    [TestMethod]
+    public async Task Jar_Invalid_Alg_None_Rejected()
+    {
+        using var http = SharedTestInfrastructure.CreateHttpClient("mrwho", disableRedirects: true);
+        using var disco = await GetDiscoveryAsync(http);
+        var authz = disco.RootElement.GetProperty("authorization_endpoint").GetString()!;
+        // Create unsigned JWT (alg=none) manually
+        var header = Base64UrlEncode(Encoding.UTF8.GetBytes("{\"alg\":\"none\"}"));
+        var payloadObj = new Dictionary<string, object>
+        {
+            ["client_id"] = DemoClientId,
+            ["response_type"] = "code",
+            ["redirect_uri"] = RedirectUri,
+            ["scope"] = BaseScope,
+            ["state"] = Guid.NewGuid().ToString("n"),
+            ["nonce"] = Guid.NewGuid().ToString("n"),
+            ["exp"] = DateTimeOffset.UtcNow.AddMinutes(5).ToUnixTimeSeconds(),
+            ["iat"] = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
+            ["aud"] = authz,
+            ["iss"] = DemoClientId
+        };
+        var payloadJson = JsonSerializer.Serialize(payloadObj);
+        var payload = Base64UrlEncode(Encoding.UTF8.GetBytes(payloadJson));
+        var unsigned = header + "." + payload + "."; // empty signature per RFC 7515 alg=none
+        var resp = await SendAuthorizeAsync(http, unsigned, DemoClientId);
+        Assert.IsTrue((int)resp.StatusCode >= 400, "alg=none request object should be rejected");
     }
 }

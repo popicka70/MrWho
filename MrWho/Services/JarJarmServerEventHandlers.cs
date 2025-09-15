@@ -8,8 +8,8 @@ using MrWho.Data; // for ApplicationDbContext
 using MrWho.Options; // for symmetric policy options
 using MrWho.Shared; // for JarMode enum
 using OpenIddict.Abstractions;
-using OpenIddict.Server;
-using static OpenIddict.Server.OpenIddictServerEvents;
+using OpenIddict.Server; // ensure OpenIddict server types
+using static OpenIddict.Server.OpenIddictServerEvents; // restore static event context types
 
 namespace MrWho.Services;
 
@@ -360,6 +360,59 @@ internal sealed class JarmAuthorizationResponseHandler : IOpenIddictServerHandle
     }
 }
 
+internal sealed class JarEarlyExtractAndValidateHandler : IOpenIddictServerHandler<OpenIddictServerEvents.ExtractAuthorizationRequestContext>
+{
+    private readonly IJarValidationService _validator;
+    private readonly ILogger<JarEarlyExtractAndValidateHandler> _logger;
+    private readonly OidcAdvancedOptions _adv;
+
+    public JarEarlyExtractAndValidateHandler(IJarValidationService validator, ILogger<JarEarlyExtractAndValidateHandler> logger, Microsoft.Extensions.Options.IOptions<OidcAdvancedOptions> adv)
+    { _validator = validator; _logger = logger; _adv = adv.Value; }
+
+    public async ValueTask HandleAsync(OpenIddictServerEvents.ExtractAuthorizationRequestContext context)
+    {
+        if (context == null || context.Request == null) return;
+        var request = context.Request;
+        if (string.IsNullOrEmpty(request.Request)) return; // no JAR param
+        if (_adv.JarHandlerMode != JarHandlerMode.CustomExclusive) return; // allow built-in pipeline when not exclusive
+
+        try
+        {
+            var queryClientId = request.ClientId;
+            var jwt = request.Request;
+            var result = await _validator.ValidateAsync(jwt!, queryClientId, context.CancellationToken);
+            if (!result.Success)
+            {
+                context.Reject(
+                    error: result.Error ?? OpenIddictConstants.Errors.InvalidRequestObject,
+                    description: result.ErrorDescription ?? "invalid request object"
+                );
+                return;
+            }
+            // Merge validated parameters
+            if (result.Parameters != null)
+            {
+                foreach (var kv in result.Parameters)
+                {
+                    // Override or set
+                    request.SetParameter(kv.Key, kv.Value);
+                }
+            }
+            // Remove original request object so built-in handlers do not re-validate.
+            request.Request = null;
+            request.SetParameter(OpenIddictConstants.Parameters.Request, null);
+            // Add sentinel
+            request.SetParameter("_jar_validated", "1");
+            _logger.LogDebug("[JAR] Early extract validated request object for client {ClientId} alg {Alg} (merged {Count} params)", result.ClientId, result.Algorithm, result.Parameters?.Count ?? 0);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[JAR] Unhandled error during early validation");
+            context.Reject(error: OpenIddictConstants.Errors.InvalidRequestObject, description: "invalid request object");
+        }
+    }
+}
+
 public static class JarJarmServerEventHandlers
 {
     // NEW: extraction phase handler to normalize response_mode before validation
@@ -404,6 +457,13 @@ public static class JarJarmServerEventHandlers
         OpenIddictServerHandlerDescriptor.CreateBuilder<ApplyAuthorizationResponseContext>()
             .UseScopedHandler<JarmAuthorizationResponseHandler>()
             .SetOrder(int.MaxValue) // run late to wrap final response
+            .SetType(OpenIddictServerHandlerType.Custom)
+            .Build();
+
+    public static OpenIddictServerHandlerDescriptor JarEarlyExtractAndValidateDescriptor { get; } =
+        OpenIddictServerHandlerDescriptor.CreateBuilder<OpenIddictServerEvents.ExtractAuthorizationRequestContext>()
+            .UseScopedHandler<JarEarlyExtractAndValidateHandler>()
+            .SetOrder(int.MinValue + 50) // run very early but after JARM response_mode normalization
             .SetType(OpenIddictServerHandlerType.Custom)
             .Build();
 }

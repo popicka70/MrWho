@@ -369,6 +369,7 @@ public static partial class ServiceCollectionExtensions
                 // JAR/JARM handlers remain
                 options.AddEventHandler(JarJarmServerEventHandlers.ConfigurationHandlerDescriptor);
                 options.AddEventHandler(JarJarmServerEventHandlers.ExtractNormalizeJarmResponseModeDescriptor);
+                options.AddEventHandler(JarJarmServerEventHandlers.JarEarlyExtractAndValidateDescriptor); // new early JAR handler
                 options.AddEventHandler(JarJarmServerEventHandlers.NormalizeJarmResponseModeDescriptor);
                 options.AddEventHandler(JarJarmServerEventHandlers.ApplyAuthorizationResponseDescriptor);
             })
