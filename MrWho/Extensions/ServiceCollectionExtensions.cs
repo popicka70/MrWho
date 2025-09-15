@@ -34,11 +34,14 @@ public static partial class ServiceCollectionExtensions
     {
         // Register shared accessors
         services.AddHttpContextAccessor();
+        // Advanced options
+        services.AddOptions<OidcAdvancedOptions>().BindConfiguration("OidcAdvanced");
         // JAR/JARM support services
         services.AddMemoryCache();
         services.AddSingleton<IJarReplayCache, InMemoryJarReplayCache>();
         services.AddOptions<JarOptions>().BindConfiguration(JarOptions.SectionName);
         services.AddScoped<IJarRequestValidator, JarRequestValidator>();
+        services.AddScoped<IJarValidationService, JarRequestValidator>(); // unified validator
 
         // Register database access layer
         services.AddScoped<ISeedingService, SeedingService>();
@@ -511,12 +514,10 @@ public static partial class ServiceCollectionExtensions
 
     public static IServiceCollection AddMrWhoAntiforgery(this IServiceCollection services)
     {
-        // Add antiforgery services
         services.AddAntiforgery(options =>
         {
-            options.HeaderName = "X-XSRF-TOKEN"; // Custom header for Angular
+            options.HeaderName = "X-XSRF-TOKEN";
         });
-
         return services;
     }
 }

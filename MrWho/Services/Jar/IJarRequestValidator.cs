@@ -17,15 +17,21 @@ public interface IJarRequestValidator
     Task<JarValidationResult> ValidateAsync(string jwt, string? queryClientId, CancellationToken ct = default);
 }
 
+// New higher-level service (alias) used by OpenIddict handlers going forward.
+public interface IJarValidationService
+{
+    Task<JarValidationResult> ValidateAsync(string jwt, string? queryClientId, CancellationToken ct = default);
+}
+
 public sealed record JarValidationResult(bool Success, string? Error, string? ErrorDescription, string? ClientId, string? Algorithm, Dictionary<string, string>? Parameters);
 
-internal sealed class JarRequestValidator : IJarRequestValidator
+internal sealed class JarRequestValidator : IJarRequestValidator, IJarValidationService
 {
     private readonly ApplicationDbContext _db;
     private readonly IKeyManagementService _keys;
     private readonly IJarReplayCache _replay;
     private readonly ISymmetricSecretPolicy _symPolicy;
-    private readonly IClientSecretService _secretService; // NEW: resolve plaintext via history
+    private readonly IClientSecretService _secretService;
     private readonly JarOptions _options;
     private readonly ILogger<JarRequestValidator> _logger;
 
@@ -53,7 +59,14 @@ internal sealed class JarRequestValidator : IJarRequestValidator
         _db = db; _keys = keys; _replay = replay; _symPolicy = symPolicy; _secretService = secretService; _options = options.Value; _logger = logger;
     }
 
-    public async Task<JarValidationResult> ValidateAsync(string jwt, string? queryClientId, CancellationToken ct = default)
+    public Task<JarValidationResult> ValidateAsync(string jwt, string? queryClientId, CancellationToken ct = default)
+        => ValidateCoreAsync(jwt, queryClientId, ct);
+
+    // Backwards compatibility for IJarRequestValidator
+    Task<JarValidationResult> IJarRequestValidator.ValidateAsync(string jwt, string? queryClientId, CancellationToken ct)
+        => ValidateCoreAsync(jwt, queryClientId, ct);
+
+    private async Task<JarValidationResult> ValidateCoreAsync(string jwt, string? queryClientId, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(jwt))
         {
