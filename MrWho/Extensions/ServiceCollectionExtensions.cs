@@ -372,6 +372,10 @@ public static partial class ServiceCollectionExtensions
                 options.AddEventHandler(JarJarmServerEventHandlers.JarEarlyExtractAndValidateDescriptor); // new early JAR handler
                 options.AddEventHandler(JarJarmServerEventHandlers.NormalizeJarmResponseModeDescriptor);
                 options.AddEventHandler(JarJarmServerEventHandlers.ApplyAuthorizationResponseDescriptor);
+                options.AddEventHandler(JarJarmServerEventHandlers.ParRequestUriResolutionDescriptor);
+                options.AddEventHandler(JarJarmServerEventHandlers.ParModeEnforcementDescriptor);
+                options.AddEventHandler(JarJarmServerEventHandlers.ParConsumptionDescriptor);
+                options.AddEventHandler(JarJarmServerEventHandlers.RequestConflictAndLimitValidationDescriptor); // PJ40/PJ41
             })
             .AddValidation(options => { options.UseLocalServer(); options.UseAspNetCore(); });
         return services;
