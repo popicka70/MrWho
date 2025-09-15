@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
@@ -34,6 +35,7 @@ internal sealed class JarRequestValidator : IJarRequestValidator, IJarValidation
     private readonly IClientSecretService _secretService;
     private readonly JarOptions _options;
     private readonly ILogger<JarRequestValidator> _logger;
+    private readonly string? _serverIssuer; // expected audience value
 
     private static readonly HashSet<string> _recognized = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -54,8 +56,9 @@ internal sealed class JarRequestValidator : IJarRequestValidator, IJarValidation
         ISymmetricSecretPolicy symPolicy,
         IClientSecretService secretService,
         IOptions<JarOptions> options,
-        ILogger<JarRequestValidator> logger)
-    { _db = db; _keys = keys; _replay = replay; _symPolicy = symPolicy; _secretService = secretService; _options = options.Value; _logger = logger; }
+        ILogger<JarRequestValidator> logger,
+        IConfiguration configuration)
+    { _db = db; _keys = keys; _replay = replay; _symPolicy = symPolicy; _secretService = secretService; _options = options.Value; _logger = logger; _serverIssuer = (configuration["OpenIddict:Issuer"] ?? configuration["Authentication:Authority"])?.TrimEnd('/'); }
 
     public Task<JarValidationResult> ValidateAsync(string jwt, string? queryClientId, CancellationToken ct = default)
         => ValidateCoreAsync(jwt, queryClientId, ct);

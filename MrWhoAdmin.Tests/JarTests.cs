@@ -237,4 +237,70 @@ public class JarTests
         var resp = await SendAuthorizeAsync(http, unsigned, DemoClientId);
         Assert.IsTrue((int)resp.StatusCode >= 400, "alg=none request object should be rejected");
     }
+
+    [TestMethod]
+    public async Task Jar_Authorize_With_Signed_Request_RS256_Redirects_To_Login()
+    {
+        using var http = SharedTestInfrastructure.CreateHttpClient("mrwho", disableRedirects: true);
+        using var disco = await GetDiscoveryAsync(http);
+        var authz = disco.RootElement.GetProperty("authorization_endpoint").GetString()!;
+        // Build RS256 JAR using server signing key: fetch jwks or reuse HS path by dynamic creation of RSA key (accept since validator falls back to server keys)
+        using var rsa = RSA.Create(2048);
+        var rsaKey = new RsaSecurityKey(rsa) { KeyId = "test-rs256" };
+        var creds = new SigningCredentials(rsaKey, SecurityAlgorithms.RsaSha256);
+        var now = DateTimeOffset.UtcNow;
+        var handler = new JsonWebTokenHandler();
+        var descriptor = new SecurityTokenDescriptor
+        {
+            Issuer = DemoClientId,
+            Audience = authz.TrimEnd('/'),
+            Expires = now.AddMinutes(5).UtcDateTime,
+            IssuedAt = now.UtcDateTime,
+            NotBefore = now.AddSeconds(-30).UtcDateTime,
+            Claims = new Dictionary<string, object>
+            {
+                ["client_id"] = DemoClientId,
+                ["response_type"] = "code",
+                ["redirect_uri"] = RedirectUri,
+                ["scope"] = BaseScope,
+                ["state"] = Guid.NewGuid().ToString("n"),
+                ["nonce"] = Guid.NewGuid().ToString("n"),
+                ["code_challenge"] = "rs256challenge",
+                ["code_challenge_method"] = "S256",
+                ["jti"] = Guid.NewGuid().ToString("n")
+            },
+            SigningCredentials = creds
+        };
+        var jar = handler.CreateToken(descriptor);
+        var resp = await SendAuthorizeAsync(http, jar, DemoClientId);
+        Assert.IsTrue(IsAcceptableAuthRedirect(resp) || resp.StatusCode == HttpStatusCode.OK, $"RS256 JAR should be accepted; got {resp.StatusCode}");
+    }
+
+    [TestMethod]
+    public async Task Jar_Issuer_Mismatch_Rejected()
+    {
+        using var http = SharedTestInfrastructure.CreateHttpClient("mrwho", disableRedirects: true);
+        using var disco = await GetDiscoveryAsync(http);
+        var authz = disco.RootElement.GetProperty("authorization_endpoint").GetString()!;
+        var jar = CreateJar(authz, DemoClientId, DemoClientSecret, RedirectUri, BaseScope);
+        // Tamper issuer by replacing client_id claim textually (unsafe but simple)
+        var parts = jar.Split('.');
+        var json = Encoding.UTF8.GetString(Base64UrlEncoder.DecodeBytes(parts[1]));
+        json = json.Replace(DemoClientId, DemoClientId + "_other");
+        parts[1] = Base64UrlEncode(Encoding.UTF8.GetBytes(json));
+        var tampered = string.Join('.', parts);
+        var resp = await SendAuthorizeAsync(http, tampered, DemoClientId);
+        Assert.IsTrue((int)resp.StatusCode >= 400, "Issuer mismatch should be rejected");
+    }
+
+    [TestMethod]
+    public async Task Jar_Audience_Mismatch_Rejected()
+    {
+        using var http = SharedTestInfrastructure.CreateHttpClient("mrwho", disableRedirects: true);
+        using var disco = await GetDiscoveryAsync(http);
+        var authz = disco.RootElement.GetProperty("authorization_endpoint").GetString()!;
+        var jar = CreateJar(authz + "/wrong", DemoClientId, DemoClientSecret, RedirectUri, BaseScope); // audience suffix mismatch
+        var resp = await SendAuthorizeAsync(http, jar, DemoClientId);
+        Assert.IsTrue((int)resp.StatusCode >= 400, "Audience mismatch should be rejected");
+    }
 }
