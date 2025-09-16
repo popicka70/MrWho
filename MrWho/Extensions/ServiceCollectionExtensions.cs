@@ -353,7 +353,9 @@ public static partial class ServiceCollectionExtensions
                        .SetUserInfoEndpointUris("/connect/userinfo")
                        .SetRevocationEndpointUris("/connect/revocation")
                        .SetIntrospectionEndpointUris("/connect/introspect");
+                // Enable flows
                 options.AllowAuthorizationCodeFlow().AllowClientCredentialsFlow().AllowRefreshTokenFlow();
+                // removed unsupported AllowRequestParameter/AllowRequestUriParameter (custom handlers manage JAR/PAR extraction)
                 var enablePassword = string.Equals(Environment.GetEnvironmentVariable("MRWHO_TESTS"), "1", StringComparison.OrdinalIgnoreCase) || environment.IsEnvironment("Testing");
                 if (enablePassword)
                 {
@@ -374,6 +376,8 @@ public static partial class ServiceCollectionExtensions
                 options.AddEventHandler(JarJarmServerEventHandlers.ExtractNormalizeJarmResponseModeDescriptor);
                 options.AddEventHandler(JarJarmServerEventHandlers.JarEarlyExtractAndValidateDescriptor); // new early JAR handler
                 options.AddEventHandler(JarJarmServerEventHandlers.NormalizeJarmResponseModeDescriptor);
+                options.AddEventHandler(JarJarmServerEventHandlers.JarValidateRequestObjectDescriptor); // validate stage fallback
+                options.AddEventHandler(JarJarmServerEventHandlers.RedirectUriFallbackDescriptor); // ensure redirect_uri present
                 options.AddEventHandler(JarJarmServerEventHandlers.ApplyAuthorizationResponseDescriptor);
                 options.AddEventHandler(JarJarmServerEventHandlers.ParRequestUriResolutionDescriptor);
                 options.AddEventHandler(JarJarmServerEventHandlers.ParModeEnforcementDescriptor);
