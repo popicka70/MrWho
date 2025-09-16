@@ -2,7 +2,7 @@
 
 Status: Draft (Phase 2 wrap rebaseline)
 Owner: Identity Platform
-Last Updated: UTC 2025-09-16 (Re-assessed)
+Last Updated: UTC 2025-09-16 (Re-assessed + metrics instrumentation pass)
 Target Version: Phased (v1.1 – v1.4)
 
 ## Phase 2 Progress Snapshot (Rebaseline)
@@ -10,7 +10,7 @@ Completed (✅):
 - PJ48 PAR push capture endpoint implemented (hash+reuse, accepts `request`)
 - PJ49 PAR authorize consumption (single-use enforcement via option)
 - PJ50 PAR resolution marker (sentinel `_par_resolved` + consumption handler) ✅ (moved from In Progress)
-- PJ51 PAR metrics counters (push/reuse/resolution/consumed/replay/conflict/limit hooks)
+- PJ51 PAR metrics counters (push/reuse/resolution/consumed/replay/conflict/limit hooks) – core counters defined
 - PJ14 Native ParMode=Required enforcement (event handler) – middleware fallback now obsolete
 - PJ37 Built-in handler suppression final (legacy middleware removed; native JarMode & ParMode enforcement active)
 - JAR validator core (alg/size/lifetime/issuer/audience/jti replay + early extract merge) – Success & negative path coverage
@@ -21,10 +21,11 @@ In Progress (🛠):
 - PJ41 Claim & length limits (limit handler implemented; needs configuration exposure, tuning & fuzz coverage)
 - PJ11 JARM success packaging final (handler issues signed JWT, needs end-to-end post-auth tests & claim assertions)
 - PJ12 JARM error packaging final (error path JWT emitted; need negative/error scenario tests)
-- PJ30 Metrics counters foundation (ProtocolMetrics service in place; wiring for JAR/JARM increments pending final integration)
+- PJ30 Metrics counters foundation (ProtocolMetrics service extended; PAR/JAR/JARM/validation observers partially wired)
+- PJ56 JAR/JARM & extended PAR metrics wiring (jar/jarm + par resolution observers added; remaining: push reuse, consumed granular outcomes)
 
 Pending (🎯 next):
-- PJ17 JAR jti replay metrics (extend existing replay cache usage -> add counters + export)
+- PJ17 JAR jti replay metrics (extend existing replay cache usage -> add counters + export) – counter placeholder present (`replay` outcome, need full tests)
 - PJ42 Discovery gating refinements (adaptive advertise based on active clients/modes; current state = always-on advertise)
 - PJ13 JARM key rotation test (kid stability & validation across rotation) – needs test harness
 - PJ26 Required mode negative matrix (systematic ParMode/JarMode/JarmMode failure assertions)
@@ -36,7 +37,6 @@ Pending (🎯 next):
 - PJ33 Developer guide updates (adapter diagrams + handler ordering)
 - PJ34 Ops runbook (replay/reuse guidance; configuring limits safely)
 - PJ35 Config matrix (behavior combinations including modes + limits + conflicts)
-- PJ56 JAR/JARM metrics wiring (jar_validations_total, jar_replay_blocked_total, jarm_issued_total, jarm_error_total) – new
 - PJ43 Remove obsolete PAR entity (Cleanup) – Deferred
 
 ## Phase 1 Closure Summary (Unchanged Reference)
@@ -72,13 +72,13 @@ Objectives (updated status):
 | PJ48 | PAR push capture handler | Handler | Hash & dedupe reuse | ✅ Done |
 | PJ49 | Authorize consumption handler | Handler | Single vs multi-use enforcement | ✅ Done |
 | PJ50 | PAR resolution marker | Handler | Reliable detection | ✅ Done |
-| PJ51 | PAR metrics | Telemetry | Request/reuse counters | ✅ Done |
+| PJ51 | PAR metrics | Telemetry | Request/reuse/resolution/consumed/replay/conflict/limit hooks | ✅ Core counters defined |
 | PJ14 | Enforce ParMode=Required (native) | Enforcement | Event-based rejection | ✅ Done |
 | PJ40 | Query vs request conflict detection | Validation | Reject mismatches | 🛠 In Progress |
 | PJ41 | Claim & length limits | Validation | Prevent bloat | 🛠 In Progress |
 | PJ17 | JAR jti replay metrics | Security | Detect & count replays | Pending |
-| PJ30 | Metrics counters foundation | Telemetry | jar/jarm/replay counters infra | 🛠 Partial |
-| PJ56 | JAR/JARM metrics wiring | Telemetry | Increment & expose jar/jarm counters | Pending |
+| PJ30 | Metrics counters foundation | Telemetry | jar/jarm/replay counters infra | 🛠 Partial (extended snapshot) |
+| PJ56 | JAR/JARM metrics wiring | Telemetry | Increment & expose jar/jarm counters | 🛠 Partial (JAR/JARM + basic PAR resolution) |
 | PJ42 | Discovery gating | Integration | Adaptive advertise | Pending |
 | PJ37 | Built-in handler suppression final | Hardening | Single validation trace | ✅ Done |
 | PJ26 | Required mode negative matrix | Testing | Systematic failures | Pending |
@@ -102,7 +102,7 @@ Objectives (updated status):
 | PAR Core | PJ48, PJ49, PJ51, PJ14, PJ50 | Replay tests | CustomFull |
 | JARM | Packaging handlers (success+error) | PJ11–PJ13 (tests, rotation) | Encryption/advanced |
 | Enforcement | Native PAR/JAR/JARM | Conflict & limits finalization | Unified policy engine |
-| Telemetry | PAR counters infra | JAR/JARM wiring (PJ56), replay metrics (PJ17) | SLA dashboards |
+| Telemetry | PAR counters + snapshot | JAR/JARM wiring (PJ56), replay metrics (PJ17) | SLA dashboards |
 | Security | Validations baseline | Replay metrics, conflict, limits | DoS protections |
 | Docs | Error catalog | Adapter/ops docs | Migration guide |
 
@@ -114,13 +114,13 @@ Objectives (updated status):
 | v1.4 (Phase 4) | Cleanup & performance | Schema cleanup + perf baseline + migration guide |
 
 ## Immediate Next Actions (Week Focus)
-1. Wire ProtocolMetrics increments inside JarRequestValidator & JarmAuthorizationResponseHandler (PJ56)
-2. Add counters for replay blocked (early + validate stage) (PJ17)
-3. Expose metrics snapshot endpoint (internal) for jar/jarm/replay + existing PAR metrics
-4. Enable RequestLimits & RequestConflicts via configuration defaults (document safe rollout) (PJ40/PJ41)
-5. Add JARM success & error JWT assertion tests (claims: iss,aud,iat,exp,state,code/error) (PJ11/PJ12)
-6. Add key rotation test verifying previously issued JARM JWT validation (PJ13)
-7. Author required-mode negative matrix test suite (PJ26)
+1. Finalize PAR push/reuse/consumed instrumentation (extend push controller & consumption handler) (PJ51/PJ56)
+2. Add detailed conflict/limit outcome codes (e.g. conflict:client_id, limit:scope_items) to validation metrics
+3. Implement JARM success/error claim assertion tests (iss,aud,iat,exp,state,code/error mapping) (PJ11/PJ12)
+4. Add key rotation + historical JARM validation test (PJ13)
+5. Build required-mode negative matrix generator (covers ParMode/JarMode/JarmMode permutations) (PJ26)
+6. Replay scenario expansion: same JAR reused across PAR push + direct authorize, and late-stage replay after partial consumption (PJ27)
+7. Draft adaptive discovery gating logic (counts active clients requiring features) (PJ42)
 
 ## Risk / Watchlist
 - Conflict & limit handlers currently fail-open on internal exceptions (log at Debug). Evaluate tightening once stable.

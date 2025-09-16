@@ -23,9 +23,23 @@ public class ProtocolMetricsController : ControllerBase
         var snap = _metrics.GetSnapshot();
         return Ok(new
         {
+            captured_at_utc = snap.CapturedAtUtc,
             jar_requests = snap.JarRequests,
             jar_replay_blocked = snap.JarReplayBlocked,
-            jarm_responses = snap.JarmResponses
+            jarm_responses = snap.JarmResponses,
+            par_pushes = snap.ParPushes,
+            par_resolutions = snap.ParResolutions,
+            validation_events = snap.ValidationEvents
         });
+    }
+
+    /// <summary>
+    /// Resets the in-memory protocol metrics counters.
+    /// </summary>
+    [HttpPost("reset")]
+    public IActionResult Reset()
+    {
+        _metrics.Reset();
+        return NoContent();
     }
 }
