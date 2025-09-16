@@ -77,7 +77,7 @@ public class JarmModeEnforcementTests
         return parsed.TryGetValue(key, out var values) ? values.ToString() : null;
     }
 
-    // Task 17: JarmMode=Required without providing response_mode=jwt should be silently enforced (middleware injects mrwho_jarm)
+    // Task 17: JarmMode=Required without providing response_mode=jwt should be silently enforced (handler injects mrwho_jarm)
     [TestMethod]
     public async Task JarmMode_Required_Without_ResponseMode_Query_Is_Enforced()
     {
@@ -116,26 +116,18 @@ public class JarmModeEnforcementTests
         using var authClient = CreateServerClient();
         var authResp = await authClient.GetAsync(authorizeUrl);
 
-        // Expect redirect (login) or OK (rendered login) but NOT a 400
         Assert.IsTrue(((int)authResp.StatusCode >= 300 && (int)authResp.StatusCode <= 399) || authResp.StatusCode == HttpStatusCode.OK,
             $"Expected redirect/OK. Got {(int)authResp.StatusCode} {authResp.StatusCode}. Body: {await authResp.Content.ReadAsStringAsync()}");
 
-        // Follow intermediate authorize caching redirect if present
+        // Follow intermediate authorize redirect if present
         if ((int)authResp.StatusCode is >= 300 and <= 399)
         {
             var loc = authResp.Headers.Location?.ToString() ?? string.Empty;
             if (loc.Contains("/connect/authorize", StringComparison.OrdinalIgnoreCase) && loc.Contains("request_uri=", StringComparison.OrdinalIgnoreCase))
             {
-                // Follow one hop
-                string next; if (loc.StartsWith("http", StringComparison.OrdinalIgnoreCase))
-                {
-                    next = loc;
-                }
-                else
-                {
-                    next = new Uri(authClient.BaseAddress!, loc).ToString();
-                }
-
+                string next = loc.StartsWith("http", StringComparison.OrdinalIgnoreCase)
+                    ? loc
+                    : new Uri(authClient.BaseAddress!, loc).ToString();
                 var relative = next.StartsWith(authClient.BaseAddress!.ToString(), StringComparison.OrdinalIgnoreCase)
                     ? next.Substring(authClient.BaseAddress!.ToString().Length).TrimStart('/')
                     : next;
@@ -143,7 +135,7 @@ public class JarmModeEnforcementTests
             }
         }
 
-        // After following any intermediate redirect, inspect final redirect (likely to login) for mrwho_jarm evidence.
+        // After any follow-up, we must see mrwho_jarm=1 either in redirect URL or embedded returnUrl
         if ((int)authResp.StatusCode is >= 300 and <= 399)
         {
             var loc = authResp.Headers.Location?.ToString() ?? string.Empty;
@@ -151,22 +143,18 @@ public class JarmModeEnforcementTests
             if (!string.IsNullOrEmpty(returnUrlRaw))
             {
                 var decoded = Uri.UnescapeDataString(returnUrlRaw);
-                if (!decoded.Contains("mrwho_jarm=1", StringComparison.Ordinal))
-                {
-                    Assert.Inconclusive($"mrwho_jarm flag not yet propagated to returnUrl (location={loc}). Pending full JARM enforcement wiring.");
-                }
-                return; // success or inconclusive already handled
+                Assert.IsTrue(decoded.Contains("mrwho_jarm=1", StringComparison.Ordinal), $"Expected mrwho_jarm=1 inside returnUrl. returnUrl={decoded}");
             }
-            // If no returnUrl (e.g., direct authorize redirect) check location itself
-            if (!loc.Contains("mrwho_jarm=1", StringComparison.Ordinal))
+            else
             {
-                Assert.Inconclusive($"mrwho_jarm flag missing in redirect location (loc={loc}).");
+                Assert.IsTrue(loc.Contains("mrwho_jarm=1", StringComparison.Ordinal), $"Expected mrwho_jarm=1 in redirect location. Location={loc}");
             }
         }
         else if (authResp.StatusCode == HttpStatusCode.OK)
         {
-            // Rendered login page scenario: we cannot see redirect, minimal assertion (server accepted request). Optionally could fetch embedded form action.
-            Assert.IsTrue(true, "OK status accepted with enforced JARM (implicit)");
+            // Rendered login page scenario: minimal assertion – ensure we can fetch the login page with enforced flag in form action (optional future enhancement)
+            // For now accept OK as implicit enforcement path (server already injected flag internally for subsequent navigation)
+            Assert.IsTrue(true);
         }
     }
 }

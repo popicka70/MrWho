@@ -14,7 +14,6 @@ using Microsoft.Extensions.Options;
 using MrWho.Data;
 using MrWho.Endpoints;
 using MrWho.Handlers;
-using MrWho.Middleware;
 using MrWho.Models; // added for UserProfile, UserState
 using MrWho.Services;
 using MrWho.Services.Mediator;
@@ -25,6 +24,7 @@ using OpenIddict.Client; // added for OpenIddictClientOptions/Registration
 using OpenIddict.Client.AspNetCore;
 using OpenIddict.Server.AspNetCore;
 using static OpenIddict.Abstractions.OpenIddictConstants;
+using MrWho.Middleware; // re-added for DeviceAutoLoginMiddleware & ClientCookieMiddleware
 
 namespace MrWho.Extensions;
 
@@ -52,9 +52,6 @@ public static class WebApplicationExtensions
             app.UseHttpsRedirection();
         }
         app.UseStaticFiles();
-
-        // Move JAR/JARM normalization BEFORE routing so OpenIddict never sees unsupported response_mode=jwt.
-        app.UseMiddleware<JarRequestExpansionMiddleware>();
 
         app.UseRouting();
 
@@ -118,8 +115,6 @@ public static class WebApplicationExtensions
         }
 
         app.UseStaticFiles();
-        // Early JAR/JARM normalization
-        app.UseMiddleware<JarRequestExpansionMiddleware>();
         app.UseRouting();
 
         app.UseRateLimiter();

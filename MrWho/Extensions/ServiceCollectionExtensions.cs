@@ -379,6 +379,7 @@ public static partial class ServiceCollectionExtensions
                 options.AddEventHandler(JarJarmServerEventHandlers.ParModeEnforcementDescriptor);
                 options.AddEventHandler(JarJarmServerEventHandlers.ParConsumptionDescriptor);
                 options.AddEventHandler(JarJarmServerEventHandlers.RequestConflictAndLimitValidationDescriptor); // PJ40/PJ41
+                options.AddEventHandler(JarJarmServerEventHandlers.JarModeEnforcementDescriptor); // PJ37 JAR required enforcement
             })
             .AddValidation(options => { options.UseLocalServer(); options.UseAspNetCore(); });
         return services;

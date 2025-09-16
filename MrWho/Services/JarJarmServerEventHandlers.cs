@@ -4,6 +4,7 @@ using System.Text.Json; // for JSON array construction
 using Microsoft.EntityFrameworkCore; // added for context queries
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options; // added for IOptions<>
+
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens; // signing
 using MrWho.Data; // for ApplicationDbContext
@@ -737,6 +738,46 @@ internal sealed class ParModeEnforcementHandler : IOpenIddictServerHandler<OpenI
     }
 }
 
+// NEW: JarMode enforcement handler (PJ37) – replaces legacy middleware logic for JAR required
+internal sealed class JarModeEnforcementHandler : IOpenIddictServerHandler<ValidateAuthorizationRequestContext>
+{
+    private readonly ApplicationDbContext _db;
+    private readonly ILogger<JarModeEnforcementHandler> _logger;
+    public JarModeEnforcementHandler(ApplicationDbContext db, ILogger<JarModeEnforcementHandler> logger)
+    { _db = db; _logger = logger; }
+
+    public ValueTask HandleAsync(ValidateAuthorizationRequestContext context)
+    {
+        var request = context.Request;
+        if (request == null) return ValueTask.CompletedTask;
+        var clientId = request.ClientId;
+        if (string.IsNullOrEmpty(clientId)) return ValueTask.CompletedTask; // core handler will reject missing client
+        try
+        {
+            var jarMode = _db.Clients.AsNoTracking()
+                .Where(c => c.ClientId == clientId)
+                .Select(c => c.JarMode)
+                .FirstOrDefault();
+            if (jarMode == JarMode.Required)
+            {
+                // JAR considered satisfied if early validator merged it (_jar_validated) OR raw request param still present (built-in path) OR request object still in Request
+                bool hasValidated = request.GetParameter("_jar_validated") is not null;
+                bool hasRaw = request.GetParameter(OpenIddictConstants.Parameters.Request) is not null || !string.IsNullOrEmpty(request.Request);
+                if (!hasValidated && !hasRaw)
+                {
+                    context.Reject(error: OpenIddictConstants.Errors.InvalidRequest, description: "request object required for this client");
+                    _logger.LogDebug("[JAR] Rejected authorize request missing request object (JarMode=Required) client {ClientId}", clientId);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "[JAR] JarMode enforcement skipped due to error for client {ClientId}", clientId);
+        }
+        return ValueTask.CompletedTask;
+    }
+}
+
 public static class JarJarmServerEventHandlers
 {
     // UPDATED: extraction phase handler now enforces JARM required by injecting mrwho_jarm=1 if client requires it
@@ -845,6 +886,13 @@ public static class JarJarmServerEventHandlers
         OpenIddictServerHandlerDescriptor.CreateBuilder<OpenIddictServerEvents.ValidateAuthorizationRequestContext>()
             .UseScopedHandler<ParModeEnforcementHandler>()
             .SetOrder(int.MinValue + 8) // after resolution (+2) and JAR early extract (+5) but before consumption (+10)
+            .SetType(OpenIddictServerHandlerType.Custom)
+            .Build();
+
+    public static OpenIddictServerHandlerDescriptor JarModeEnforcementDescriptor { get; } =
+        OpenIddictServerHandlerDescriptor.CreateBuilder<ValidateAuthorizationRequestContext>()
+            .UseScopedHandler<JarModeEnforcementHandler>()
+            .SetOrder(int.MinValue + 7) // after conflict (+6) and before ParMode (+8)
             .SetType(OpenIddictServerHandlerType.Custom)
             .Build();
 
