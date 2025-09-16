@@ -4,7 +4,6 @@ using System.Text.Json; // for JSON array construction
 using Microsoft.EntityFrameworkCore; // added for context queries
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options; // added for IOptions<>
-
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens; // signing
 using MrWho.Data; // for ApplicationDbContext
@@ -94,8 +93,7 @@ internal sealed class RequestConflictAndLimitValidationHandler : IOpenIddictServ
                         _metrics.IncrementValidationEvent("limit", "name_length");
                         return ValueTask.CompletedTask;
                     }
-                    var valObj = request.GetParameter(name);
-                    var valStr = valObj?.ToString() ?? string.Empty;
+                    var valStr = request.GetParameter(name)?.ToString() ?? string.Empty;
                     if (limits.MaxParameterValueLength is int mv && mv > 0 && !_skipValueLength.Contains(name) && valStr.Length > mv)
                     {
                         context.Reject(error: OpenIddictConstants.Errors.InvalidRequest, description: "limit_exceeded:value_length");
@@ -597,7 +595,7 @@ internal sealed class ParRequestUriResolutionHandler : IOpenIddictServerHandler<
             {
                 try
                 {
-                    var dict = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(par.ParametersJson) ?? new();
+                    var dict = JsonSerializer.Deserialize<Dictionary<string, string>>(par.ParametersJson) ?? new();
                     foreach (var kv in dict)
                     {
                         if (kv.Key == OpenIddictConstants.Parameters.RequestUri) continue;
@@ -698,17 +696,12 @@ internal sealed class ParModeEnforcementHandler : IOpenIddictServerHandler<OpenI
                 .FirstOrDefault();
             if (parMode == MrWho.Shared.PushedAuthorizationMode.Required)
             {
-                bool hasRequestUri = request.GetParameter(OpenIddictConstants.Parameters.RequestUri) is not null;
+                // Consider PAR satisfied once resolution marker is present, even if core removed request_uri param.
                 bool resolved = request.GetParameter("_par_resolved") is not null;
-                if (!hasRequestUri)
+                if (!resolved)
                 {
                     context.Reject(error: OpenIddictConstants.Errors.InvalidRequest, description: "PAR required for this client");
-                    _logger.LogDebug("[PAR] Rejected authorize request missing request_uri (ParMode=Required) client {ClientId}", clientId);
-                }
-                else if (!resolved)
-                {
-                    context.Reject(error: OpenIddictConstants.Errors.InvalidRequestUri, description: "invalid or expired request_uri for required PAR");
-                    _logger.LogDebug("[PAR] Rejected authorize request with unresolved request_uri (ParMode=Required) client {ClientId}", clientId);
+                    _logger.LogDebug("[PAR] Rejected authorize request missing resolved PAR (ParMode=Required) client {ClientId}", clientId);
                 }
             }
         }
@@ -744,8 +737,8 @@ internal sealed class JarModeEnforcementHandler : IOpenIddictServerHandler<Valid
             {
                 bool hasValidated = request.GetParameter("_jar_validated") is not null;
                 bool hasRaw = request.GetParameter(OpenIddictConstants.Parameters.Request) is not null || !string.IsNullOrEmpty(request.Request);
-                // NEW: treat resolved PAR with stored request object (request_uri + _par_resolved marker) as satisfying pre-validation so enforcement doesn't fire prematurely
-                bool parResolved = request.GetParameter("_par_resolved") is not null && request.GetParameter(OpenIddictConstants.Parameters.RequestUri) is not null;
+                // Consider PAR resolution sufficient to defer enforcement until JAR validation runs.
+                bool parResolved = request.GetParameter("_par_resolved") is not null;
                 if (!hasValidated && !hasRaw && !parResolved)
                 {
                     _logger.LogDebug("[JAR] Enforcement fail client={ClientId} validated={Validated} raw={Raw} parResolved={ParResolved}", clientId, hasValidated, hasRaw, parResolved);
@@ -938,31 +931,31 @@ public static class JarJarmServerEventHandlers
 
     public static OpenIddictServerHandlerDescriptor RequestConflictAndLimitValidationDescriptor { get; } =
         OpenIddictServerHandlerDescriptor.CreateBuilder<ValidateAuthorizationRequestContext>()
-            .UseScopedHandler<RequestConflictAndLimitValidationHandler>()
-            .SetOrder(int.MinValue + 6)
-            .SetType(OpenIddictServerHandlerType.Custom)
-            .Build();
+        .UseScopedHandler<RequestConflictAndLimitValidationHandler>()
+        .SetOrder(int.MinValue + 6)
+        .SetType(OpenIddictServerHandlerType.Custom)
+        .Build();
 
     public static OpenIddictServerHandlerDescriptor JarModeEnforcementDescriptor { get; } =
         OpenIddictServerHandlerDescriptor.CreateBuilder<ValidateAuthorizationRequestContext>()
-            .UseScopedHandler<JarModeEnforcementHandler>()
-            .SetOrder(int.MinValue + 7)
-            .SetType(OpenIddictServerHandlerType.Custom)
-            .Build();
+        .UseScopedHandler<JarModeEnforcementHandler>()
+        .SetOrder(int.MinValue + 7)
+        .SetType(OpenIddictServerHandlerType.Custom)
+        .Build();
 
     public static OpenIddictServerHandlerDescriptor ParModeEnforcementDescriptor { get; } =
         OpenIddictServerHandlerDescriptor.CreateBuilder<ValidateAuthorizationRequestContext>()
-            .UseScopedHandler<ParModeEnforcementHandler>()
-            .SetOrder(int.MinValue + 8)
-            .SetType(OpenIddictServerHandlerType.Custom)
-            .Build();
+        .UseScopedHandler<ParModeEnforcementHandler>()
+        .SetOrder(int.MinValue + 8)
+        .SetType(OpenIddictServerHandlerType.Custom)
+        .Build();
 
     public static OpenIddictServerHandlerDescriptor ParConsumptionDescriptor { get; } =
         OpenIddictServerHandlerDescriptor.CreateBuilder<ValidateAuthorizationRequestContext>()
-            .UseScopedHandler<ParConsumptionHandler>()
-            .SetOrder(int.MinValue + 10)
-            .SetType(OpenIddictServerHandlerType.Custom)
-            .Build();
+        .UseScopedHandler<ParConsumptionHandler>()
+        .SetOrder(int.MinValue + 10)
+        .SetType(OpenIddictServerHandlerType.Custom)
+        .Build();
 
     public static OpenIddictServerHandlerDescriptor ApplyAuthorizationResponseDescriptor { get; } =
         OpenIddictServerHandlerDescriptor.CreateBuilder<ApplyAuthorizationResponseContext>()
@@ -981,7 +974,7 @@ public static class JarJarmServerEventHandlers
     public static OpenIddictServerHandlerDescriptor RedirectUriFallbackDescriptor { get; } =
         OpenIddictServerHandlerDescriptor.CreateBuilder<ValidateAuthorizationRequestContext>()
             .UseScopedHandler<RedirectUriFallbackHandler>()
-            .SetOrder(int.MinValue + 1) // early in validation before core required param checks
+            .SetOrder(int.MinValue + 1)
             .SetType(OpenIddictServerHandlerType.Custom)
             .Build();
 }
