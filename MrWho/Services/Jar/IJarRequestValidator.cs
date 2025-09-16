@@ -36,6 +36,7 @@ internal sealed class JarRequestValidator : IJarRequestValidator, IJarValidation
     private readonly JarOptions _options;
     private readonly ILogger<JarRequestValidator> _logger;
     private readonly string? _serverIssuer; // expected audience value (base authority)
+    private readonly IProtocolMetrics _metrics; // NEW
 
     private static readonly HashSet<string> _recognized = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -58,8 +59,9 @@ internal sealed class JarRequestValidator : IJarRequestValidator, IJarValidation
         IClientSecretService secretService,
         IOptions<JarOptions> options,
         ILogger<JarRequestValidator> logger,
-        IConfiguration configuration)
-    { _db = db; _keys = keys; _replay = replay; _symPolicy = symPolicy; _secretService = secretService; _options = options.Value; _logger = logger; _serverIssuer = (configuration["OpenIddict:Issuer"] ?? configuration["Authentication:Authority"])?.TrimEnd('/'); }
+        IConfiguration configuration,
+        IProtocolMetrics metrics) // NEW
+    { _db = db; _keys = keys; _replay = replay; _symPolicy = symPolicy; _secretService = secretService; _options = options.Value; _logger = logger; _serverIssuer = (configuration["OpenIddict:Issuer"] ?? configuration["Authentication:Authority"])?.TrimEnd('/'); _metrics = metrics; }
 
     public Task<JarValidationResult> ValidateAsync(string jwt, string? queryClientId, CancellationToken ct = default)
         => ValidateCoreAsync(jwt, queryClientId, ct);
@@ -304,5 +306,10 @@ internal sealed class JarRequestValidator : IJarRequestValidator, IJarValidation
     }
 
     private JarValidationResult Fail(string? clientId, string? alg, string description)
-        => new(false, OpenIddict.Abstractions.OpenIddictConstants.Errors.InvalidRequestObject, description, clientId, alg, null);
+    {   // metric outcome classification
+        var outcome = description.Contains("replay", StringComparison.OrdinalIgnoreCase) ? "replay" : "reject";
+        _metrics.IncrementJarRequest(outcome, alg ?? "?");
+        if (outcome == "replay") _metrics.IncrementJarReplayBlocked();
+        return new(false, OpenIddict.Abstractions.OpenIddictConstants.Errors.InvalidRequestObject, description, clientId, alg, null);
+    }
 }

@@ -339,9 +339,10 @@ internal sealed class JarmAuthorizationResponseHandler : IOpenIddictServerHandle
     private readonly IKeyManagementService _keyService;
     private readonly JarOptions _jarOptions;
     private readonly ISecurityAuditWriter _auditWriter; // injected
+    private readonly IProtocolMetrics _metrics; // NEW
 
-    public JarmAuthorizationResponseHandler(ILogger<JarmAuthorizationResponseHandler> logger, IKeyManagementService keyService, Microsoft.Extensions.Options.IOptions<JarOptions> jarOptions, ISecurityAuditWriter auditWriter)
-    { _logger = logger; _keyService = keyService; _jarOptions = jarOptions.Value; _auditWriter = auditWriter; }
+    public JarmAuthorizationResponseHandler(ILogger<JarmAuthorizationResponseHandler> logger, IKeyManagementService keyService, Microsoft.Extensions.Options.IOptions<JarOptions> jarOptions, ISecurityAuditWriter auditWriter, IProtocolMetrics metrics)
+    { _logger = logger; _keyService = keyService; _jarOptions = jarOptions.Value; _auditWriter = auditWriter; _metrics = metrics; }
 
     private static void EnsureKeyId(SecurityKey key, ILogger logger)
     {
@@ -449,6 +450,7 @@ internal sealed class JarmAuthorizationResponseHandler : IOpenIddictServerHandle
             if (signingKey is null)
             {
                 _logger.LogWarning("No signing key available for JARM response");
+                _metrics.IncrementJarmResponse("failure");
                 return; // fail open
             }
             EnsureKeyId(signingKey, _logger); // NEW: guarantee kid for downstream validators
@@ -480,11 +482,14 @@ internal sealed class JarmAuthorizationResponseHandler : IOpenIddictServerHandle
                 response[OpenIddictConstants.Parameters.ErrorDescription] = null;
             }
             response["response"] = jwt;
-            _logger.LogDebug("Issued JARM JWT (iss={Issuer}, aud={Aud}, codePresent={HasCode}, errorPresent={HasError}, kid={Kid})", issuer, clientId, !string.IsNullOrEmpty(codeValue), !string.IsNullOrEmpty(errorValue), signingKey.KeyId);
+            var outcome = string.IsNullOrEmpty(errorValue) ? "success" : "error";
+            _metrics.IncrementJarmResponse(outcome);
+            _logger.LogDebug("Issued JARM JWT (iss={Issuer}, aud={Aud}, outcome={Outcome}, kid={Kid})", issuer, clientId, outcome, signingKey.KeyId);
             try { await _auditWriter.WriteAsync("auth.security", errorValue == null ? "jarm.issued" : "jarm.error", new { clientId, hasCode = codeValue != null, error = errorValue, state = stateValue, kid = signingKey.KeyId }, "info", actorClientId: clientId); } catch { }
         }
         catch (Exception ex)
         {
+            _metrics.IncrementJarmResponse("failure");
             _logger.LogError(ex, "Failed to create JARM response JWT");
             try { await _auditWriter.WriteAsync("auth.security", "jarm.failure", new { ex = ex.Message }, "error"); } catch { }
         }
@@ -497,12 +502,14 @@ internal sealed class JarEarlyExtractAndValidateHandler : IOpenIddictServerHandl
     private readonly ILogger<JarEarlyExtractAndValidateHandler> _logger;
     private readonly OidcAdvancedOptions _adv;
     private readonly JarOptions _jarOptions; // NEW
+    private readonly IJarReplayCache _replay; // NEW
 
     public JarEarlyExtractAndValidateHandler(IJarValidationService validator,
         ILogger<JarEarlyExtractAndValidateHandler> logger,
         Microsoft.Extensions.Options.IOptions<OidcAdvancedOptions> adv,
-        Microsoft.Extensions.Options.IOptions<JarOptions> jarOptions)
-    { _validator = validator; _logger = logger; _adv = adv.Value; _jarOptions = jarOptions.Value; }
+        Microsoft.Extensions.Options.IOptions<JarOptions> jarOptions,
+        IJarReplayCache replay)
+    { _validator = validator; _logger = logger; _adv = adv.Value; _jarOptions = jarOptions.Value; _replay = replay; }
 
     public async ValueTask HandleAsync(OpenIddictServerEvents.ExtractAuthorizationRequestContext context)
     {
@@ -523,6 +530,38 @@ internal sealed class JarEarlyExtractAndValidateHandler : IOpenIddictServerHandl
                     description: result.ErrorDescription ?? "invalid request object"
                 );
                 return;
+            }
+
+            // JTI replay detection (early) --------------------------------------------------------
+            string? jti = null;
+            if (result.Parameters != null && result.Parameters.TryGetValue("jti", out var jtiParam))
+            {
+                jti = jtiParam?.ToString();
+            }
+            if (string.IsNullOrEmpty(jti))
+            {
+                if (_jarOptions.RequireJti)
+                {
+                    context.Reject(error: OpenIddictConstants.Errors.InvalidRequestObject, description: "missing jti");
+                    return;
+                }
+            }
+            if (!string.IsNullOrEmpty(jti))
+            {
+                // Determine exp for cache window (cap)
+                DateTimeOffset exp = DateTimeOffset.UtcNow.Add(_jarOptions.JtiCacheWindow);
+                if (result.Parameters != null && result.Parameters.TryGetValue("exp", out var expParam) && long.TryParse(expParam?.ToString(), out var expEpoch))
+                {
+                    try { exp = DateTimeOffset.FromUnixTimeSeconds(expEpoch); } catch { }
+                }
+                if (exp > DateTimeOffset.UtcNow + _jarOptions.MaxExp) exp = DateTimeOffset.UtcNow + _jarOptions.MaxExp;
+                var cacheKey = "auth_jti:" + (queryClientId ?? "?") + ":" + jti;
+                if (!_replay.TryAdd(cacheKey, exp))
+                {
+                    _logger.LogDebug("[JAR] Replay detected (early stage) client={ClientId} jti={Jti}", queryClientId, jti);
+                    context.Reject(error: OpenIddictConstants.Errors.InvalidRequest, description: "replay jti");
+                    return;
+                }
             }
 
             // Conflict detection immediate (PJ40) BEFORE merging into request
@@ -575,14 +614,13 @@ internal sealed class JarEarlyExtractAndValidateHandler : IOpenIddictServerHandl
             // Strip original 'request' so core pipeline doesn't see unsupported parameter
             request.Request = null;
             request.SetParameter(OpenIddictConstants.Parameters.Request, null);
-            // Also clear on transaction root if different reference (defensive)
             if (context.Transaction?.Request != null)
             {
                 context.Transaction.Request.SetParameter(OpenIddictConstants.Parameters.Request, null);
                 context.Transaction.Request.Request = null;
             }
             request.SetParameter("_jar_validated", "1");
-            _logger.LogDebug("[JAR] Early extract validated request object for client {ClientId} alg {Alg} (merged {Count} params)", result.ClientId, result.Algorithm, result.Parameters?.Count ?? 0);
+            _logger.LogDebug("[JAR] Early extract validated request object for client {ClientId} alg {Alg} (merged {Count} params, jti={Jti})", result.ClientId, result.Algorithm, result.Parameters?.Count ?? 0, jti);
         }
         catch (Exception ex)
         {
@@ -782,13 +820,18 @@ internal sealed class JarModeEnforcementHandler : IOpenIddictServerHandler<Valid
                 .FirstOrDefault();
             if (jarMode == JarMode.Required)
             {
-                // JAR considered satisfied if early validator merged it (_jar_validated) OR raw request param still present (built-in path) OR request object still in Request
                 bool hasValidated = request.GetParameter("_jar_validated") is not null;
                 bool hasRaw = request.GetParameter(OpenIddictConstants.Parameters.Request) is not null || !string.IsNullOrEmpty(request.Request);
-                if (!hasValidated && !hasRaw)
+                // NEW: treat resolved PAR with stored request object (request_uri + _par_resolved marker) as satisfying pre-validation so enforcement doesn't fire prematurely
+                bool parResolved = request.GetParameter("_par_resolved") is not null && request.GetParameter(OpenIddictConstants.Parameters.RequestUri) is not null;
+                if (!hasValidated && !hasRaw && !parResolved)
                 {
+                    _logger.LogDebug("[JAR] Enforcement fail client={ClientId} validated={Validated} raw={Raw} parResolved={ParResolved}", clientId, hasValidated, hasRaw, parResolved);
                     context.Reject(error: OpenIddictConstants.Errors.InvalidRequest, description: "request object required for this client");
-                    _logger.LogDebug("[JAR] Rejected authorize request missing request object (JarMode=Required) client {ClientId}", clientId);
+                }
+                else
+                {
+                    _logger.LogDebug("[JAR] Enforcement pass client={ClientId} validated={Validated} raw={Raw} parResolved={ParResolved}", clientId, hasValidated, hasRaw, parResolved);
                 }
             }
         }
@@ -805,8 +848,10 @@ internal sealed class JarValidateRequestObjectHandler : IOpenIddictServerHandler
     private readonly IJarValidationService _validator;
     private readonly ILogger<JarValidateRequestObjectHandler> _logger;
     private readonly OidcAdvancedOptions _adv;
-    public JarValidateRequestObjectHandler(IJarValidationService validator, ILogger<JarValidateRequestObjectHandler> logger, Microsoft.Extensions.Options.IOptions<OidcAdvancedOptions> adv)
-    { _validator = validator; _logger = logger; _adv = adv.Value; }
+    private readonly IJarReplayCache _replay; // NEW
+    private readonly JarOptions _jarOptions;  // NEW
+    public JarValidateRequestObjectHandler(IJarValidationService validator, ILogger<JarValidateRequestObjectHandler> logger, Microsoft.Extensions.Options.IOptions<OidcAdvancedOptions> adv, IJarReplayCache replay, Microsoft.Extensions.Options.IOptions<JarOptions> jarOptions)
+    { _validator = validator; _logger = logger; _adv = adv.Value; _replay = replay; _jarOptions = jarOptions.Value; }
     public async ValueTask HandleAsync(ValidateAuthorizationRequestContext context)
     {
         var req = context.Request;
@@ -821,6 +866,28 @@ internal sealed class JarValidateRequestObjectHandler : IOpenIddictServerHandler
                 context.Reject(error: result.Error ?? OpenIddictConstants.Errors.InvalidRequestObject, description: result.ErrorDescription ?? "invalid request object");
                 return;
             }
+            // JTI replay (validate stage fallback)
+            string? jti = null;
+            if (result.Parameters != null && result.Parameters.TryGetValue("jti", out var jtiParam)) jti = jtiParam?.ToString();
+            if (string.IsNullOrEmpty(jti) && _jarOptions.RequireJti)
+            {
+                context.Reject(error: OpenIddictConstants.Errors.InvalidRequestObject, description: "missing jti");
+                return;
+            }
+            if (!string.IsNullOrEmpty(jti))
+            {
+                DateTimeOffset exp = DateTimeOffset.UtcNow.Add(_jarOptions.JtiCacheWindow);
+                if (result.Parameters != null && result.Parameters.TryGetValue("exp", out var expParam) && long.TryParse(expParam?.ToString(), out var expEpoch))
+                { try { exp = DateTimeOffset.FromUnixTimeSeconds(expEpoch); } catch { } }
+                if (exp > DateTimeOffset.UtcNow + _jarOptions.MaxExp) exp = DateTimeOffset.UtcNow + _jarOptions.MaxExp;
+                var cacheKey = "auth_jti:" + (req.ClientId ?? "?") + ":" + jti;
+                if (!_replay.TryAdd(cacheKey, exp))
+                {
+                    _logger.LogDebug("[JAR] Replay detected (validate stage) client={ClientId} jti={Jti}", req.ClientId, jti);
+                    context.Reject(error: OpenIddictConstants.Errors.InvalidRequest, description: "replay jti");
+                    return;
+                }
+            }
             if (result.Parameters != null)
             {
                 foreach (var kv in result.Parameters)
@@ -830,7 +897,7 @@ internal sealed class JarValidateRequestObjectHandler : IOpenIddictServerHandler
             }
             req.Request = null; req.SetParameter(OpenIddictConstants.Parameters.Request, null);
             req.SetParameter("_jar_validated", "1");
-            _logger.LogDebug("[JAR] Validate-stage processed leftover request object for client {ClientId} (merged {Count} params)", result.ClientId, result.Parameters?.Count ?? 0);
+            _logger.LogDebug("[JAR] Validate-stage processed leftover request object for client {ClientId} (merged {Count} params, jti={Jti})", result.ClientId, result.Parameters?.Count ?? 0, jti);
         }
         catch (Exception ex)
         {
@@ -917,17 +984,24 @@ public static class JarJarmServerEventHandlers
             .SetType(OpenIddictServerHandlerType.Custom)
             .Build();
 
+    public static OpenIddictServerHandlerDescriptor ParRequestUriResolutionDescriptor { get; } =
+        OpenIddictServerHandlerDescriptor.CreateBuilder<ExtractAuthorizationRequestContext>()
+            .UseScopedHandler<ParRequestUriResolutionHandler>()
+            .SetOrder(int.MinValue) // earliest
+            .SetType(OpenIddictServerHandlerType.Custom)
+            .Build();
+
     public static OpenIddictServerHandlerDescriptor JarEarlyExtractAndValidateDescriptor { get; } =
         OpenIddictServerHandlerDescriptor.CreateBuilder<ExtractAuthorizationRequestContext>()
             .UseScopedHandler<JarEarlyExtractAndValidateHandler>()
-            .SetOrder(int.MinValue) // absolute earliest
+            .SetOrder(int.MinValue + 1) // immediately after PAR resolution so we beat built-in handlers
             .SetType(OpenIddictServerHandlerType.Custom)
             .Build();
 
     public static OpenIddictServerHandlerDescriptor ExtractNormalizeJarmResponseModeDescriptor { get; } =
         OpenIddictServerHandlerDescriptor.CreateBuilder<ExtractAuthorizationRequestContext>()
             .UseScopedHandler<JarmResponseModeExtractHandler>()
-            .SetOrder(int.MinValue + 1)
+            .SetOrder(int.MinValue + 10)
             .SetType(OpenIddictServerHandlerType.Custom)
             .Build();
 
@@ -935,13 +1009,6 @@ public static class JarJarmServerEventHandlers
         OpenIddictServerHandlerDescriptor.CreateBuilder<ValidateAuthorizationRequestContext>()
             .UseScopedHandler<JarmResponseModeNormalizationHandler>()
             .SetOrder(int.MinValue)
-            .SetType(OpenIddictServerHandlerType.Custom)
-            .Build();
-
-    public static OpenIddictServerHandlerDescriptor ParRequestUriResolutionDescriptor { get; } =
-        OpenIddictServerHandlerDescriptor.CreateBuilder<ExtractAuthorizationRequestContext>()
-            .UseScopedHandler<ParRequestUriResolutionHandler>()
-            .SetOrder(int.MinValue + 2)
             .SetType(OpenIddictServerHandlerType.Custom)
             .Build();
 

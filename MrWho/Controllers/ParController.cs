@@ -1,127 +1,204 @@
 using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.JsonWebTokens;
-using Microsoft.IdentityModel.Tokens; // added for Base64UrlEncoder
+using Microsoft.IdentityModel.Tokens;
 using MrWho.Data;
 using MrWho.Models;
-using MrWho.Services; // for IJarReplayCache, JarOptions
+using MrWho.Services;
 using Microsoft.Extensions.Options;
 
 namespace MrWho.Controllers;
 
-/// <summary>
-/// Pushed Authorization Request (PAR) endpoint implementation (RFC 9126).
-/// POST /connect/par with standard authorization request parameters.
-/// Stores the parameters server-side and returns a request_uri reference.
-/// </summary>
 [AllowAnonymous]
-[Route("connect")]
+[ApiController]
 public sealed class ParController : Controller
 {
     private readonly ApplicationDbContext _db;
     private readonly ILogger<ParController> _logger;
     private readonly IJarReplayCache _replay;
     private readonly JarOptions _jarOptions;
-
     private static readonly JsonWebTokenHandler JwtHandler = new();
 
     public ParController(ApplicationDbContext db, ILogger<ParController> logger, IJarReplayCache replay, IOptions<JarOptions> jarOptions)
     { _db = db; _logger = logger; _replay = replay; _jarOptions = jarOptions.Value; }
 
-    [HttpPost("par")]
+    [HttpPost]
+    [Route("connect/par")] // explicit OIDC PAR endpoint
     public async Task<IActionResult> Post()
     {
         if (!Request.HasFormContentType)
         {
-            return BadRequest(new { error = "invalid_request", error_description = "form_post_expected" });
+            return Error("invalid_request", "form_post_expected");
         }
         var form = await Request.ReadFormAsync();
         var clientId = form[OpenIddict.Abstractions.OpenIddictConstants.Parameters.ClientId].ToString();
         if (string.IsNullOrWhiteSpace(clientId))
         {
-            return BadRequest(new { error = "invalid_request", error_description = "client_id_missing" });
+            return Error("invalid_request", "client_id_missing");
         }
 
-        // Validate client exists and enabled
         var client = await _db.Clients.AsNoTracking().FirstOrDefaultAsync(c => c.ClientId == clientId);
         if (client == null || client.IsEnabled == false)
         {
-            return BadRequest(new { error = "invalid_client", error_description = "unknown_client" });
+            return Error("invalid_client", "unknown_client");
         }
-        // If PAR disabled for this client
-        if (client.ParMode == Shared.PushedAuthorizationMode.Disabled)
+        if (client.ParMode == MrWho.Shared.PushedAuthorizationMode.Disabled)
         {
-            return BadRequest(new { error = "invalid_request", error_description = "PAR disabled for this client" });
+            return Error("invalid_request", "PAR disabled for this client");
         }
 
-        // Build dictionary of parameters (string values only for now)
         var dict = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var kv in form)
         {
-            if (kv.Key.Equals("client_secret", StringComparison.OrdinalIgnoreCase)) continue; // don't persist secret
+            if (kv.Key.Equals("client_secret", StringComparison.OrdinalIgnoreCase)) continue;
             dict[kv.Key] = kv.Value.ToString();
         }
 
-        // Optional JAR replay/jti checks (basic – signature validation happens later in pipeline)
         if (dict.TryGetValue(OpenIddict.Abstractions.OpenIddictConstants.Parameters.Request, out var requestJwt) && !string.IsNullOrWhiteSpace(requestJwt))
         {
             if (requestJwt.Length > _jarOptions.MaxRequestObjectBytes)
             {
-                return BadRequest(new { error = "invalid_request_object", error_description = "request object too large" });
+                return Error("invalid_request_object", "request object too large");
             }
             try
             {
+                var allowsRs = (client.AllowedRequestObjectAlgs ?? string.Empty)
+                    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .Any(a => a.StartsWith("RS", StringComparison.OrdinalIgnoreCase));
+                SecurityKey? configuredRsaKey = null;
+                if (allowsRs && !string.IsNullOrWhiteSpace(client.JarRsaPublicKeyPem))
+                {
+                    try
+                    {
+                        using var rsaProbe = RSA.Create();
+                        rsaProbe.ImportFromPem(client.JarRsaPublicKeyPem.AsSpan());
+                        var p = rsaProbe.ExportParameters(false);
+                        if (p.Modulus == null || p.Modulus.Length * 8 < 2048)
+                        {
+                            return Error("invalid_request_object", "invalid RSA public key configured for client");
+                        }
+                        configuredRsaKey = new RsaSecurityKey(p);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogDebug(ex, "[PAR] RSA public key import failed for client {ClientId}", clientId);
+                        return Error("invalid_request_object", "invalid RSA public key configured for client");
+                    }
+                }
+
+                // Additional heuristic: reject obviously short PEM bodies (<300 chars) for RS256 keys
+                if (allowsRs && !string.IsNullOrWhiteSpace(client.JarRsaPublicKeyPem) && client.JarRsaPublicKeyPem.Length < 300)
+                {
+                    _logger.LogDebug("[PAR] RSA public key PEM too short for client {ClientId} length={Len}", clientId, client.JarRsaPublicKeyPem.Length);
+                    return Error("invalid_request_object", "invalid RSA public key configured for client");
+                }
+
                 var jwt = JwtHandler.ReadJsonWebToken(requestJwt);
+                var alg = jwt.Alg;
+                if (client.RequireSignedRequestObject == true)
+                {
+                    if (string.IsNullOrEmpty(alg) || alg.Equals("none", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return Error("invalid_request_object", "unsigned request object not allowed");
+                    }
+                    if (!string.IsNullOrWhiteSpace(client.AllowedRequestObjectAlgs))
+                    {
+                        var allowed = client.AllowedRequestObjectAlgs.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                        if (!allowed.Contains(alg, StringComparer.OrdinalIgnoreCase))
+                        {
+                            return Error("invalid_request_object", "algorithm not allowed");
+                        }
+                    }
+                }
+
+                // Strict signature validation against configured RSA key (if provided for RS* algs)
+                if (configuredRsaKey != null)
+                {
+                    try
+                    {
+                        var tvp = new TokenValidationParameters
+                        {
+                            RequireSignedTokens = true,
+                            ValidateIssuer = false,
+                            ValidateAudience = false,
+                            ValidateLifetime = false, // lifetime handled later in full JAR validator
+                            ValidateIssuerSigningKey = true,
+                            IssuerSigningKey = configuredRsaKey,
+                            SignatureValidator = null
+                        };
+                        // ValidateToken returns principal or throws; we only care that signature matches key
+                        var result = JwtHandler.ValidateToken(requestJwt, tvp);
+                        if (!result.IsValid)
+                        {
+                            return Error("invalid_request_object", "request object signature invalid");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogDebug(ex, "[PAR] Signature validation failed for client {ClientId}", clientId);
+                        return Error("invalid_request_object", "request object signature invalid");
+                    }
+                }
+
                 var jti = jwt.Id;
                 if (string.IsNullOrEmpty(jti))
                 {
                     if (_jarOptions.RequireJti)
                     {
-                        return BadRequest(new { error = "invalid_request_object", error_description = "missing jti" });
+                        return Error("invalid_request_object", "missing jti");
                     }
                     jti = Base64UrlEncoder.Encode(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(requestJwt)));
                 }
                 long expEpoch = 0;
-                if (jwt.TryGetPayloadValue<long>("exp", out var expVal))
-                {
-                    expEpoch = expVal;
-                }
+                if (jwt.TryGetPayloadValue<long>("exp", out var expVal)) expEpoch = expVal;
                 var exp = expEpoch > 0 ? DateTimeOffset.FromUnixTimeSeconds(expEpoch) : DateTimeOffset.UtcNow.Add(_jarOptions.MaxExp);
-                if (exp > DateTimeOffset.UtcNow + _jarOptions.MaxExp)
-                {
-                    exp = DateTimeOffset.UtcNow + _jarOptions.MaxExp;
-                }
+                if (exp > DateTimeOffset.UtcNow + _jarOptions.MaxExp) exp = DateTimeOffset.UtcNow + _jarOptions.MaxExp;
                 var cacheKey = "par_jti:" + clientId + ":" + jti;
                 if (!_replay.TryAdd(cacheKey, exp))
                 {
-                    // Align with JAR validator behaviour
-                    return BadRequest(new { error = "invalid_request_object", error_description = "jti replay" });
+                    _logger.LogDebug("[PAR] JTI replay detected for client {ClientId} jti={Jti}", clientId, jti);
+                    return Error("invalid_request", "replay jti");
                 }
+            }
+            catch (Exception ex) when (ex is ArgumentException || ex is FormatException)
+            {
+                return Error("invalid_request_object", "malformed request object");
             }
             catch (Exception ex)
             {
                 _logger.LogDebug(ex, "Failed to parse request object for PAR submission");
-                return BadRequest(new { error = "invalid_request_object", error_description = "malformed request object" });
+                return Error("invalid_request_object", "malformed request object");
             }
         }
 
-        // Persist
         var par = new PushedAuthorizationRequest
         {
             ClientId = clientId,
             ParametersJson = JsonSerializer.Serialize(dict),
             CreatedAt = DateTime.UtcNow,
-            ExpiresAt = DateTime.UtcNow.AddSeconds(90) // default short lifetime
+            ExpiresAt = DateTime.UtcNow.AddSeconds(90)
         };
         par.RequestUri = $"urn:ietf:params:oauth:request_uri:{par.Id}";
         _db.PushedAuthorizationRequests.Add(par);
         await _db.SaveChangesAsync();
 
+        NoCache();
+        return StatusCode(201, new { request_uri = par.RequestUri, expires_in = (int)(par.ExpiresAt - DateTime.UtcNow).TotalSeconds });
+    }
+
+    private IActionResult Error(string error, string description)
+    {
+        NoCache();
+        return BadRequest(new { error, error_description = description });
+    }
+
+    private void NoCache()
+    {
         Response.Headers["Cache-Control"] = "no-store";
         Response.Headers["Pragma"] = "no-cache";
-        return StatusCode(201, new { request_uri = par.RequestUri, expires_in = (int)(par.ExpiresAt - DateTime.UtcNow).TotalSeconds });
     }
 }

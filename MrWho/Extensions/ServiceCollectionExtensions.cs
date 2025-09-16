@@ -347,7 +347,7 @@ public static partial class ServiceCollectionExtensions
 
                 options.AddEventHandler(CustomUserInfoHandler.Descriptor);
                 options.SetAuthorizationEndpointUris("/connect/authorize")
-                       .SetPushedAuthorizationEndpointUris("/connect/par")
+                       //.SetPushedAuthorizationEndpointUris("/connect/par") // handled by custom ParController
                        .SetTokenEndpointUris("/connect/token")
                        .SetEndSessionEndpointUris("/connect/logout")
                        .SetUserInfoEndpointUris("/connect/userinfo")
