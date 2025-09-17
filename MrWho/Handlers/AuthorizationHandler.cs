@@ -104,7 +104,14 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
                 if (dbClient != null)
                 {
                     var jarMode = dbClient.JarMode ?? JarMode.Disabled;
+                    // Try to read the 'request' value from both the strongly-typed property and raw parameters
                     var requestJwt = request.Request; // "request" parameter
+                    if (string.IsNullOrEmpty(requestJwt))
+                    {
+                        var rawReq = request.GetParameter(OpenIddictConstants.Parameters.Request)?.ToString();
+                        if (!string.IsNullOrWhiteSpace(rawReq)) requestJwt = rawReq;
+                        else if (context.Request.Query.TryGetValue(OpenIddictConstants.Parameters.Request, out var qReq) && !string.IsNullOrWhiteSpace(qReq)) requestJwt = qReq.ToString();
+                    }
 
                     if (jarMode == JarMode.Required && string.IsNullOrEmpty(requestJwt))
                     {
@@ -128,6 +135,19 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
                         if (jarResult is { } errorObject)
                         {
                             return Results.BadRequest(errorObject);
+                        }
+                    }
+                    else
+                    {
+                        // No JWT available here: it may have been consumed earlier or the request was pre-expanded.
+                        // Detect query vs effective value conflicts now (at least for scope) to fail before login redirect.
+                        if (context.Request.Query.TryGetValue(OpenIddictConstants.Parameters.Scope, out var qsScope) && !string.IsNullOrWhiteSpace(qsScope) && !string.IsNullOrWhiteSpace(request.Scope))
+                        {
+                            static string Norm(string? s) => string.Join(' ', (s ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).OrderBy(x => x, StringComparer.Ordinal));
+                            if (!string.Equals(Norm(qsScope.ToString()), Norm(request.Scope), StringComparison.Ordinal))
+                            {
+                                return Results.BadRequest(new { error = OpenIddictConstants.Errors.InvalidRequest, error_description = "parameter_conflict:scope" });
+                            }
                         }
                     }
                 }
