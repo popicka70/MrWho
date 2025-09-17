@@ -87,6 +87,7 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
 
         var clientId = request.ClientId ?? string.Empty;
         _logger.LogDebug("Authorization request received for client {ClientId}", clientId);
+        bool jarmRequired = false; // track requirement for later redirects
 
         // Ensure nonce from raw query (in case JAR omitted it but client handler still sent it separately)
         if (string.IsNullOrWhiteSpace(request.Nonce) && context.Request.Query.TryGetValue("nonce", out var rawNonce) && !string.IsNullOrWhiteSpace(rawNonce))
@@ -104,6 +105,8 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
                 if (dbClient != null)
                 {
                     var jarMode = dbClient.JarMode ?? JarMode.Disabled;
+                    // Track JARM requirement for this client for later redirects
+                    try { jarmRequired = (dbClient.JarmMode ?? JarmMode.Disabled) == JarmMode.Required; } catch { jarmRequired = false; }
 
                     // If OpenIddict pipeline already validated/expanded the request object, don't re-validate here.
                     var jarAlreadyValidated = request.GetParameter("_jar_validated") is not null;
@@ -328,6 +331,23 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         {
             _logger.LogDebug("No authenticated user found for client {ClientId}; redirecting to login", clientId);
             var originalAuthorizeUrl = context.Request.GetDisplayUrl();
+            // Inject JARM enforcement flag when required and not already present or using response_mode=jwt
+            if (jarmRequired)
+            {
+                try
+                {
+                    var uri = new Uri(originalAuthorizeUrl);
+                    var query = QueryHelpers.ParseQuery(uri.Query);
+                    var hasJarm = query.ContainsKey("mrwho_jarm");
+                    var hasJwtMode = query.TryGetValue(OpenIddictConstants.Parameters.ResponseMode, out var rm) && string.Equals(rm.ToString(), "jwt", StringComparison.OrdinalIgnoreCase);
+                    if (!hasJarm && !hasJwtMode)
+                    {
+                        originalAuthorizeUrl = QueryHelpers.AddQueryString(originalAuthorizeUrl, "mrwho_jarm", "1");
+                        _logger.LogDebug("Enforced JARM by adding mrwho_jarm=1 to returnUrl for client {ClientId}", clientId);
+                    }
+                }
+                catch (Exception ex) { _logger.LogDebug(ex, "Failed to enforce JARM flag on returnUrl"); }
+            }
             var loginUrl = "/connect/login?" +
                            $"returnUrl={Uri.EscapeDataString(originalAuthorizeUrl)}" +
                            (string.IsNullOrEmpty(clientId) ? string.Empty : $"&clientId={Uri.EscapeDataString(clientId)}");
