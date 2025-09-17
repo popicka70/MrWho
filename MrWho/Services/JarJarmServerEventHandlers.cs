@@ -698,10 +698,12 @@ internal sealed class ParModeEnforcementHandler : IOpenIddictServerHandler<OpenI
             {
                 // Consider PAR satisfied once resolution marker is present, even if core removed request_uri param.
                 bool resolved = request.GetParameter("_par_resolved") is not null;
-                if (!resolved)
+                // Also defer enforcement if a request_uri is present (resolution happens later in pipeline).
+                bool hasRequestUri = request.GetParameter(OpenIddictConstants.Parameters.RequestUri) is not null;
+                if (!resolved && !hasRequestUri)
                 {
                     context.Reject(error: OpenIddictConstants.Errors.InvalidRequest, description: "PAR required for this client");
-                    _logger.LogDebug("[PAR] Rejected authorize request missing resolved PAR (ParMode=Required) client {ClientId}", clientId);
+                    _logger.LogDebug("[PAR] Rejected authorize request missing request_uri/resolution (ParMode=Required) client {ClientId}", clientId);
                 }
             }
         }
@@ -739,14 +741,16 @@ internal sealed class JarModeEnforcementHandler : IOpenIddictServerHandler<Valid
                 bool hasRaw = request.GetParameter(OpenIddictConstants.Parameters.Request) is not null || !string.IsNullOrEmpty(request.Request);
                 // Consider PAR resolution sufficient to defer enforcement until JAR validation runs.
                 bool parResolved = request.GetParameter("_par_resolved") is not null;
-                if (!hasValidated && !hasRaw && !parResolved)
+                // Also defer enforcement if a request_uri is present (resolution/validation happens later).
+                bool hasRequestUri = request.GetParameter(OpenIddictConstants.Parameters.RequestUri) is not null;
+                if (!hasValidated && !hasRaw && !parResolved && !hasRequestUri)
                 {
-                    _logger.LogDebug("[JAR] Enforcement fail client={ClientId} validated={Validated} raw={Raw} parResolved={ParResolved}", clientId, hasValidated, hasRaw, parResolved);
+                    _logger.LogDebug("[JAR] Enforcement fail client={ClientId} validated={Validated} raw={Raw} parResolved={ParResolved} hasRequestUri={HasRequestUri}", clientId, hasValidated, hasRaw, parResolved, hasRequestUri);
                     context.Reject(error: OpenIddictConstants.Errors.InvalidRequest, description: "request object required for this client");
                 }
                 else
                 {
-                    _logger.LogDebug("[JAR] Enforcement pass client={ClientId} validated={Validated} raw={Raw} parResolved={ParResolved}", clientId, hasValidated, hasRaw, parResolved);
+                    _logger.LogDebug("[JAR] Enforcement pass client={ClientId} validated={Validated} raw={Raw} parResolved={ParResolved} hasRequestUri={HasRequestUri}", clientId, hasValidated, hasRaw, parResolved, hasRequestUri);
                 }
             }
         }
