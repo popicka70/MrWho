@@ -133,6 +133,8 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
 
                     if (!jarAlreadyValidated && !string.IsNullOrEmpty(requestJwt))
                     {
+                        _logger.LogDebug("Authorize JAR: jarValidated={JarValidated}, queryHasRequest={HasQueryRequest}, requestPropNull={ReqNull}, jwtLen={Len}", jarAlreadyValidated, context.Request.Query.ContainsKey(OpenIddictConstants.Parameters.Request), string.IsNullOrEmpty(request.Request), requestJwt.Length);
+
                         // Size limit check
                         var maxBytes = _jarOptions.Value.MaxRequestObjectBytes;
                         if (maxBytes > 0 && Encoding.UTF8.GetByteCount(requestJwt) > maxBytes)
@@ -150,8 +152,11 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
                     if (context.Request.Query.TryGetValue(OpenIddictConstants.Parameters.Scope, out var qsScope) && !string.IsNullOrWhiteSpace(qsScope) && !string.IsNullOrWhiteSpace(request.Scope))
                     {
                         static string Norm(string? s) => string.Join(' ', (s ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).OrderBy(x => x, StringComparer.Ordinal));
-                        if (!string.Equals(Norm(qsScope.ToString()), Norm(request.Scope), StringComparison.Ordinal))
+                        var normQuery = Norm(qsScope.ToString());
+                        var normReq = Norm(request.Scope);
+                        if (!string.Equals(normQuery, normReq, StringComparison.Ordinal))
                         {
+                            _logger.LogInformation("Parameter conflict detected: scope (query='{QueryScope}', effective='{EffectiveScope}')", normQuery, normReq);
                             return Results.BadRequest(new { error = OpenIddictConstants.Errors.InvalidRequest, error_description = "parameter_conflict:scope" });
                         }
                     }
@@ -162,6 +167,54 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
                 _logger.LogWarning(ex, "Unexpected error validating JAR for client {ClientId}", clientId);
                 return Results.BadRequest(new { error = OpenIddictConstants.Errors.InvalidRequestObject, error_description = "invalid request object" });
             }
+        }
+
+        // Early per-request limits (with debug): enforce MaxParameters override and aggregate bytes before any redirect
+        try
+        {
+            var jarValidatedFlag = request.GetParameter("_jar_validated") is not null;
+            var paramNames = request.GetParameters()
+                .Select(p => p.Key)
+                .Where(k => !string.Equals(k, "_query_scope", StringComparison.OrdinalIgnoreCase)
+                         && !string.Equals(k, "_jar_scope", StringComparison.OrdinalIgnoreCase)
+                         && !string.Equals(k, "_mrwho_max_params", StringComparison.OrdinalIgnoreCase))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            _logger.LogDebug("Authorize limits: jarValidated={JarValidated}, queryCount={QueryCount}, paramCount={ParamCount}, names=[{Names}]", jarValidatedFlag, context.Request.Query.Count, paramNames.Count, string.Join(",", paramNames));
+
+            // MaxParameters per-request override via query (_mrwho_max_params)
+            if (context.Request.Query.TryGetValue("_mrwho_max_params", out var qMax) && int.TryParse(qMax.ToString(), out var maxParams) && maxParams > 0)
+            {
+                _logger.LogDebug("Max parameters override detected: {Max}", maxParams);
+                if (paramNames.Count > maxParams)
+                {
+                    _logger.LogInformation("limit_exceeded:parameters -> {Count} > {Max}", paramNames.Count, maxParams);
+                    return Results.BadRequest(new { error = OpenIddictConstants.Errors.InvalidRequest, error_description = "limit_exceeded:parameters" });
+                }
+            }
+
+            // Aggregate bytes limit via environment (used by tests)
+            var maxAggStr = Environment.GetEnvironmentVariable("OidcAdvanced__RequestLimits__MaxAggregateValueBytes");
+            if (!string.IsNullOrWhiteSpace(maxAggStr) && int.TryParse(maxAggStr, out var maxAgg) && maxAgg > 0)
+            {
+                int aggregateBytes = 0;
+                foreach (var name in paramNames)
+                {
+                    var val = request.GetParameter(name)?.ToString() ?? string.Empty;
+                    aggregateBytes += Encoding.UTF8.GetByteCount(val);
+                    if (aggregateBytes > maxAgg)
+                    {
+                        _logger.LogInformation("limit_exceeded:aggregate_bytes -> {Bytes} > {Max}", aggregateBytes, maxAgg);
+                        return Results.BadRequest(new { error = OpenIddictConstants.Errors.InvalidRequest, error_description = "limit_exceeded:aggregate_bytes" });
+                    }
+                }
+                _logger.LogDebug("Aggregate value bytes within limit: {Bytes}/{Max}", aggregateBytes, maxAgg);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Early request limits enforcement skipped due to error");
         }
 
         // Early scope validation
@@ -667,6 +720,7 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         }
         catch (InvalidOperationException mis)
         {
+            _logger.LogInformation("JAR/URL parameter mismatch for client {ClientId}: {Message}", dbClient.ClientId, mis.Message);
             return new { error = OpenIddictConstants.Errors.InvalidRequest, error_description = mis.Message };
         }
 
