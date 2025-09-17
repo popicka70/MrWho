@@ -13,6 +13,7 @@ using MrWho.Data;
 using MrWho.Handlers;
 using MrWho.Handlers.Auth;
 using MrWho.Handlers.Users;
+using MrWho.Infrastructure; // NEW: for JarPreprocessingStartupFilter
 using MrWho.Options;
 using MrWho.Services;
 using MrWho.Services.Background;
@@ -42,6 +43,9 @@ public static partial class ServiceCollectionExtensions
         services.AddOptions<JarOptions>().BindConfiguration(JarOptions.SectionName);
         services.AddScoped<IJarRequestValidator, JarRequestValidator>();
         services.AddScoped<IJarValidationService, JarRequestValidator>(); // unified validator
+
+        // Register early JAR preprocessing middleware as startup filter so redirect_uri is available before OpenIddict validation
+        services.AddTransient<IStartupFilter, JarPreprocessingStartupFilter>();
 
         // Protocol metrics (PJ17 JAR replay metrics + JARM outcomes)
         services.AddSingleton<IProtocolMetrics, InMemoryProtocolMetrics>();
@@ -355,7 +359,11 @@ public static partial class ServiceCollectionExtensions
                        .SetIntrospectionEndpointUris("/connect/introspect");
                 // Enable flows
                 options.AllowAuthorizationCodeFlow().AllowClientCredentialsFlow().AllowRefreshTokenFlow();
-                // removed unsupported AllowRequestParameter/AllowRequestUriParameter (custom handlers manage JAR/PAR extraction)
+
+                // Allow request_uri parameter so PAR-required clients can submit request_uri (we pre-resolve it early)
+                //options.AllowRequestUriParameter();
+                // Do not enable request parameter since we strip/merge it in early middleware
+
                 var enablePassword = string.Equals(Environment.GetEnvironmentVariable("MRWHO_TESTS"), "1", StringComparison.OrdinalIgnoreCase) || environment.IsEnvironment("Testing");
                 if (enablePassword)
                 {
@@ -384,6 +392,7 @@ public static partial class ServiceCollectionExtensions
                 options.AddEventHandler(JarJarmServerEventHandlers.ParModeEnforcementDescriptor);
                 options.AddEventHandler(JarJarmServerEventHandlers.ParConsumptionDescriptor);
                 options.AddEventHandler(JarJarmServerEventHandlers.JarModeEnforcementDescriptor); // PJ37 JAR required enforcement
+                options.AddEventHandler(JarJarmServerEventHandlers.ExtractRedirectUriFallbackDescriptor); // NEW: ensure redirect_uri applied early in extract stage
             })
             .AddValidation(options => { options.UseLocalServer(); options.UseAspNetCore(); });
         return services;

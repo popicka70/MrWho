@@ -55,6 +55,19 @@ public static class WebApplicationExtensions
 
         app.UseRouting();
 
+        // Strip bearer Authorization header for the authorize endpoint to avoid OpenIddict validation interfering with anonymous flows in tests
+        app.Use(async (ctx, next) =>
+        {
+            if (ctx.Request.Path.Equals("/connect/authorize", StringComparison.OrdinalIgnoreCase))
+            {
+                if (ctx.Request.Headers.ContainsKey("Authorization"))
+                {
+                    ctx.Request.Headers.Remove("Authorization");
+                }
+            }
+            await next();
+        });
+
         // Enable ASP.NET Core rate limiting middleware
         app.UseRateLimiter();
 
@@ -116,6 +129,19 @@ public static class WebApplicationExtensions
 
         app.UseStaticFiles();
         app.UseRouting();
+
+        // Strip bearer Authorization header for the authorize endpoint to avoid OpenIddict validation interfering with anonymous flows in tests
+        app.Use(async (ctx, next) =>
+        {
+            if (ctx.Request.Path.Equals("/connect/authorize", StringComparison.OrdinalIgnoreCase))
+            {
+                if (ctx.Request.Headers.ContainsKey("Authorization"))
+                {
+                    ctx.Request.Headers.Remove("Authorization");
+                }
+            }
+            await next();
+        });
 
         app.UseRateLimiter();
 
