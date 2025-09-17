@@ -28,7 +28,7 @@ public sealed class OidcAdvancedOptions
     /// Query vs request object conflict detection (PJ40).
     /// Disabled by default for safe rollout.
     /// </summary>
-    public RequestConflictOptions RequestConflicts { get; set; } = new();
+    public RequestConflictOptions RequestConflicts { get; set; } = new() { Enabled = true };
 
     /// <summary>
     /// Claim / parameter limits (PJ41). Disabled (null/0) by default.

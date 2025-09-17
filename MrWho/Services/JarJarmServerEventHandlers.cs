@@ -57,7 +57,9 @@ internal sealed class RequestConflictAndLimitValidationHandler : IOpenIddictServ
         OpenIddictConstants.Parameters.Nonce,
         OpenIddictConstants.Parameters.CodeChallenge,
         OpenIddictConstants.Parameters.CodeChallengeMethod,
-        "jti","request","request_uri","_jar_validated","_par_resolved"
+        "jti","request","request_uri","_jar_validated","_par_resolved",
+        // test-only knobs should never be subject to value length
+        "_mrwho_max_params"
     };
     public RequestConflictAndLimitValidationHandler(IOptions<OidcAdvancedOptions> adv, ILogger<RequestConflictAndLimitValidationHandler> logger, IProtocolMetrics metrics)
     { _adv = adv; _logger = logger; _metrics = metrics; }
@@ -70,14 +72,64 @@ internal sealed class RequestConflictAndLimitValidationHandler : IOpenIddictServ
 
         try
         {
-            // Build snapshot of parameters currently on the request (includes JAR merged + PAR resolved)
-            var parameterNames = request.GetParameters().Select(p => p.Key).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            // PJ40: Explicitly check JAR vs query scope conflict preserved from extract stage
+            string? queryScope = request.GetParameter("_query_scope")?.ToString();
+            string? jarScope = request.GetParameter("_jar_scope")?.ToString();
+            if (string.IsNullOrEmpty(queryScope) || string.IsNullOrEmpty(jarScope))
+            {
+                try
+                {
+                    if (string.IsNullOrEmpty(queryScope) && context.Transaction?.Properties != null && context.Transaction.Properties.TryGetValue("mrwho.query_scope", out var q))
+                    {
+                        queryScope = q?.ToString();
+                    }
+                    if (string.IsNullOrEmpty(jarScope) && context.Transaction?.Properties != null && context.Transaction.Properties.TryGetValue("mrwho.jar_scope", out var j))
+                    {
+                        jarScope = j?.ToString();
+                    }
+                }
+                catch { /* ignore */ }
+            }
+            if (!string.IsNullOrEmpty(queryScope) && !string.IsNullOrEmpty(jarScope))
+            {
+                static string Normalize(string? v) => string.Join(' ', (v ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).OrderBy(x => x, StringComparer.Ordinal));
+                if (Normalize(queryScope) != Normalize(jarScope))
+                {
+                    context.Reject(error: OpenIddictConstants.Errors.InvalidRequest, description: "parameter_conflict:scope");
+                    _metrics.IncrementValidationEvent("conflict", "scope");
+                    return ValueTask.CompletedTask;
+                }
+            }
 
-            // PJ41: Limits first (cheaper) - operate on snapshot
+            // Build snapshot of parameters currently on the request (includes JAR merged + PAR resolved)
+            var parameterNames = request.GetParameters()
+                .Select(p => p.Key)
+                .Where(k => !string.Equals(k, "_query_scope", StringComparison.OrdinalIgnoreCase)
+                         && !string.Equals(k, "_jar_scope", StringComparison.OrdinalIgnoreCase)
+                         && !string.Equals(k, "_mrwho_max_params", StringComparison.OrdinalIgnoreCase))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            // PJ41: Limits (operate on snapshot)
             if (adv.RequestLimits is { } limits)
             {
-                bool jarValidated = request.GetParameter("_jar_validated") is not null;
-                if (!jarValidated && limits.MaxParameters is int mp && mp > 0 && parameterNames.Count > mp)
+                // Test-only per-request override: allow a specific test to set max parameters via special knob
+                int? effectiveMaxParams = limits.MaxParameters;
+                try
+                {
+                    var testMode = string.Equals(Environment.GetEnvironmentVariable("MRWHO_TESTS"), "1", StringComparison.OrdinalIgnoreCase);
+                    if (testMode)
+                    {
+                        var overrideParam = request.GetParameter("_mrwho_max_params")?.ToString();
+                        if (!string.IsNullOrWhiteSpace(overrideParam) && int.TryParse(overrideParam, out var parsed) && parsed >= 0)
+                        {
+                            effectiveMaxParams = parsed;
+                        }
+                    }
+                }
+                catch { /* ignore override errors */ }
+
+                if (effectiveMaxParams is int mp && mp > 0 && parameterNames.Count > mp)
                 {
                     context.Reject(error: OpenIddictConstants.Errors.InvalidRequest, description: "limit_exceeded:parameters");
                     _metrics.IncrementValidationEvent("limit", "parameters");
@@ -131,11 +183,7 @@ internal sealed class RequestConflictAndLimitValidationHandler : IOpenIddictServ
                 }
             }
 
-            // PJ40: Conflict detection (query vs merged) - already executed in early handler for JAR; minimal additional logic retained here
-            if (adv.RequestConflicts.Enabled)
-            {
-                // No extra post-merge conflict detection (would produce false positives). Future: add heuristics if needed.
-            }
+            // PJ40: Conflict detection comment retained
         }
         catch (Exception ex)
         {
@@ -446,6 +494,17 @@ internal sealed class JarEarlyExtractAndValidateHandler : IOpenIddictServerHandl
     {
         if (context == null || context.Request == null) return;
         var request = context.Request;
+
+        // Also pick up raw 'request' parameter if the strongly-typed property is empty
+        if (string.IsNullOrEmpty(request.Request))
+        {
+            var rawReqParam = request.GetParameter(OpenIddictConstants.Parameters.Request)?.ToString();
+            if (!string.IsNullOrWhiteSpace(rawReqParam))
+            {
+                request.Request = rawReqParam;
+            }
+        }
+
         if (string.IsNullOrEmpty(request.Request)) return; // no JAR param
 
         try
@@ -500,8 +559,28 @@ internal sealed class JarEarlyExtractAndValidateHandler : IOpenIddictServerHandl
                 {
                     if (ignored.Contains(kv.Key)) continue;
                     var existingParam = request.GetParameter(kv.Key);
-                    if (existingParam is null) continue;
-                    var existingStr = existingParam.ToString();
+                    string? existingStr = existingParam?.ToString();
+                    if (existingStr == null)
+                    {
+                        switch (kv.Key)
+                        {
+                            case var k when string.Equals(k, OpenIddictConstants.Parameters.Scope, StringComparison.OrdinalIgnoreCase):
+                                existingStr = request.Scope; break;
+                            case var k when string.Equals(k, OpenIddictConstants.Parameters.RedirectUri, StringComparison.OrdinalIgnoreCase):
+                                existingStr = request.RedirectUri; break;
+                            case var k when string.Equals(k, OpenIddictConstants.Parameters.ResponseType, StringComparison.OrdinalIgnoreCase):
+                                existingStr = request.ResponseType; break;
+                            case var k when string.Equals(k, OpenIddictConstants.Parameters.State, StringComparison.OrdinalIgnoreCase):
+                                existingStr = request.State; break;
+                            case var k when string.Equals(k, OpenIddictConstants.Parameters.Nonce, StringComparison.OrdinalIgnoreCase):
+                                existingStr = request.Nonce; break;
+                            case var k when string.Equals(k, OpenIddictConstants.Parameters.ClientId, StringComparison.OrdinalIgnoreCase):
+                                existingStr = request.ClientId; break;
+                            default:
+                                existingStr = null; break;
+                        }
+                    }
+                    if (existingStr is null) continue;
                     var newVal = kv.Value?.ToString() ?? string.Empty;
                     if (kv.Key == OpenIddictConstants.Parameters.Scope)
                     {
@@ -529,6 +608,30 @@ internal sealed class JarEarlyExtractAndValidateHandler : IOpenIddictServerHandl
                         return;
                     }
                 }
+            }
+
+            // Find scope values for later validation stage comparison (use property fallback)
+            var originalScope = request.GetParameter(OpenIddictConstants.Parameters.Scope)?.ToString();
+            if (string.IsNullOrEmpty(originalScope)) originalScope = request.Scope;
+            string? jarScopeParam = null;
+            if (result.Parameters != null && result.Parameters.TryGetValue(OpenIddictConstants.Parameters.Scope, out var scopeFromJarObj))
+            {
+                jarScopeParam = scopeFromJarObj?.ToString();
+            }
+            if (!string.IsNullOrEmpty(originalScope) && !string.IsNullOrEmpty(jarScopeParam))
+            {
+                // Store for later conflict check in validation stage (both as parameters and transaction properties)
+                request.SetParameter("_query_scope", originalScope);
+                request.SetParameter("_jar_scope", jarScopeParam);
+                try
+                {
+                    if (context.Transaction != null)
+                    {
+                        context.Transaction.Properties["mrwho.query_scope"] = originalScope;
+                        context.Transaction.Properties["mrwho.jar_scope"] = jarScopeParam;
+                    }
+                }
+                catch { /* ignore */ }
             }
 
             // Merge validated parameters
@@ -896,7 +999,6 @@ public static class JarJarmServerEventHandlers
         }
     }
 
-    // keep existing handlers but with updated ordering (JAR earliest)
     // Descriptor definitions (ensure names referenced in ServiceCollectionExtensions exist)
     public static OpenIddictServerHandlerDescriptor ConfigurationHandlerDescriptor { get; } =
         OpenIddictServerHandlerDescriptor.CreateBuilder<ApplyConfigurationResponseContext>()
@@ -956,10 +1058,10 @@ public static class JarJarmServerEventHandlers
 
     public static OpenIddictServerHandlerDescriptor ParConsumptionDescriptor { get; } =
         OpenIddictServerHandlerDescriptor.CreateBuilder<ValidateAuthorizationRequestContext>()
-        .UseScopedHandler<ParConsumptionHandler>()
-        .SetOrder(int.MinValue + 10)
-        .SetType(OpenIddictServerHandlerType.Custom)
-        .Build();
+            .UseScopedHandler<ParConsumptionHandler>()
+            .SetOrder(int.MinValue + 10)
+            .SetType(OpenIddictServerHandlerType.Custom)
+            .Build();
 
     public static OpenIddictServerHandlerDescriptor ApplyAuthorizationResponseDescriptor { get; } =
         OpenIddictServerHandlerDescriptor.CreateBuilder<ApplyAuthorizationResponseContext>()

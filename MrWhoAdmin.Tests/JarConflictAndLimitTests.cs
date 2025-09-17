@@ -79,7 +79,7 @@ public class JarConflictAndLimitTests
     [TestMethod]
     public async Task PJ41_MaxParameters_Limit_Enforced()
     {
-        // MaxParameters set to 5 (via env). We'll send >5 distinct names after merge to trigger limit.
+        // We'll send >5 distinct names after merge to trigger limit. Override MaxParameters=5 only for this request.
         var jarClaims = new Dictionary<string, object>
         {
             ["client_id"] = DemoClientId,
@@ -98,9 +98,8 @@ public class JarConflictAndLimitTests
         var jar = CreateJar(jarClaims);
 
         using var http = SharedTestInfrastructure.CreateHttpClient("mrwho", disableRedirects: true);
-        var resp = await AuthorizeAsync(http, jar, string.Empty);
+        var resp = await AuthorizeAsync(http, jar, "&_mrwho_max_params=5");
         var body = await resp.Content.ReadAsStringAsync();
-        // Depending on evaluation order, handler should reject with limit_exceeded:parameters (or possibly name/value length if config changes). Accept either 400 + limit_exceeded token.
         Assert.AreEqual(HttpStatusCode.BadRequest, resp.StatusCode, $"Expected 400 for parameter limit. Status={(int)resp.StatusCode} Body={body}");
         StringAssert.Contains(body, "limit_exceeded:parameters", "Parameter limit indicator missing");
     }
