@@ -41,9 +41,20 @@ public static class WebApplicationExtensions
             app.UseHsts();
         }
 
-        // Behind a reverse proxy (Railway, containers), honor X-Forwarded-* so Request.Scheme becomes https
-        // Place this BEFORE redirection/auth so downstream sees the correct scheme/remote IP. Options are configured in DI.
         app.UseForwardedHeaders();
+
+        // Strip bearer Authorization header for all /connect/* endpoints as early as possible
+        app.Use(async (ctx, next) =>
+        {
+            if (ctx.Request.Path.StartsWithSegments("/connect", StringComparison.OrdinalIgnoreCase))
+            {
+                if (ctx.Request.Headers.ContainsKey("Authorization"))
+                {
+                    ctx.Request.Headers.Remove("Authorization");
+                }
+            }
+            await next();
+        });
 
         // Allow disabling HTTPS redirection for containerized/internal HTTP calls
         var disableHttpsRedirect = string.Equals(Environment.GetEnvironmentVariable("DISABLE_HTTPS_REDIRECT"), "true", StringComparison.OrdinalIgnoreCase);
@@ -54,19 +65,6 @@ public static class WebApplicationExtensions
         app.UseStaticFiles();
 
         app.UseRouting();
-
-        // Strip bearer Authorization header for the authorize endpoint to avoid OpenIddict validation interfering with anonymous flows in tests
-        app.Use(async (ctx, next) =>
-        {
-            if (ctx.Request.Path.Equals("/connect/authorize", StringComparison.OrdinalIgnoreCase))
-            {
-                if (ctx.Request.Headers.ContainsKey("Authorization"))
-                {
-                    ctx.Request.Headers.Remove("Authorization");
-                }
-            }
-            await next();
-        });
 
         // Enable ASP.NET Core rate limiting middleware
         app.UseRateLimiter();
@@ -118,8 +116,20 @@ public static class WebApplicationExtensions
             app.UseHsts();
         }
 
-        // Behind a reverse proxy (Railway, containers), honor X-Forwarded-* so Request.Scheme becomes https
         app.UseForwardedHeaders();
+
+        // Strip bearer Authorization header for all /connect/* endpoints as early as possible
+        app.Use(async (ctx, next) =>
+        {
+            if (ctx.Request.Path.StartsWithSegments("/connect", StringComparison.OrdinalIgnoreCase))
+            {
+                if (ctx.Request.Headers.ContainsKey("Authorization"))
+                {
+                    ctx.Request.Headers.Remove("Authorization");
+                }
+            }
+            await next();
+        });
 
         var disableHttpsRedirect = string.Equals(Environment.GetEnvironmentVariable("DISABLE_HTTPS_REDIRECT"), "true", StringComparison.OrdinalIgnoreCase);
         if (!disableHttpsRedirect)
@@ -130,25 +140,9 @@ public static class WebApplicationExtensions
         app.UseStaticFiles();
         app.UseRouting();
 
-        // Strip bearer Authorization header for the authorize endpoint to avoid OpenIddict validation interfering with anonymous flows in tests
-        app.Use(async (ctx, next) =>
-        {
-            if (ctx.Request.Path.Equals("/connect/authorize", StringComparison.OrdinalIgnoreCase))
-            {
-                if (ctx.Request.Headers.ContainsKey("Authorization"))
-                {
-                    ctx.Request.Headers.Remove("Authorization");
-                }
-            }
-            await next();
-        });
-
         app.UseRateLimiter();
-
         app.UseSession();
-
         app.UseMiddleware<DeviceAutoLoginMiddleware>();
-
         app.UseMiddleware<ClientCookieMiddleware>();
         app.UseAntiforgery();
 

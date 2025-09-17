@@ -41,6 +41,7 @@ builder.Services.AddMrWhoIdentityWithClientCookies();
 builder.Services.AddMrWhoServices(); // includes registrar & hosted service
 builder.Services.AddMrWhoClientCookies(builder.Configuration); // config-driven naming
 // Updated to pass environment (Options 1 & 2 changes inside)
+// Reverted to normal extension method call for AddMrWhoOpenIddict
 builder.Services.AddMrWhoOpenIddict(builder.Configuration, builder.Environment);
 
 // Ensure Challenge() uses the Identity application cookie (redirects to login page)

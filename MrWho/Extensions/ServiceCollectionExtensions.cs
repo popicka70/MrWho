@@ -24,6 +24,8 @@ using OpenIddict.Abstractions;
 using OpenIddict.Client;
 using OpenIddict.Client.AspNetCore;
 using OpenIddict.Client.SystemNetHttp;
+using OpenIddict.Server; // added for handler descriptors (kept though we're not removing handlers now)
+using OpenIddict.Server.AspNetCore;
 
 namespace MrWho.Extensions;
 
@@ -44,7 +46,8 @@ public static partial class ServiceCollectionExtensions
         services.AddScoped<IJarRequestValidator, JarRequestValidator>();
         services.AddScoped<IJarValidationService, JarRequestValidator>(); // unified validator
 
-        // Register early JAR preprocessing middleware as startup filter so redirect_uri is available before OpenIddict validation
+        // Minimal early filters
+        services.AddTransient<IStartupFilter, AuthorizeHeaderStripStartupFilter>();
         services.AddTransient<IStartupFilter, JarPreprocessingStartupFilter>();
 
         // Protocol metrics (PJ17 JAR replay metrics + JARM outcomes)
@@ -335,69 +338,6 @@ public static partial class ServiceCollectionExtensions
         return services;
     }
 
-    public static IServiceCollection AddMrWhoOpenIddict(this IServiceCollection services, IConfiguration configuration, IWebHostEnvironment environment)
-    {
-        services.AddOpenIddict()
-            .AddCore(options =>
-            {
-                options.UseEntityFrameworkCore().UseDbContext<ApplicationDbContext>();
-            })
-            .AddServer(options =>
-            {
-                var issuer = configuration["OpenIddict:Issuer"]; if (!string.IsNullOrWhiteSpace(issuer))
-                {
-                    options.SetIssuer(new Uri(issuer, UriKind.Absolute));
-                }
-
-                options.AddEventHandler(CustomUserInfoHandler.Descriptor);
-                options.SetAuthorizationEndpointUris("/connect/authorize")
-                       //.SetPushedAuthorizationEndpointUris("/connect/par") // handled by custom ParController
-                       .SetTokenEndpointUris("/connect/token")
-                       .SetEndSessionEndpointUris("/connect/logout")
-                       .SetUserInfoEndpointUris("/connect/userinfo")
-                       .SetRevocationEndpointUris("/connect/revocation")
-                       .SetIntrospectionEndpointUris("/connect/introspect");
-                // Enable flows
-                options.AllowAuthorizationCodeFlow().AllowClientCredentialsFlow().AllowRefreshTokenFlow();
-
-                // Allow request_uri parameter so PAR-required clients can submit request_uri (we pre-resolve it early)
-                //options.AllowRequestUriParameter();
-                // Do not enable request parameter since we strip/merge it in early middleware
-
-                var enablePassword = string.Equals(Environment.GetEnvironmentVariable("MRWHO_TESTS"), "1", StringComparison.OrdinalIgnoreCase) || environment.IsEnvironment("Testing");
-                if (enablePassword)
-                {
-                    options.AllowPasswordFlow();
-                }
-
-                options.RequireProofKeyForCodeExchange();
-                options.SetAccessTokenLifetime(TimeSpan.FromMinutes(60)).SetRefreshTokenLifetime(TimeSpan.FromDays(14));
-                if (environment.IsDevelopment())
-                {
-                    options.DisableRollingRefreshTokens();
-                }
-
-                options.RegisterScopes(StandardScopes.OpenId, OpenIddictConstants.Scopes.Email, OpenIddictConstants.Scopes.Profile, OpenIddictConstants.Scopes.Roles, OpenIddictConstants.Scopes.OfflineAccess, StandardScopes.ApiRead, StandardScopes.ApiWrite, StandardScopes.MrWhoUse, "roles.global", "roles.client", "roles.all");
-                options.UseAspNetCore().EnableAuthorizationEndpointPassthrough().EnableTokenEndpointPassthrough().EnableEndSessionEndpointPassthrough();
-                // JAR/JARM handlers remain
-                options.AddEventHandler(JarJarmServerEventHandlers.ConfigurationHandlerDescriptor);
-                options.AddEventHandler(JarJarmServerEventHandlers.ParRequestUriResolutionDescriptor);
-                options.AddEventHandler(JarJarmServerEventHandlers.JarEarlyExtractAndValidateDescriptor);
-                options.AddEventHandler(JarJarmServerEventHandlers.ExtractNormalizeJarmResponseModeDescriptor);
-                options.AddEventHandler(JarJarmServerEventHandlers.NormalizeJarmResponseModeDescriptor);
-                options.AddEventHandler(JarJarmServerEventHandlers.JarValidateRequestObjectDescriptor);
-                options.AddEventHandler(JarJarmServerEventHandlers.RequestConflictAndLimitValidationDescriptor);
-                options.AddEventHandler(JarJarmServerEventHandlers.RedirectUriFallbackDescriptor);
-                options.AddEventHandler(JarJarmServerEventHandlers.ApplyAuthorizationResponseDescriptor);
-                options.AddEventHandler(JarJarmServerEventHandlers.ParModeEnforcementDescriptor);
-                options.AddEventHandler(JarJarmServerEventHandlers.ParConsumptionDescriptor);
-                options.AddEventHandler(JarJarmServerEventHandlers.JarModeEnforcementDescriptor); // PJ37 JAR required enforcement
-                options.AddEventHandler(JarJarmServerEventHandlers.ExtractRedirectUriFallbackDescriptor); // NEW: ensure redirect_uri applied early in extract stage
-            })
-            .AddValidation(options => { options.UseLocalServer(); options.UseAspNetCore(); });
-        return services;
-    }
-
     /// <summary>
     /// Adds and configures the OpenIddict client (upstream external providers) using a consistent extension pattern.
     /// Mirrors the inline configuration previously in Program.cs.
@@ -432,10 +372,98 @@ public static partial class ServiceCollectionExtensions
                 options.UseWebProviders();
             });
 
-        // Upstream client option configurators (already used in Program.cs) stay consistent here so caller just registers them once.
         services.AddSingleton<IConfigureOptions<OpenIddictClientOptions>, ExternalIdpClientOptionsConfigurator>();
         services.AddSingleton<IPostConfigureOptions<OpenIddictClientOptions>, OpenIddictClientOptionsPostConfigurator>();
 
+        return services;
+    }
+
+    /// <summary>
+    /// Adds and configures the OpenIddict server (ourselves) using a consistent extension pattern.
+    /// Mirrors the inline configuration previously in Program.cs.
+    /// </summary>
+    /// <param name="services">Service collection</param>
+    /// <param name="configuration">App configuration (for future use)</param>
+    /// <param name="environment">Hosting environment for dev/prod cert decisions</param>
+    public static IServiceCollection AddMrWhoOpenIddict(this IServiceCollection services, IConfiguration configuration, IWebHostEnvironment environment)
+    {
+        services.AddOpenIddict()
+            .AddCore(options =>
+            {
+                options.UseEntityFrameworkCore().UseDbContext<ApplicationDbContext>();
+            })
+            .AddServer(options =>
+            {
+                var issuer = configuration["OpenIddict:Issuer"]; if (!string.IsNullOrWhiteSpace(issuer))
+                {
+                    options.SetIssuer(new Uri(issuer, UriKind.Absolute));
+                }
+
+                options.AddEventHandler(CustomUserInfoHandler.Descriptor);
+                options.SetAuthorizationEndpointUris("/connect/authorize")
+                       //.SetPushedAuthorizationEndpointUris("/connect/par")
+                       .SetTokenEndpointUris("/connect/token")
+                       .SetEndSessionEndpointUris("/connect/logout")
+                       .SetUserInfoEndpointUris("/connect/userinfo")
+                       .SetRevocationEndpointUris("/connect/revocation")
+                       .SetIntrospectionEndpointUris("/connect/introspect");
+                options.AllowAuthorizationCodeFlow().AllowClientCredentialsFlow().AllowRefreshTokenFlow();
+
+                var enablePassword = string.Equals(Environment.GetEnvironmentVariable("MRWHO_TESTS"), "1", StringComparison.OrdinalIgnoreCase) || environment.IsEnvironment("Testing");
+                if (enablePassword)
+                {
+                    options.AllowPasswordFlow();
+                }
+
+                options.RequireProofKeyForCodeExchange();
+                options.SetAccessTokenLifetime(TimeSpan.FromMinutes(60)).SetRefreshTokenLifetime(TimeSpan.FromDays(14));
+                if (environment.IsDevelopment())
+                {
+                    options.DisableRollingRefreshTokens();
+                }
+
+                options.RegisterScopes(StandardScopes.OpenId, OpenIddictConstants.Scopes.Email, OpenIddictConstants.Scopes.Profile, OpenIddictConstants.Scopes.Roles, OpenIddictConstants.Scopes.OfflineAccess, StandardScopes.ApiRead, StandardScopes.ApiWrite, StandardScopes.MrWhoUse, "roles.global", "roles.client", "roles.all");
+                options.UseAspNetCore().EnableAuthorizationEndpointPassthrough().EnableTokenEndpointPassthrough().EnableEndSessionEndpointPassthrough();
+
+                // Short-circuit built-ins when our sentinels exist
+                options.AddEventHandler(JarJarmServerEventHandlers.ShortCircuitExtractDescriptor);
+                options.AddEventHandler(JarJarmServerEventHandlers.ShortCircuitValidateDescriptor);
+
+                // Our custom pipeline
+                options.AddEventHandler(JarJarmServerEventHandlers.ConfigurationHandlerDescriptor);
+                options.AddEventHandler(JarJarmServerEventHandlers.ParRequestUriResolutionDescriptor);
+                options.AddEventHandler(JarJarmServerEventHandlers.JarEarlyExtractAndValidateDescriptor);
+                options.AddEventHandler(JarJarmServerEventHandlers.ExtractNormalizeJarmResponseModeDescriptor);
+                options.AddEventHandler(JarJarmServerEventHandlers.NormalizeJarmResponseModeDescriptor);
+                options.AddEventHandler(JarJarmServerEventHandlers.JarValidateRequestObjectDescriptor);
+                options.AddEventHandler(JarJarmServerEventHandlers.RequestConflictAndLimitValidationDescriptor);
+                options.AddEventHandler(JarJarmServerEventHandlers.RedirectUriFallbackDescriptor);
+                options.AddEventHandler(JarJarmServerEventHandlers.ApplyAuthorizationResponseDescriptor);
+                options.AddEventHandler(JarJarmServerEventHandlers.ParModeEnforcementDescriptor);
+                options.AddEventHandler(JarJarmServerEventHandlers.ParConsumptionDescriptor);
+                options.AddEventHandler(JarJarmServerEventHandlers.JarModeEnforcementDescriptor);
+                options.AddEventHandler(JarJarmServerEventHandlers.ExtractRedirectUriFallbackDescriptor);
+                options.AddEventHandler(JarJarmServerEventHandlers.AuthorizationResponseDebugLoggerDescriptor);
+            })
+            .AddValidation(options => { options.UseLocalServer(); options.UseAspNetCore(); });
+        return services;
+    }
+
+    /// <summary>
+    /// Standardizes the registration of OpenIddict handlers for consistency and ease of use.
+    /// </summary>
+    public static IServiceCollection AddMrWhoOpenIddictHandlers(this IServiceCollection services)
+    {
+        // Removed unsupported OpenIddict helper APIs. This method is now a no-op to keep binary compatibility.
+        return services;
+    }
+
+    /// <summary>
+    /// Standardizes the registration of OpenIddict clients for consistency and ease of use.
+    /// </summary>
+    public static IServiceCollection AddMrWhoOpenIddictClients(this IServiceCollection services)
+    {
+        // Removed unsupported OpenIddict helper APIs. This method is now a no-op to keep binary compatibility.
         return services;
     }
 
@@ -451,8 +479,8 @@ public static partial class ServiceCollectionExtensions
         int tokenPerHour = section.GetValue<int?>("TokenPerHour") ?? 60;
         int authorizePerHour = section.GetValue<int?>("AuthorizePerHour") ?? 120;
         int userInfoPerHour = section.GetValue<int?>("UserInfoPerHour") ?? 240;
-        int devicePerHour = section.GetValue<int?>("DevicePerHour") ?? 60; // new
-        int verifyPerHour = section.GetValue<int?>("VerifyPerHour") ?? 120; // new
+        int devicePerHour = section.GetValue<int?>("DevicePerHour") ?? 60;
+        int verifyPerHour = section.GetValue<int?>("VerifyPerHour") ?? 120;
 
         services.AddRateLimiter(options =>
         {
