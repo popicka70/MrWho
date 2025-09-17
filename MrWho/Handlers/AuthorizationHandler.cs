@@ -351,7 +351,7 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
                     if (allowedList.Count == 0)
                     {
                         allowedList = new List<string> { "totp", "fido2", "passkey" };
-                    }
+                      }
 
                     var currentAmr = amrSource?.FindAll("amr").Select(c => c.Value).ToList() ?? new List<string>();
                     var amrOk = currentAmr.Any(v => v == "mfa" || v == "fido2");
@@ -622,11 +622,23 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         }
         try
         {
-            CheckMismatch("scope", Get(OpenIddictConstants.Parameters.Scope), request.Scope);
-            CheckMismatch("redirect_uri", Get(OpenIddictConstants.Parameters.RedirectUri), request.RedirectUri);
-            CheckMismatch("response_type", Get(OpenIddictConstants.Parameters.ResponseType), request.ResponseType);
-            CheckMismatch("state", Get(OpenIddictConstants.Parameters.State), request.State);
-            CheckMismatch("nonce", Get(OpenIddictConstants.Parameters.Nonce), request.Nonce); // NEW: ensure nonce consistency
+            // Fallback to raw query values when OpenIddictRequest properties are empty (common when 'request' param is present)
+            string? urlScope = request.Scope;
+            if (string.IsNullOrEmpty(urlScope)) urlScope = httpContext.Request.Query.TryGetValue(OpenIddictConstants.Parameters.Scope, out var qScope) ? qScope.ToString() : null;
+            string? urlRedirectUri = request.RedirectUri;
+            if (string.IsNullOrEmpty(urlRedirectUri)) urlRedirectUri = httpContext.Request.Query.TryGetValue(OpenIddictConstants.Parameters.RedirectUri, out var qRedirect) ? qRedirect.ToString() : null;
+            string? urlResponseType = request.ResponseType;
+            if (string.IsNullOrEmpty(urlResponseType)) urlResponseType = httpContext.Request.Query.TryGetValue(OpenIddictConstants.Parameters.ResponseType, out var qRt) ? qRt.ToString() : null;
+            string? urlState = request.State;
+            if (string.IsNullOrEmpty(urlState)) urlState = httpContext.Request.Query.TryGetValue(OpenIddictConstants.Parameters.State, out var qState) ? qState.ToString() : null;
+            string? urlNonce = request.Nonce;
+            if (string.IsNullOrEmpty(urlNonce)) urlNonce = httpContext.Request.Query.TryGetValue(OpenIddictConstants.Parameters.Nonce, out var qNonce) ? qNonce.ToString() : null;
+
+            CheckMismatch("scope", Get(OpenIddictConstants.Parameters.Scope), urlScope);
+            CheckMismatch("redirect_uri", Get(OpenIddictConstants.Parameters.RedirectUri), urlRedirectUri);
+            CheckMismatch("response_type", Get(OpenIddictConstants.Parameters.ResponseType), urlResponseType);
+            CheckMismatch("state", Get(OpenIddictConstants.Parameters.State), urlState);
+            CheckMismatch("nonce", Get(OpenIddictConstants.Parameters.Nonce), urlNonce); // NEW: ensure nonce consistency
         }
         catch (InvalidOperationException mis)
         {

@@ -373,16 +373,16 @@ public static partial class ServiceCollectionExtensions
                 options.UseAspNetCore().EnableAuthorizationEndpointPassthrough().EnableTokenEndpointPassthrough().EnableEndSessionEndpointPassthrough();
                 // JAR/JARM handlers remain
                 options.AddEventHandler(JarJarmServerEventHandlers.ConfigurationHandlerDescriptor);
-                options.AddEventHandler(JarJarmServerEventHandlers.ExtractNormalizeJarmResponseModeDescriptor);
-                options.AddEventHandler(JarJarmServerEventHandlers.JarEarlyExtractAndValidateDescriptor); // new early JAR handler
-                options.AddEventHandler(JarJarmServerEventHandlers.NormalizeJarmResponseModeDescriptor);
-                options.AddEventHandler(JarJarmServerEventHandlers.JarValidateRequestObjectDescriptor); // validate stage fallback
-                options.AddEventHandler(JarJarmServerEventHandlers.RedirectUriFallbackDescriptor); // ensure redirect_uri present
-                options.AddEventHandler(JarJarmServerEventHandlers.ApplyAuthorizationResponseDescriptor);
                 options.AddEventHandler(JarJarmServerEventHandlers.ParRequestUriResolutionDescriptor);
+                options.AddEventHandler(JarJarmServerEventHandlers.JarEarlyExtractAndValidateDescriptor);
+                options.AddEventHandler(JarJarmServerEventHandlers.ExtractNormalizeJarmResponseModeDescriptor);
+                options.AddEventHandler(JarJarmServerEventHandlers.NormalizeJarmResponseModeDescriptor);
+                options.AddEventHandler(JarJarmServerEventHandlers.JarValidateRequestObjectDescriptor);
+                options.AddEventHandler(JarJarmServerEventHandlers.RequestConflictAndLimitValidationDescriptor);
+                options.AddEventHandler(JarJarmServerEventHandlers.RedirectUriFallbackDescriptor);
+                options.AddEventHandler(JarJarmServerEventHandlers.ApplyAuthorizationResponseDescriptor);
                 options.AddEventHandler(JarJarmServerEventHandlers.ParModeEnforcementDescriptor);
                 options.AddEventHandler(JarJarmServerEventHandlers.ParConsumptionDescriptor);
-                options.AddEventHandler(JarJarmServerEventHandlers.RequestConflictAndLimitValidationDescriptor); // PJ40/PJ41
                 options.AddEventHandler(JarJarmServerEventHandlers.JarModeEnforcementDescriptor); // PJ37 JAR required enforcement
             })
             .AddValidation(options => { options.UseLocalServer(); options.UseAspNetCore(); });

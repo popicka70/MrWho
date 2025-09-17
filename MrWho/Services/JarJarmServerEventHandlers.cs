@@ -1014,13 +1014,6 @@ public static class JarJarmServerEventHandlers
             .SetType(OpenIddictServerHandlerType.Custom)
             .Build();
 
-    public static OpenIddictServerHandlerDescriptor JarEarlyExtractAndValidateDescriptor { get; } =
-        OpenIddictServerHandlerDescriptor.CreateBuilder<ExtractAuthorizationRequestContext>()
-            .UseScopedHandler<JarEarlyExtractAndValidateHandler>()
-            .SetOrder(int.MinValue + 1) // immediately after PAR resolution so we beat built-in handlers
-            .SetType(OpenIddictServerHandlerType.Custom)
-            .Build();
-
     public static OpenIddictServerHandlerDescriptor ExtractNormalizeJarmResponseModeDescriptor { get; } =
         OpenIddictServerHandlerDescriptor.CreateBuilder<ExtractAuthorizationRequestContext>()
             .UseScopedHandler<JarmResponseModeExtractHandler>()
@@ -1031,16 +1024,31 @@ public static class JarJarmServerEventHandlers
     public static OpenIddictServerHandlerDescriptor NormalizeJarmResponseModeDescriptor { get; } =
         OpenIddictServerHandlerDescriptor.CreateBuilder<ValidateAuthorizationRequestContext>()
             .UseScopedHandler<JarmResponseModeNormalizationHandler>()
-            .SetOrder(int.MinValue)
+            .SetOrder(int.MinValue + 2)
+            .SetType(OpenIddictServerHandlerType.Custom)
+            .Build();
+
+    // adjust JarEarlyExtract to run early after PAR resolution
+    public static OpenIddictServerHandlerDescriptor JarEarlyExtractAndValidateDescriptor { get; } =
+        OpenIddictServerHandlerDescriptor.CreateBuilder<ExtractAuthorizationRequestContext>()
+            .UseScopedHandler<JarEarlyExtractAndValidateHandler>()
+            .SetOrder(int.MinValue + 1) // immediately after PAR resolution
             .SetType(OpenIddictServerHandlerType.Custom)
             .Build();
 
     public static OpenIddictServerHandlerDescriptor RequestConflictAndLimitValidationDescriptor { get; } =
         OpenIddictServerHandlerDescriptor.CreateBuilder<ValidateAuthorizationRequestContext>()
         .UseScopedHandler<RequestConflictAndLimitValidationHandler>()
-        .SetOrder(int.MinValue + 6)
+        .SetOrder(int.MinValue) // run before redirect-uri fallback to return 400 (not 302) on conflicts
         .SetType(OpenIddictServerHandlerType.Custom)
         .Build();
+
+    public static OpenIddictServerHandlerDescriptor RedirectUriFallbackDescriptor { get; } =
+        OpenIddictServerHandlerDescriptor.CreateBuilder<ValidateAuthorizationRequestContext>()
+            .UseScopedHandler<RedirectUriFallbackHandler>()
+            .SetOrder(int.MinValue + 3) // after conflict/limit and JARM normalization
+            .SetType(OpenIddictServerHandlerType.Custom)
+            .Build();
 
     public static OpenIddictServerHandlerDescriptor JarModeEnforcementDescriptor { get; } =
         OpenIddictServerHandlerDescriptor.CreateBuilder<ValidateAuthorizationRequestContext>()
@@ -1074,13 +1082,6 @@ public static class JarJarmServerEventHandlers
         OpenIddictServerHandlerDescriptor.CreateBuilder<ValidateAuthorizationRequestContext>()
             .UseScopedHandler<JarValidateRequestObjectHandler>()
             .SetOrder(int.MinValue)
-            .SetType(OpenIddictServerHandlerType.Custom)
-            .Build();
-
-    public static OpenIddictServerHandlerDescriptor RedirectUriFallbackDescriptor { get; } =
-        OpenIddictServerHandlerDescriptor.CreateBuilder<ValidateAuthorizationRequestContext>()
-            .UseScopedHandler<RedirectUriFallbackHandler>()
-            .SetOrder(int.MinValue + 1)
             .SetType(OpenIddictServerHandlerType.Custom)
             .Build();
 }
