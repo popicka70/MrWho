@@ -22,17 +22,7 @@ public sealed class JarPreprocessingStartupFilter : IStartupFilter
             {
                 var logger = ctx.RequestServices.GetRequiredService<ILogger<JarPreprocessingStartupFilter>>();
 
-                // Strip any Authorization-like artifacts for ALL /connect endpoints to avoid OpenIddict validation from engaging.
-                if ((HttpMethods.IsGet(ctx.Request.Method) || HttpMethods.IsPost(ctx.Request.Method)) &&
-                    ctx.Request.Path.StartsWithSegments("/connect", StringComparison.OrdinalIgnoreCase))
-                {
-                    if (ctx.Request.Headers.ContainsKey("Authorization"))
-                    {
-                        logger.LogDebug("[AUTHZ-MW] Stripping Authorization header for {Path}", ctx.Request.Path);
-                        ctx.Request.Headers.Remove("Authorization");
-                    }
-                }
-
+                // Only handle /connect/authorize specific preprocessing here.
                 if ((HttpMethods.IsGet(ctx.Request.Method) || HttpMethods.IsPost(ctx.Request.Method)) && ctx.Request.Path.Equals("/connect/authorize", StringComparison.OrdinalIgnoreCase))
                 {
                     // 1) PAR request_uri pre-resolution
@@ -57,7 +47,6 @@ public sealed class JarPreprocessingStartupFilter : IStartupFilter
                             var dict = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
                             foreach (var kv in ctx.Request.Query)
                             {
-                                // Copy current query as baseline; we'll conditionally keep/remove request_uri below.
                                 dict[kv.Key] = kv.Value.ToString();
                             }
 
@@ -67,7 +56,6 @@ public sealed class JarPreprocessingStartupFilter : IStartupFilter
                                 var parsed = JsonSerializer.Deserialize<Dictionary<string, string>>(par.ParametersJson) ?? new();
                                 foreach (var kv in parsed)
                                 {
-                                    // Do NOT re-inject the raw request object from PAR into front-channel
                                     if (string.Equals(kv.Key, OpenIddictConstants.Parameters.Request, StringComparison.OrdinalIgnoreCase))
                                     {
                                         continue;
@@ -158,6 +146,11 @@ public sealed class JarPreprocessingStartupFilter : IStartupFilter
                                     {
                                         dict[OpenIddictConstants.Parameters.RedirectUri] = originalRedirect;
                                     }
+                                }
+                                if (result.Parameters.TryGetValue(OpenIddictConstants.Parameters.ResponseMode, out var rmFromJar) && string.Equals(rmFromJar, "jwt", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    dict.Remove(OpenIddictConstants.Parameters.ResponseMode);
+                                    dict["mrwho_jarm"] = "1";
                                 }
                                 dict["_jar_validated"] = "1";
                                 ctx.Request.QueryString = QueryString.Create(dict!);

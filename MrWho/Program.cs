@@ -16,6 +16,7 @@ using OpenIddict.Client.SystemNetHttp;
 using Microsoft.AspNetCore.Hosting; // add for IStartupFilter
 using MrWho.Infrastructure; // add for AuthorizeHeaderStripStartupFilter
 using Microsoft.IdentityModel.Logging; // PII logging
+using MrWho.Infrastructure; // add for startup filters
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -35,8 +36,9 @@ builder.Services.Configure<MrWhoOptions>(builder.Configuration.GetSection("MrWho
 // Bind OIDC clients options for seeding (redirect URIs, secrets, etc.)
 builder.Services.Configure<OidcClientsOptions>(builder.Configuration.GetSection("OidcClients"));
 
-// Register startup filter to strip Authorization header for /connect/authorize and /connect/par very early
+// Register startup filters: strip Authorization and preprocess PAR/JAR/JARM very early
 builder.Services.AddTransient<IStartupFilter, AuthorizeHeaderStripStartupFilter>();
+builder.Services.AddTransient<IStartupFilter, JarPreprocessingStartupFilter>();
 
 // Add services to the container using extension methods
 builder.Services.AddControllersWithViews();

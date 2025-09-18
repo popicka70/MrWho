@@ -14,11 +14,13 @@ public sealed class AuthorizeHeaderStripStartupFilter : IStartupFilter
         {
             app.Use(async (ctx, nxt) =>
             {
-                // For any OIDC endpoint under /connect, ignore any incoming Authorization header.
-                if ((HttpMethods.IsGet(ctx.Request.Method) || HttpMethods.IsPost(ctx.Request.Method)) &&
-                    ctx.Request.Path.StartsWithSegments("/connect", StringComparison.OrdinalIgnoreCase))
+                // Only strip Authorization for /connect/authorize and /connect/par
+                if ((HttpMethods.IsGet(ctx.Request.Method) || HttpMethods.IsPost(ctx.Request.Method)))
                 {
-                    if (ctx.Request.Headers.ContainsKey("Authorization"))
+                    var path = ctx.Request.Path;
+                    if ((path.Equals("/connect/authorize", StringComparison.OrdinalIgnoreCase) ||
+                         path.Equals("/connect/par", StringComparison.OrdinalIgnoreCase)) &&
+                        ctx.Request.Headers.ContainsKey("Authorization"))
                     {
                         var logger = ctx.RequestServices.GetRequiredService<ILogger<AuthorizeHeaderStripStartupFilter>>();
                         logger.LogDebug("Stripping Authorization header for {Path}", ctx.Request.Path);

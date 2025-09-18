@@ -940,6 +940,18 @@ public class ClientsController : ControllerBase
             }
         }
 
+        // Guard: if RequireSignedRequestObject==true, alg list must be provided
+        if (request.RequireSignedRequestObject == true && string.IsNullOrWhiteSpace(request.AllowedRequestObjectAlgs))
+        {
+            return ValidationProblem("AllowedRequestObjectAlgs must be specified when RequireSignedRequestObject is true.");
+        }
+
+        // Guard: JarMode=Required cannot be combined with RequireSignedRequestObject=false
+        if (request.JarMode == JarMode.Required && request.RequireSignedRequestObject == false)
+        {
+            return ValidationProblem("JarMode=Required cannot be combined with RequireSignedRequestObject=false.");
+        }
+
         // === NEW: determine if a JAR symmetric secret should be stored even for public clients ===
         bool jarNeedsSecret = !string.IsNullOrWhiteSpace(request.AllowedRequestObjectAlgs) &&
                                request.AllowedRequestObjectAlgs
