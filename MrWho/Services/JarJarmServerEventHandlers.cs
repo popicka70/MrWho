@@ -12,6 +12,7 @@ using MrWho.Options;
 using MrWho.Shared;
 using OpenIddict.Abstractions;
 using OpenIddict.Server;
+using OpenIddict.Server.AspNetCore;
 using static OpenIddict.Server.OpenIddictServerEvents;
 
 namespace MrWho.Services;
@@ -1008,13 +1009,13 @@ internal sealed class MrWhoShortCircuitExtractHandler : IOpenIddictServerHandler
 {
     public ValueTask HandleAsync(ExtractAuthorizationRequestContext context)
     {
-        var req = context.Request;
-        if (req is null) return ValueTask.CompletedTask;
-        if (req.GetParameter("_jar_validated") is not null)
+        var openidRequest = context.Request;
+        if (openidRequest is null) return ValueTask.CompletedTask;
+        if (openidRequest.GetParameter("_jar_validated") is not null)
         {
-            // Ensure no built-in JAR extract sees the request parameter again.
-            req.Request = null;
-            req.SetParameter(OpenIddictConstants.Parameters.Request, null);
+            // Ensure 'request' not processed again
+            openidRequest.Request = null;
+            openidRequest.SetParameter(OpenIddictConstants.Parameters.Request, null);
             if (context.Transaction?.Request != null)
             {
                 context.Transaction.Request.Request = null;
@@ -1033,7 +1034,6 @@ internal sealed class MrWhoShortCircuitValidateHandler : IOpenIddictServerHandle
         if (req is null) return ValueTask.CompletedTask;
         if (req.GetParameter("_jar_validated") is not null)
         {
-            // Make sure default validators don't re-process the JAR.
             req.Request = null;
             req.SetParameter(OpenIddictConstants.Parameters.Request, null);
             if (context.Transaction?.Request != null)
