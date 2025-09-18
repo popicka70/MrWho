@@ -68,6 +68,7 @@ public class ParController : Controller
             }
 
             string? requestJwt = null;
+            Dictionary<string, string>? expandedFromJar = null;
             if (dict.TryGetValue(OpenIddictConstants.Parameters.Request, out var rawRequest) && !string.IsNullOrWhiteSpace(rawRequest))
             {
                 requestJwt = rawRequest;
@@ -133,6 +134,19 @@ public class ParController : Controller
                             return BadRequest(new { error = OpenIddictConstants.Errors.InvalidRequest, error_description = "replay jti" });
                         }
                         _logger.LogDebug("[PAR] Stored jti for replay detection key=par_jti:{ClientId}:{Jti} exp={Exp}", clientId, jti, exp);
+                    }
+
+                    // Persist expanded parameters so authorize resolution doesn't need to re-validate and trip jti replay
+                    if (result.Parameters is not null)
+                    {
+                        expandedFromJar = new Dictionary<string, string>(result.Parameters, StringComparer.OrdinalIgnoreCase);
+                        foreach (var kv in expandedFromJar)
+                        {
+                            if (string.Equals(kv.Key, OpenIddictConstants.Parameters.Request, StringComparison.OrdinalIgnoreCase)) continue; // never store raw request back
+                            if (!dict.ContainsKey(kv.Key)) dict[kv.Key] = kv.Value;
+                        }
+                        // Mark as already validated so downstream pipeline can short-circuit
+                        dict["_jar_validated"] = "1";
                     }
                 }
                 catch (Exception ex)

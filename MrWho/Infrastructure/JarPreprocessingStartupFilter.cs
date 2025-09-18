@@ -8,6 +8,7 @@ using Microsoft.Extensions.Primitives;
 using MrWho.Data;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
+using MrWho.Shared; // for PushedAuthorizationMode
 
 namespace MrWho.Infrastructure;
 
@@ -21,9 +22,9 @@ public sealed class JarPreprocessingStartupFilter : IStartupFilter
             {
                 var logger = ctx.RequestServices.GetRequiredService<ILogger<JarPreprocessingStartupFilter>>();
 
-                // Only strip Authorization for /connect/authorize to prevent validation middleware from intercepting authorize
+                // Strip any Authorization-like artifacts for ALL /connect endpoints to avoid OpenIddict validation from engaging.
                 if ((HttpMethods.IsGet(ctx.Request.Method) || HttpMethods.IsPost(ctx.Request.Method)) &&
-                    ctx.Request.Path.StartsWithSegments("/connect/authorize", StringComparison.OrdinalIgnoreCase))
+                    ctx.Request.Path.StartsWithSegments("/connect", StringComparison.OrdinalIgnoreCase))
                 {
                     if (ctx.Request.Headers.ContainsKey("Authorization"))
                     {
@@ -56,14 +57,11 @@ public sealed class JarPreprocessingStartupFilter : IStartupFilter
                             var dict = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
                             foreach (var kv in ctx.Request.Query)
                             {
-                                // We'll drop request_uri after merge to avoid double processing by downstream components.
-                                if (string.Equals(kv.Key, OpenIddictConstants.Parameters.RequestUri, StringComparison.OrdinalIgnoreCase))
-                                {
-                                    continue;
-                                }
+                                // Copy current query as baseline; we'll conditionally keep/remove request_uri below.
                                 dict[kv.Key] = kv.Value.ToString();
                             }
 
+                            // Merge parameters stored at PAR time without re-validating the embedded JAR
                             try
                             {
                                 var parsed = JsonSerializer.Deserialize<Dictionary<string, string>>(par.ParametersJson) ?? new();
@@ -86,8 +84,38 @@ public sealed class JarPreprocessingStartupFilter : IStartupFilter
                             }
 
                             dict["_par_resolved"] = "1";
+
+                            // Conditionally keep or strip request_uri based on client configuration
+                            bool keepRequestUri = false;
+                            string? clientId = null;
+                            dict.TryGetValue(OpenIddictConstants.Parameters.ClientId, out clientId);
+                            if (!string.IsNullOrWhiteSpace(clientId))
+                            {
+                                try
+                                {
+                                    var client = await db.Clients.AsNoTracking().FirstOrDefaultAsync(c => c.ClientId == clientId, ctx.RequestAborted);
+                                    if (client != null)
+                                    {
+                                        keepRequestUri = (client.ParMode ?? PushedAuthorizationMode.Disabled) == PushedAuthorizationMode.Required;
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    logger.LogDebug(ex, "[PAR][MW] Failed to load client {ClientId} for request_uri handling", clientId);
+                                }
+                            }
+
+                            if (!keepRequestUri)
+                            {
+                                dict.Remove(OpenIddictConstants.Parameters.RequestUri);
+                                logger.LogDebug("[PAR][MW] Stripped request_uri from query for client {ClientId} (PAR not required)", clientId ?? "?");
+                            }
+                            else
+                            {
+                                logger.LogDebug("[PAR][MW] Kept request_uri for client {ClientId} (PAR required)", clientId ?? "?");
+                            }
+
                             ctx.Request.QueryString = QueryString.Create(dict!);
-                            logger.LogDebug("[PAR][MW] Pre-resolved request_uri, merged params and removed request_uri from query");
                         }
                         catch (Exception ex)
                         {
@@ -155,22 +183,19 @@ public sealed class JarPreprocessingStartupFilter : IStartupFilter
                         }
                     }
 
-                    // 3) JARM response_mode normalization: if response_mode=jwt was explicitly supplied, remove it
-                    // and inject a lightweight marker that we requested JARM. The server will honor JARM mode later.
-                    if (ctx.Request.Query.TryGetValue(OpenIddictConstants.Parameters.ResponseMode, out var rm) &&
-                        string.Equals(rm.ToString(), "jwt", StringComparison.OrdinalIgnoreCase))
+                    // 3) JARM response_mode normalization: strip explicit response_mode=jwt and inject flag marker
+                    if (ctx.Request.Query.TryGetValue(OpenIddictConstants.Parameters.ResponseMode, out var rm) && string.Equals(rm.ToString(), "jwt", StringComparison.OrdinalIgnoreCase))
                     {
                         var dict = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
                         foreach (var kv in ctx.Request.Query)
                         {
                             if (string.Equals(kv.Key, OpenIddictConstants.Parameters.ResponseMode, StringComparison.OrdinalIgnoreCase))
                             {
-                                continue; // strip response_mode from front-channel
+                                continue; // remove response_mode from front-channel
                             }
                             dict[kv.Key] = kv.Value.ToString();
                         }
-                        // Inject a flag so downstream login redirect (returnUrl) carries an indicator
-                        dict["mrwho_jarm"] = "1";
+                        dict["mrwho_jarm"] = "1"; // signal JARM for downstream handlers
                         ctx.Request.QueryString = QueryString.Create(dict!);
                         logger.LogDebug("[JARM][MW] Normalized response_mode=jwt -> injected mrwho_jarm=1 and removed response_mode from query");
                     }
