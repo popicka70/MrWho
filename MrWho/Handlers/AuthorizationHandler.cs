@@ -85,6 +85,25 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         var request = context.GetOpenIddictServerRequest() ??
                       throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
 
+        // Clear bearer-style tokens from query to avoid OpenIddict ID2004 on authorize endpoint
+        try
+        {
+            var qs = QueryHelpers.ParseQuery(context.Request.QueryString.Value ?? string.Empty);
+            if (qs.ContainsKey("access_token") || qs.ContainsKey("id_token") || qs.ContainsKey("token"))
+            {
+                var dict = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+                foreach (var kv in context.Request.Query)
+                {
+                    if (string.Equals(kv.Key, "access_token", StringComparison.OrdinalIgnoreCase)) continue;
+                    if (string.Equals(kv.Key, "id_token", StringComparison.OrdinalIgnoreCase)) continue;
+                    if (string.Equals(kv.Key, "token", StringComparison.OrdinalIgnoreCase)) continue;
+                    dict[kv.Key] = kv.Value.ToString();
+                }
+                context.Request.QueryString = Microsoft.AspNetCore.Http.QueryString.Create(dict);
+            }
+        }
+        catch { }
+
         // Try to get request object and derive client_id if missing
         var jarAlreadyValidated = request.GetParameter("_jar_validated") is not null;
         string? requestJwt = null;

@@ -19,7 +19,7 @@ namespace MrWho.Controllers;
 /// </summary>
 [Route("connect/register")]
 [ApiController]
-[Authorize] // admin portal users only initial slice
+[Authorize(Policy = AuthorizationPolicies.AdminClientApi)] // require admin client bearer with mrwho.use
 public class DynamicClientRegistrationController : ControllerBase
 {
     private readonly ApplicationDbContext _db;
