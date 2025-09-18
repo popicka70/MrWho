@@ -7,6 +7,7 @@ public interface IProtocolMetrics
     // JAR
     void IncrementJarRequest(string outcome, string alg); // outcome: success|reject|replay|error
     void IncrementJarReplayBlocked();
+    void IncrementJarSecretFallback(); // NEW: count HS secret fallback usages
     // JARM
     void IncrementJarmResponse(string outcome); // outcome: success|error|failure
     // PAR
@@ -21,6 +22,7 @@ public interface IProtocolMetrics
 public sealed record ProtocolMetricsSnapshot(
     IReadOnlyDictionary<string, int> JarRequests,
     int JarReplayBlocked,
+    int JarSecretFallbacks,
     IReadOnlyDictionary<string, int> JarmResponses,
     IReadOnlyDictionary<string, int> ParPushes,
     IReadOnlyDictionary<string, int> ParResolutions,
@@ -35,6 +37,7 @@ internal sealed class InMemoryProtocolMetrics : IProtocolMetrics
     private readonly ConcurrentDictionary<string, int> _parResolve = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, int> _validation = new(StringComparer.OrdinalIgnoreCase);
     private int _jarReplayBlocked;
+    private int _jarSecretFallbacks;
 
     public void IncrementJarRequest(string outcome, string alg)
     {
@@ -45,6 +48,8 @@ internal sealed class InMemoryProtocolMetrics : IProtocolMetrics
     }
 
     public void IncrementJarReplayBlocked() => Interlocked.Increment(ref _jarReplayBlocked);
+
+    public void IncrementJarSecretFallback() => Interlocked.Increment(ref _jarSecretFallbacks);
 
     public void IncrementJarmResponse(string outcome)
     {
@@ -75,6 +80,7 @@ internal sealed class InMemoryProtocolMetrics : IProtocolMetrics
     public ProtocolMetricsSnapshot GetSnapshot() => new(
         _jar.ToDictionary(kvp => kvp.Key, kvp => kvp.Value, StringComparer.OrdinalIgnoreCase),
         Volatile.Read(ref _jarReplayBlocked),
+        Volatile.Read(ref _jarSecretFallbacks),
         _jarm.ToDictionary(kvp => kvp.Key, kvp => kvp.Value, StringComparer.OrdinalIgnoreCase),
         _parPush.ToDictionary(kvp => kvp.Key, kvp => kvp.Value, StringComparer.OrdinalIgnoreCase),
         _parResolve.ToDictionary(kvp => kvp.Key, kvp => kvp.Value, StringComparer.OrdinalIgnoreCase),
@@ -89,5 +95,6 @@ internal sealed class InMemoryProtocolMetrics : IProtocolMetrics
         _parResolve.Clear();
         _validation.Clear();
         Interlocked.Exchange(ref _jarReplayBlocked, 0);
+        Interlocked.Exchange(ref _jarSecretFallbacks, 0);
     }
 }

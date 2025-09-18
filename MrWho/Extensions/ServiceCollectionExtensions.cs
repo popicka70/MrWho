@@ -9,6 +9,8 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Caching.Memory;
 using MrWho.Data;
 using MrWho.Handlers;
 using MrWho.Handlers.Auth;
@@ -35,13 +37,25 @@ public static partial class ServiceCollectionExtensions
 
     public static IServiceCollection AddMrWhoServices(this IServiceCollection services)
     {
+        // Increase visibility for OpenIddict categories when tracing is enabled
+        services.AddLogging(logging =>
+        {
+            logging.AddFilter("OpenIddict.Server", LogLevel.Trace);
+            logging.AddFilter("OpenIddict.Validation", LogLevel.Trace);
+            logging.AddFilter("OpenIddict.Server.OpenIddictServerDispatcher", LogLevel.Trace);
+        });
+
+        // Register caches
+        services.AddMemoryCache();
+        services.AddDistributedMemoryCache();
+        services.AddSingleton<IJarReplayCache, DistributedJarReplayCache>();
+
         // Register shared accessors
         services.AddHttpContextAccessor();
         // Advanced options
         services.AddOptions<OidcAdvancedOptions>().BindConfiguration("OidcAdvanced");
         // JAR/JARM support services
-        services.AddMemoryCache();
-        services.AddSingleton<IJarReplayCache, InMemoryJarReplayCache>();
+        services.AddSingleton<IJarReplayCache, DistributedJarReplayCache>(); // ensure single registration
         services.AddOptions<JarOptions>().BindConfiguration(JarOptions.SectionName);
         services.AddScoped<IJarRequestValidator, JarRequestValidator>();
         services.AddScoped<IJarValidationService, JarRequestValidator>(); // unified validator
@@ -415,7 +429,9 @@ public static partial class ServiceCollectionExtensions
                     options.AllowPasswordFlow();
                 }
 
-                options.RequireProofKeyForCodeExchange();
+                // NOTE: PKCE is now enforced per-application using application requirements.
+                // Do not call options.RequireProofKeyForCodeExchange() here.
+
                 options.SetAccessTokenLifetime(TimeSpan.FromMinutes(60)).SetRefreshTokenLifetime(TimeSpan.FromDays(14));
                 if (environment.IsDevelopment())
                 {

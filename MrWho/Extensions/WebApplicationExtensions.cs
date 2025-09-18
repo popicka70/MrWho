@@ -43,11 +43,10 @@ public static class WebApplicationExtensions
 
         app.UseForwardedHeaders();
 
-        // Strip bearer on authorize only
         app.Use(async (ctx, next) =>
         {
             if ((HttpMethods.IsGet(ctx.Request.Method) || HttpMethods.IsPost(ctx.Request.Method)) &&
-                ctx.Request.Path.StartsWithSegments("/connect/authorize", StringComparison.OrdinalIgnoreCase))
+                ctx.Request.Path.StartsWithSegments("/connect", StringComparison.OrdinalIgnoreCase))
             {
                 if (ctx.Request.Headers.ContainsKey("Authorization"))
                 {
@@ -119,11 +118,10 @@ public static class WebApplicationExtensions
 
         app.UseForwardedHeaders();
 
-        // Strip bearer on authorize only
         app.Use(async (ctx, next) =>
         {
             if ((HttpMethods.IsGet(ctx.Request.Method) || HttpMethods.IsPost(ctx.Request.Method)) &&
-                ctx.Request.Path.StartsWithSegments("/connect/authorize", StringComparison.OrdinalIgnoreCase))
+                ctx.Request.Path.StartsWithSegments("/connect", StringComparison.OrdinalIgnoreCase))
             {
                 if (ctx.Request.Headers.ContainsKey("Authorization"))
                 {

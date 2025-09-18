@@ -13,11 +13,20 @@ using MrWho.Services;
 using OpenIddict.Client;
 using OpenIddict.Client.AspNetCore;
 using OpenIddict.Client.SystemNetHttp;
+using Microsoft.AspNetCore.Hosting; // add for IStartupFilter
+using MrWho.Infrastructure; // add for AuthorizeHeaderStripStartupFilter
+using Microsoft.IdentityModel.Logging; // PII logging
 
 var builder = WebApplication.CreateBuilder(args);
 
 AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
 builder.Logging.AddFilter("OpenTelemetry", LogLevel.Debug);
+
+// Enable detailed IdentityModel logs for token validation in dev/test or when explicitly requested.
+if (builder.Environment.IsDevelopment() || string.Equals(Environment.GetEnvironmentVariable("SHOW_PII"), "1", StringComparison.OrdinalIgnoreCase))
+{
+    IdentityModelEventSource.ShowPII = true;
+}
 
 builder.AddServiceDefaults();
 
@@ -25,6 +34,9 @@ builder.AddServiceDefaults();
 builder.Services.Configure<MrWhoOptions>(builder.Configuration.GetSection("MrWho"));
 // Bind OIDC clients options for seeding (redirect URIs, secrets, etc.)
 builder.Services.Configure<OidcClientsOptions>(builder.Configuration.GetSection("OidcClients"));
+
+// Register startup filter to strip Authorization header for /connect/authorize and /connect/par very early
+builder.Services.AddTransient<IStartupFilter, AuthorizeHeaderStripStartupFilter>();
 
 // Add services to the container using extension methods
 builder.Services.AddControllersWithViews();
@@ -156,6 +168,9 @@ var logger = app.Services.GetRequiredService<ILogger<Program>>();
 logger.LogInformation("MrWho OIDC Server starting...");
 
 await app.ConfigureMrWhoPipelineWithClientCookiesAsync();
+
+// Optional OIDC trace middleware, behind env/config toggle
+app.UseMiddleware<MrWho.Infrastructure.OidcTraceMiddleware>();
 
 // Correlation middleware should be very early (after routing added in pipeline builder). If extension already built pipeline, insert here before auth endpoints.
 app.Use(async (ctx, next) => await next()); // placeholder to keep relative position comment

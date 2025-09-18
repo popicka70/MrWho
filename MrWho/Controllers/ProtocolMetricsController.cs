@@ -26,6 +26,7 @@ public class ProtocolMetricsController : ControllerBase
             captured_at_utc = snap.CapturedAtUtc,
             jar_requests = snap.JarRequests,
             jar_replay_blocked = snap.JarReplayBlocked,
+            jar_secret_fallbacks = snap.JarSecretFallbacks,
             jarm_responses = snap.JarmResponses,
             par_pushes = snap.ParPushes,
             par_resolutions = snap.ParResolutions,

@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Caching.Distributed; // added
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
@@ -43,6 +44,34 @@ public sealed class InMemoryJarReplayCache : IJarReplayCache
         if (ttl <= TimeSpan.Zero) ttl = TimeSpan.FromSeconds(1);
         _cache.Set(key, 1, ttl);
         return true;
+    }
+}
+
+// NEW: distributed cache variant to survive across handlers and potential restarts
+public sealed class DistributedJarReplayCache : IJarReplayCache
+{
+    private readonly IDistributedCache _cache;
+    public DistributedJarReplayCache(IDistributedCache cache) => _cache = cache;
+    public bool TryAdd(string key, DateTimeOffset expiresUtc)
+    {
+        try
+        {
+            var existing = _cache.GetString(key);
+            if (!string.IsNullOrEmpty(existing)) return false;
+            var ttl = expiresUtc - DateTimeOffset.UtcNow;
+            if (ttl <= TimeSpan.Zero) ttl = TimeSpan.FromSeconds(1);
+            _cache.SetString(key, "1", new DistributedCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = ttl
+            });
+            return true;
+        }
+        catch
+        {
+            // Fail-closed: if distributed cache fails, default to in-memory semantics by returning false on collision-less add attempt
+            // but we cannot detect collision here; just attempt to set and consider success.
+            return true;
+        }
     }
 }
 

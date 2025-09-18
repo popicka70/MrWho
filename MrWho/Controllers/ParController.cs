@@ -1,204 +1,185 @@
-using System.Security.Cryptography;
-using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
+using System.Security.Cryptography; // added
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.JsonWebTokens;
-using Microsoft.IdentityModel.Tokens;
+using Microsoft.Extensions.Caching.Memory;
 using MrWho.Data;
 using MrWho.Models;
 using MrWho.Services;
-using Microsoft.Extensions.Options;
+using OpenIddict.Abstractions;
 
 namespace MrWho.Controllers;
 
-[AllowAnonymous]
-[ApiController]
-public sealed class ParController : Controller
+[Route("connect")]
+public class ParController : Controller
 {
     private readonly ApplicationDbContext _db;
     private readonly ILogger<ParController> _logger;
-    private readonly IJarReplayCache _replay;
-    private readonly JarOptions _jarOptions;
-    private static readonly JsonWebTokenHandler JwtHandler = new();
+    private readonly IJarReplayCache _replay; // now required
+    private readonly IProtocolMetrics _metrics;
+    private readonly IJarValidationService _jarValidator;
 
-    public ParController(ApplicationDbContext db, ILogger<ParController> logger, IJarReplayCache replay, IOptions<JarOptions> jarOptions)
-    { _db = db; _logger = logger; _replay = replay; _jarOptions = jarOptions.Value; }
+    public ParController(ApplicationDbContext db, ILogger<ParController> logger, IProtocolMetrics metrics, IJarValidationService jarValidator, IJarReplayCache replay)
+    { _db = db; _logger = logger; _metrics = metrics; _jarValidator = jarValidator; _replay = replay; }
 
-    [HttpPost]
-    [Route("connect/par")] // explicit OIDC PAR endpoint
-    public async Task<IActionResult> Post()
+    [HttpPost("par")]
+    [AllowAnonymous]
+    public async Task<IActionResult> Push()
     {
-        if (!Request.HasFormContentType)
+        if (Request.Headers.ContainsKey("Authorization"))
         {
-            return Error("invalid_request", "form_post_expected");
-        }
-        var form = await Request.ReadFormAsync();
-        var clientId = form[OpenIddict.Abstractions.OpenIddictConstants.Parameters.ClientId].ToString();
-        if (string.IsNullOrWhiteSpace(clientId))
-        {
-            return Error("invalid_request", "client_id_missing");
+            try { Request.Headers.Remove("Authorization"); } catch { }
         }
 
-        var client = await _db.Clients.AsNoTracking().FirstOrDefaultAsync(c => c.ClientId == clientId);
-        if (client == null || client.IsEnabled == false)
+        try
         {
-            return Error("invalid_client", "unknown_client");
-        }
-        if (client.ParMode == MrWho.Shared.PushedAuthorizationMode.Disabled)
-        {
-            return Error("invalid_request", "PAR disabled for this client");
-        }
-
-        var dict = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var kv in form)
-        {
-            if (kv.Key.Equals("client_secret", StringComparison.OrdinalIgnoreCase)) continue;
-            dict[kv.Key] = kv.Value.ToString();
-        }
-
-        if (dict.TryGetValue(OpenIddict.Abstractions.OpenIddictConstants.Parameters.Request, out var requestJwt) && !string.IsNullOrWhiteSpace(requestJwt))
-        {
-            if (requestJwt.Length > _jarOptions.MaxRequestObjectBytes)
+            if (!Request.HasFormContentType)
             {
-                return Error("invalid_request_object", "request object too large");
+                _metrics.IncrementParPush("error");
+                return BadRequest(new { error = OpenIddictConstants.Errors.InvalidRequest, error_description = "Form content required" });
             }
-            try
+
+            var form = await Request.ReadFormAsync(HttpContext.RequestAborted);
+            var clientId = form[OpenIddictConstants.Parameters.ClientId].ToString();
+            if (string.IsNullOrWhiteSpace(clientId))
             {
-                var allowsRs = (client.AllowedRequestObjectAlgs ?? string.Empty)
-                    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                    .Any(a => a.StartsWith("RS", StringComparison.OrdinalIgnoreCase));
-                SecurityKey? configuredRsaKey = null;
-                if (allowsRs && !string.IsNullOrWhiteSpace(client.JarRsaPublicKeyPem))
+                _metrics.IncrementParPush("error");
+                return BadRequest(new { error = OpenIddictConstants.Errors.InvalidClient });
+            }
+
+            var client = await _db.Clients.AsNoTracking().FirstOrDefaultAsync(c => c.ClientId == clientId && c.IsEnabled, HttpContext.RequestAborted);
+            if (client is null)
+            {
+                _metrics.IncrementParPush("error");
+                return BadRequest(new { error = OpenIddictConstants.Errors.InvalidClient });
+            }
+
+            var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var kv in form)
+            {
+                var key = kv.Key;
+                var val = kv.Value.ToString();
+                if (string.Equals(key, OpenIddictConstants.Parameters.ClientSecret, StringComparison.OrdinalIgnoreCase))
+                    continue;
+                if (string.Equals(key, OpenIddictConstants.Parameters.RequestUri, StringComparison.OrdinalIgnoreCase))
+                    continue;
+                dict[key] = val;
+            }
+
+            string? requestJwt = null;
+            if (dict.TryGetValue(OpenIddictConstants.Parameters.Request, out var rawRequest) && !string.IsNullOrWhiteSpace(rawRequest))
+            {
+                requestJwt = rawRequest;
+
+                // Secondary replay guard based on raw JAR content hash
+                try
                 {
-                    try
+                    using var sha = SHA256.Create();
+                    var hash = sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(requestJwt));
+                    var hashB64 = Convert.ToBase64String(hash);
+                    var hashKey = $"par_jwt_hash:{clientId}:{hashB64}";
+                    if (!_replay.TryAdd(hashKey, DateTimeOffset.UtcNow.AddMinutes(5)))
                     {
-                        using var rsaProbe = RSA.Create();
-                        rsaProbe.ImportFromPem(client.JarRsaPublicKeyPem.AsSpan());
-                        var p = rsaProbe.ExportParameters(false);
-                        if (p.Modulus == null || p.Modulus.Length * 8 < 2048)
+                        _metrics.IncrementParPush("reused");
+                        return BadRequest(new { error = OpenIddictConstants.Errors.InvalidRequest, error_description = "replay jwt" });
+                    }
+                }
+                catch { }
+
+                // DB-level duplicate detection (same client, same request JWT, unexpired)
+                try
+                {
+                    var nowUtc = DateTime.UtcNow;
+                    var candidates = await _db.PushedAuthorizationRequests.AsNoTracking()
+                        .Where(p => p.ClientId == clientId && p.ExpiresAt > nowUtc)
+                        .OrderByDescending(p => p.CreatedAt)
+                        .Take(20) // small window
+                        .ToListAsync(HttpContext.RequestAborted);
+                    foreach (var cand in candidates)
+                    {
+                        try
                         {
-                            return Error("invalid_request_object", "invalid RSA public key configured for client");
+                            if (string.IsNullOrWhiteSpace(cand.ParametersJson)) continue;
+                            var cdict = JsonSerializer.Deserialize<Dictionary<string, string>>(cand.ParametersJson);
+                            if (cdict != null && cdict.TryGetValue(OpenIddictConstants.Parameters.Request, out var prev) && !string.IsNullOrEmpty(prev))
+                            {
+                                if (string.Equals(prev, requestJwt, StringComparison.Ordinal))
+                                {
+                                    _metrics.IncrementParPush("reused");
+                                    return BadRequest(new { error = OpenIddictConstants.Errors.InvalidRequest, error_description = "replay jwt" });
+                                }
+                            }
                         }
-                        configuredRsaKey = new RsaSecurityKey(p);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogDebug(ex, "[PAR] RSA public key import failed for client {ClientId}", clientId);
-                        return Error("invalid_request_object", "invalid RSA public key configured for client");
+                        catch { }
                     }
                 }
+                catch { }
 
-                // Additional heuristic: reject obviously short PEM bodies (<300 chars) for RS256 keys
-                if (allowsRs && !string.IsNullOrWhiteSpace(client.JarRsaPublicKeyPem) && client.JarRsaPublicKeyPem.Length < 300)
+                try
                 {
-                    _logger.LogDebug("[PAR] RSA public key PEM too short for client {ClientId} length={Len}", clientId, client.JarRsaPublicKeyPem.Length);
-                    return Error("invalid_request_object", "invalid RSA public key configured for client");
-                }
-
-                var jwt = JwtHandler.ReadJsonWebToken(requestJwt);
-                var alg = jwt.Alg;
-                if (client.RequireSignedRequestObject == true)
-                {
-                    if (string.IsNullOrEmpty(alg) || alg.Equals("none", StringComparison.OrdinalIgnoreCase))
+                    var result = await _jarValidator.ValidateAsync(requestJwt, clientId, HttpContext.RequestAborted);
+                    if (!result.Success)
                     {
-                        return Error("invalid_request_object", "unsigned request object not allowed");
+                        _logger.LogDebug("[PAR] Rejecting invalid request object at push (alg={Alg}, error={Error}, desc={Desc})", result.Algorithm, result.Error, result.ErrorDescription);
+                        _metrics.IncrementParPush("invalid");
+                        return BadRequest(new { error = result.Error ?? OpenIddictConstants.Errors.InvalidRequest, error_description = result.ErrorDescription ?? "invalid request object" });
                     }
-                    if (!string.IsNullOrWhiteSpace(client.AllowedRequestObjectAlgs))
+
+                    // Enforce PAR jti replay after successful validation
+                    string? jti = null;
+                    if (result.Parameters != null && result.Parameters.TryGetValue("jti", out var jtiVal)) jti = jtiVal;
+                    if (string.IsNullOrWhiteSpace(jti))
                     {
-                        var allowed = client.AllowedRequestObjectAlgs.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-                        if (!allowed.Contains(alg, StringComparer.OrdinalIgnoreCase))
+                        try { var jwt = new Microsoft.IdentityModel.JsonWebTokens.JsonWebToken(requestJwt); jti = jwt.Id; } catch { }
+                    }
+                    if (!string.IsNullOrWhiteSpace(jti))
+                    {
+                        var exp = DateTimeOffset.UtcNow.AddMinutes(5);
+                        if (result.Parameters != null && result.Parameters.TryGetValue("exp", out var expStr) && long.TryParse(expStr, out var expEpoch))
+                        { try { exp = DateTimeOffset.FromUnixTimeSeconds(expEpoch); } catch { } }
+
+                        if (!_replay.TryAdd($"par_jti:{clientId}:{jti}", exp))
                         {
-                            return Error("invalid_request_object", "algorithm not allowed");
+                            _metrics.IncrementParPush("reused");
+                            return BadRequest(new { error = OpenIddictConstants.Errors.InvalidRequest, error_description = "replay jti" });
                         }
+                        _logger.LogDebug("[PAR] Stored jti for replay detection key=par_jti:{ClientId}:{Jti} exp={Exp}", clientId, jti, exp);
                     }
                 }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "[PAR] Validation threw for request object; rejecting");
+                    _metrics.IncrementParPush("invalid");
+                    return BadRequest(new { error = OpenIddictConstants.Errors.InvalidRequestObject, error_description = "invalid request object" });
+                }
+            }
 
-                // Strict signature validation against configured RSA key (if provided for RS* algs)
-                if (configuredRsaKey != null)
-                {
-                    try
-                    {
-                        var tvp = new TokenValidationParameters
-                        {
-                            RequireSignedTokens = true,
-                            ValidateIssuer = false,
-                            ValidateAudience = false,
-                            ValidateLifetime = false, // lifetime handled later in full JAR validator
-                            ValidateIssuerSigningKey = true,
-                            IssuerSigningKey = configuredRsaKey,
-                            SignatureValidator = null
-                        };
-                        // ValidateToken returns principal or throws; we only care that signature matches key
-                        var result = JwtHandler.ValidateToken(requestJwt, tvp);
-                        if (!result.IsValid)
-                        {
-                            return Error("invalid_request_object", "request object signature invalid");
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogDebug(ex, "[PAR] Signature validation failed for client {ClientId}", clientId);
-                        return Error("invalid_request_object", "request object signature invalid");
-                    }
-                }
+            var id = Guid.NewGuid().ToString("n");
+            var requestUri = $"urn:ietf:params:oauth:request_uri:{id}";
+            var expiresIn = 90; // seconds
+            var entity = new PushedAuthorizationRequest
+            {
+                Id = id,
+                RequestUri = requestUri,
+                ClientId = clientId,
+                ParametersJson = JsonSerializer.Serialize(dict),
+                CreatedAt = DateTime.UtcNow,
+                ExpiresAt = DateTime.UtcNow.AddSeconds(expiresIn)
+            };
+            _db.PushedAuthorizationRequests.Add(entity);
+            await _db.SaveChangesAsync(HttpContext.RequestAborted);
 
-                var jti = jwt.Id;
-                if (string.IsNullOrEmpty(jti))
-                {
-                    if (_jarOptions.RequireJti)
-                    {
-                        return Error("invalid_request_object", "missing jti");
-                    }
-                    jti = Base64UrlEncoder.Encode(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(requestJwt)));
-                }
-                long expEpoch = 0;
-                if (jwt.TryGetPayloadValue<long>("exp", out var expVal)) expEpoch = expVal;
-                var exp = expEpoch > 0 ? DateTimeOffset.FromUnixTimeSeconds(expEpoch) : DateTimeOffset.UtcNow.Add(_jarOptions.MaxExp);
-                if (exp > DateTimeOffset.UtcNow + _jarOptions.MaxExp) exp = DateTimeOffset.UtcNow + _jarOptions.MaxExp;
-                var cacheKey = "par_jti:" + clientId + ":" + jti;
-                if (!_replay.TryAdd(cacheKey, exp))
-                {
-                    _logger.LogDebug("[PAR] JTI replay detected for client {ClientId} jti={Jti}", clientId, jti);
-                    return Error("invalid_request", "replay jti");
-                }
-            }
-            catch (Exception ex) when (ex is ArgumentException || ex is FormatException)
-            {
-                return Error("invalid_request_object", "malformed request object");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogDebug(ex, "Failed to parse request object for PAR submission");
-                return Error("invalid_request_object", "malformed request object");
-            }
+            Response.Headers.CacheControl = "no-store";
+            Response.Headers.Pragma = "no-cache";
+            _metrics.IncrementParPush("created");
+            return Ok(new { request_uri = requestUri, expires_in = expiresIn });
         }
-
-        var par = new PushedAuthorizationRequest
+        catch (Exception ex)
         {
-            ClientId = clientId,
-            ParametersJson = JsonSerializer.Serialize(dict),
-            CreatedAt = DateTime.UtcNow,
-            ExpiresAt = DateTime.UtcNow.AddSeconds(90)
-        };
-        par.RequestUri = $"urn:ietf:params:oauth:request_uri:{par.Id}";
-        _db.PushedAuthorizationRequests.Add(par);
-        await _db.SaveChangesAsync();
-
-        NoCache();
-        return StatusCode(201, new { request_uri = par.RequestUri, expires_in = (int)(par.ExpiresAt - DateTime.UtcNow).TotalSeconds });
-    }
-
-    private IActionResult Error(string error, string description)
-    {
-        NoCache();
-        return BadRequest(new { error, error_description = description });
-    }
-
-    private void NoCache()
-    {
-        Response.Headers["Cache-Control"] = "no-store";
-        Response.Headers["Pragma"] = "no-cache";
+            _logger.LogError(ex, "PAR push failed");
+            _metrics.IncrementParPush("error");
+            return StatusCode(500, new { error = OpenIddictConstants.Errors.ServerError, error_description = ex.Message });
+        }
     }
 }

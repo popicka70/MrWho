@@ -640,6 +640,25 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
             if (alg.StartsWith("HS", StringComparison.OrdinalIgnoreCase))
             {
                 var plainSecret = await _clientSecretService.GetActivePlaintextAsync(dbClient.ClientId, httpContext.RequestAborted);
+                // Fallback: use DB client secret if history not present and secret is not placeholder and long enough
+                if (string.IsNullOrWhiteSpace(plainSecret) || Encoding.UTF8.GetByteCount(plainSecret) < 32)
+                {
+                    var fallback = dbClient.ClientSecret;
+                    if (!string.IsNullOrWhiteSpace(fallback) && !string.Equals(fallback, "{HASHED}", StringComparison.Ordinal) && Encoding.UTF8.GetByteCount(fallback) >= 32)
+                    {
+                        _logger.LogDebug("Using DB client secret as HS256 JAR fallback for {ClientId}", dbClient.ClientId);
+                        try
+                        {
+                            if (httpContext.RequestServices.GetService(typeof(IProtocolMetrics)) is IProtocolMetrics m)
+                            {
+                                m.IncrementJarSecretFallback();
+                            }
+                        }
+                        catch { }
+                        plainSecret = fallback;
+                    }
+                }
+
                 if (string.IsNullOrWhiteSpace(plainSecret) || Encoding.UTF8.GetByteCount(plainSecret) < 32)
                 {
                     return new { error = OpenIddictConstants.Errors.InvalidRequestObject, error_description = "client secret length below policy" };
