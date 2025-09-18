@@ -43,18 +43,8 @@ public static class WebApplicationExtensions
 
         app.UseForwardedHeaders();
 
-        app.Use(async (ctx, next) =>
-        {
-            if ((HttpMethods.IsGet(ctx.Request.Method) || HttpMethods.IsPost(ctx.Request.Method)) &&
-                ctx.Request.Path.StartsWithSegments("/connect", StringComparison.OrdinalIgnoreCase))
-            {
-                if (ctx.Request.Headers.ContainsKey("Authorization"))
-                {
-                    ctx.Request.Headers.Remove("Authorization");
-                }
-            }
-            await next();
-        });
+        // Remove overly broad Authorization stripping on all /connect routes.
+        // Authorization header is stripped narrowly by AuthorizeHeaderStripStartupFilter for /connect/authorize and /connect/par only.
 
         // Allow disabling HTTPS redirection for containerized/internal HTTP calls
         var disableHttpsRedirect = string.Equals(Environment.GetEnvironmentVariable("DISABLE_HTTPS_REDIRECT"), "true", StringComparison.OrdinalIgnoreCase);
@@ -65,22 +55,11 @@ public static class WebApplicationExtensions
         app.UseStaticFiles();
 
         app.UseRouting();
-
-        // Enable ASP.NET Core rate limiting middleware
         app.UseRateLimiter();
-
-        // Enable session before custom middleware that uses it
         app.UseSession();
-
-        // Device auto-login (silent) BEFORE normal auth so principal is established
         app.UseMiddleware<DeviceAutoLoginMiddleware>();
-
-        // Client cookie middleware (requires session)
         app.UseMiddleware<ClientCookieMiddleware>();
-
-        // Add antiforgery middleware
         app.UseAntiforgery();
-
         app.UseAuthentication();
         app.UseAuthorization();
 
@@ -118,18 +97,8 @@ public static class WebApplicationExtensions
 
         app.UseForwardedHeaders();
 
-        app.Use(async (ctx, next) =>
-        {
-            if ((HttpMethods.IsGet(ctx.Request.Method) || HttpMethods.IsPost(ctx.Request.Method)) &&
-                ctx.Request.Path.StartsWithSegments("/connect", StringComparison.OrdinalIgnoreCase))
-            {
-                if (ctx.Request.Headers.ContainsKey("Authorization"))
-                {
-                    ctx.Request.Headers.Remove("Authorization");
-                }
-            }
-            await next();
-        });
+        // Remove overly broad Authorization stripping on all /connect routes.
+        // Authorization header is stripped narrowly by AuthorizeHeaderStripStartupFilter for /connect/authorize and /connect/par only.
 
         var disableHttpsRedirect = string.Equals(Environment.GetEnvironmentVariable("DISABLE_HTTPS_REDIRECT"), "true", StringComparison.OrdinalIgnoreCase);
         if (!disableHttpsRedirect)

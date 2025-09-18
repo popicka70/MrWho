@@ -123,6 +123,7 @@ public sealed class JarPreprocessingStartupFilter : IStartupFilter
                             var jwt = raw.ToString();
                             var queryClientId = ctx.Request.Query[OpenIddictConstants.Parameters.ClientId].ToString();
                             var originalRedirect = ctx.Request.Query[OpenIddictConstants.Parameters.RedirectUri].ToString();
+                            var originalScope = ctx.Request.Query[OpenIddictConstants.Parameters.Scope].ToString();
                             var result = await validator.ValidateAsync(jwt, queryClientId, ctx.RequestAborted);
                             if (result.Success && result.Parameters != null)
                             {
@@ -146,6 +147,15 @@ public sealed class JarPreprocessingStartupFilter : IStartupFilter
                                     {
                                         dict[OpenIddictConstants.Parameters.RedirectUri] = originalRedirect;
                                     }
+                                }
+                                // Record both original query scope and JAR scope to enable strict conflict detection later.
+                                if (!string.IsNullOrEmpty(originalScope))
+                                {
+                                    dict["_query_scope"] = originalScope;
+                                }
+                                if (result.Parameters.TryGetValue(OpenIddictConstants.Parameters.Scope, out var jarScopeVal) && !string.IsNullOrWhiteSpace(jarScopeVal))
+                                {
+                                    dict["_jar_scope"] = jarScopeVal;
                                 }
                                 if (result.Parameters.TryGetValue(OpenIddictConstants.Parameters.ResponseMode, out var rmFromJar) && string.Equals(rmFromJar, "jwt", StringComparison.OrdinalIgnoreCase))
                                 {

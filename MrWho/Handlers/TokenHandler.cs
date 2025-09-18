@@ -414,6 +414,23 @@ public class TokenHandler : ITokenHandler
 
         var scopes = request.GetScopes();
         var identity = await BuildUserIdentityAsync(user, clientId, scopes);
+
+        // Add azp/client_id so AdminClientApi policy can authorize bearer tokens issued via password grant
+        try
+        {
+            var azp = new Claim(OpenIddictConstants.Claims.AuthorizedParty, clientId);
+            azp.SetDestinations(Destinations.AccessToken);
+            identity.AddClaim(azp);
+
+            var clientIdClaim = new Claim("client_id", clientId);
+            clientIdClaim.SetDestinations(Destinations.AccessToken);
+            identity.AddClaim(clientIdClaim);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Failed adding azp/client_id claims for password grant token");
+        }
+
         var principal = new ClaimsPrincipal(identity);
         principal.SetScopes(scopes);
         var audienceResult = await ApplyAudiencesAsync(principal, clientId, scopes, context);
