@@ -56,6 +56,11 @@ public sealed class JarPreprocessingStartupFilter : IStartupFilter
                             var dict = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
                             foreach (var kv in ctx.Request.Query)
                             {
+                                // We'll drop request_uri after merge to avoid double processing by downstream components.
+                                if (string.Equals(kv.Key, OpenIddictConstants.Parameters.RequestUri, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    continue;
+                                }
                                 dict[kv.Key] = kv.Value.ToString();
                             }
 
@@ -64,6 +69,11 @@ public sealed class JarPreprocessingStartupFilter : IStartupFilter
                                 var parsed = JsonSerializer.Deserialize<Dictionary<string, string>>(par.ParametersJson) ?? new();
                                 foreach (var kv in parsed)
                                 {
+                                    // Do NOT re-inject the raw request object from PAR into front-channel
+                                    if (string.Equals(kv.Key, OpenIddictConstants.Parameters.Request, StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        continue;
+                                    }
                                     if (!dict.ContainsKey(kv.Key))
                                     {
                                         dict[kv.Key] = kv.Value;
@@ -77,7 +87,7 @@ public sealed class JarPreprocessingStartupFilter : IStartupFilter
 
                             dict["_par_resolved"] = "1";
                             ctx.Request.QueryString = QueryString.Create(dict!);
-                            logger.LogDebug("[PAR][MW] Pre-resolved request_uri and kept it in query (merged {Count} params)", dict.Count);
+                            logger.LogDebug("[PAR][MW] Pre-resolved request_uri, merged params and removed request_uri from query");
                         }
                         catch (Exception ex)
                         {
@@ -143,6 +153,26 @@ public sealed class JarPreprocessingStartupFilter : IStartupFilter
                             await ctx.Response.WriteAsJsonAsync(new { error = OpenIddictConstants.Errors.InvalidRequestObject, error_description = "invalid request object" });
                             return;
                         }
+                    }
+
+                    // 3) JARM response_mode normalization: if response_mode=jwt was explicitly supplied, remove it
+                    // and inject a lightweight marker that we requested JARM. The server will honor JARM mode later.
+                    if (ctx.Request.Query.TryGetValue(OpenIddictConstants.Parameters.ResponseMode, out var rm) &&
+                        string.Equals(rm.ToString(), "jwt", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var dict = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+                        foreach (var kv in ctx.Request.Query)
+                        {
+                            if (string.Equals(kv.Key, OpenIddictConstants.Parameters.ResponseMode, StringComparison.OrdinalIgnoreCase))
+                            {
+                                continue; // strip response_mode from front-channel
+                            }
+                            dict[kv.Key] = kv.Value.ToString();
+                        }
+                        // Inject a flag so downstream login redirect (returnUrl) carries an indicator
+                        dict["mrwho_jarm"] = "1";
+                        ctx.Request.QueryString = QueryString.Create(dict!);
+                        logger.LogDebug("[JARM][MW] Normalized response_mode=jwt -> injected mrwho_jarm=1 and removed response_mode from query");
                     }
                 }
                 await nxt();

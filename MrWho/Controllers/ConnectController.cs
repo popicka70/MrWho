@@ -105,18 +105,7 @@ public class ConnectController : Controller
             try { Request.Headers.Remove("Authorization"); } catch { }
         }
 
-        // Test-mode fast path for PAR+JAR happy-path validation. Tests accept 200 OK.
-        var testMode = string.Equals(Environment.GetEnvironmentVariable("MRWHO_TESTS"), "1", StringComparison.OrdinalIgnoreCase);
-        if (testMode)
-        {
-            var hasParOrJar = !string.IsNullOrWhiteSpace(Request.Query[OpenIddictConstants.Parameters.RequestUri]) || !string.IsNullOrWhiteSpace(Request.Query[OpenIddictConstants.Parameters.Request]);
-            if (hasParOrJar)
-            {
-                _logger.LogDebug("[TEST-MODE] Short-circuit authorize OK for PAR/JAR validation");
-                return Ok(new { status = "ok" });
-            }
-        }
-
+        // Allow the normal authorization flow to validate JAR/PAR and enforce policies (no test-mode short-circuit here)
         return Wrap(await _mediator.Send(new OidcAuthorizeRequest(HttpContext)));
     }
 

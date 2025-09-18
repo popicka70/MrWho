@@ -26,22 +26,6 @@ public sealed class AuthorizeHeaderStripStartupFilter : IStartupFilter
                     }
                 }
 
-                // Test-mode fast path: let integration tests validate PAR+JAR mechanics without full pipeline.
-                var isTest = string.Equals(Environment.GetEnvironmentVariable("MRWHO_TESTS"), "1", StringComparison.OrdinalIgnoreCase);
-                if (isTest && ctx.Request.Path.StartsWithSegments("/connect/authorize", StringComparison.OrdinalIgnoreCase))
-                {
-                    var hasPar = !string.IsNullOrWhiteSpace(ctx.Request.Query[OpenIddictConstants.Parameters.RequestUri]);
-                    var hasJar = !string.IsNullOrWhiteSpace(ctx.Request.Query[OpenIddictConstants.Parameters.Request]);
-                    if (hasPar || hasJar)
-                    {
-                        ctx.Response.Headers["Cache-Control"] = "no-store";
-                        ctx.Response.Headers["Pragma"] = "no-cache";
-                        ctx.Response.ContentType = "application/json";
-                        await ctx.Response.WriteAsJsonAsync(new { status = "ok" });
-                        return; // short-circuit
-                    }
-                }
-
                 await nxt();
             });
             next(app);
