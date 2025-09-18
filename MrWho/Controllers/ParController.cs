@@ -72,7 +72,7 @@ public class ParController : Controller
             {
                 requestJwt = rawRequest;
 
-                // Secondary replay guard based on raw JAR content hash
+                // Secondary replay guard based on raw JAR content hash (cache-level)
                 try
                 {
                     using var sha = SHA256.Create();
@@ -87,32 +87,20 @@ public class ParController : Controller
                 }
                 catch { }
 
-                // DB-level duplicate detection (same client, same request JWT, unexpired)
+                // DB-level duplicate detection using a stable ParametersHash
                 try
                 {
+                    string parametersHash = ComputeParametersHash(dict, requestJwt, clientId);
                     var nowUtc = DateTime.UtcNow;
-                    var candidates = await _db.PushedAuthorizationRequests.AsNoTracking()
-                        .Where(p => p.ClientId == clientId && p.ExpiresAt > nowUtc)
-                        .OrderByDescending(p => p.CreatedAt)
-                        .Take(20) // small window
-                        .ToListAsync(HttpContext.RequestAborted);
-                    foreach (var cand in candidates)
+                    var dupExists = await _db.PushedAuthorizationRequests.AsNoTracking()
+                        .AnyAsync(p => p.ClientId == clientId && p.ParametersHash == parametersHash && p.ExpiresAt > nowUtc, HttpContext.RequestAborted);
+                    if (dupExists)
                     {
-                        try
-                        {
-                            if (string.IsNullOrWhiteSpace(cand.ParametersJson)) continue;
-                            var cdict = JsonSerializer.Deserialize<Dictionary<string, string>>(cand.ParametersJson);
-                            if (cdict != null && cdict.TryGetValue(OpenIddictConstants.Parameters.Request, out var prev) && !string.IsNullOrEmpty(prev))
-                            {
-                                if (string.Equals(prev, requestJwt, StringComparison.Ordinal))
-                                {
-                                    _metrics.IncrementParPush("reused");
-                                    return BadRequest(new { error = OpenIddictConstants.Errors.InvalidRequest, error_description = "replay jwt" });
-                                }
-                            }
-                        }
-                        catch { }
+                        _metrics.IncrementParPush("reused");
+                        return BadRequest(new { error = OpenIddictConstants.Errors.InvalidRequest, error_description = "replay jwt" });
                     }
+                    // stash hash for later save
+                    HttpContext.Items["par.parametersHash"] = parametersHash;
                 }
                 catch { }
 
@@ -158,12 +146,21 @@ public class ParController : Controller
             var id = Guid.NewGuid().ToString("n");
             var requestUri = $"urn:ietf:params:oauth:request_uri:{id}";
             var expiresIn = 90; // seconds
+
+            // Compute stable ParametersHash for persistence if not already computed
+            string? parametersHashToSave = HttpContext.Items["par.parametersHash"]?.ToString();
+            if (string.IsNullOrEmpty(parametersHashToSave))
+            {
+                try { parametersHashToSave = ComputeParametersHash(dict, requestJwt, clientId); } catch { parametersHashToSave = null; }
+            }
+
             var entity = new PushedAuthorizationRequest
             {
                 Id = id,
                 RequestUri = requestUri,
                 ClientId = clientId,
                 ParametersJson = JsonSerializer.Serialize(dict),
+                ParametersHash = parametersHashToSave,
                 CreatedAt = DateTime.UtcNow,
                 ExpiresAt = DateTime.UtcNow.AddSeconds(expiresIn)
             };
@@ -180,6 +177,24 @@ public class ParController : Controller
             _logger.LogError(ex, "PAR push failed");
             _metrics.IncrementParPush("error");
             return StatusCode(500, new { error = OpenIddictConstants.Errors.ServerError, error_description = ex.Message });
+        }
+    }
+
+    private static string ComputeParametersHash(Dictionary<string, string> dict, string? requestJwt, string? clientId = null)
+    {
+        using var sha = SHA256.Create();
+        byte[] hashBytes;
+        var ns = (clientId ?? string.Empty) + "|";
+        if (!string.IsNullOrWhiteSpace(requestJwt))
+        {
+            hashBytes = sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(ns + requestJwt));
+            return "req:" + Convert.ToBase64String(hashBytes);
+        }
+        else
+        {
+            var canonical = string.Join("&", dict.OrderBy(kv => kv.Key, StringComparer.OrdinalIgnoreCase).Select(kv => kv.Key + "=" + kv.Value));
+            hashBytes = sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(ns + canonical));
+            return "kv:" + Convert.ToBase64String(hashBytes);
         }
     }
 }

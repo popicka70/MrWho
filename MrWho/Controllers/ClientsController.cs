@@ -940,12 +940,11 @@ public class ClientsController : ControllerBase
             }
         }
 
-        // === NEW: Jar/JARM guards (Item 6) ===
-        var jarCheck = ValidateJarConfig(request.JarMode, request.RequireSignedRequestObject, request.AllowedRequestObjectAlgs);
-        if (!jarCheck.ok)
-        {
-            return jarCheck.error!;
-        }
+        // === NEW: determine if a JAR symmetric secret should be stored even for public clients ===
+        bool jarNeedsSecret = !string.IsNullOrWhiteSpace(request.AllowedRequestObjectAlgs) &&
+                               request.AllowedRequestObjectAlgs
+                                   .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                                   .Any(a => a.StartsWith("HS", StringComparison.OrdinalIgnoreCase));
 
         var strategy = _context.Database.CreateExecutionStrategy();
         var result = await strategy.ExecuteAsync(async () =>
@@ -1053,7 +1052,7 @@ public class ClientsController : ControllerBase
                 await _context.SaveChangesAsync();
 
                 // Hash and record secret only after client exists in DB
-                if (requiresSecret && !string.IsNullOrWhiteSpace(request.ClientSecret))
+                if (!string.IsNullOrWhiteSpace(request.ClientSecret) && (requiresSecret || jarNeedsSecret))
                 {
                     await _clientSecretService.SetNewSecretAsync(client.Id, providedPlaintext: request.ClientSecret);
                 }
@@ -1506,12 +1505,19 @@ public class ClientsController : ControllerBase
         var descriptor = new OpenIddictApplicationDescriptor
         {
             ClientId = client.ClientId,
-            ClientSecret = request.ClientSecret, // use plaintext provided at creation
             DisplayName = client.Name,
             ClientType = client.ClientType == ClientType.Public
                 ? OpenIddictConstants.ClientTypes.Public
                 : OpenIddictConstants.ClientTypes.Confidential
         };
+
+        // Determine if a secret is required for this client. Public clients MUST NOT have a secret.
+        var requiresSecret = client.ClientType != ClientType.Public && client.RequireClientSecret;
+        if (requiresSecret)
+        {
+            // Use plaintext provided at creation (validated earlier). For confidential/machine only.
+            descriptor.ClientSecret = request.ClientSecret;
+        }
 
         // Add permissions based on flows
         if (client.AllowAuthorizationCodeFlow)

@@ -1,10 +1,13 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.EntityFrameworkCore; // added for [Index]
 
 namespace MrWho.Models;
 
 /// <summary>
 /// Stored pushed authorization request parameters (PAR - RFC 9126)
 /// </summary>
+[PrimaryKey(nameof(Id))]
+[Index(nameof(ClientId), nameof(ParametersHash))]
 public class PushedAuthorizationRequest
 {
     [Key]
@@ -30,7 +33,7 @@ public class PushedAuthorizationRequest
     public DateTime? ConsumedAt { get; set; }
 
     /// <summary>
-    /// Optional hash of ParametersJson for integrity checks
+    /// Optional hash of ParametersJson or raw request JWT (stable hash for replay detection)
     /// </summary>
     [MaxLength(128)]
     public string? ParametersHash { get; set; }
