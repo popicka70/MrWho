@@ -23,7 +23,7 @@ In Progress (🛠):
 - PJ11 JARM success packaging final (handler issues signed RS256 JWT with iss/aud/iat/exp/code/state; needs end-to-end post-auth tests & claim assertions)
 - PJ12 JARM error packaging final (error path JWT emitted; negative/error scenario tests pending)
 - PJ30 Metrics counters foundation (ProtocolMetrics extended; PAR/JAR/JARM/validation observers wired; export/UX pending)
-- PJ56 JAR/JARM & extended PAR metrics wiring (JAR/JARM + PAR resolution wired; remaining: PAR push created/reused + consumed granular outcomes)
+- PJ56 JAR/JARM & extended PAR metrics wiring (JAR/JARM + PAR resolution wired; push wiring pending)
 - PJ17 JAR jti replay metrics (counters wired via replay cache hits; test coverage and dashboards pending)
 - PJ26 Required mode negative matrix (some tests present for PAR required and JAR required; expand to full matrix + realms/defaults)
 - PJ27 Replay tests (end-to-end) – initial PAR+JAR replay covered; extend to cross-channel and late-stage duplicates
@@ -115,14 +115,14 @@ Objectives (updated status):
 | v1.4 (Phase 4) | Cleanup & performance | Schema cleanup + perf baseline + migration guide |
 
 ## Immediate Next Actions (Week Focus)
-1. Wire and validate PAR push metrics (created/reused) in push controller; ensure consumed outcomes are granular (PJ51/PJ56)
+1. Wire and validate PAR push metrics (created/reused) in push controller; ensure consumed outcomes are granular via ParResolve("consumed"). Verified with ProtocolMetrics. (PJ51/PJ56)
 2. Expand validation metrics with detailed outcome codes and finalize docs (e.g., conflict:client_id, limit:scope_items) (PJ40/PJ41)
 3. Implement JARM success/error claim assertion tests (iss,aud,iat,exp,state,code/error mapping) (PJ11/PJ12)
 4. Add key rotation + historical JARM validation test (PJ13)
 5. Extend required-mode negative matrix generator (ParMode/JarMode/JarmMode permutations across realm defaults vs client overrides) (PJ26)
 6. Replay scenario expansion: same JAR reused across PAR push + direct authorize, and late-stage replay after partial consumption (PJ27)
 7. Draft adaptive discovery gating logic (counts active clients requiring features) (PJ42)
-8. Expose ProtocolMetrics snapshot via admin/diagnostics endpoint for quick verification (PJ30/PJ56)
+8. Expose ProtocolMetrics snapshot via admin/diagnostics endpoint for quick verification at GET /diagnostics/protocol-metrics; include optional POST /diagnostics/protocol-metrics/reset (PJ30/PJ56)
 
 ## Risk / Watchlist
 - Conflict & limit handlers currently fail-open on internal exceptions (log at Debug). Evaluate tightening once stable.
