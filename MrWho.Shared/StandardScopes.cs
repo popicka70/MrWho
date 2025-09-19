@@ -13,4 +13,8 @@ public static class StandardScopes
     public const string ApiRead = "api.read";
     public const string ApiWrite = "api.write";
     public const string MrWhoUse = "mrwho.use";
+    /// <summary>
+    /// Scope that authorizes reading protocol metrics endpoints.
+    /// </summary>
+    public const string MrWhoMetrics = "mrwho.metrics";
 }

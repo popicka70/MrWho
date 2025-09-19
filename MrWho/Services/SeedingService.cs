@@ -201,7 +201,8 @@ public class SeedingService : ISeedingService
             { "Administrator", "Full system administrator with all permissions" },
             { "User", "Standard user with basic permissions" },
             { "Manager", "Manager with elevated permissions for team management" },
-            { "Viewer", "Read-only access to view system information" }
+            { "Viewer", "Read-only access to view system information" },
+            { "MetricsReader", "Role that can read protocol metrics endpoints" } // NEW role
         };
 
         foreach (var (roleName, description) in defaultRoles)
@@ -247,6 +248,8 @@ public class SeedingService : ISeedingService
             if (result.Succeeded)
             {
                 await _userManager.AddToRoleAsync(user, "Administrator");
+                // NEW: grant metrics reader role for admin by default
+                try { await _userManager.AddToRoleAsync(user, "MetricsReader"); } catch { }
                 _logger.LogInformation("Created default admin user: {Email}", defaultEmail);
 
                 // Ensure profile (ACTIVE so admin can log in immediately)
@@ -282,6 +285,20 @@ public class SeedingService : ISeedingService
                 });
                 await _context.SaveChangesAsync();
                 _logger.LogInformation("Backfilled ACTIVE user profile for existing admin user {UserId}", existing.Id);
+            }
+
+            // NEW: ensure admin has MetricsReader role
+            try
+            {
+                if (!await _userManager.IsInRoleAsync(existing, "MetricsReader"))
+                {
+                    await _userManager.AddToRoleAsync(existing, "MetricsReader");
+                    _logger.LogInformation("Granted MetricsReader role to existing admin user");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Unable to grant MetricsReader role to existing admin (may not exist yet)");
             }
         }
     }

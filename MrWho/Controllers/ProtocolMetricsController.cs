@@ -1,12 +1,13 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MrWho.Services;
+using MrWho.Shared;
 
 namespace MrWho.Controllers;
 
 [ApiController]
 [Route("api/monitoring/protocol-metrics")]
-[AllowAnonymous] // TODO: restrict in production
+[Authorize(Policy = AuthorizationPolicies.MetricsRead)]
 public class ProtocolMetricsController : ControllerBase
 {
     private readonly IProtocolMetrics _metrics;

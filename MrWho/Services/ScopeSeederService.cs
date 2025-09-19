@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using MrWho.Data;
 using MrWho.Models;
+using MrWho.Shared; // added for StandardScopes constants
 using MrWho.Shared.Models;
 
 namespace MrWho.Services;
@@ -48,7 +49,7 @@ public class ScopeSeederService : IScopeSeederService
         {
             new StandardScopeDefinition
             {
-                Name = "openid",
+                Name = StandardScopes.OpenId,
                 DisplayName = "OpenID",
                 Description = "Access to OpenID Connect identity",
                 IsRequired = true,
@@ -57,7 +58,7 @@ public class ScopeSeederService : IScopeSeederService
             },
             new StandardScopeDefinition
             {
-                Name = "profile",
+                Name = StandardScopes.Profile,
                 DisplayName = "Profile",
                 Description = "Access to profile information",
                 Type = ScopeType.Identity,
@@ -65,7 +66,7 @@ public class ScopeSeederService : IScopeSeederService
             },
             new StandardScopeDefinition
             {
-                Name = "email",
+                Name = StandardScopes.Email,
                 DisplayName = "Email",
                 Description = "Access to email address",
                 Type = ScopeType.Identity,
@@ -73,7 +74,7 @@ public class ScopeSeederService : IScopeSeederService
             },
             new StandardScopeDefinition
             {
-                Name = "roles",
+                Name = StandardScopes.Roles,
                 DisplayName = "Roles",
                 Description = "Access to user roles",
                 Type = ScopeType.Identity,
@@ -81,7 +82,7 @@ public class ScopeSeederService : IScopeSeederService
             },
             new StandardScopeDefinition
             {
-                Name = "offline_access",
+                Name = StandardScopes.OfflineAccess,
                 DisplayName = "Offline Access",
                 Description = "Request refresh token / offline access",
                 Type = ScopeType.Resource,
@@ -89,7 +90,7 @@ public class ScopeSeederService : IScopeSeederService
             },
             new StandardScopeDefinition
             {
-                Name = "api.read",
+                Name = StandardScopes.ApiRead,
                 DisplayName = "API Read Access",
                 Description = "Read access to API resources",
                 Type = ScopeType.Resource,
@@ -97,7 +98,7 @@ public class ScopeSeederService : IScopeSeederService
             },
             new StandardScopeDefinition
             {
-                Name = "api.write",
+                Name = StandardScopes.ApiWrite,
                 DisplayName = "API Write Access",
                 Description = "Write access to API resources",
                 Type = ScopeType.Resource,
@@ -105,11 +106,20 @@ public class ScopeSeederService : IScopeSeederService
             },
             new StandardScopeDefinition
             {
-                Name = "mrwho.use",
+                Name = StandardScopes.MrWhoUse,
                 DisplayName = "MrWho API Usage",
                 Description = "Use MrWho API services and features",
                 Type = ScopeType.Resource,
                 Claims = new[] { "department" }
+            },
+            // NEW: metrics scope for reading protocol metrics
+            new StandardScopeDefinition
+            {
+                Name = StandardScopes.MrWhoMetrics,
+                DisplayName = "MrWho Metrics Access",
+                Description = "Allows reading protocol metrics endpoints",
+                Type = ScopeType.Resource,
+                Claims = new[] { "scope" }
             }
         };
 
@@ -128,7 +138,7 @@ public class ScopeSeederService : IScopeSeederService
         {
             new StandardIdentityResourceDefinition
             {
-                Name = "openid",
+                Name = StandardScopes.OpenId,
                 DisplayName = "OpenID",
                 Description = "Access to OpenID Connect identity",
                 IsRequired = true,
@@ -136,21 +146,21 @@ public class ScopeSeederService : IScopeSeederService
             },
             new StandardIdentityResourceDefinition
             {
-                Name = "profile",
+                Name = StandardScopes.Profile,
                 DisplayName = "Profile",
                 Description = "Access to profile information",
                 Claims = new[] { "name", "family_name", "given_name", "middle_name", "nickname", "preferred_username", "profile", "picture", "website", "gender", "birthdate", "zoneinfo", "locale", "updated_at" }
             },
             new StandardIdentityResourceDefinition
             {
-                Name = "email",
+                Name = StandardScopes.Email,
                 DisplayName = "Email",
                 Description = "Access to email address",
                 Claims = new[] { "email", "email_verified" }
             },
             new StandardIdentityResourceDefinition
             {
-                Name = "roles",
+                Name = StandardScopes.Roles,
                 DisplayName = "Roles",
                 Description = "Access to user roles",
                 Claims = new[] { "role" }

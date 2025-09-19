@@ -115,6 +115,9 @@
 
     protected override async Task OnInitializedAsync() => await LoadRoles();
 
+    // Helper used by nested dialog to safely close without NRE when DialogService is not cascaded
+    internal void CloseDialog(bool result) { try { DialogService?.Close(result); } catch { } }
+
     private async Task LoadRoles()
     {
         loading = true;
@@ -224,7 +227,7 @@
                     </ChildContent>
                 </RadzenFormField>
                 <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" JustifyContent="JustifyContent.End">
-                    <RadzenButton Text="Cancel" Icon="close" ButtonStyle="ButtonStyle.Light" Click="@(()=> DialogService.Close(false))" />
+                    <RadzenButton Text="Cancel" Icon="close" ButtonStyle="ButtonStyle.Light" Click="@(async ()=> Parent.CloseDialog(false))" />
                     <RadzenButton Text="Save" Icon="save" ButtonStyle="ButtonStyle.Primary" IsBusy="@Parent.editBusy" Disabled="@string.IsNullOrWhiteSpace(Parent.editModel.Name)" Click="@(async ()=> await Parent.SaveEdit())" />
                 </RadzenStack>
             </RadzenStack>;

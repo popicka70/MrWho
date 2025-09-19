@@ -10,4 +10,10 @@ public static class AuthorizationPolicies
     /// Requires callers to be authenticated as the Admin client/API.
     /// </summary>
     public const string AdminClientApi = "AdminClientApi";
+
+    /// <summary>
+    /// Metrics read policy: allows access for callers with role "metrics.read" OR scope "mrwho.metrics".
+    /// Works for both user tokens (role) and M2M/bearer tokens (scope).
+    /// </summary>
+    public const string MetricsRead = "MetricsRead";
 }

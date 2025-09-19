@@ -132,6 +132,35 @@ public class DynamicAuthorizationPolicyProvider : IAuthorizationPolicyProvider
                         return false;
                     })
                     .Build();
+            case AuthorizationPolicies.MetricsRead:
+                // Accept either:
+                // - Identity roles: Administrator or MetricsReader
+                // - legacy claim-based role "metrics.read"
+                // - scope mrwho.metrics (M2M/applications)
+                return new AuthorizationPolicyBuilder()
+                    .RequireAuthenticatedUser()
+                    .AddAuthenticationSchemes(OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme)
+                    .RequireAssertion(ctx =>
+                    {
+                        var user = ctx.User;
+                        if (user?.Identity?.IsAuthenticated != true)
+                            return false;
+
+                        // Role based (Identity roles)
+                        if (user.IsInRole("Administrator") || user.IsInRole("MetricsReader"))
+                            return true;
+
+                        // Back-compat role claims (metrics.read)
+                        bool roleOk = user.IsInRole("metrics.read") || user.HasClaim(ClaimTypes.Role, "metrics.read") || user.HasClaim("roles", "metrics.read");
+                        if (roleOk)
+                            return true;
+
+                        // Scope based for M2M
+                        bool scopeOk = user.FindAll("scope").Any(c => c.Value.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                                                                        .Contains(StandardScopes.MrWhoMetrics));
+                        return scopeOk;
+                    })
+                    .Build();
         }
 
         if (policyName.StartsWith("Client_", StringComparison.Ordinal))
