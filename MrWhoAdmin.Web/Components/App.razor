@@ -15,8 +15,7 @@
 </head>
 
 <body>
-    <!-- Force non-prerendered interactive server mode globally -->
-    <RadzenComponents @rendermode="InteractiveServer" />
+    <!-- RadzenComponents moved to MainLayout to avoid duplication -->
     <CascadingAuthenticationState>
         <Routes @rendermode="InteractiveServer" />
     </CascadingAuthenticationState>

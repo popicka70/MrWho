@@ -91,9 +91,9 @@ public static class WebApplicationExtensions
             await context.SignOutAsync(OpenIdConnectDefaults.AuthenticationScheme, properties);
         });
 
-        // Add explicit handling for OIDC callback paths to prevent 404s
-        app.MapGet("/signin-oidc", () => "OIDC callback endpoint - this should not be called directly");
-        app.MapGet("/signout-callback-oidc", () => "OIDC signout callback endpoint - this should not be called directly");
+        // IMPORTANT: Do NOT map OIDC callback endpoints here. They are handled by the OpenIdConnect middleware
+        // based on the configured CallbackPath/SignedOutCallbackPath. Mapping them would short-circuit the
+        // middleware and break the login flow.
 
         // Debug endpoint to clear authentication state (development only)
         if (app.Environment.IsDevelopment())

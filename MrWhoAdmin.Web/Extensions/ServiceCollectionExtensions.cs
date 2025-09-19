@@ -468,7 +468,7 @@ public static class ServiceCollectionExtensions
 
         ConfigureScopes(options);
         ConfigureClaimActions(options);
-        ConfigureEvents(options);
+        ConfigureEvents(options, configuration, profile);
     }
 
     /// <summary>
@@ -521,14 +521,15 @@ public static class ServiceCollectionExtensions
     /// <summary>
     /// Configures OpenID Connect events for logging and debugging
     /// </summary>
-    private static void ConfigureEvents(OpenIdConnectOptions options)
+    private static void ConfigureEvents(OpenIdConnectOptions options, IConfiguration configuration, AdminProfile? profile)
     {
         options.Events = new OpenIdConnectEvents
         {
-            OnRedirectToIdentityProvider = context =>
+            OnRedirectToIdentityProvider = async context =>
             {
                 var logger = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
                 logger.LogInformation("Redirecting to identity provider (scheme: {Scheme})", context.Scheme.Name);
+
                 var authority = context.Options.Authority?.TrimEnd('/') ?? string.Empty;
                 if (!string.IsNullOrEmpty(authority))
                 {
@@ -538,11 +539,56 @@ public static class ServiceCollectionExtensions
                         context.ProtocolMessage.IssuerAddress = desiredAuthorize;
                     }
                 }
+
                 if (context.Properties?.Items.TryGetValue("force", out var force) == true && force == "1")
                 {
                     context.ProtocolMessage.Prompt = "login";
                 }
-                return Task.CompletedTask;
+
+                // NEW: Optional PAR push when requested
+                if (context.Properties?.Items.TryGetValue("use_par", out var usePar) == true && usePar == "1")
+                {
+                    try
+                    {
+                        var parUrl = $"{authority}/connect/par";
+                        var form = new List<KeyValuePair<string, string>>
+                        {
+                            new("client_id", context.Options.ClientId),
+                            new("redirect_uri", context.ProtocolMessage.RedirectUri ?? string.Empty),
+                            new("response_type", context.ProtocolMessage.ResponseType ?? "code"),
+                            new("scope", context.ProtocolMessage.Scope ?? string.Empty)
+                        };
+                        if (!string.IsNullOrEmpty(context.ProtocolMessage.State)) form.Add(new("state", context.ProtocolMessage.State));
+                        if (!string.IsNullOrEmpty(context.ProtocolMessage.Nonce)) form.Add(new("nonce", context.ProtocolMessage.Nonce));
+
+                        var clientSecret = context.Options.ClientSecret;
+                        if (!string.IsNullOrWhiteSpace(clientSecret)) form.Add(new("client_secret", clientSecret));
+
+                        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+                        var resp = await http.PostAsync(parUrl, new FormUrlEncodedContent(form));
+                        var body = await resp.Content.ReadAsStringAsync();
+                        if (!resp.IsSuccessStatusCode)
+                        {
+                            logger.LogWarning("PAR push failed: {Status} {Body}", resp.StatusCode, body);
+                        }
+                        else
+                        {
+                            using var doc = JsonDocument.Parse(body);
+                            var requestUri = doc.RootElement.GetProperty("request_uri").GetString();
+                            // Use request_uri; keep state. Do not try to set PKCE fields here.
+                            context.ProtocolMessage.Scope = null;
+                            context.ProtocolMessage.ResponseType = null;
+                            context.ProtocolMessage.Nonce = null;
+                            context.ProtocolMessage.RequestUri = requestUri;
+                            logger.LogInformation("PAR push succeeded; using request_uri for authorize redirect.");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        var logger2 = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+                        logger2.LogError(ex, "Error performing PAR push in OnRedirectToIdentityProvider");
+                    }
+                }
             },
             OnTokenValidated = ctx =>
             {

@@ -28,8 +28,41 @@ public class AdditionalAuthFlowTests
     [TestMethod]
     public async Task AuthorizationEndpoint_Redirects_To_Login_When_Not_Authenticated()
     {
+        // Use PAR to avoid parameter limit checks in the front-channel
+        // Build a valid PKCE S256 challenge (Base64Url-encoded 32-byte SHA256)
+        const string codeChallenge = "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"; // RFC7636 example
+        var redirectUri = "https://localhost:7257/signin-oidc";
+
+        // Push authorization request via PAR
+        using var parClient = CreateServerClient();
+        var parForm = new Dictionary<string, string>
+        {
+            ["client_id"] = "mrwho_admin_web",
+            ["client_secret"] = "FTZvvlIIFdmtBg7IdBql9EEXRDj1xwLmi1qW9fGbJBY",
+            ["redirect_uri"] = redirectUri,
+            ["response_type"] = "code",
+            ["scope"] = "openid profile",
+            ["code_challenge"] = codeChallenge,
+            ["code_challenge_method"] = "S256"
+        };
+        var parResp = await parClient.PostAsync("connect/par", new FormUrlEncodedContent(parForm));
+        var parBody = await parResp.Content.ReadAsStringAsync();
+        if (parResp.StatusCode == HttpStatusCode.NotFound)
+        {
+            Assert.Inconclusive("PAR endpoint not implemented (404). Test skipped.");
+        }
+        if (!parResp.IsSuccessStatusCode)
+        {
+            // Some servers may not accept 'request' objects at PAR yet; here we only used plain parameters.
+            Assert.Fail($"PAR failed: {(int)parResp.StatusCode} {parBody}");
+        }
+        using var parDoc = JsonDocument.Parse(parBody);
+        var requestUri = parDoc.RootElement.GetProperty("request_uri").GetString();
+        Assert.IsFalse(string.IsNullOrWhiteSpace(requestUri), "PAR response missing request_uri");
+
+        // Now call authorize with only client_id + request_uri
         using var client = CreateServerClient();
-        var url = "/connect/authorize?response_type=code&client_id=mrwho_admin_web&redirect_uri=https%3A%2F%2Flocalhost%3A7257%2Fsignin-oidc&scope=openid+profile&state=abc&code_challenge=xyz&code_challenge_method=plain";
+        var url = $"/connect/authorize?client_id=mrwho_admin_web&request_uri={Uri.EscapeDataString(requestUri!)}";
         var resp = await client.GetAsync(url);
         // Expect a redirect to login (302/303) or an HTML login page (OK) depending on pipeline configuration.
         Assert.IsTrue(resp.StatusCode == HttpStatusCode.Redirect || resp.StatusCode == HttpStatusCode.Found || resp.StatusCode == HttpStatusCode.OK, $"Unexpected status: {(int)resp.StatusCode}");

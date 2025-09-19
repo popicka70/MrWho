@@ -14,14 +14,14 @@
                 <RadzenFormField Text="Client" Variant="Variant.Outlined">
                     <ChildContent>
                         <RadzenDropDown Data="_clients" @bind-Value="_selectedClientId" Style="width:100%"
-                                        TextProperty="Name" ValueProperty="Id" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive" AllowClear="true" />
+                                        TextProperty="Name" ValueProperty="Id" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive" AllowClear="true" Name="ClientId" />
                     </ChildContent>
                 </RadzenFormField>
             </RadzenColumn>
             <RadzenColumn Size="12" SizeMD="6">
                 <RadzenFormField Text="Search Clients" Variant="Variant.Outlined">
                     <ChildContent>
-                        <RadzenTextBox @bind-Value="_clientSearch" Style="width:100%" Placeholder="type to search..." Change="@(async _ => await LoadClients())" />
+                        <RadzenTextBox @bind-Value="_clientSearch" Style="width:100%" Placeholder="type to search..." Change="@(async _ => await LoadClients())" Name="ClientSearch" />
                     </ChildContent>
                 </RadzenFormField>
             </RadzenColumn>
@@ -30,21 +30,21 @@
             <RadzenColumn Size="12" SizeMD="6">
                 <RadzenFormField Text="Display Name Override" Variant="Variant.Outlined">
                     <ChildContent>
-                        <RadzenTextBox @bind-Value="_displayNameOverride" Style="width:100%" />
+                        <RadzenTextBox @bind-Value="_displayNameOverride" Style="width:100%" Name="DisplayNameOverride" />
                     </ChildContent>
                 </RadzenFormField>
             </RadzenColumn>
             <RadzenColumn Size="12" SizeMD="3">
                 <RadzenFormField Text="Order" Variant="Variant.Outlined">
                     <ChildContent>
-                        <RadzenNumeric TValue="int?" @bind-Value="_order" Style="width:100%" />
+                        <RadzenNumeric TValue="int?" @bind-Value="_order" Style="width:100%" Name="Order" />
                     </ChildContent>
                 </RadzenFormField>
             </RadzenColumn>
             <RadzenColumn Size="12" SizeMD="12">
                 <RadzenFormField Text="Claim mappings (JSON)" Variant="Variant.Outlined">
                     <ChildContent>
-                        <RadzenTextArea @bind-Value="_claimMappingsJson" Style="width:100%; min-height: 120px;" Placeholder='{"external_claim":"local_claim"}' />
+                        <RadzenTextArea @bind-Value="_claimMappingsJson" Style="width:100%; min-height: 120px;" Placeholder='{"external_claim":"local_claim"}' Name="ClaimMappingsJson" />
                     </ChildContent>
                     <Helper>
                         <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Optional per-client mapping from external claims to local claim types.</RadzenText>
@@ -76,7 +76,7 @@
     </RadzenCard>
 
     <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" JustifyContent="JustifyContent.End">
-        <RadzenButton Icon="close" ButtonStyle="ButtonStyle.Secondary" Text="Close" Click="@(async ()=> DialogService.Close(true))" />
+        <RadzenButton Icon="close" ButtonStyle="ButtonStyle.Secondary" Text="Close" Click="DialogService.Close" />
     </RadzenStack>
 </RadzenStack>
 

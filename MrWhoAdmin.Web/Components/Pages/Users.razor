@@ -17,8 +17,8 @@
 <RadzenCard class="rz-my-4">
     <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" class="rz-mb-4">
         <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem">
-            <RadzenTextBox @bind-Value="@searchTerm" Placeholder="Search users..." Style="width: 300px;" />
-            <RadzenButton Click="@LoadUsers" Icon="search" ButtonStyle="ButtonStyle.Secondary" />
+            <RadzenTextBox @bind-Value="@searchTerm" Name="UserSearch" Placeholder="Search users..." Style="width: 300px;" />
+            <RadzenButton Click="@LoadUsers" Icon="search" ButtonStyle="ButtonStyle.Secondary" aria-label="Search users" />
         </RadzenStack>
         <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
             <RadzenButton Click="@(() => Navigation.NavigateTo("/users/registrations"))" Icon="how_to_reg" ButtonStyle="ButtonStyle.Light" Text="Pending" />

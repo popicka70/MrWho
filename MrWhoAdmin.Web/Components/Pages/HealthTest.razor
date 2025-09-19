@@ -19,9 +19,9 @@
         <RadzenText TextStyle="TextStyle.Subtitle1">Direct Controller Test</RadzenText>
         <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
             <RadzenButton Text="Test Basic Health" Icon="health_and_safety" ButtonStyle="ButtonStyle.Primary" 
-                          Click="@(async () => { TestBasicHealth(); await Task.CompletedTask; })" IsBusy="@testingBasic" />
+                          Click="TestBasicHealth" IsBusy="@testingBasic" />
             <RadzenButton Text="Test Liveness" Icon="favorite" ButtonStyle="ButtonStyle.Success" 
-                          Click="@(async () => { TestLiveness(); await Task.CompletedTask; })" IsBusy="@testingLiveness" />
+                          Click="TestLiveness" IsBusy="@testingLiveness" />
             <RadzenButton Text="Test Readiness" Icon="check_circle" ButtonStyle="ButtonStyle.Info" 
                           Click="@(async () => await TestReadinessAsync())" IsBusy="@testingReadiness" />
         </RadzenStack>

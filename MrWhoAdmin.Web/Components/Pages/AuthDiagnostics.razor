@@ -108,6 +108,15 @@
                         <button @onclick="TestLogin" class="btn btn-success" disabled="@(!_hasRendered)">
                             Test Login Flow
                         </button>
+                        <button @onclick="StartParViaChallenge" class="btn btn-outline-success" disabled="@(!_hasRendered)" title="Use OIDC Challenge with PAR">
+                            PAR Login Test
+                        </button>
+                        <button @onclick="@(async ()=> await ParLoginWithLocalCallback())" class="btn btn-outline-secondary" disabled="@(!_hasRendered)" title="PAR using local /callback page (no middleware)">
+                            PAR Test (Local Callback)
+                        </button>
+                        <button @onclick="StartParViaChallenge" class="btn btn-outline-primary" disabled="@(!_hasRendered)" title="Use OIDC Challenge with PAR">
+                            PAR + Challenge
+                        </button>
                     </div>
                 </div>
             </div>
@@ -173,7 +182,8 @@
         try
         {
             var authConfig = Configuration.GetSection("Authentication");
-            Authority = authConfig.GetValue<string>("Authority") ?? "https://localhost:7113/";
+            var rawAuthority = authConfig.GetValue<string>("Authority") ?? "https://localhost:7113"; // allow missing trailing slash
+            Authority = NormalizeBaseUrl(rawAuthority);
             ClientId = authConfig.GetValue<string>("ClientId") ?? "mrwho_admin_web";
             CurrentUrl = Navigation.Uri;
             ExpectedCallback = Navigation.BaseUri + "signin-oidc";
@@ -208,7 +218,8 @@
             using var httpClient = new HttpClient();
             httpClient.Timeout = TimeSpan.FromSeconds(5);
 
-            var response = await httpClient.GetAsync($"{Authority}.well-known/openid-configuration");
+            var discoveryUrl = Combine(Authority, "/.well-known/openid-configuration");
+            var response = await httpClient.GetAsync(discoveryUrl);
             if (response.IsSuccessStatusCode)
             {
                 AuthorityStatus = "success";
@@ -241,7 +252,6 @@
 
         try
         {
-            // This will only work if we have HttpContext access
             DiagnosticsResult += "Token status check is only available server-side.\n";
             DiagnosticsResult += "Use /auth/status endpoint for detailed token information.\n";
         }
@@ -268,7 +278,8 @@
         try
         {
             using var httpClient = new HttpClient();
-            var response = await httpClient.GetAsync($"{Authority}.well-known/openid-configuration");
+            var discoveryUrl = Combine(Authority, "/.well-known/openid-configuration");
+            var response = await httpClient.GetAsync(discoveryUrl);
             var content = await response.Content.ReadAsStringAsync();
             
             DiagnosticsResult += $"Status: {response.StatusCode}\n";
@@ -306,7 +317,8 @@
         try
         {
             using var httpClient = new HttpClient();
-            var response = await httpClient.GetAsync($"{Authority}debug/admin-client-info");
+            var clientInfoUrl = Combine(Authority, "/debug/admin-client-info");
+            var response = await httpClient.GetAsync(clientInfoUrl);
             var content = await response.Content.ReadAsStringAsync();
             
             DiagnosticsResult += $"Status: {response.StatusCode}\n";
@@ -395,6 +407,80 @@
         return Task.CompletedTask;
     }
 
+    private void StartParViaChallenge()
+    {
+        if (_disposed || !_hasRendered) return;
+        var ret = Uri.EscapeDataString("/debug/auth-diagnostics");
+        Navigation.NavigateTo($"/auth/login?par=true&returnUrl={ret}", forceLoad: true);
+    }
+
+    private async Task ParLoginWithLocalCallback()
+    {
+        if (_disposed || !_hasRendered) return;
+
+        DiagnosticsResult = "PAR login test (local callback): pushing request...\n";
+        StateHasChanged();
+
+        try
+        {
+            var authCfg = Configuration.GetSection("Authentication");
+            var clientId = authCfg.GetValue<string>("ClientId") ?? "mrwho_admin_web";
+            var clientSecret = authCfg.GetValue<string>("ClientSecret");
+            var scope = authCfg.GetValue<string>("Scope") ?? "openid profile email";
+            var redirectUri = Navigation.BaseUri.TrimEnd('/') + "/callback"; // local diagnostics page (no middleware)
+
+            var pkce = CreatePkce();
+            await JSRuntime.InvokeVoidAsync("eval", $"sessionStorage.setItem('mrwho.par.pkce_verifier','{pkce.Verifier}')");
+            var state = Guid.NewGuid().ToString("n");
+            var nonce = Guid.NewGuid().ToString("n");
+
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+            var parUrl = Combine(Authority, "/connect/par");
+
+            var form = new List<KeyValuePair<string, string>>
+            {
+                new("client_id", clientId),
+                new("redirect_uri", redirectUri),
+                new("response_type", "code"),
+                new("scope", scope),
+                new("state", state),
+                new("nonce", nonce),
+                new("code_challenge", pkce.Challenge),
+                new("code_challenge_method", "S256")
+            };
+            if (!string.IsNullOrWhiteSpace(clientSecret)) form.Add(new("client_secret", clientSecret));
+
+            var resp = await http.PostAsync(parUrl, new FormUrlEncodedContent(form));
+            var body = await resp.Content.ReadAsStringAsync();
+            DiagnosticsResult += $"PAR status: {(int)resp.StatusCode} {resp.StatusCode}\n";
+            if (!resp.IsSuccessStatusCode) { DiagnosticsResult += body + "\n"; StateHasChanged(); return; }
+
+            using var doc = System.Text.Json.JsonDocument.Parse(body);
+            var requestUri = doc.RootElement.GetProperty("request_uri").GetString();
+            var authorizeUrl = Combine(Authority, "/connect/authorize") + $"?client_id={Uri.EscapeDataString(clientId)}&request_uri={Uri.EscapeDataString(requestUri!)}&response_mode=jwt";
+            Navigation.NavigateTo(authorizeUrl, forceLoad: true);
+        }
+        catch (Exception ex)
+        {
+            DiagnosticsResult += $"PAR exception: {ex.Message}\n";
+            if (ex.InnerException != null) DiagnosticsResult += $"Inner: {ex.InnerException.Message}\n";
+            StateHasChanged();
+        }
+    }
+
+    // Helpers for PKCE reused by both flows
+    private static (string Verifier, string Challenge) CreatePkce()
+    {
+        var bytes = System.Security.Cryptography.RandomNumberGenerator.GetBytes(32);
+        string B64Url(byte[] b) => Convert.ToBase64String(b).TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_');
+        var verifier = B64Url(bytes);
+        var hash = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.ASCII.GetBytes(verifier));
+        var challenge = B64Url(hash);
+        return (verifier, challenge);
+    }
+
     private string GetStatusClass(string status)
     {
         return status switch
@@ -408,5 +494,20 @@
     public void Dispose()
     {
         _disposed = true;
+    }
+
+    // Helpers ------------------------------------------------------------
+    private static string NormalizeBaseUrl(string baseUrl)
+    {
+        return (baseUrl ?? string.Empty).Trim().TrimEnd('/');
+    }
+
+    private static string Combine(string baseUrl, string path)
+    {
+        if (string.IsNullOrWhiteSpace(baseUrl)) return path;
+        if (string.IsNullOrWhiteSpace(path)) return baseUrl;
+        var left = baseUrl.TrimEnd('/');
+        var right = path.StartsWith("/") ? path : "/" + path;
+        return left + right;
     }
 }

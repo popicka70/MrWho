@@ -201,88 +201,49 @@ public partial class OidcClientService : IOidcClientService
             descriptor.Permissions.Add(OpenIddictConstants.Permissions.ResponseTypes.Code);
         }
         if (client.AllowClientCredentialsFlow)
-        {
             descriptor.Permissions.Add(OpenIddictConstants.Permissions.GrantTypes.ClientCredentials);
-        }
-
         if (client.AllowPasswordFlow)
-        {
             descriptor.Permissions.Add(OpenIddictConstants.Permissions.GrantTypes.Password);
-        }
-
         if (client.AllowRefreshTokenFlow)
-        {
             descriptor.Permissions.Add(OpenIddictConstants.Permissions.GrantTypes.RefreshToken);
-        }
 
         descriptor.Permissions.Add(OpenIddictConstants.Permissions.Endpoints.Token);
 
-        // PAR mode handling
+        // Re-enable advertising PAR endpoint (permission only) so clients can push requests.
         if (client.ParMode is PushedAuthorizationMode.Enabled or PushedAuthorizationMode.Required)
         {
-            descriptor.Permissions.Add(OpenIddictConstants.Permissions.Endpoints.PushedAuthorization);
+            if (!descriptor.Permissions.Contains(OpenIddictConstants.Permissions.Endpoints.PushedAuthorization))
+                descriptor.Permissions.Add(OpenIddictConstants.Permissions.Endpoints.PushedAuthorization);
         }
-        if (client.ParMode is PushedAuthorizationMode.Required)
+        // Intentionally DO NOT add requirement feature to avoid forcing request_uri on every authorize request.
+
+        // Per-application PKCE requirement
+        if (client.RequirePkce)
         {
-            descriptor.Requirements.Add(OpenIddictConstants.Requirements.Features.PushedAuthorizationRequests);
+            descriptor.Requirements.Add(OpenIddictConstants.Requirements.Features.ProofKeyForCodeExchange);
         }
 
         var (hasOpenId, scopePerms) = BuildScopePermissions(client.Scopes.Select(s => s.Scope));
-        foreach (var p in scopePerms)
-        {
-            descriptor.Permissions.Add(p);
-        }
-
+        foreach (var p in scopePerms) descriptor.Permissions.Add(p);
         if (hasOpenId)
-        {
             descriptor.Permissions.Add(OpenIddictConstants.Permissions.Endpoints.EndSession);
-        }
 
-        // endpoint access
         if (client.AllowAccessToUserInfoEndpoint == true && hasOpenId)
-        {
             descriptor.Permissions.Add(UserInfoEndpointPermission);
-        }
-
         if (client.AllowAccessToRevocationEndpoint == true)
-        {
             descriptor.Permissions.Add(RevocationEndpointPermission);
-        }
-
         if (client.AllowAccessToIntrospectionEndpoint == true)
-        {
             descriptor.Permissions.Add(IntrospectionEndpointPermission);
-        }
 
         foreach (var permission in client.Permissions.Select(p => p.Permission))
         {
-            if (permission.StartsWith("scp:") || permission.StartsWith("oidc:scope:"))
-            {
-                continue;
-            }
-
+            if (permission.StartsWith("scp:") || permission.StartsWith("oidc:scope:")) continue;
             if (permission is "endpoints:userinfo" or "endpoints:revocation" or "endpoints:introspection" ||
-                permission is "endpoints/userinfo" or "endpoints/revocation" or "endpoints/introspection")
-            {
-                continue;
-            }
-
-            if (!descriptor.Permissions.Contains(permission))
-            {
-                descriptor.Permissions.Add(permission);
-            }
+                permission is "endpoints/userinfo" or "endpoints/revocation" or "endpoints/introspection") continue;
+            if (!descriptor.Permissions.Contains(permission)) descriptor.Permissions.Add(permission);
         }
-
-        foreach (var redirect in client.RedirectUris)
-        {
-            descriptor.RedirectUris.Add(new Uri(redirect.Uri));
-        }
-
-        foreach (var postLogout in client.PostLogoutUris)
-        {
-            descriptor.PostLogoutRedirectUris.Add(new Uri(postLogout.Uri));
-        }
-
+        foreach (var redirect in client.RedirectUris) descriptor.RedirectUris.Add(new Uri(redirect.Uri));
+        foreach (var postLogout in client.PostLogoutUris) descriptor.PostLogoutRedirectUris.Add(new Uri(postLogout.Uri));
         return descriptor;
     }
 
