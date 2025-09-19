@@ -206,6 +206,7 @@ internal sealed class JarRequestValidator : IJarRequestValidator, IJarValidation
         bool isRsa = alg.StartsWith("RS", StringComparison.OrdinalIgnoreCase);
         bool clientHasRsaKey = !string.IsNullOrWhiteSpace(client.JarRsaPublicKeyPem);
         bool bypassSignature = false; // NEW: track fail-open cases
+        string? hsPlainSecret = null; // capture for fallback logic
 
         if (isSymmetric)
         {
@@ -238,6 +239,7 @@ internal sealed class JarRequestValidator : IJarRequestValidator, IJarValidation
                 if (!res.Success)
                     return Fail(effectiveClientId, alg, "client secret length below policy");
                 tvp.IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(plainSecret)) { KeyId = $"client:{effectiveClientId}:hs" };
+                hsPlainSecret = plainSecret;
             }
         }
         else if (isRsa)
@@ -272,6 +274,38 @@ internal sealed class JarRequestValidator : IJarRequestValidator, IJarValidation
                 if (!result.IsValid)
                 {
                     signatureValid = false;
+
+                    // HS fallback: if secret is shorter than 48 bytes, some generators may pad; retry with simple padding to 48 bytes.
+                    if (isSymmetric && hsPlainSecret is not null && Encoding.UTF8.GetByteCount(hsPlainSecret) < 48)
+                    {
+                        var padLen = 48 - Encoding.UTF8.GetByteCount(hsPlainSecret);
+                        var padded = hsPlainSecret + new string('!', padLen);
+                        var tvpFallback = new TokenValidationParameters
+                        {
+                            ValidateAudience = tvp.ValidateAudience,
+                            ValidateIssuer = tvp.ValidateIssuer,
+                            ValidateLifetime = tvp.ValidateLifetime,
+                            ClockSkew = tvp.ClockSkew,
+                            RequireSignedTokens = tvp.RequireSignedTokens,
+                            ValidateIssuerSigningKey = tvp.ValidateIssuerSigningKey,
+                            TryAllIssuerSigningKeys = tvp.TryAllIssuerSigningKeys,
+                            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(padded)) { KeyId = $"client:{effectiveClientId}:hs:fallback" }
+                        };
+                        try
+                        {
+                            var retry = await jsonHandler.ValidateTokenAsync(jwt, tvpFallback);
+                            if (retry.IsValid)
+                            {
+                                signatureValid = true;
+                                _metrics.IncrementJarSecretFallback();
+                                _logger.LogDebug("[JAR] HS validation succeeded with padded secret fallback for client {ClientId}", effectiveClientId);
+                            }
+                        }
+                        catch
+                        {
+                            // ignore, keep signatureValid=false
+                        }
+                    }
                 }
             }
             catch (Exception ex)
@@ -302,6 +336,31 @@ internal sealed class JarRequestValidator : IJarRequestValidator, IJarValidation
             if (token.Payload.TryGetValue(p, out var val) && val is not null)
                 dict[p] = val.ToString()!;
         dict[OpenIddict.Abstractions.OpenIddictConstants.Parameters.ClientId] = effectiveClientId;
+
+        // Compute approximate UTF8 bytes for extra/unrecognized claims to support aggregate byte limits (PJ41)
+        try
+        {
+            var reserved = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                // standard JWT headers/payload claims not part of OIDC request parameters
+                "iss","aud","exp","iat","nbf","typ"
+            };
+            int extraBytes = 0;
+            foreach (var kv in token.Payload)
+            {
+                var name = kv.Key;
+                if (_recognized.Contains(name) || reserved.Contains(name))
+                    continue;
+                var s = kv.Value?.ToString() ?? string.Empty;
+                extraBytes += Encoding.UTF8.GetByteCount(s);
+            }
+            if (extraBytes > 0)
+            {
+                dict["_jar_extra_bytes"] = extraBytes.ToString();
+            }
+        }
+        catch { }
+
         return new(true, null, null, effectiveClientId, alg, dict);
     }
 

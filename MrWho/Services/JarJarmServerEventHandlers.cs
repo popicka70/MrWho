@@ -92,12 +92,14 @@ internal sealed class RequestConflictAndLimitValidationHandler : IOpenIddictServ
         OpenIddictConstants.Parameters.CodeChallenge,
         OpenIddictConstants.Parameters.CodeChallengeMethod,
         "jti","request","request_uri","_jar_validated","_par_resolved",
-        "_mrwho_max_params","_par_request_uri","_jar_metrics","mrwho_jarm"
+        "_mrwho_max_params","_par_request_uri","_jar_metrics","mrwho_jarm",
+        "_jar_extra_bytes" // NEW: internal accounting param provided by JAR validator
     };
 
     private static readonly HashSet<string> _internalParams = new(StringComparer.OrdinalIgnoreCase)
     {
-        "_query_scope","_jar_scope","_mrwho_max_params","_par_resolved","_par_request_uri","_jar_validated","_jar_metrics","mrwho_jarm"
+        "_query_scope","_jar_scope","_mrwho_max_params","_par_resolved","_par_request_uri","_jar_validated","_jar_metrics","mrwho_jarm",
+        "_jar_extra_bytes" // NEW
     };
 
     public RequestConflictAndLimitValidationHandler(IOptions<OidcAdvancedOptions> adv, ILogger<RequestConflictAndLimitValidationHandler> logger, IProtocolMetrics metrics)
@@ -176,6 +178,18 @@ internal sealed class RequestConflictAndLimitValidationHandler : IOpenIddictServ
                     }
                     aggregateBytes += Encoding.UTF8.GetByteCount(valStr);
                 }
+
+                // Include JAR extra bytes for claims that were not materialized as top-level params
+                try
+                {
+                    var extraParam = request.GetParameter("_jar_extra_bytes")?.ToString();
+                    if (!string.IsNullOrWhiteSpace(extraParam) && int.TryParse(extraParam, out var extra))
+                    {
+                        aggregateBytes += Math.Max(0, extra);
+                    }
+                }
+                catch { }
+
                 if (limits.MaxAggregateValueBytes is int mab && mab > 0 && aggregateBytes > mab)
                 {
                     context.Reject(error: OpenIddictConstants.Errors.InvalidRequest, description: "limit_exceeded:aggregate_bytes");
