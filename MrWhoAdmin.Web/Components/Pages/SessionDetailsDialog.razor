@@ -16,18 +16,18 @@
         <RadzenRow Gap="1rem">
             <RadzenColumn Size="12" SizeMD="6">
                 <RadzenFormField Text="User Name" Variant="Variant.Outlined">
-                    <RadzenTextBox Value="@Session.UserName" ReadOnly="true" Style="width: 100%;" />
+                    <RadzenTextBox Value="@Session.UserName" ReadOnly="true" Name="UserName" Style="width: 100%;" />
                 </RadzenFormField>
             </RadzenColumn>
             <RadzenColumn Size="12" SizeMD="6">
                 <RadzenFormField Text="Email" Variant="Variant.Outlined">
-                    <RadzenTextBox Value="@Session.UserEmail" ReadOnly="true" Style="width: 100%;" />
+                    <RadzenTextBox Value="@Session.UserEmail" ReadOnly="true" Name="UserEmail" Style="width: 100%;" />
                 </RadzenFormField>
             </RadzenColumn>
         </RadzenRow>
         
         <RadzenFormField Text="Subject (User ID)" Variant="Variant.Outlined">
-            <RadzenTextBox Value="@Session.Subject" ReadOnly="true" Style="width: 100%; font-family: monospace;" />
+            <RadzenTextBox Value="@Session.Subject" ReadOnly="true" Name="Subject" Style="width: 100%; font-family: monospace;" />
         </RadzenFormField>
     </RadzenStack>
 
@@ -37,12 +37,12 @@
         <RadzenRow Gap="1rem">
             <RadzenColumn Size="12" SizeMD="6">
                 <RadzenFormField Text="Client ID" Variant="Variant.Outlined">
-                    <RadzenTextBox Value="@Session.ClientId" ReadOnly="true" Style="width: 100%; font-family: monospace;" />
+                    <RadzenTextBox Value="@Session.ClientId" ReadOnly="true" Name="ClientId" Style="width: 100%; font-family: monospace;" />
                 </RadzenFormField>
             </RadzenColumn>
             <RadzenColumn Size="12" SizeMD="6">
                 <RadzenFormField Text="Client Name" Variant="Variant.Outlined">
-                    <RadzenTextBox Value="@Session.ClientName" ReadOnly="true" Style="width: 100%;" />
+                    <RadzenTextBox Value="@Session.ClientName" ReadOnly="true" Name="ClientName" Style="width: 100%;" />
                 </RadzenFormField>
             </RadzenColumn>
         </RadzenRow>
@@ -62,7 +62,7 @@
             <RadzenColumn Size="12" SizeMD="4">
                 <RadzenFormField Text="Started" Variant="Variant.Outlined">
                     <RadzenStack Gap="0.25rem" Style="margin-top: 0.5rem;">
-                        <RadzenTextBox Value="@Session.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")" ReadOnly="true" Style="width: 100%; font-family: monospace;" />
+                        <RadzenTextBox Value="@Session.CreatedAt.ToString("yyyy-MM-dd HH:mm:ss")" ReadOnly="true" Name="CreatedAt" Style="width: 100%; font-family: monospace;" />
                         <RadzenText TextStyle="TextStyle.Caption" Text="@GetTimeAgo(Session.CreatedAt)" class="rz-color-secondary" />
                     </RadzenStack>
                 </RadzenFormField>
@@ -73,7 +73,7 @@
                     @if (Session.LastActivity.HasValue)
                     {
                         <RadzenStack Gap="0.25rem" Style="margin-top: 0.5rem;">
-                            <RadzenTextBox Value="@Session.LastActivity.Value.ToString("yyyy-MM-dd HH:mm:ss")" ReadOnly="true" Style="width: 100%; font-family: monospace;" />
+                            <RadzenTextBox Value="@Session.LastActivity.Value.ToString("yyyy-MM-dd HH:mm:ss")" ReadOnly="true" Name="LastActivity" Style="width: 100%; font-family: monospace;" />
                             <RadzenText TextStyle="TextStyle.Caption" Text="@GetTimeAgo(Session.LastActivity.Value)" class="rz-color-secondary" />
                         </RadzenStack>
                     }
@@ -93,7 +93,7 @@
                         
                         <RadzenStack Gap="0.25rem" Style="margin-top: 0.5rem;">
                             <RadzenTextBox Value="@Session.ExpiresAt.Value.ToString("yyyy-MM-dd HH:mm:ss")" 
-                                          ReadOnly="true" 
+                                          ReadOnly="true" Name="ExpiresAt" 
                                           Style="@($"width: 100%; font-family: monospace; {(isExpiringSoon ? "color: var(--rz-danger);" : "")}")" />
                             <RadzenText TextStyle="TextStyle.Caption" 
                                        Text="@GetTimeUntil(Session.ExpiresAt.Value)" 
@@ -185,12 +185,12 @@
             <RadzenColumn Size="12" SizeMD="6">
                 <RadzenFormField Text="Session ID" Variant="Variant.Outlined">
                     <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" Style="margin-top: 0.5rem;">
-                        <RadzenTextBox Value="@Session.Id" ReadOnly="true" Style="width: 100%; font-family: monospace; font-size: 0.875rem;" />
+                        <RadzenTextBox Value="@Session.Id" ReadOnly="true" Name="SessionId" Style="width: 100%; font-family: monospace; font-size: 0.875rem;" />
                         <RadzenButton Icon="content_copy" 
                                      Size="ButtonSize.Small" 
                                      ButtonStyle="ButtonStyle.Light" 
                                      Click="@(async () => await CopyToClipboard(Session.Id))"
-                                     title="Copy Session ID" />
+                                     title="Copy Session ID" aria-label="Copy Session ID" />
                     </RadzenStack>
                 </RadzenFormField>
             </RadzenColumn>
@@ -198,12 +198,12 @@
             <RadzenColumn Size="12" SizeMD="6">
                 <RadzenFormField Text="User ID" Variant="Variant.Outlined">
                     <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" Style="margin-top: 0.5rem;">
-                        <RadzenTextBox Value="@Session.UserId" ReadOnly="true" Style="width: 100%; font-family: monospace; font-size: 0.875rem;" />
+                        <RadzenTextBox Value="@Session.UserId" ReadOnly="true" Name="UserId" Style="width: 100%; font-family: monospace; font-size: 0.875rem;" />
                         <RadzenButton Icon="content_copy" 
                                      Size="ButtonSize.Small" 
                                      ButtonStyle="ButtonStyle.Light" 
                                      Click="@(async () => await CopyToClipboard(Session.UserId))"
-                                     title="Copy User ID" />
+                                     title="Copy User ID" aria-label="Copy User ID" />
                     </RadzenStack>
                 </RadzenFormField>
             </RadzenColumn>
@@ -212,13 +212,13 @@
         <RadzenRow Gap="1rem">
             <RadzenColumn Size="12" SizeMD="6">
                 <RadzenFormField Text="IP Address" Variant="Variant.Outlined">
-                    <RadzenTextBox Value="@Session.IpAddress" ReadOnly="true" Style="width: 100%; font-family: monospace;" />
+                    <RadzenTextBox Value="@Session.IpAddress" ReadOnly="true" Name="IpAddress" Style="width: 100%; font-family: monospace;" />
                 </RadzenFormField>
             </RadzenColumn>
             
             <RadzenColumn Size="12" SizeMD="6">
                 <RadzenFormField Text="User Agent" Variant="Variant.Outlined">
-                    <RadzenTextBox Value="@Session.UserAgent" ReadOnly="true" Style="width: 100%;" />
+                    <RadzenTextBox Value="@Session.UserAgent" ReadOnly="true" Name="UserAgent" Style="width: 100%;" />
                 </RadzenFormField>
             </RadzenColumn>
         </RadzenRow>

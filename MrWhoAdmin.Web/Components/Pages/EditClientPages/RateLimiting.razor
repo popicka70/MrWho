@@ -4,21 +4,21 @@
         <RadzenColumn Size="12" SizeMD="4">
             <RadzenFormField Text="Per Minute Limit" Variant="Variant.Outlined">
                 <ChildContent>
-                    <RadzenNumeric @bind-Value="@model.RateLimitRequestsPerMinute" Min="0" Max="10000" Style="width: 100%;" />
+                    <RadzenNumeric @bind-Value="@model.RateLimitRequestsPerMinute" Min="0" Max="10000" Style="width: 100%;" Name="RateLimitPerMinute" />
                 </ChildContent>
             </RadzenFormField>
         </RadzenColumn>
         <RadzenColumn Size="12" SizeMD="4">
             <RadzenFormField Text="Per Hour Limit" Variant="Variant.Outlined">
                 <ChildContent>
-                    <RadzenNumeric @bind-Value="@model.RateLimitRequestsPerHour" Min="0" Max="1000000" Style="width: 100%;" />
+                    <RadzenNumeric @bind-Value="@model.RateLimitRequestsPerHour" Min="0" Max="1000000" Style="width: 100%;" Name="RateLimitPerHour" />
                 </ChildContent>
             </RadzenFormField>
         </RadzenColumn>
         <RadzenColumn Size="12" SizeMD="4">
             <RadzenFormField Text="Per Day Limit" Variant="Variant.Outlined">
                 <ChildContent>
-                    <RadzenNumeric @bind-Value="@model.RateLimitRequestsPerDay" Min="0" Max="10000000" Style="width: 100%;" />
+                    <RadzenNumeric @bind-Value="@model.RateLimitRequestsPerDay" Min="0" Max="10000000" Style="width: 100%;" Name="RateLimitPerDay" />
                 </ChildContent>
             </RadzenFormField>
         </RadzenColumn>

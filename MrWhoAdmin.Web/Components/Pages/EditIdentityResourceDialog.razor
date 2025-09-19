@@ -7,7 +7,7 @@
 
 <RadzenStack Gap="1rem">
     <RadzenFormField Text="Scope Name" Variant="Variant.Outlined">
-        <RadzenDropDown @bind-Value="selectedScopeName" Data="@scopeNames"
+        <RadzenDropDown @bind-Value="selectedScopeName" Data="@scopeNames" Name="ScopeName"
                          Placeholder="Select scope..." Style="width: 100%;"
                          AllowClear="false" AllowFiltering="true"
                          FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
@@ -16,11 +16,11 @@
     </RadzenFormField>
 
     <RadzenFormField Text="Display Name" Variant="Variant.Outlined">
-        <RadzenTextBox @bind-Value="@request.DisplayName" MaxLength="200" Style="width: 100%;" />
+        <RadzenTextBox @bind-Value="@request.DisplayName" MaxLength="200" Style="width: 100%;" Name="DisplayName" />
     </RadzenFormField>
 
     <RadzenFormField Text="Description" Variant="Variant.Outlined">
-        <RadzenTextArea @bind-Value="@request.Description" MaxLength="1000" Rows="3" Style="width: 100%;" />
+        <RadzenTextArea @bind-Value="@request.Description" MaxLength="1000" Rows="3" Style="width: 100%;" Name="Description" />
     </RadzenFormField>
 
     <RadzenRow Gap="1rem">
@@ -70,7 +70,7 @@
         <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">User Claims</RadzenText>
         <RadzenStack Gap="0.5rem">
             <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
-                <RadzenDropDown @bind-Value="@selectedClaimType" Data="@availableClaimTypes" 
+                <RadzenDropDown @bind-Value="@selectedClaimType" Data="@availableClaimTypes" Name="ClaimTypeSelector"
                                Placeholder="@ClaimTypePlaceholder" 
                                Style="width: 400px;" AllowClear="true" AllowFiltering="true" 
                                FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
@@ -142,7 +142,7 @@
                 {
                     <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center" class="rz-mt-2" Style="padding-left: 24px;">
                         <RadzenIcon Icon="code" />
-                        <RadzenTextBox @bind-Value="@customClaimType" Placeholder="Enter custom claim type" Style="width: 300px;" />
+                        <RadzenTextBox @bind-Value="@customClaimType" Placeholder="Enter custom claim type" Style="width: 300px;" Name="CustomClaimType" />
                         <RadzenButton Text="Add Custom" Icon="add" ButtonStyle="ButtonStyle.Light" 
                                     Click="@(async () => await AddCustomClaim())" 
                                     Disabled="@(string.IsNullOrWhiteSpace(customClaimType) || userClaims.Contains(customClaimType))" />
@@ -162,7 +162,7 @@
                                                class="rz-text-secondary-color" />
                                 </RadzenStack>
                                 <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.ExtraSmall" 
-                                            Click="@(async () => await RemoveClaim(claim))" />
+                                            Click="@(async () => await RemoveClaim(claim))" aria-label="@($"Delete claim {claim}")" />
                             </RadzenStack>
                         </RadzenCard>
                     </Template>
@@ -181,8 +181,8 @@
         <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">Properties</RadzenText>
         <RadzenStack Gap="0.5rem">
             <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
-                <RadzenTextBox @bind-Value="@newPropertyKey" Placeholder="Property key" Style="width: 200px;" />
-                <RadzenTextBox @bind-Value="@newPropertyValue" Placeholder="Property value" Style="width: 200px;" />
+                <RadzenTextBox @bind-Value="@newPropertyKey" Placeholder="Property key" Style="width: 200px;" Name="PropertyKey" />
+                <RadzenTextBox @bind-Value="@newPropertyValue" Placeholder="Property value" Style="width: 200px;" Name="PropertyValue" />
                 <RadzenButton Text="Add Property" Icon="add" ButtonStyle="ButtonStyle.Light" 
                             Click="@(async () => await AddProperty())" 
                             Disabled="@(string.IsNullOrWhiteSpace(newPropertyKey) || string.IsNullOrWhiteSpace(newPropertyValue))" />
@@ -196,7 +196,7 @@
                             <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center">
                                 <RadzenText Text="@($"{property.Key}: {property.Value}")" />
                                 <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger" Size="ButtonSize.ExtraSmall" 
-                                            Click="@(async () => await RemoveProperty(property.Key))" />
+                                            Click="@(async () => await RemoveProperty(property.Key))" aria-label="@($"Delete property {property.Key}")" />
                             </RadzenStack>
                         </RadzenCard>
                     </Template>

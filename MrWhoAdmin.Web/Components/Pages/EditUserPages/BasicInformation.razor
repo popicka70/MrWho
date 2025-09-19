@@ -9,7 +9,7 @@
 }
 else
 {
-<div style="padding: 1 rem;">
+<div style="padding: 1rem;">
     <RadzenStack Gap="2rem">
         <RadzenStack Gap="0.75rem" class="rz-mb-2">
             <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">User Information</RadzenText>
@@ -17,7 +17,7 @@ else
                 <RadzenRow>
                     <RadzenColumn Size="12" SizeMD="6">
                         <RadzenFormField Text="Email Address" Variant="Variant.Outlined">
-                            <RadzenTextBox @bind-Value="editUser.userModel.Email" Placeholder="user@example.com" Style="width: 100%;" Disabled="@editUser.IsEdit" />
+                            <RadzenTextBox @bind-Value="editUser.userModel.Email" Name="Email" Placeholder="user@example.com" Style="width: 100%;" Disabled="@editUser.IsEdit" />
                             <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
                                 @(editUser.IsEdit ? "Email cannot be changed after creation" : "This will be used for login")
                             </RadzenText>
@@ -25,7 +25,7 @@ else
                     </RadzenColumn>
                     <RadzenColumn Size="12" SizeMD="6">
                         <RadzenFormField Text="Username" Variant="Variant.Outlined">
-                            <RadzenTextBox @bind-Value="editUser.userModel.UserName" Placeholder="Enter username" Style="width: 100%;" Disabled="@editUser.IsEdit" />
+                            <RadzenTextBox @bind-Value="editUser.userModel.UserName" Name="UserName" Placeholder="Enter username" Style="width: 100%;" Disabled="@editUser.IsEdit" />
                             <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">
                                 @(editUser.IsEdit ? "Username cannot be changed after creation" : "Leave blank to use email as username")
                             </RadzenText>
@@ -39,8 +39,8 @@ else
                         <RadzenColumn Size="12" SizeMD="6">
                             <RadzenFormField Text="Password" Variant="Variant.Outlined">
                                 <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Stretch">
-                                    <RadzenTextBox @bind-Value="editUser.userModel.Password" Type="@(editUser.showPassword ? "text" : "password")" Placeholder="Enter password" Style="flex: 1;" />
-                                    <RadzenButton Icon="@(editUser.showPassword ? "visibility_off" : "visibility")" ButtonStyle="ButtonStyle.Light" Click="@(() => editUser.showPassword = !editUser.showPassword)" />
+                                    <RadzenTextBox @bind-Value="editUser.userModel.Password" Name="Password" Type="@(editUser.showPassword ? "text" : "password")" Placeholder="Enter password" Style="flex: 1;" />
+                                    <RadzenButton Icon="@(editUser.showPassword ? "visibility_off" : "visibility")" ButtonStyle="ButtonStyle.Light" aria-label="@(editUser.showPassword ? "Hide password" : "Show password")" Click="@(() => editUser.showPassword = !editUser.showPassword)" />
                                     <RadzenButton Icon="refresh" ButtonStyle="ButtonStyle.Secondary" Text="Generate" Click="@(() => editUser.GeneratePassword())" />
                                 </RadzenStack>
                                 <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Minimum 8 characters with mixed case, numbers, and symbols</RadzenText>
@@ -48,7 +48,7 @@ else
                         </RadzenColumn>
                         <RadzenColumn Size="12" SizeMD="6">
                             <RadzenFormField Text="Confirm Password" Variant="Variant.Outlined">
-                                <RadzenTextBox @bind-Value="editUser.confirmPassword" Type="password" Placeholder="Confirm password" Style="width: 100%;" />
+                                <RadzenTextBox @bind-Value="editUser.confirmPassword" Name="ConfirmPassword" Type="password" Placeholder="Confirm password" Style="width: 100%;" />
                             </RadzenFormField>
                         </RadzenColumn>
                     </RadzenRow>
@@ -58,12 +58,12 @@ else
                     <RadzenRow>
                         <RadzenColumn Size="12" SizeMD="6">
                             <RadzenFormField Text="User ID" Variant="Variant.Outlined">
-                                <RadzenTextBox Value="@(editUser.currentUser?.Id ?? string.Empty)" ReadOnly="true" Style="width: 100%;" />
+                                <RadzenTextBox Value="@(editUser.currentUser?.Id ?? string.Empty)" Name="UserId" ReadOnly="true" Style="width: 100%;" />
                             </RadzenFormField>
                         </RadzenColumn>
                         <RadzenColumn Size="12" SizeMD="6">
                             <RadzenFormField Text="Phone Number" Variant="Variant.Outlined">
-                                <RadzenTextBox @bind-Value="editUser.userModel.PhoneNumber" Placeholder="+1 (555) 123-4567" Style="width: 100%;" />
+                                <RadzenTextBox @bind-Value="editUser.userModel.PhoneNumber" Name="PhoneNumber" Placeholder="+1 (555) 123-4567" Style="width: 100%;" />
                                 <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Optional - used for two-factor authentication</RadzenText>
                             </RadzenFormField>
                         </RadzenColumn>
@@ -73,7 +73,7 @@ else
                 @if (!editUser.IsEdit)
                 {
                     <RadzenFormField Text="Phone Number" Variant="Variant.Outlined">
-                        <RadzenTextBox @bind-Value="editUser.userModel.PhoneNumber" Placeholder="+1 (555) 123-4567" Style="width: 100%;" />
+                        <RadzenTextBox @bind-Value="editUser.userModel.PhoneNumber" Name="PhoneNumber" Placeholder="+1 (555) 123-4567" Style="width: 100%;" />
                         <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Optional - used for two-factor authentication</RadzenText>
                     </RadzenFormField>
                 }

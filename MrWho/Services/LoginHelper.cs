@@ -8,7 +8,8 @@ namespace MrWho.Services;
 public interface ILoginHelper
 {
     bool ShouldUseRecaptcha();
-    Task<bool> VerifyRecaptchaAsync(HttpContext http, string? token, string actionExpected);
+    Task<bool> VerifyRecaptchaAsync(HttpContext http, string? token, string actionExpected); // existing single action
+    Task<bool> VerifyRecaptchaAsync(HttpContext http, string? token, IEnumerable<string> allowedActions); // new multi-action overload
     string? TryExtractClientIdFromReturnUrl(string? returnUrl);
     bool IsLocalUrl(string? url);
     string? GetRecaptchaSiteKey();
@@ -54,11 +55,34 @@ public sealed class LoginHelper : ILoginHelper
         return !string.IsNullOrWhiteSpace(site) && !string.IsNullOrWhiteSpace(secret);
     }
 
-    public async Task<bool> VerifyRecaptchaAsync(HttpContext http, string? token, string actionExpected)
+    // Backwards-compatible single expected action wrapper
+    public Task<bool> VerifyRecaptchaAsync(HttpContext http, string? token, string actionExpected)
+        => VerifyRecaptchaAsync(http, token, new[] { actionExpected });
+
+    // New multi-action overload (allows several acceptable actions or wildcard "*")
+    public async Task<bool> VerifyRecaptchaAsync(HttpContext http, string? token, IEnumerable<string> allowedActions)
     {
         if (!ShouldUseRecaptcha())
         {
             return true;
+        }
+
+        var allowed = (allowedActions ?? Array.Empty<string>())
+            .Where(a => !string.IsNullOrWhiteSpace(a))
+            .Select(a => a.Trim())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (allowed.Count == 0)
+        {
+            // Default to login if not specified
+            allowed.Add("login");
+        }
+
+        // Always implicitly allow common synonyms for login-related flows when "login" present
+        if (allowed.Contains("login"))
+        {
+            allowed.Add("register");
+            allowed.Add("device_register");
+            allowed.Add("device-register");
         }
 
         var secret = _configuration["GoogleReCaptcha:SecretKey"];
@@ -94,7 +118,8 @@ public sealed class LoginHelper : ILoginHelper
             threshold = t;
         }
 
-        if (!string.Equals(result.action, actionExpected, StringComparison.OrdinalIgnoreCase))
+        // Action validation: pass if wildcard present or action returned in allowed set
+        if (!allowed.Contains("*") && !string.IsNullOrEmpty(result.action) && !allowed.Contains(result.action))
         {
             return false;
         }

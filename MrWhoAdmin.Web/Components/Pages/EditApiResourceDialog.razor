@@ -74,15 +74,15 @@ else
                 <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Select where claims for this API resource should appear.</RadzenText>
                 <RadzenFormField Text="Access Token" Variant="Variant.Outlined">
                     <Start>
-                        <RadzenCheckBox @bind-Value="accessTokenSelected" />
+                        <RadzenCheckBox @bind-Value="accessTokenSelected" Name="IncludeAccessTokenClaims" />
                     </Start>
-                    <ChildContent><RadzenLabel Text="Include claims in access tokens" /></ChildContent>
+                    <ChildContent><RadzenLabel Text="Include claims in access tokens" Component="IncludeAccessTokenClaims" /></ChildContent>
                 </RadzenFormField>
                 <RadzenFormField Text="ID Token" Variant="Variant.Outlined">
                     <Start>
-                        <RadzenCheckBox @bind-Value="idTokenSelected" />
+                        <RadzenCheckBox @bind-Value="idTokenSelected" Name="IncludeIdTokenClaims" />
                     </Start>
-                    <ChildContent><RadzenLabel Text="Include claims in ID tokens" /></ChildContent>
+                    <ChildContent><RadzenLabel Text="Include claims in ID tokens" Component="IncludeIdTokenClaims" /></ChildContent>
                 </RadzenFormField>
             </RadzenStack>
         </RadzenStack>
@@ -95,11 +95,11 @@ else
                 <RadzenRow>
                     <RadzenColumn Size="10">
                         <RadzenFormField Text="Add Scope" Variant="Variant.Outlined">
-                            <RadzenDropDown Data="@filteredAvailableScopes" TextProperty="Name" ValueProperty="Name" @bind-Value="selectedScopeName" AllowClear="true" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive" Filter="true" Placeholder="Select scope..." Style="width:100%" />
+                            <RadzenDropDown Data="@filteredAvailableScopes" TextProperty="Name" ValueProperty="Name" @bind-Value="selectedScopeName" Name="ScopeToAdd" AllowClear="true" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive" Filter="true" Placeholder="Select scope..." Style="width:100%" />
                         </RadzenFormField>
                     </RadzenColumn>
                     <RadzenColumn Size="2">
-                        <RadzenButton Click="@AddScopeFromSelection" Icon="add" ButtonStyle="ButtonStyle.Primary" class="w-100" Disabled="@string.IsNullOrWhiteSpace(selectedScopeName)" />
+                        <RadzenButton Click="@AddScopeFromSelection" Icon="add" ButtonStyle="ButtonStyle.Primary" class="w-100" Disabled="@string.IsNullOrWhiteSpace(selectedScopeName)" aria-label="Add selected scope" />
                     </RadzenColumn>
                 </RadzenRow>
                 @if (model.Scopes != null && model.Scopes.Any())
@@ -110,7 +110,7 @@ else
                             <RadzenBadge BadgeStyle="BadgeStyle.Info" class="rz-p-2">
                                 <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
                                     <RadzenText>@scope</RadzenText>
-                                    <RadzenButton Click="@(async () => RemoveScope(scope))" Icon="close" Size="ButtonSize.ExtraSmall" ButtonStyle="ButtonStyle.Danger" Variant="Variant.Text" />
+                                    <RadzenButton Click="@(() => RemoveScope(scope))" Icon="close" Size="ButtonSize.ExtraSmall" ButtonStyle="ButtonStyle.Danger" Variant="Variant.Text" aria-label="@($"Remove scope {scope}")" />
                                 </RadzenStack>
                             </RadzenBadge>
                         }
@@ -131,11 +131,11 @@ else
                 <RadzenRow>
                     <RadzenColumn Size="10">
                         <RadzenFormField Text="Add Claim Type" Variant="Variant.Outlined">
-                            <RadzenDropDown Data="@filteredAvailableClaimTypes" TextProperty="Type" ValueProperty="Type" @bind-Value="selectedClaimType" AllowClear="true" Filter="true" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive" Placeholder="Select claim type..." Style="width:100%" />
+                            <RadzenDropDown Data="@filteredAvailableClaimTypes" TextProperty="Type" ValueProperty="Type" @bind-Value="selectedClaimType" Name="ClaimTypeToAdd" AllowClear="true" Filter="true" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive" Placeholder="Select claim type..." Style="width:100%" />
                         </RadzenFormField>
                     </RadzenColumn>
                     <RadzenColumn Size="2">
-                        <RadzenButton Click="@AddClaimFromSelection" Icon="add" ButtonStyle="ButtonStyle.Primary" class="w-100" Disabled="@string.IsNullOrWhiteSpace(selectedClaimType)" />
+                        <RadzenButton Click="@AddClaimFromSelection" Icon="add" ButtonStyle="ButtonStyle.Primary" class="w-100" Disabled="@string.IsNullOrWhiteSpace(selectedClaimType)" aria-label="Add selected claim type" />
                     </RadzenColumn>
                 </RadzenRow>
                 @if (model.UserClaims != null && model.UserClaims.Any())
@@ -146,7 +146,7 @@ else
                             <RadzenBadge BadgeStyle="BadgeStyle.Success" class="rz-p-2">
                                 <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
                                     <RadzenText>@claim</RadzenText>
-                                    <RadzenButton Click="@(() => RemoveClaim(claim))" Icon="close" Size="ButtonSize.ExtraSmall" ButtonStyle="ButtonStyle.Danger" Variant="Variant.Text" />
+                                    <RadzenButton Click="@(() => RemoveClaim(claim))" Icon="close" Size="ButtonSize.ExtraSmall" ButtonStyle="ButtonStyle.Danger" Variant="Variant.Text" aria-label="@($"Remove claim {claim}")" />
                                 </RadzenStack>
                             </RadzenBadge>
                         }
@@ -159,7 +159,7 @@ else
             </RadzenStack>
         </RadzenStack>
 
-        <!-- Secrets (unchanged) -->
+        <!-- Secrets -->
         <RadzenStack Gap="0.75rem">
             <RadzenText TextStyle="TextStyle.Subtitle1" class="rz-font-weight-600">API Secrets</RadzenText>
             <RadzenStack Gap="1rem">
@@ -170,28 +170,28 @@ else
                         <RadzenStack Gap="1rem">
                             <RadzenRow>
                                 <RadzenColumn Size="12" SizeMD="6">
-                                    <RadzenFormField Text="Description" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="@newSecret.Description" class="w-100" /></RadzenFormField>
+                                    <RadzenFormField Text="Description" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="@newSecret.Description" Name="NewSecretDescription" class="w-100" /></RadzenFormField>
                                 </RadzenColumn>
                                 <RadzenColumn Size="12" SizeMD="6">
-                                    <RadzenFormField Text="Secret Value" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="@newSecret.Value" class="w-100" /></RadzenFormField>
+                                    <RadzenFormField Text="Secret Value" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="@newSecret.Value" Name="NewSecretValue" class="w-100" /></RadzenFormField>
                                 </RadzenColumn>
                             </RadzenRow>
                             <RadzenRow>
                                 <RadzenColumn Size="12" SizeMD="6">
-                                    <RadzenFormField Text="Expiration (Optional)" Variant="Variant.Outlined"><RadzenDatePicker @bind-Value="@newSecret.Expiration" class="w-100" ShowTime="true" /></RadzenFormField>
+                                    <RadzenFormField Text="Expiration (Optional)" Variant="Variant.Outlined"><RadzenDatePicker @bind-Value="@newSecret.Expiration" Name="NewSecretExpiration" class="w-100" ShowTime="true" /></RadzenFormField>
                                 </RadzenColumn>
                                 <RadzenColumn Size="12" SizeMD="6">
-                                    <RadzenFormField Text="Type" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="@newSecret.Type" class="w-100" /></RadzenFormField>
+                                    <RadzenFormField Text="Type" Variant="Variant.Outlined"><RadzenTextBox @bind-Value="@newSecret.Type" Name="NewSecretType" class="w-100" /></RadzenFormField>
                                 </RadzenColumn>
                             </RadzenRow>
                             <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
-                                <RadzenButton Click="@AddSecret" Icon="add" ButtonStyle="ButtonStyle.Success" Text="Add Secret" />
-                                <RadzenButton Click="@CancelAddSecret" Icon="cancel" ButtonStyle="ButtonStyle.Light" Text="Cancel" />
+                                <RadzenButton Click="@AddSecret" Icon="add" ButtonStyle="ButtonStyle.Success" Text="Add Secret" aria-label="Add secret" />
+                                <RadzenButton Click="@CancelAddSecret" Icon="cancel" ButtonStyle="ButtonStyle.Light" Text="Cancel" aria-label="Cancel adding secret" />
                             </RadzenStack>
                         </RadzenStack>
                     </RadzenCard>
                 }
-                else { <RadzenButton Click="@StartAddSecret" Icon="add" ButtonStyle="ButtonStyle.Secondary" Text="Add New Secret" /> }
+                else { <RadzenButton Click="@StartAddSecret" Icon="add" ButtonStyle="ButtonStyle.Secondary" Text="Add New Secret" aria-label="Start adding new secret" /> }
                 @if (model.Secrets != null && model.Secrets.Any())
                 {
                     <RadzenStack Gap="0.5rem">
@@ -204,7 +204,7 @@ else
                                         <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Type: @secret.Secret.Type</RadzenText>
                                         @if (secret.Secret.Expiration.HasValue) { <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary">Expires: @secret.Secret.Expiration.Value.ToString("MMM dd, yyyy HH:mm")</RadzenText> }
                                     </RadzenStack>
-                                    <RadzenButton Click="@(() => RemoveSecret(secret.Index))" Icon="delete" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Danger" />
+                                    <RadzenButton Click="@(() => RemoveSecret(secret.Index))" Icon="delete" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Danger" aria-label="@($"Delete secret {(string.IsNullOrEmpty(secret.Secret.Description) ? (secret.Index + 1).ToString() : secret.Secret.Description)}")" />
                                 </RadzenStack>
                             </RadzenCard>
                         }
@@ -220,8 +220,8 @@ else
         <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween" Gap="1rem">
             <div style="min-height: 1.25rem;"><ValidationSummary /></div>
             <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
-                <RadzenButton Click="@(() => DialogService.Close())" Text="Cancel" ButtonStyle="ButtonStyle.Light" />
-                <RadzenButton ButtonType="ButtonType.Submit" Text="Update API Resource" ButtonStyle="ButtonStyle.Primary" IsBusy="@isSubmitting" />
+                <RadzenButton Click="@(() => DialogService.Close())" Text="Cancel" ButtonStyle="ButtonStyle.Light" aria-label="Cancel editing API resource" />
+                <RadzenButton ButtonType="ButtonType.Submit" Text="Update API Resource" ButtonStyle="ButtonStyle.Primary" IsBusy="@isSubmitting" aria-label="Submit API resource updates" />
             </RadzenStack>
         </RadzenStack>
     </div>
