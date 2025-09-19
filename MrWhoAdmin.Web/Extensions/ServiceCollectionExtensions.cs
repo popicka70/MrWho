@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -6,6 +7,8 @@ using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using MrWhoAdmin.Web.Extensions;
 using MrWhoAdmin.Web.Services;
 using Radzen;
+using Microsoft.IdentityModel.JsonWebTokens; // added
+using Microsoft.IdentityModel.Tokens; // added
 
 namespace MrWhoAdmin.Web.Extensions;
 
@@ -545,49 +548,157 @@ public static class ServiceCollectionExtensions
                     context.ProtocolMessage.Prompt = "login";
                 }
 
-                // NEW: Optional PAR push when requested
-                if (context.Properties?.Items.TryGetValue("use_par", out var usePar) == true && usePar == "1")
+                // Always try PAR + JAR for admin web
+                try
                 {
-                    try
+                    var parUrl = $"{authority}/connect/par";
+
+                    // Build JAR when a client secret is available (HS256)
+                    string? jwt = null;
+                    var clientId = context.Options.ClientId;
+                    var clientSecret = context.Options.ClientSecret;
+                    if (!string.IsNullOrWhiteSpace(clientSecret))
                     {
-                        var parUrl = $"{authority}/connect/par";
-                        var form = new List<KeyValuePair<string, string>>
+                        var handler = new JsonWebTokenHandler();
+                        var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(clientSecret));
+                        var creds = new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256);
+                        var now = DateTimeOffset.UtcNow;
+                        var claims = new Dictionary<string, object>
                         {
-                            new("client_id", context.Options.ClientId),
-                            new("redirect_uri", context.ProtocolMessage.RedirectUri ?? string.Empty),
-                            new("response_type", context.ProtocolMessage.ResponseType ?? "code"),
-                            new("scope", context.ProtocolMessage.Scope ?? string.Empty)
+                            ["client_id"] = clientId!,
+                            ["iss"] = clientId!,
+                            ["aud"] = $"{authority}/connect/authorize",
+                            ["response_type"] = context.ProtocolMessage.ResponseType ?? "code",
+                            ["redirect_uri"] = context.ProtocolMessage.RedirectUri!,
+                            ["scope"] = context.ProtocolMessage.Scope ?? string.Join(' ', context.Options.Scope),
+                            ["state"] = context.ProtocolMessage.State ?? Guid.NewGuid().ToString("n"),
+                            ["nonce"] = context.ProtocolMessage.Nonce ?? Guid.NewGuid().ToString("n"),
+                            ["jti"] = Guid.NewGuid().ToString("n")
                         };
+                        var codeChallenge = context.ProtocolMessage.GetParameter("code_challenge");
+                        var codeChallengeMethod = context.ProtocolMessage.GetParameter("code_challenge_method");
+                        if (!string.IsNullOrEmpty(codeChallenge)) claims["code_challenge"] = codeChallenge!;
+                        if (!string.IsNullOrEmpty(codeChallengeMethod)) claims["code_challenge_method"] = codeChallengeMethod!;
+
+                        var desc = new SecurityTokenDescriptor
+                        {
+                            Issuer = clientId,
+                            Audience = $"{authority}/connect/authorize",
+                            NotBefore = now.UtcDateTime.AddSeconds(-30),
+                            Expires = now.UtcDateTime.AddMinutes(5),
+                            SigningCredentials = creds,
+                            Claims = claims
+                        };
+                        jwt = handler.CreateToken(desc);
+                    }
+
+                    // Submit PAR request (prefer client_secret_basic)
+                    using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+                    var form = new List<KeyValuePair<string, string>>
+                    {
+                        new("client_id", context.Options.ClientId ?? string.Empty)
+                    };
+                    if (!string.IsNullOrEmpty(jwt))
+                    {
+                        form.Add(new("request", jwt));
+                    }
+                    else
+                    {
+                        form.Add(new("redirect_uri", context.ProtocolMessage.RedirectUri ?? string.Empty));
+                        form.Add(new("response_type", context.ProtocolMessage.ResponseType ?? "code"));
+                        if (!string.IsNullOrEmpty(context.ProtocolMessage.Scope)) form.Add(new("scope", context.ProtocolMessage.Scope));
                         if (!string.IsNullOrEmpty(context.ProtocolMessage.State)) form.Add(new("state", context.ProtocolMessage.State));
                         if (!string.IsNullOrEmpty(context.ProtocolMessage.Nonce)) form.Add(new("nonce", context.ProtocolMessage.Nonce));
-
-                        var clientSecret = context.Options.ClientSecret;
-                        if (!string.IsNullOrWhiteSpace(clientSecret)) form.Add(new("client_secret", clientSecret));
-
-                        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
-                        var resp = await http.PostAsync(parUrl, new FormUrlEncodedContent(form));
-                        var body = await resp.Content.ReadAsStringAsync();
-                        if (!resp.IsSuccessStatusCode)
-                        {
-                            logger.LogWarning("PAR push failed: {Status} {Body}", resp.StatusCode, body);
-                        }
-                        else
-                        {
-                            using var doc = JsonDocument.Parse(body);
-                            var requestUri = doc.RootElement.GetProperty("request_uri").GetString();
-                            // Use request_uri; keep state. Do not try to set PKCE fields here.
-                            context.ProtocolMessage.Scope = null;
-                            context.ProtocolMessage.ResponseType = null;
-                            context.ProtocolMessage.Nonce = null;
-                            context.ProtocolMessage.RequestUri = requestUri;
-                            logger.LogInformation("PAR push succeeded; using request_uri for authorize redirect.");
-                        }
+                        var cc = context.ProtocolMessage.GetParameter("code_challenge");
+                        var ccm = context.ProtocolMessage.GetParameter("code_challenge_method");
+                        if (!string.IsNullOrEmpty(cc)) form.Add(new("code_challenge", cc!));
+                        if (!string.IsNullOrEmpty(ccm)) form.Add(new("code_challenge_method", ccm!));
                     }
-                    catch (Exception ex)
+
+                    using var formContent = new FormUrlEncodedContent(form);
+
+                    if (!string.IsNullOrWhiteSpace(context.Options.ClientSecret))
                     {
-                        var logger2 = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
-                        logger2.LogError(ex, "Error performing PAR push in OnRedirectToIdentityProvider");
+                        var raw = $"{context.Options.ClientId}:{context.Options.ClientSecret}";
+                        var basic = Convert.ToBase64String(Encoding.UTF8.GetBytes(raw));
+                        http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", basic);
                     }
+
+                    var resp = await http.PostAsync(parUrl, formContent, context.HttpContext.RequestAborted);
+                    var body = await resp.Content.ReadAsStringAsync();
+                    if (resp.IsSuccessStatusCode)
+                    {
+                        using var doc = JsonDocument.Parse(body);
+                        var requestUri = doc.RootElement.GetProperty("request_uri").GetString();
+                        var rm = context.ProtocolMessage.ResponseMode; // keep any response_mode
+                        var state = context.ProtocolMessage.State;
+                        // keep redirect_uri explicitly
+                        var redirect = context.ProtocolMessage.RedirectUri;
+
+                        context.ProtocolMessage.Parameters.Clear();
+                        context.ProtocolMessage.ClientId = context.Options.ClientId;
+                        context.ProtocolMessage.RedirectUri = redirect; // keep consistent for code redemption
+                        context.ProtocolMessage.RequestUri = requestUri;
+                        if (!string.IsNullOrEmpty(state)) context.ProtocolMessage.State = state;
+                        if (!string.IsNullOrEmpty(rm)) context.ProtocolMessage.ResponseMode = rm;
+
+                        logger.LogInformation("[Admin PAR] Success; using request_uri={RequestUri}", requestUri);
+                        return; // done
+                    }
+                    else
+                    {
+                        logger.LogWarning("[Admin PAR] push failed: {Status} {Body}", (int)resp.StatusCode, body);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    var logger2 = context.HttpContext.RequestServices.GetRequiredService<ILogger<Program>>();
+                    logger2.LogWarning(ex, "[Admin PAR] unexpected failure; continuing without PAR");
+                }
+
+                // Fallback: attach JAR directly if we can build it
+                try
+                {
+                    if (!string.IsNullOrWhiteSpace(context.Options.ClientSecret))
+                    {
+                        var handler = new JsonWebTokenHandler();
+                        var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(context.Options.ClientSecret));
+                        var creds = new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256);
+                        var now = DateTimeOffset.UtcNow;
+                        var claims = new Dictionary<string, object>
+                        {
+                            ["client_id"] = context.Options.ClientId!,
+                            ["iss"] = context.Options.ClientId!,
+                            ["aud"] = $"{authority}/connect/authorize",
+                            ["response_type"] = context.ProtocolMessage.ResponseType ?? "code",
+                            ["redirect_uri"] = context.ProtocolMessage.RedirectUri!,
+                            ["scope"] = context.ProtocolMessage.Scope ?? string.Join(' ', context.Options.Scope),
+                            ["state"] = context.ProtocolMessage.State ?? Guid.NewGuid().ToString("n"),
+                            ["nonce"] = context.ProtocolMessage.Nonce ?? Guid.NewGuid().ToString("n"),
+                            ["jti"] = Guid.NewGuid().ToString("n")
+                        };
+                        var codeChallenge = context.ProtocolMessage.GetParameter("code_challenge");
+                        var codeChallengeMethod = context.ProtocolMessage.GetParameter("code_challenge_method");
+                        if (!string.IsNullOrEmpty(codeChallenge)) claims["code_challenge"] = codeChallenge!;
+                        if (!string.IsNullOrEmpty(codeChallengeMethod)) claims["code_challenge_method"] = codeChallengeMethod!;
+
+                        var desc = new SecurityTokenDescriptor
+                        {
+                            Issuer = context.Options.ClientId,
+                            Audience = $"{authority}/connect/authorize",
+                            NotBefore = now.UtcDateTime.AddSeconds(-30),
+                            Expires = now.UtcDateTime.AddMinutes(5),
+                            SigningCredentials = creds,
+                            Claims = claims
+                        };
+                        var jwt2 = handler.CreateToken(desc);
+                        context.ProtocolMessage.SetParameter("request", jwt2);
+                        logger.LogInformation("[Admin JAR] Attached signed request object (HS256)");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex, "[Admin JAR] failed to attach request object; proceeding without JAR");
                 }
             },
             OnTokenValidated = ctx =>
