@@ -9,6 +9,7 @@ using MrWho.Models;
 using MrWho.Services;
 using MrWho.Shared;
 using OpenIddict.Abstractions;
+using OpenIddict.Validation.AspNetCore;
 
 namespace MrWho.Controllers;
 
@@ -19,7 +20,7 @@ namespace MrWho.Controllers;
 /// </summary>
 [Route("connect/register")]
 [ApiController]
-[Authorize] // admin portal users only initial slice
+[Authorize(AuthenticationSchemes = OpenIddictValidationAspNetCoreDefaults.AuthenticationScheme, Policy = AuthorizationPolicies.AdminClientApi)]
 public class DynamicClientRegistrationController : ControllerBase
 {
     private readonly ApplicationDbContext _db;

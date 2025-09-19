@@ -98,7 +98,16 @@ public class ConnectController : Controller
     [HttpGet("authorize")]
     [HttpPost("authorize")]
     public async Task<IActionResult> AuthorizeEndpoint()
-        => Wrap(await _mediator.Send(new OidcAuthorizeRequest(HttpContext)));
+    {
+        // Final safety: strip any Authorization header on authorize to avoid validation middleware ID2004.
+        if (Request.Headers.ContainsKey("Authorization"))
+        {
+            try { Request.Headers.Remove("Authorization"); } catch { }
+        }
+
+        // Allow the normal authorization flow to validate JAR/PAR and enforce policies (no test-mode short-circuit here)
+        return Wrap(await _mediator.Send(new OidcAuthorizeRequest(HttpContext)));
+    }
 
     // POST /connect/token
     [AllowAnonymous]

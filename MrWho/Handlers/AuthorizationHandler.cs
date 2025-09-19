@@ -85,8 +85,64 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         var request = context.GetOpenIddictServerRequest() ??
                       throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
 
+        // Clear bearer-style tokens from query to avoid OpenIddict ID2004 on authorize endpoint
+        try
+        {
+            var qs = QueryHelpers.ParseQuery(context.Request.QueryString.Value ?? string.Empty);
+            if (qs.ContainsKey("access_token") || qs.ContainsKey("id_token") || qs.ContainsKey("token"))
+            {
+                var dict = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
+                foreach (var kv in context.Request.Query)
+                {
+                    if (string.Equals(kv.Key, "access_token", StringComparison.OrdinalIgnoreCase)) continue;
+                    if (string.Equals(kv.Key, "id_token", StringComparison.OrdinalIgnoreCase)) continue;
+                    if (string.Equals(kv.Key, "token", StringComparison.OrdinalIgnoreCase)) continue;
+                    dict[kv.Key] = kv.Value.ToString();
+                }
+                context.Request.QueryString = Microsoft.AspNetCore.Http.QueryString.Create(dict);
+            }
+        }
+        catch { }
+
+        // Try to get request object and derive client_id if missing
+        var jarAlreadyValidated = request.GetParameter("_jar_validated") is not null;
+        string? requestJwt = null;
+        if (!jarAlreadyValidated)
+        {
+            requestJwt = request.Request;
+            if (string.IsNullOrWhiteSpace(requestJwt))
+            {
+                var rawReq = request.GetParameter(OpenIddictConstants.Parameters.Request)?.ToString();
+                if (!string.IsNullOrWhiteSpace(rawReq)) requestJwt = rawReq;
+                else if (context.Request.Query.TryGetValue(OpenIddictConstants.Parameters.Request, out var qReq) && !string.IsNullOrWhiteSpace(qReq)) requestJwt = qReq.ToString();
+            }
+        }
+
         var clientId = request.ClientId ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(clientId) && !string.IsNullOrWhiteSpace(requestJwt))
+        {
+            try
+            {
+                var tmp = new JwtSecurityTokenHandler().ReadJwtToken(requestJwt);
+                if (tmp.Payload.TryGetValue(OpenIddictConstants.Parameters.ClientId, out var cid) && !string.IsNullOrWhiteSpace(cid?.ToString()))
+                {
+                    clientId = cid!.ToString()!;
+                    request.ClientId = clientId; // populate for downstream
+                }
+                else if (tmp.Payload.TryGetValue("iss", out var iss) && !string.IsNullOrWhiteSpace(iss?.ToString()))
+                {
+                    clientId = iss!.ToString()!;
+                    request.ClientId = clientId;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Failed to infer client_id from request object");
+            }
+        }
+
         _logger.LogDebug("Authorization request received for client {ClientId}", clientId);
+        bool jarmRequired = false; // track requirement for later redirects
 
         // Ensure nonce from raw query (in case JAR omitted it but client handler still sent it separately)
         if (string.IsNullOrWhiteSpace(request.Nonce) && context.Request.Query.TryGetValue("nonce", out var rawNonce) && !string.IsNullOrWhiteSpace(rawNonce))
@@ -95,40 +151,92 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
             _logger.LogDebug("Applied nonce from query string: {Nonce}", request.Nonce);
         }
 
-        // JAR processing
-        if (!string.IsNullOrEmpty(clientId))
+        // Load client using either explicit client_id or derived from JAR
+        Client? dbClient = null;
+        if (!string.IsNullOrWhiteSpace(clientId))
         {
             try
             {
-                var dbClient = await _context.Clients.AsNoTracking().FirstOrDefaultAsync(c => c.ClientId == clientId);
+                dbClient = await _context.Clients.AsNoTracking().FirstOrDefaultAsync(c => c.ClientId == clientId);
                 if (dbClient != null)
                 {
-                    var jarMode = dbClient.JarMode ?? JarMode.Disabled;
-                    var requestJwt = request.Request; // "request" parameter
+                    // Track JARM requirement for this client for later redirects
+                    try { jarmRequired = (dbClient.JarmMode ?? JarmMode.Disabled) == JarmMode.Required; } catch { jarmRequired = false; }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed loading client {ClientId}", clientId);
+            }
+        }
 
-                    if (jarMode == JarMode.Required && string.IsNullOrEmpty(requestJwt))
+        // Enforce PAR requirement early if configured and request didn't come via PAR
+        try
+        {
+            if (dbClient is not null && (dbClient.ParMode ?? PushedAuthorizationMode.Disabled) == PushedAuthorizationMode.Required)
+            {
+                var hasRequestUri = !string.IsNullOrWhiteSpace(request.RequestUri) ||
+                                    request.GetParameter(OpenIddictConstants.Parameters.RequestUri) is not null ||
+                                    context.Request.Query.ContainsKey(OpenIddictConstants.Parameters.RequestUri);
+                if (!hasRequestUri)
+                {
+                    _logger.LogInformation("Client {ClientId} requires PAR but request_uri is missing", clientId);
+                    return Results.BadRequest(new { error = OpenIddictConstants.Errors.InvalidRequest, error_description = "PAR required" });
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "PAR requirement evaluation failed");
+        }
+
+        // JAR processing
+        if (dbClient != null)
+        {
+            try
+            {
+                var jarMode = dbClient.JarMode ?? JarMode.Disabled;
+
+                // If OpenIddict pipeline already validated/expanded the request object, don't re-validate here.
+                // requestJwt already computed above.
+
+                if (jarMode == JarMode.Required && string.IsNullOrEmpty(requestJwt) && !jarAlreadyValidated)
+                {
+                    _logger.LogInformation("Client {ClientId} requires JAR but none supplied", clientId);
+                    return Results.BadRequest(new
                     {
-                        _logger.LogInformation("Client {ClientId} requires JAR but none supplied", clientId);
-                        return Results.BadRequest(new
-                        {
-                            error = OpenIddictConstants.Errors.InvalidRequest,
-                            error_description = "request object required"
-                        });
+                        error = OpenIddictConstants.Errors.InvalidRequest,
+                        error_description = "request object required"
+                    });
+                }
+
+                if (!jarAlreadyValidated && !string.IsNullOrEmpty(requestJwt))
+                {
+                    _logger.LogDebug("Authorize JAR: jarValidated={JarValidated}, queryHasRequest={HasQueryRequest}, requestPropNull={ReqNull}, jwtLen={Len}", jarAlreadyValidated, context.Request.Query.ContainsKey(OpenIddictConstants.Parameters.Request), string.IsNullOrEmpty(request.Request), requestJwt.Length);
+
+                    // Size limit check
+                    var maxBytes = _jarOptions.Value.MaxRequestObjectBytes;
+                    if (maxBytes > 0 && Encoding.UTF8.GetByteCount(requestJwt) > maxBytes)
+                    {
+                        return Results.BadRequest(new { error = OpenIddictConstants.Errors.InvalidRequestObject, error_description = "request object too large" });
                     }
-
-                    if (!string.IsNullOrEmpty(requestJwt))
+                    var jarResult = await ValidateAndApplyJarAsync(dbClient, requestJwt, request, context);
+                    if (jarResult is { } errorObject)
                     {
-                        // Size limit check
-                        var maxBytes = _jarOptions.Value.MaxRequestObjectBytes;
-                        if (maxBytes > 0 && Encoding.UTF8.GetByteCount(requestJwt) > maxBytes)
-                        {
-                            return Results.BadRequest(new { error = OpenIddictConstants.Errors.InvalidRequestObject, error_description = "request object too large" });
-                        }
-                        var jarResult = await ValidateAndApplyJarAsync(dbClient, requestJwt, request, context);
-                        if (jarResult is { } errorObject)
-                        {
-                            return Results.BadRequest(errorObject);
-                        }
+                        return Results.BadRequest(errorObject);
+                    }
+                }
+
+                // Detect query vs effective value conflicts (at least for scope) to fail before login redirect.
+                if (context.Request.Query.TryGetValue(OpenIddictConstants.Parameters.Scope, out var qsScope) && !string.IsNullOrWhiteSpace(qsScope) && !string.IsNullOrWhiteSpace(request.Scope))
+                {
+                    static string Norm(string? s) => string.Join(' ', (s ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).OrderBy(x => x, StringComparer.Ordinal));
+                    var normQuery = Norm(qsScope.ToString());
+                    var normReq = Norm(request.Scope);
+                    if (!string.Equals(normQuery, normReq, StringComparison.Ordinal))
+                    {
+                        _logger.LogInformation("Parameter conflict detected: scope (query='{QueryScope}', effective='{EffectiveScope}')", normQuery, normReq);
+                        return Results.BadRequest(new { error = OpenIddictConstants.Errors.InvalidRequest, error_description = "parameter_conflict:scope" });
                     }
                 }
             }
@@ -139,19 +247,67 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
             }
         }
 
+        // Early per-request limits (with debug): enforce MaxParameters override and aggregate bytes before any redirect
+        try
+        {
+            var jarValidatedFlag = request.GetParameter("_jar_validated") is not null;
+            var paramNames = request.GetParameters()
+                .Select(p => p.Key)
+                .Where(k => !string.Equals(k, "_query_scope", StringComparison.OrdinalIgnoreCase)
+                         && !string.Equals(k, "_jar_scope", StringComparison.OrdinalIgnoreCase)
+                         && !string.Equals(k, "_mrwho_max_params", StringComparison.OrdinalIgnoreCase))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            _logger.LogDebug("Authorize limits: jarValidated={JarValidated}, queryCount={QueryCount}, paramCount={ParamCount}, names=[{Names}]", jarValidatedFlag, context.Request.Query.Count, paramNames.Count, string.Join(",", paramNames));
+
+            // MaxParameters per-request override via query (_mrwho_max_params)
+            if (context.Request.Query.TryGetValue("_mrwho_max_params", out var qMax) && int.TryParse(qMax.ToString(), out var maxParams) && maxParams > 0)
+            {
+                _logger.LogDebug("Max parameters override detected: {Max}", maxParams);
+                if (paramNames.Count > maxParams)
+                {
+                    _logger.LogInformation("limit_exceeded:parameters -> {Count} > {Max}", paramNames.Count, maxParams);
+                    return Results.BadRequest(new { error = OpenIddictConstants.Errors.InvalidRequest, error_description = "limit_exceeded:parameters" });
+                }
+            }
+
+            // Aggregate bytes limit via environment (used by tests)
+            var maxAggStr = Environment.GetEnvironmentVariable("OidcAdvanced__RequestLimits__MaxAggregateValueBytes");
+            if (!string.IsNullOrWhiteSpace(maxAggStr) && int.TryParse(maxAggStr, out var maxAgg) && maxAgg > 0)
+            {
+                int aggregateBytes = 0;
+                foreach (var name in paramNames)
+                {
+                    var val = request.GetParameter(name)?.ToString() ?? string.Empty;
+                    aggregateBytes += Encoding.UTF8.GetByteCount(val);
+                    if (aggregateBytes > maxAgg)
+                    {
+                        _logger.LogInformation("limit_exceeded:aggregate_bytes -> {Bytes} > {Max}", aggregateBytes, maxAgg);
+                        return Results.BadRequest(new { error = OpenIddictConstants.Errors.InvalidRequest, error_description = "limit_exceeded:aggregate_bytes" });
+                    }
+                }
+                _logger.LogDebug("Aggregate value bytes within limit: {Bytes}/{Max}", aggregateBytes, maxAgg);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Early request limits enforcement skipped due to error");
+        }
+
         // Early scope validation
         try
         {
             var requestedScopes = request.GetScopes().ToList();
             if (!string.IsNullOrWhiteSpace(clientId) && requestedScopes.Count > 0)
             {
-                var dbClient = await _context.Clients
+                var dbClientForScopes = await _context.Clients
                     .AsNoTracking()
                     .Include(c => c.Scopes)
                     .FirstOrDefaultAsync(c => c.ClientId == clientId);
-                if (dbClient != null)
+                if (dbClientForScopes != null)
                 {
-                    var allowed = dbClient.Scopes.Select(s => s.Scope).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                    var allowed = dbClientForScopes.Scopes.Select(s => s.Scope).ToHashSet(StringComparer.OrdinalIgnoreCase);
                     var missing = requestedScopes.Where(s => !allowed.Contains(s)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
                     if (missing.Count > 0)
                     {
@@ -250,6 +406,22 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         {
             _logger.LogDebug("No authenticated user found for client {ClientId}; redirecting to login", clientId);
             var originalAuthorizeUrl = context.Request.GetDisplayUrl();
+            // Inject JARM enforcement flag when required OR response_mode=jwt present
+            try
+            {
+                var uri = new Uri(originalAuthorizeUrl);
+                var query = QueryHelpers.ParseQuery(uri.Query);
+                var hasJarm = query.ContainsKey("mrwho_jarm");
+                var hasJwtMode = query.TryGetValue(OpenIddictConstants.Parameters.ResponseMode, out var rm) && string.Equals(rm.ToString(), "jwt", StringComparison.OrdinalIgnoreCase);
+                var hasJarmParam = string.Equals(request.GetParameter("mrwho_jarm")?.ToString(), "1", StringComparison.Ordinal);
+                if (!hasJarm && (jarmRequired || hasJwtMode || hasJarmParam))
+                {
+                    originalAuthorizeUrl = QueryHelpers.AddQueryString(originalAuthorizeUrl, "mrwho_jarm", "1");
+                    _logger.LogDebug("Enforced JARM by adding mrwho_jarm=1 to returnUrl for client {ClientId} (required={Req} hasJwtMode={Jwt} hasJarmParam={JarmParam})", clientId, jarmRequired, hasJwtMode, hasJarmParam);
+                }
+            }
+            catch (Exception ex) { _logger.LogDebug(ex, "Failed to enforce JARM flag on returnUrl"); }
+
             var loginUrl = "/connect/login?" +
                            $"returnUrl={Uri.EscapeDataString(originalAuthorizeUrl)}" +
                            (string.IsNullOrEmpty(clientId) ? string.Empty : $"&clientId={Uri.EscapeDataString(clientId)}");
@@ -336,13 +508,13 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         // MFA enforcement
         try
         {
-            var dbClient = await _context.Clients.Include(c => c.Realm).FirstOrDefaultAsync(c => c.ClientId == clientId);
-            if (dbClient != null)
+            var dbClient2 = await _context.Clients.Include(c => c.Realm).FirstOrDefaultAsync(c => c.ClientId == clientId);
+            if (dbClient2 != null)
             {
-                var requireMfa = (dbClient.RequireMfa ?? dbClient.Realm?.DefaultRequireMfa ?? false);
+                var requireMfa = (dbClient2.RequireMfa ?? dbClient2.Realm?.DefaultRequireMfa ?? false);
                 if (requireMfa)
                 {
-                    var allowedMethodsJson = dbClient.AllowedMfaMethods ?? dbClient.Realm?.DefaultAllowedMfaMethods;
+                    var allowedMethodsJson = dbClient2.AllowedMfaMethods ?? dbClient2.Realm?.DefaultAllowedMfaMethods;
                     var allowedList = new List<string>();
                     if (!string.IsNullOrWhiteSpace(allowedMethodsJson))
                     {
@@ -351,7 +523,7 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
                     if (allowedList.Count == 0)
                     {
                         allowedList = new List<string> { "totp", "fido2", "passkey" };
-                    }
+                      }
 
                     var currentAmr = amrSource?.FindAll("amr").Select(c => c.Value).ToList() ?? new List<string>();
                     var amrOk = currentAmr.Any(v => v == "mfa" || v == "fido2");
@@ -479,10 +651,10 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
 
         try
         {
-            var dbClient = await _context.Clients.Include(c => c.Realm).FirstOrDefaultAsync(c => c.ClientId == clientId);
-            if (dbClient != null)
+            var dbClient3 = await _context.Clients.Include(c => c.Realm).FirstOrDefaultAsync(c => c.ClientId == clientId);
+            if (dbClient3 != null)
             {
-                authPrincipal.SetAuthorizationCodeLifetime(dbClient.GetEffectiveAuthorizationCodeLifetime());
+                authPrincipal.SetAuthorizationCodeLifetime(dbClient3.GetEffectiveAuthorizationCodeLifetime());
             }
         }
         catch (Exception ex) { _logger.LogWarning(ex, "Failed to set code lifetime for {ClientId}", clientId); }
@@ -542,6 +714,25 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
             if (alg.StartsWith("HS", StringComparison.OrdinalIgnoreCase))
             {
                 var plainSecret = await _clientSecretService.GetActivePlaintextAsync(dbClient.ClientId, httpContext.RequestAborted);
+                // Fallback: use DB client secret if history not present and secret is not placeholder and long enough
+                if (string.IsNullOrWhiteSpace(plainSecret) || Encoding.UTF8.GetByteCount(plainSecret) < 32)
+                {
+                    var fallback = dbClient.ClientSecret;
+                    if (!string.IsNullOrWhiteSpace(fallback) && !string.Equals(fallback, "{HASHED}", StringComparison.Ordinal) && Encoding.UTF8.GetByteCount(fallback) >= 32)
+                    {
+                        _logger.LogDebug("Using DB client secret as HS256 JAR fallback for {ClientId}", dbClient.ClientId);
+                        try
+                        {
+                            if (httpContext.RequestServices.GetService(typeof(IProtocolMetrics)) is IProtocolMetrics m)
+                            {
+                                m.IncrementJarSecretFallback();
+                            }
+                        }
+                        catch { }
+                        plainSecret = fallback;
+                    }
+                }
+
                 if (string.IsNullOrWhiteSpace(plainSecret) || Encoding.UTF8.GetByteCount(plainSecret) < 32)
                 {
                     return new { error = OpenIddictConstants.Errors.InvalidRequestObject, error_description = "client secret length below policy" };
@@ -593,6 +784,35 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
             }
         }
 
+        // Issuer and audience checks
+        try
+        {
+            var iss = token.Issuer;
+            var clientIdFromJwt = token.Payload.TryGetValue(OpenIddictConstants.Parameters.ClientId, out var cidObj) ? cidObj?.ToString() : null;
+            if (!string.IsNullOrWhiteSpace(iss) && !string.IsNullOrWhiteSpace(clientIdFromJwt))
+            {
+                if (!string.Equals(iss, clientIdFromJwt, StringComparison.Ordinal))
+                {
+                    return new { error = OpenIddictConstants.Errors.InvalidRequestObject, error_description = "issuer invalid" };
+                }
+            }
+            else if (!string.IsNullOrWhiteSpace(iss) && !string.Equals(iss, dbClient.ClientId, StringComparison.Ordinal))
+            {
+                return new { error = OpenIddictConstants.Errors.InvalidRequestObject, error_description = "issuer invalid" };
+            }
+
+            var aud = token.Audiences?.FirstOrDefault() ?? (token.Payload.TryGetValue("aud", out var audObj) ? audObj?.ToString() : null);
+            if (string.IsNullOrWhiteSpace(aud) || !string.Equals(aud, "mrwho", StringComparison.OrdinalIgnoreCase))
+            {
+                return new { error = OpenIddictConstants.Errors.InvalidRequestObject, error_description = "aud invalid" };
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Extra iss/aud validation failed");
+            return new { error = OpenIddictConstants.Errors.InvalidRequestObject, error_description = "invalid request object" };
+        }
+
         // JTI replay protection
         if (opts.RequireJti)
         {
@@ -622,14 +842,27 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         }
         try
         {
-            CheckMismatch("scope", Get(OpenIddictConstants.Parameters.Scope), request.Scope);
-            CheckMismatch("redirect_uri", Get(OpenIddictConstants.Parameters.RedirectUri), request.RedirectUri);
-            CheckMismatch("response_type", Get(OpenIddictConstants.Parameters.ResponseType), request.ResponseType);
-            CheckMismatch("state", Get(OpenIddictConstants.Parameters.State), request.State);
-            CheckMismatch("nonce", Get(OpenIddictConstants.Parameters.Nonce), request.Nonce); // NEW: ensure nonce consistency
+            // Fallback to raw query values when OpenIddictRequest properties are empty (common when 'request' param is present)
+            string? urlScope = request.Scope;
+            if (string.IsNullOrEmpty(urlScope)) urlScope = httpContext.Request.Query.TryGetValue(OpenIddictConstants.Parameters.Scope, out var qScope) ? qScope.ToString() : null;
+            string? urlRedirectUri = request.RedirectUri;
+            if (string.IsNullOrEmpty(urlRedirectUri)) urlRedirectUri = httpContext.Request.Query.TryGetValue(OpenIddictConstants.Parameters.RedirectUri, out var qRedirect) ? qRedirect.ToString() : null;
+            string? urlResponseType = request.ResponseType;
+            if (string.IsNullOrEmpty(urlResponseType)) urlResponseType = httpContext.Request.Query.TryGetValue(OpenIddictConstants.Parameters.ResponseType, out var qRt) ? qRt.ToString() : null;
+            string? urlState = request.State;
+            if (string.IsNullOrEmpty(urlState)) urlState = httpContext.Request.Query.TryGetValue(OpenIddictConstants.Parameters.State, out var qState) ? qState.ToString() : null;
+            string? urlNonce = request.Nonce;
+            if (string.IsNullOrEmpty(urlNonce)) urlNonce = httpContext.Request.Query.TryGetValue(OpenIddictConstants.Parameters.Nonce, out var qNonce) ? qNonce.ToString() : null;
+
+            CheckMismatch("scope", Get(OpenIddictConstants.Parameters.Scope), urlScope);
+            CheckMismatch("redirect_uri", Get(OpenIddictConstants.Parameters.RedirectUri), urlRedirectUri);
+            CheckMismatch("response_type", Get(OpenIddictConstants.Parameters.ResponseType), urlResponseType);
+            CheckMismatch("state", Get(OpenIddictConstants.Parameters.State), urlState);
+            CheckMismatch("nonce", Get(OpenIddictConstants.Parameters.Nonce), urlNonce); // NEW: ensure nonce consistency
         }
         catch (InvalidOperationException mis)
         {
+            _logger.LogInformation("JAR/URL parameter mismatch for client {ClientId}: {Message}", dbClient.ClientId, mis.Message);
             return new { error = OpenIddictConstants.Errors.InvalidRequest, error_description = mis.Message };
         }
 

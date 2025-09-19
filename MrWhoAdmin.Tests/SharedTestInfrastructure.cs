@@ -40,6 +40,18 @@ public static class SharedTestInfrastructure
         // Disable HTTPS redirection inside the API during tests to avoid http->https redirect losing Authorization header
         Environment.SetEnvironmentVariable("DISABLE_HTTPS_REDIRECT", "true");
 
+        // Enable advanced OIDC request conflict + limit enforcement for tests covering PJ40/PJ41
+        Environment.SetEnvironmentVariable("OidcAdvanced__RequestConflicts__Enabled", "true");
+        // Keep scope ordering relaxed (normalize) so conflict test relies on differing values not ordering
+        Environment.SetEnvironmentVariable("OidcAdvanced__RequestConflicts__StrictScopeOrdering", "false");
+        // Tight limits to exercise limit_exceeded paths
+        // NOTE: Do not set MaxParameters globally; specific tests can override per request using _mrwho_max_params when MRWHO_TESTS=1
+        // Environment.SetEnvironmentVariable("OidcAdvanced__RequestLimits__MaxParameters", "5");
+        Environment.SetEnvironmentVariable("OidcAdvanced__RequestLimits__MaxParameterNameLength", "40");
+        Environment.SetEnvironmentVariable("OidcAdvanced__RequestLimits__MaxParameterValueLength", "200");
+        Environment.SetEnvironmentVariable("OidcAdvanced__RequestLimits__MaxAggregateValueBytes", "1024");
+        Environment.SetEnvironmentVariable("OidcAdvanced__RequestLimits__MaxScopeItems", "10");
+
         using var cts = new CancellationTokenSource(StartupTimeout);
         var ct = cts.Token;
 

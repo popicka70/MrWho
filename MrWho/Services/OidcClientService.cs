@@ -217,6 +217,12 @@ public partial class OidcClientService : IOidcClientService
         }
         // Intentionally DO NOT add requirement feature to avoid forcing request_uri on every authorize request.
 
+        // Per-application PKCE requirement
+        if (client.RequirePkce)
+        {
+            descriptor.Requirements.Add(OpenIddictConstants.Requirements.Features.ProofKeyForCodeExchange);
+        }
+
         var (hasOpenId, scopePerms) = BuildScopePermissions(client.Scopes.Select(s => s.Scope));
         foreach (var p in scopePerms) descriptor.Permissions.Add(p);
         if (hasOpenId)

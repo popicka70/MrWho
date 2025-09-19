@@ -1,0 +1,80 @@
+@page "/callback"
+@rendermode InteractiveServer
+@inject NavigationManager Nav
+@inject IConfiguration Configuration
+@inject ILogger<CallbackDebug> Logger
+@inject IJSRuntime JS
+
+<PageTitle>PAR Callback (Diagnostics)</PageTitle>
+
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header">
+            <h5>PAR Callback Diagnostics</h5>
+        </div>
+        <div class="card-body">
+            <p class="text-muted">This endpoint is used only for the PAR login test. It does not redeem tokens.</p>
+
+            @if (!string.IsNullOrEmpty(Error))
+            {
+                <div class="alert alert-danger">
+                    <strong>Error:</strong> @Error<br />
+                    @if (!string.IsNullOrEmpty(ErrorDescription))
+                    {
+                        <span class="text-muted">@ErrorDescription</span>
+                    }
+                </div>
+            }
+
+            <ul class="list-group mb-3">
+                <li class="list-group-item"><strong>code</strong>: <code>@Code</code></li>
+                <li class="list-group-item"><strong>state</strong>: <code>@State</code></li>
+                <li class="list-group-item"><strong>iss</strong>: <code>@Iss</code></li>
+                <li class="list-group-item"><strong>response</strong>: <code style="word-break:break-all;">@ResponseJwt</code></li>
+            </ul>
+
+            @if (!string.IsNullOrWhiteSpace(_pkceVerifier))
+            {
+                <div class="alert alert-info py-2">
+                    PKCE verifier found in session storage. Token exchange not implemented in this test.
+                </div>
+            }
+
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary" @onclick="GoBack">Back to Diagnostics</button>
+                <button class="btn btn-outline-secondary" @onclick="Reload">Reload</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery] public string? Code { get; set; }
+    [SupplyParameterFromQuery] public string? State { get; set; }
+    [SupplyParameterFromQuery] public string? Error { get; set; }
+    [SupplyParameterFromQuery] public string? ErrorDescription { get; set; }
+    [SupplyParameterFromQuery(Name = "iss")] public string? Iss { get; set; }
+    [SupplyParameterFromQuery(Name = "response")] public string? ResponseJwt { get; set; }
+
+    private string _pkceVerifier = string.Empty;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            try
+            {
+                _pkceVerifier = await JS.InvokeAsync<string>("eval", "sessionStorage.getItem('mrwho.par.pkce_verifier') || ''");
+                StateHasChanged();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogDebug(ex, "Failed reading PKCE verifier from sessionStorage");
+            }
+        }
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    private void GoBack() => Nav.NavigateTo("/debug/auth-diagnostics");
+    private void Reload() => Nav.NavigateTo(Nav.Uri, forceLoad: true);
+}

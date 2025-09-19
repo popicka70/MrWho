@@ -39,7 +39,7 @@ namespace MrWho.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("DataProtectionKeys");
+                    b.ToTable("DataProtectionKeys", (string)null);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
@@ -279,7 +279,7 @@ namespace MrWho.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("ApiResources");
+                    b.ToTable("ApiResources", (string)null);
                 });
 
             modelBuilder.Entity("MrWho.Models.ApiResourceClaim", b =>
@@ -300,7 +300,7 @@ namespace MrWho.Migrations
                     b.HasIndex("ApiResourceId", "ClaimType")
                         .IsUnique();
 
-                    b.ToTable("ApiResourceClaims");
+                    b.ToTable("ApiResourceClaims", (string)null);
                 });
 
             modelBuilder.Entity("MrWho.Models.ApiResourceScope", b =>
@@ -321,7 +321,7 @@ namespace MrWho.Migrations
                     b.HasIndex("ApiResourceId", "Scope")
                         .IsUnique();
 
-                    b.ToTable("ApiResourceScopes");
+                    b.ToTable("ApiResourceScopes", (string)null);
                 });
 
             modelBuilder.Entity("MrWho.Models.ApiResourceSecret", b =>
@@ -354,7 +354,7 @@ namespace MrWho.Migrations
 
                     b.HasIndex("ApiResourceId");
 
-                    b.ToTable("ApiResourceSecrets");
+                    b.ToTable("ApiResourceSecrets", (string)null);
                 });
 
             modelBuilder.Entity("MrWho.Models.AuditIntegrityRecord", b =>
@@ -421,7 +421,7 @@ namespace MrWho.Migrations
 
                     b.HasIndex("TimestampUtc");
 
-                    b.ToTable("AuditIntegrityRecords");
+                    b.ToTable("AuditIntegrityRecords", (string)null);
                 });
 
             modelBuilder.Entity("MrWho.Models.AuditLog", b =>
@@ -474,7 +474,7 @@ namespace MrWho.Migrations
 
                     b.HasIndex("EntityType", "EntityId", "OccurredAt");
 
-                    b.ToTable("AuditLogs");
+                    b.ToTable("AuditLogs", (string)null);
                 });
 
             modelBuilder.Entity("MrWho.Models.ClaimType", b =>
@@ -529,7 +529,7 @@ namespace MrWho.Migrations
                     b.HasIndex("Type")
                         .IsUnique();
 
-                    b.ToTable("ClaimTypes");
+                    b.ToTable("ClaimTypes", (string)null);
                 });
 
             modelBuilder.Entity("MrWho.Models.Client", b =>
@@ -841,7 +841,7 @@ namespace MrWho.Migrations
 
                     b.HasIndex("RealmId");
 
-                    b.ToTable("Clients");
+                    b.ToTable("Clients", (string)null);
                 });
 
             modelBuilder.Entity("MrWho.Models.ClientAudience", b =>
@@ -869,7 +869,7 @@ namespace MrWho.Migrations
                     b.HasIndex("ClientId", "Audience")
                         .IsUnique();
 
-                    b.ToTable("ClientAudiences");
+                    b.ToTable("ClientAudiences", (string)null);
                 });
 
             modelBuilder.Entity("MrWho.Models.ClientIdentityProvider", b =>
@@ -922,7 +922,7 @@ namespace MrWho.Migrations
                     b.HasIndex("ClientId", "IdentityProviderId")
                         .IsUnique();
 
-                    b.ToTable("ClientIdentityProviders");
+                    b.ToTable("ClientIdentityProviders", (string)null);
                 });
 
             modelBuilder.Entity("MrWho.Models.ClientPermission", b =>
@@ -944,7 +944,7 @@ namespace MrWho.Migrations
                     b.HasIndex("ClientId", "Permission")
                         .IsUnique();
 
-                    b.ToTable("ClientPermissions");
+                    b.ToTable("ClientPermissions", (string)null);
                 });
 
             modelBuilder.Entity("MrWho.Models.ClientPostLogoutUri", b =>
@@ -966,7 +966,7 @@ namespace MrWho.Migrations
                     b.HasIndex("ClientId", "Uri")
                         .IsUnique();
 
-                    b.ToTable("ClientPostLogoutUris");
+                    b.ToTable("ClientPostLogoutUris", (string)null);
                 });
 
             modelBuilder.Entity("MrWho.Models.ClientRedirectUri", b =>
@@ -988,7 +988,7 @@ namespace MrWho.Migrations
                     b.HasIndex("ClientId", "Uri")
                         .IsUnique();
 
-                    b.ToTable("ClientRedirectUris");
+                    b.ToTable("ClientRedirectUris", (string)null);
                 });
 
             modelBuilder.Entity("MrWho.Models.ClientRole", b =>
@@ -1020,7 +1020,7 @@ namespace MrWho.Migrations
                     b.HasIndex("ClientId", "NormalizedName")
                         .IsUnique();
 
-                    b.ToTable("ClientRoles");
+                    b.ToTable("ClientRoles", (string)null);
                 });
 
             modelBuilder.Entity("MrWho.Models.ClientScope", b =>
@@ -1042,7 +1042,7 @@ namespace MrWho.Migrations
                     b.HasIndex("ClientId", "Scope")
                         .IsUnique();
 
-                    b.ToTable("ClientScopes");
+                    b.ToTable("ClientScopes", (string)null);
                 });
 
             modelBuilder.Entity("MrWho.Models.ClientSecretHistory", b =>
@@ -1089,7 +1089,7 @@ namespace MrWho.Migrations
 
                     b.HasIndex("ClientId", "Status");
 
-                    b.ToTable("ClientSecretHistories");
+                    b.ToTable("ClientSecretHistories", (string)null);
                 });
 
             modelBuilder.Entity("MrWho.Models.ClientUser", b =>
@@ -1118,7 +1118,7 @@ namespace MrWho.Migrations
                     b.HasIndex("ClientId", "UserId")
                         .IsUnique();
 
-                    b.ToTable("ClientUsers");
+                    b.ToTable("ClientUsers", (string)null);
                 });
 
             modelBuilder.Entity("MrWho.Models.Consent", b =>
@@ -1153,7 +1153,7 @@ namespace MrWho.Migrations
                     b.HasIndex("UserId", "ClientId")
                         .IsUnique();
 
-                    b.ToTable("Consents");
+                    b.ToTable("Consents", (string)null);
                 });
 
             modelBuilder.Entity("MrWho.Models.DeviceAuthenticationLog", b =>
@@ -1208,7 +1208,7 @@ namespace MrWho.Migrations
 
                     b.HasIndex("UserId", "OccurredAt");
 
-                    b.ToTable("DeviceAuthenticationLogs");
+                    b.ToTable("DeviceAuthenticationLogs", (string)null);
                 });
 
             modelBuilder.Entity("MrWho.Models.DeviceAuthorization", b =>
@@ -1288,7 +1288,7 @@ namespace MrWho.Migrations
 
                     b.HasIndex("Status", "ExpiresAt");
 
-                    b.ToTable("DeviceAuthorizations");
+                    b.ToTable("DeviceAuthorizations", (string)null);
                 });
 
             modelBuilder.Entity("MrWho.Models.IdentityProvider", b =>
@@ -1390,7 +1390,7 @@ namespace MrWho.Migrations
                     b.HasIndex("RealmId", "Name")
                         .IsUnique();
 
-                    b.ToTable("IdentityProviders");
+                    b.ToTable("IdentityProviders", (string)null);
                 });
 
             modelBuilder.Entity("MrWho.Models.IdentityResource", b =>
@@ -1443,7 +1443,7 @@ namespace MrWho.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("IdentityResources");
+                    b.ToTable("IdentityResources", (string)null);
                 });
 
             modelBuilder.Entity("MrWho.Models.IdentityResourceClaim", b =>
@@ -1465,7 +1465,7 @@ namespace MrWho.Migrations
                     b.HasIndex("IdentityResourceId", "ClaimType")
                         .IsUnique();
 
-                    b.ToTable("IdentityResourceClaims");
+                    b.ToTable("IdentityResourceClaims", (string)null);
                 });
 
             modelBuilder.Entity("MrWho.Models.IdentityResourceProperty", b =>
@@ -1492,7 +1492,7 @@ namespace MrWho.Migrations
                     b.HasIndex("IdentityResourceId", "Key")
                         .IsUnique();
 
-                    b.ToTable("IdentityResourceProperties");
+                    b.ToTable("IdentityResourceProperties", (string)null);
                 });
 
             modelBuilder.Entity("MrWho.Models.KeyMaterial", b =>
@@ -1554,7 +1554,7 @@ namespace MrWho.Migrations
 
                     b.HasIndex("Use", "Status", "ActivateAt");
 
-                    b.ToTable("KeyMaterials");
+                    b.ToTable("KeyMaterials", (string)null);
                 });
 
             modelBuilder.Entity("MrWho.Models.PendingClientRegistration", b =>
@@ -1617,7 +1617,7 @@ namespace MrWho.Migrations
 
                     b.HasIndex("Status", "SubmittedAt");
 
-                    b.ToTable("PendingClientRegistrations");
+                    b.ToTable("PendingClientRegistrations", (string)null);
                 });
 
             modelBuilder.Entity("MrWho.Models.PersistentQrSession", b =>
@@ -1684,7 +1684,7 @@ namespace MrWho.Migrations
 
                     b.HasIndex("UserId", "Status");
 
-                    b.ToTable("PersistentQrSessions");
+                    b.ToTable("PersistentQrSessions", (string)null);
                 });
 
             modelBuilder.Entity("MrWho.Models.PushedAuthorizationRequest", b =>
@@ -1728,7 +1728,7 @@ namespace MrWho.Migrations
 
                     b.HasIndex("ClientId", "ExpiresAt");
 
-                    b.ToTable("PushedAuthorizationRequests");
+                    b.ToTable("PushedAuthorizationRequests", (string)null);
                 });
 
             modelBuilder.Entity("MrWho.Models.Realm", b =>
@@ -1894,7 +1894,7 @@ namespace MrWho.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("Realms");
+                    b.ToTable("Realms", (string)null);
                 });
 
             modelBuilder.Entity("MrWho.Models.ReturnUrlEntry", b =>
@@ -1922,7 +1922,7 @@ namespace MrWho.Migrations
 
                     b.HasIndex("ExpiresAt");
 
-                    b.ToTable("ReturnUrlEntries");
+                    b.ToTable("ReturnUrlEntries", (string)null);
                 });
 
             modelBuilder.Entity("MrWho.Models.Scope", b =>
@@ -1975,7 +1975,7 @@ namespace MrWho.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("Scopes");
+                    b.ToTable("Scopes", (string)null);
                 });
 
             modelBuilder.Entity("MrWho.Models.ScopeClaim", b =>
@@ -1997,7 +1997,7 @@ namespace MrWho.Migrations
                     b.HasIndex("ScopeId", "ClaimType")
                         .IsUnique();
 
-                    b.ToTable("ScopeClaims");
+                    b.ToTable("ScopeClaims", (string)null);
                 });
 
             modelBuilder.Entity("MrWho.Models.SecurityAuditEvent", b =>
@@ -2053,7 +2053,7 @@ namespace MrWho.Migrations
 
                     b.HasIndex("TimestampUtc", "Category");
 
-                    b.ToTable("SecurityAuditEvents");
+                    b.ToTable("SecurityAuditEvents", (string)null);
                 });
 
             modelBuilder.Entity("MrWho.Models.TokenStatisticsSnapshot", b =>
@@ -2104,7 +2104,7 @@ namespace MrWho.Migrations
                     b.HasIndex("Granularity", "PeriodStartUtc")
                         .IsUnique();
 
-                    b.ToTable("TokenStatisticsSnapshots");
+                    b.ToTable("TokenStatisticsSnapshots", (string)null);
                 });
 
             modelBuilder.Entity("MrWho.Models.UserClientRole", b =>
@@ -2119,7 +2119,7 @@ namespace MrWho.Migrations
 
                     b.HasIndex("ClientRoleId", "UserId");
 
-                    b.ToTable("UserClientRoles");
+                    b.ToTable("UserClientRoles", (string)null);
                 });
 
             modelBuilder.Entity("MrWho.Models.UserDevice", b =>
@@ -2215,7 +2215,7 @@ namespace MrWho.Migrations
 
                     b.HasIndex("UserId", "IsTrusted");
 
-                    b.ToTable("UserDevices");
+                    b.ToTable("UserDevices", (string)null);
                 });
 
             modelBuilder.Entity("MrWho.Models.UserProfile", b =>
@@ -2246,7 +2246,7 @@ namespace MrWho.Migrations
 
                     b.HasKey("UserId");
 
-                    b.ToTable("UserProfiles");
+                    b.ToTable("UserProfiles", (string)null);
                 });
 
             modelBuilder.Entity("MrWho.Models.WebAuthnCredential", b =>
@@ -2297,7 +2297,7 @@ namespace MrWho.Migrations
                     b.HasIndex("UserId", "CredentialId")
                         .IsUnique();
 
-                    b.ToTable("WebAuthnCredentials");
+                    b.ToTable("WebAuthnCredentials", (string)null);
                 });
 
             modelBuilder.Entity("OpenIddict.EntityFrameworkCore.Models.OpenIddictEntityFrameworkCoreApplication", b =>

@@ -1,165 +1,134 @@
-# PAR / JAR / JARM Custom Stack Backlog
+﻿# PAR / JAR / JARM Custom Stack Backlog
 
-Status: Draft
+Status: Draft (Phase 2 wrap rebaseline)
 Owner: Identity Platform
-Last Updated: UTC {{DATE}}
-Target Version: Phased (v1.1 � v1.3)
+Last Updated: UTC 2025-09-16 (Re-assessed + metrics instrumentation pass)
+Target Version: Phased (v1.1 – v1.4)
 
-## 0. Context Snapshot (Current State)
-- PAR: Native OpenIddict permission advertised (optional). No custom request_uri resolution in middleware.
-- JAR: Partial validation inside `AuthorizationHandler` (direct request only). No central service, limited replay protection.
-- JARM: Not implemented (modes inert).
-- Mode flags (ParMode/JarMode/JarmMode): Largely informational; strict enforcement missing.
-- Custom PAR DB entity exists but unused by pipeline.
-- Replay cache & JAR expansion middleware removed.
+## Phase 2 Progress Snapshot (Rebaseline)
+Completed (✅):
+- PJ48 PAR push capture endpoint implemented (hash+reuse, accepts `request`)
+- PJ49 PAR authorize consumption (single-use enforcement via option)
+- PJ50 PAR resolution marker (sentinel `_par_resolved` + consumption handler) ✅ (moved from In Progress)
+- PJ51 PAR metrics counters (push/reuse/resolution/consumed/replay/conflict/limit hooks) – core counters defined
+- PJ14 Native ParMode=Required enforcement (event handler) – middleware fallback now obsolete
+- PJ37 Built-in handler suppression final (legacy middleware removed; native JarMode & ParMode enforcement active)
+- JAR validator core (alg/size/lifetime/issuer/audience/jti replay + early extract merge) – Success & negative path coverage
+- Dynamic discovery augmentation (request/request_uri supported, response_mode jwt, dynamic HS alg advertisement)
 
-## 1. Objectives
-1. Provide a self-contained custom pipeline for PAR/JAR/JARM (opt-in).
-2. Enforce per?client modes (Disabled / Optional / Required) consistently.
-3. Centralize JAR validation (alg whitelist, size, exp/iat/nbf, iss/aud, jti replay, signature) with clear error semantics.
-4. Implement JARM (signed JWT auth responses) when requested & permitted.
-5. Maintain fallbacks: ability to toggle between native PAR and custom PAR.
-6. Deliver comprehensive automated test coverage.
+In Progress (🛠):
+- PJ40 Query vs request conflict detection (implemented in early extract + validation handlers behind config; needs config surface + full matrix tests)
+- PJ41 Claim & length limits (limit handler implemented; needs configuration exposure, tuning & fuzz coverage)
+- PJ11 JARM success packaging final (handler issues signed JWT, needs end-to-end post-auth tests & claim assertions)
+- PJ12 JARM error packaging final (error path JWT emitted; need negative/error scenario tests)
+- PJ30 Metrics counters foundation (ProtocolMetrics service extended; PAR/JAR/JARM/validation observers partially wired)
+- PJ56 JAR/JARM & extended PAR metrics wiring (jar/jarm + par resolution observers added; remaining: push reuse, consumed granular outcomes)
 
-## 2. High-Level Epics
-| Epic | Title | Goal | Priority |
-|------|-------|------|----------|
-| E1 | Middleware & Routing Layer | Restore custom resolver & expansion | High |
-| E2 | JAR Validation Service | Single authoritative validator | High |
-| E3 | PAR Store & Lifecycle | Secure, replay-safe storage | High |
-| E4 | JARM Packaging | JWT-wrapped auth responses | Medium |
-| E5 | Mode Enforcement | Consistent Required/Optional behavior | High |
-| E6 | Security Hardening | Replay, integrity, logging | High |
-| E7 | Migration & Cleanup | Remove dead code / config drift | Medium |
-| E8 | Test Suite Expansion | Confidence + regression safety | High |
-| E9 | Telemetry & Observability | Operational insight | Medium |
-| E10 | Documentation & DX | Clear guidance & toggles | Medium |
+Pending (🎯 next):
+- PJ17 JAR jti replay metrics (extend existing replay cache usage -> add counters + export) – counter placeholder present (`replay` outcome, need full tests)
+- PJ42 Discovery gating refinements (adaptive advertise based on active clients/modes; current state = always-on advertise)
+- PJ13 JARM key rotation test (kid stability & validation across rotation) – needs test harness
+- PJ26 Required mode negative matrix (systematic ParMode/JarMode/JarmMode failure assertions)
+- PJ27 Replay tests (end-to-end) – extend to PAR + JAR multi-stage replay and late-stage duplicate detection
+- PJ29 Fuzz / malformed inputs (oversize claims, unicode, structured tampering) against new limit handler
+- PJ18 Audit logging enrichment (add structured reasons for JAR/JARM packaging, limit & conflict rejections)
+- PJ31 Health status extension (/healthz feature state exposure)
+- PJ32 Feature toggle health section (show RequestLimits/RequestConflicts gating status)
+- PJ33 Developer guide updates (adapter diagrams + handler ordering)
+- PJ34 Ops runbook (replay/reuse guidance; configuring limits safely)
+- PJ35 Config matrix (behavior combinations including modes + limits + conflicts)
+- PJ43 Remove obsolete PAR entity (Cleanup) – Deferred
 
-## 3. Detailed Backlog
-### Epic E1 � Middleware & Routing
-| ID | Story | Description | Acceptance Criteria |
-|----|-------|-------------|---------------------|
-| PJ1 | Reinstate request_uri middleware | Reintroduce `JarRequestExpansionMiddleware` to resolve stored PAR entries before OpenIddict | (a) Removes `request_uri`; (b) Attaches expanded parameters; (c) Marks consumed flag |
-| PJ2 | Parameter merge precedence | Ensure JAR claims override query unless conflict + mismatch check | (a) Mismatch yields RFC-compliant error; (b) Unit test covers precedence |
-| PJ3 | Config toggle native vs custom PAR | App setting `ParPipelineMode` (Native|Custom) | (a) Switching to Custom suppresses advertising pushed_authorization permission; (b) Smoke tests pass both modes |
+## Phase 1 Closure Summary (Unchanged Reference)
+Scope Delivered:
+- JAR core: validator (alg/size/lifetime/iss+aud), early extract merge, built-in preemption (now fully exclusive path), HS/RS happy paths.
+- Mode enforcement: PAR required (native), JAR required (native), JARM injection & packaging.
+- Error catalog draft + snapshot test (PJ54) to detect drift.
+- Test coverage: positive JAR flows, negative size/alg/issuer/audience, PAR required denial, JAR required denial, secret length policy, replay (basic), preemption sentinel, conflict & limit rejection tests (PJ40/PJ41 scenarios).
+- Configuration scaffolds for claim limits & conflict detection.
 
-### Epic E2 � JAR Validation Service
-| ID | Story | Description | Acceptance Criteria |
-|----|-------|-------------|---------------------|
-| PJ4 | Create `IJarValidationService` | Encapsulate decode + validate + map parameters | (a) Returns structured result object; (b) No direct token handler calls in middleware/auth handler |
-| PJ5 | Alg / size enforcement | Enforce `AllowedRequestObjectAlgs`, max bytes | (a) Oversize rejected; (b) Unsupported alg rejected |
-| PJ6 | Lifetime & skew rules | Unified exp/iat/nbf policy | (a) Exp > max window rejected; (b) iat outside skew rejected |
-| PJ7 | Iss/Aud/Client binding | Ensure issuer=client_id & aud matches server | (a) Mismatch yields invalid_request_object; tests added |
+Known Phase 1 Limitations (addressed / remaining):
+- PAR push rejects JAR (`request_not_supported`) – RESOLVED (PJ48).
+- Replay metrics pending (PJ17).
+- Claim/length & conflict detection still behind config gates (rollout phased) – PARTIAL (handlers exist; gating + docs pending).
+- Discovery still static (adaptive gating pending PJ42) – PARTIAL.
+- JARM signed success/error JWT assertions pending (PJ11–PJ13) – IN PROGRESS.
 
-### Epic E3 � PAR Store & Lifecycle
-| ID | Story | Description | Acceptance Criteria |
-|----|-------|-------------|---------------------|
-| PJ8 | Hash + dedupe semantics | Store hash of canonical parameter set | (a) Duplicate submission returns same request_uri if within TTL (configurable) |
-| PJ9 | Consumption policy | Single-use or multi-use (config flag) | (a) If single-use, second resolve => invalid_request_uri |
-| PJ10 | Expiry scavenger | Background cleanup | (a) Timer job deletes expired rows; metric emitted |
+## Phase 2 Focus (Adapter & Hardening)
+Objectives (updated status):
+1. PAR + JAR interoperability ✅
+2. Adapter metadata + metrics ✅ core (needs JAR/JARM counters wiring -> PJ56)
+3. Conflict & claim limits 🛠 (handlers implemented; enable + test)
+4. Replay robustness ⏳ (add metrics + extended scenarios)
+5. Mode enforcement reliability ✅ (middleware removed, native handlers active)
+6. Telemetry expansion 🛠 (ProtocolMetrics present; need emission wiring + exposure endpoints)
+7. Adaptive discovery gating ⏳ (currently unconditional advertise; add feature-driven gating)
+8. Negative/error matrix + fuzz ⏳ (expand tests for conflicts/limits/JARM)
 
-### Epic E4 � JARM Packaging
-| ID | Story | Description | Acceptance Criteria |
-|----|-------|-------------|---------------------|
-| PJ11 | JARM response builder | `IJarmResponseService` producing signed JWT | (a) Code/state inside claims; (b) kid header present |
-| PJ12 | Error wrapping | Authorization errors wrapped when response_mode=jwt | (a) Conforms to spec claim naming; tests verify parsing |
-| PJ13 | Key selection | Use active signing key (rotate-compatible) | (a) Changing primary key rotates JARM correctly |
+## Phase 2 Backlog (Updated)
+| ID | Title | Type | Goal | Status |
+|----|-------|------|------|--------|
+| PJ47 | ParRequestMeta entity | Schema | Adjunct meta storage | (Merged) |
+| PJ48 | PAR push capture handler | Handler | Hash & dedupe reuse | ✅ Done |
+| PJ49 | Authorize consumption handler | Handler | Single vs multi-use enforcement | ✅ Done |
+| PJ50 | PAR resolution marker | Handler | Reliable detection | ✅ Done |
+| PJ51 | PAR metrics | Telemetry | Request/reuse/resolution/consumed/replay/conflict/limit hooks | ✅ Core counters defined |
+| PJ14 | Enforce ParMode=Required (native) | Enforcement | Event-based rejection | ✅ Done |
+| PJ40 | Query vs request conflict detection | Validation | Reject mismatches | 🛠 In Progress |
+| PJ41 | Claim & length limits | Validation | Prevent bloat | 🛠 In Progress |
+| PJ17 | JAR jti replay metrics | Security | Detect & count replays | Pending |
+| PJ30 | Metrics counters foundation | Telemetry | jar/jarm/replay counters infra | 🛠 Partial (extended snapshot) |
+| PJ56 | JAR/JARM metrics wiring | Telemetry | Increment & expose jar/jarm counters | 🛠 Partial (JAR/JARM + basic PAR resolution) |
+| PJ42 | Discovery gating | Integration | Adaptive advertise | Pending |
+| PJ37 | Built-in handler suppression final | Hardening | Single validation trace | ✅ Done |
+| PJ26 | Required mode negative matrix | Testing | Systematic failures | Pending |
+| PJ27 | Replay tests (end-to-end) | Testing | Reject replays | Pending |
+| PJ29 | Fuzz / malformed inputs | Testing | Robustness | Pending |
+| PJ11 | JARM success packaging final | JARM | Signed response assertions | 🛠 In Progress |
+| PJ12 | JARM error packaging final | JARM | Signed error assertions | 🛠 In Progress |
+| PJ13 | JARM key rotation test | JARM | kid validity across rotation | Pending |
+| PJ18 | Audit logging enrichment | Observability | Structured reasons | Pending |
+| PJ31 | Health status extension | Observability | /healthz feature state | Pending |
+| PJ32 | Feature toggle health section | Observability | Show adapter flags | Pending |
+| PJ33 | Developer guide updates | Docs | Adapter diagrams | Pending |
+| PJ34 | Ops runbook | Docs | Replay/reuse guidance | Pending |
+| PJ35 | Config matrix | Docs | Behavior combinations | Pending |
+| PJ43 | Remove obsolete PAR entity | Cleanup | Drop unused table | Deferred |
 
-### Epic E5 � Mode Enforcement
-| ID | Story | Description | Acceptance Criteria |
-|----|-------|-------------|---------------------|
-| PJ14 | Enforce ParMode=Required | Reject non-PAR authorize requests | (a) Returns invalid_request; tests pass |
-| PJ15 | Enforce JarMode=Required | Reject when no signed request object supplied | (a) Works for both direct & PAR flows |
-| PJ16 | Enforce JarmMode=Required | Force/normalize response_mode=jwt | (a) Auth flow returns JWT response |
+## Status Matrix (Summary)
+| Story Group | Delivered | Phase 2 In Progress | Phase 3+ |
+|-------------|----------|---------------------|-----------|
+| JAR Core | PJ4-7,37,38 | PJ40, PJ41, PJ17 | Advanced profiles |
+| PAR Core | PJ48, PJ49, PJ51, PJ14, PJ50 | Replay tests | CustomFull |
+| JARM | Packaging handlers (success+error) | PJ11–PJ13 (tests, rotation) | Encryption/advanced |
+| Enforcement | Native PAR/JAR/JARM | Conflict & limits finalization | Unified policy engine |
+| Telemetry | PAR counters + snapshot | JAR/JARM wiring (PJ56), replay metrics (PJ17) | SLA dashboards |
+| Security | Validations baseline | Replay metrics, conflict, limits | DoS protections |
+| Docs | Error catalog | Adapter/ops docs | Migration guide |
 
-### Epic E6 � Security Hardening
-| ID | Story | Description | Acceptance Criteria |
-|----|-------|-------------|---------------------|
-| PJ17 | jti replay cache | Distributed in-memory abstraction | (a) Second use rejected; TTL respected |
-| PJ18 | Audit logging | Log accept/reject decisions | (a) Audit entries with outcome & correlation id |
-| PJ19 | Structured error codes | Map internal failure reasons to OIDC errors + doc | (a) Error catalog markdown published |
-| PJ20 | Anti-bloat protections | Enforce claim count & string length limits | (a) Oversize claim set rejected with specific error |
+## Milestone Targets (Reaffirmed)
+| Milestone | Scope | Exit Criteria |
+|-----------|-------|--------------|
+| v1.2 (Phase 2) | PAR Adapter + hardening | PAR reuse + single-use, conflict/claim limits (gated) active, core metrics visible (PAR + basic JAR), JARM packaging handler present |
+| v1.3 (Phase 3) | JARM & discovery gating | JARM assertions tests, adaptive metadata, replay + JAR metrics complete |
+| v1.4 (Phase 4) | Cleanup & performance | Schema cleanup + perf baseline + migration guide |
 
-### Epic E7 � Migration & Cleanup
-| ID | Story | Description | Acceptance Criteria |
-|----|-------|-------------|---------------------|
-| PJ21 | Remove unused placeholder code | Delete obsolete expansion placeholders | (a) No dead classes lingering |
-| PJ22 | Schema migration review | Confirm PAR table indexes adequate | (a) Index coverage documented; migration generated |
-| PJ23 | Config consolidation | Document & centralize feature flags | (a) Single `OidcAdvancedOptions` class |
+## Immediate Next Actions (Week Focus)
+1. Finalize PAR push/reuse/consumed instrumentation (extend push controller & consumption handler) (PJ51/PJ56)
+2. Add detailed conflict/limit outcome codes (e.g. conflict:client_id, limit:scope_items) to validation metrics
+3. Implement JARM success/error claim assertion tests (iss,aud,iat,exp,state,code/error mapping) (PJ11/PJ12)
+4. Add key rotation + historical JARM validation test (PJ13)
+5. Build required-mode negative matrix generator (covers ParMode/JarMode/JarmMode permutations) (PJ26)
+6. Replay scenario expansion: same JAR reused across PAR push + direct authorize, and late-stage replay after partial consumption (PJ27)
+7. Draft adaptive discovery gating logic (counts active clients requiring features) (PJ42)
 
-### Epic E8 � Testing
-| ID | Story | Description | Acceptance Criteria |
-|----|-------|-------------|---------------------|
-| PJ24 | Direct JAR happy path | RS256 + HS256 tests | (a) Separate fixtures; green |
-| PJ25 | PAR+JAR combined path | End-to-end test with expansion | (a) Confirms parameter precedence |
-| PJ26 | Required mode failures | Par/Jar/Jarm required negative cases | (a) All produce expected error codes |
-| PJ27 | Replay tests | jti & request_uri replay rejection | (a) Both blocked; timing test |
-| PJ28 | JARM success & error | Validate signatures, claims presence | (a) Code & error flows verified |
-| PJ29 | Fuzz / malformed inputs | Random truncation & claims noise | (a) No unhandled exceptions |
+## Risk / Watchlist
+- Conflict & limit handlers currently fail-open on internal exceptions (log at Debug). Evaluate tightening once stable.
+- Discovery advertising HS algs may over-expose if clients removed; gating logic pending (PJ42).
+- JARM packaging currently always RS256; consider advertising and enforcing separate JARM signing alg policy.
 
-### Epic E9 � Telemetry & Observability
-| ID | Story | Description | Acceptance Criteria |
-|----|-------|-------------|---------------------|
-| PJ30 | Metrics (Prometheus style) | Counters: par_requests_total, jar_validations_total, replays_blocked_total | (a) Scrape endpoint shows counters |
-| PJ31 | Structured logging | TraceId correlation for each auth journey | (a) Log sample includes correlation id |
-| PJ32 | Feature toggle health | Expose current PAR/JAR/JARM mode status | (a) /healthz advanced section |
-
-### Epic E10 � Documentation & DX
-| ID | Story | Description | Acceptance Criteria |
-|----|-------|-------------|---------------------|
-| PJ33 | Developer guide | Flow diagrams + sequence charts | (a) Markdown committed under /docs/identity |
-| PJ34 | Ops runbook | Key rotation, cache purge, diagnosing failures | (a) Linked from README |
-| PJ35 | Config matrix | Table of mode combinations & behavior | (a) Included in developer guide |
-| PJ36 | Migration guide | Steps to switch native -> custom stack | (a) Tested dry-run script |
-
-## 4. Phased Delivery Plan
-| Phase | Scope | Exit Criteria |
-|-------|-------|--------------|
-| Phase 1 | E1 (core middleware), E2 partial (RS/HS validation), E5 (Par/Jar required), E6(PJ17), E8 basic tests | All happy paths + required enforcement stable |
-| Phase 2 | E2 complete, E3, E6 (audit), E8 replay & negative tests, E9 metrics | Replay & audit operational |
-| Phase 3 | E4 (JARM), E5 JarmMode, E6 remaining, E9 full, E10 docs | JARM usable in production toggle |
-| Phase 4 | E7 cleanup, E10 migration guide | Native ? custom toggle documented |
-
-## 5. Risk Register
-| Risk | Impact | Mitigation |
-|------|--------|------------|
-| Dual PAR paths conflict | Incorrect enforcement | Single toggle + integration test matrix |
-| Replay cache scalability | Missed replays under load | Pluggable distributed store (IMemory + IDistributed) |
-| Key rotation race for JARM | Invalid response verification | Embed kid + publish JWKS pre-rotation |
-| Spec drift | Non-compliant responses | Add spec conformance tests (OIDC test suite subset) |
-
-## 6. Config & Flags (Target)
-| Name | Values | Phase | Notes |
-|------|--------|-------|-------|
-| ParPipelineMode | Native |Custom| 1 | Controls middleware activation |
-| EnforceParRequired | bool | 1 | Shortcut until full mode engine |
-| EnforceJarRequired | bool | 1 | Ditto |
-| EnableJarm | bool | 3 | Gated until JARM stable |
-| JarMaxBytes | int | 1 | Size control |
-| JarRequireJti | bool | 2 | Replay strengthening |
-| ParReuseWindowSeconds | int | 2 | Hash dedupe window |
-
-## 7. Non-Goals (Explicit)
-- Encrypted request objects (JWE) (future backlog separate)
-- DPoP / MTLS binding integration (future)
-- FAPI advanced profiles (not in current scope)
-
-## 8. Acceptance Gate (Phase 3)
-Must demonstrate:
-- 95%+ branch coverage across middleware + validator + JARM builder.
-- All replay & negative path tests green.
-- Zero unhandled exceptions in fuzz suite.
-- Metrics visible & audited in logs.
-
-## 9. Immediate Next Actions (Sprint 1 Seed)
-1. PJ1 � Restore middleware skeleton behind feature flag (Custom mode off by default).
-2. PJ4 � Introduce validator interface + RS256 path.
-3. PJ14/PJ15 � Simple mode enforcement switches.
-4. PJ24 � Direct JAR RS256 happy path test.
-5. PJ19 � Draft error catalog (map internal -> spec codes).
-
-## 10. Tracking & Mapping
-Create Azure DevOps / GitHub issues per PJ id; label `area:oidc-advanced`. Use milestones: `adv-par-phase1`, `adv-par-phase2`, etc.
+## Appendix Link
+Full original epic/story detail with acceptance criteria moved to: `docs/par-jar-jarm-backlog-full.md`.
 
 ---
-Prepared for future implementation. Update this file as epics complete.
+(Previous Phase 1 snapshot retained above; see appendix for historical details.)

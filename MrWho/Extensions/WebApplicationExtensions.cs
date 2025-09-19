@@ -14,7 +14,6 @@ using Microsoft.Extensions.Options;
 using MrWho.Data;
 using MrWho.Endpoints;
 using MrWho.Handlers;
-using MrWho.Middleware;
 using MrWho.Models; // added for UserProfile, UserState
 using MrWho.Services;
 using MrWho.Services.Mediator;
@@ -25,6 +24,7 @@ using OpenIddict.Client; // added for OpenIddictClientOptions/Registration
 using OpenIddict.Client.AspNetCore;
 using OpenIddict.Server.AspNetCore;
 using static OpenIddict.Abstractions.OpenIddictConstants;
+using MrWho.Middleware; // re-added for DeviceAutoLoginMiddleware & ClientCookieMiddleware
 
 namespace MrWho.Extensions;
 
@@ -41,9 +41,10 @@ public static class WebApplicationExtensions
             app.UseHsts();
         }
 
-        // Behind a reverse proxy (Railway, containers), honor X-Forwarded-* so Request.Scheme becomes https
-        // Place this BEFORE redirection/auth so downstream sees the correct scheme/remote IP. Options are configured in DI.
         app.UseForwardedHeaders();
+
+        // Remove overly broad Authorization stripping on all /connect routes.
+        // Authorization header is stripped narrowly by AuthorizeHeaderStripStartupFilter for /connect/authorize and /connect/par only.
 
         // Allow disabling HTTPS redirection for containerized/internal HTTP calls
         var disableHttpsRedirect = string.Equals(Environment.GetEnvironmentVariable("DISABLE_HTTPS_REDIRECT"), "true", StringComparison.OrdinalIgnoreCase);
@@ -53,26 +54,12 @@ public static class WebApplicationExtensions
         }
         app.UseStaticFiles();
 
-        // Move JAR/JARM normalization BEFORE routing so OpenIddict never sees unsupported response_mode=jwt.
-        app.UseMiddleware<JarRequestExpansionMiddleware>();
-
         app.UseRouting();
-
-        // Enable ASP.NET Core rate limiting middleware
         app.UseRateLimiter();
-
-        // Enable session before custom middleware that uses it
         app.UseSession();
-
-        // Device auto-login (silent) BEFORE normal auth so principal is established
         app.UseMiddleware<DeviceAutoLoginMiddleware>();
-
-        // Client cookie middleware (requires session)
         app.UseMiddleware<ClientCookieMiddleware>();
-
-        // Add antiforgery middleware
         app.UseAntiforgery();
-
         app.UseAuthentication();
         app.UseAuthorization();
 
@@ -108,8 +95,10 @@ public static class WebApplicationExtensions
             app.UseHsts();
         }
 
-        // Behind a reverse proxy (Railway, containers), honor X-Forwarded-* so Request.Scheme becomes https
         app.UseForwardedHeaders();
+
+        // Remove overly broad Authorization stripping on all /connect routes.
+        // Authorization header is stripped narrowly by AuthorizeHeaderStripStartupFilter for /connect/authorize and /connect/par only.
 
         var disableHttpsRedirect = string.Equals(Environment.GetEnvironmentVariable("DISABLE_HTTPS_REDIRECT"), "true", StringComparison.OrdinalIgnoreCase);
         if (!disableHttpsRedirect)
@@ -118,16 +107,11 @@ public static class WebApplicationExtensions
         }
 
         app.UseStaticFiles();
-        // Early JAR/JARM normalization
-        app.UseMiddleware<JarRequestExpansionMiddleware>();
         app.UseRouting();
 
         app.UseRateLimiter();
-
         app.UseSession();
-
         app.UseMiddleware<DeviceAutoLoginMiddleware>();
-
         app.UseMiddleware<ClientCookieMiddleware>();
         app.UseAntiforgery();
 
