@@ -156,6 +156,8 @@ public static class MrWhoClientAuthBuilderExtensions
                                     var responseMode = ctx.ProtocolMessage.ResponseMode;
                                     ctx.ProtocolMessage.Parameters.Clear();
                                     ctx.ProtocolMessage.ClientId = authReq.ClientId;
+                                    // Ensure redirect_uri is still present for downstream consistency (token redemption requires it)
+                                    ctx.ProtocolMessage.RedirectUri = authReq.RedirectUri;
                                     ctx.ProtocolMessage.SetParameter("request_uri", result.RequestUri);
                                     if (!string.IsNullOrEmpty(state))
                                     {
@@ -167,7 +169,7 @@ public static class MrWhoClientAuthBuilderExtensions
                                         ctx.ProtocolMessage.ResponseMode = responseMode;
                                     }
 
-                                    logger?.LogDebug("[PAR] request_uri={ReqUri} stateDup={HasState} rm={RM}", result.RequestUri, !string.IsNullOrEmpty(state), responseMode);
+                                    logger?.LogDebug("[PAR] request_uri={ReqUri} stateDup={HasState} rm={RM} redirect_uri={RedirectUri}", result.RequestUri, !string.IsNullOrEmpty(state), responseMode, authReq.RedirectUri);
                                     externalConfigure?.Invoke(ctx.Options);
                                     return; // done
                                 }

@@ -10,6 +10,7 @@ builder.Services.AddRazorPages();
 
 var authority = builder.Configuration["Authentication:Authority"] ?? "https://localhost:7113";
 var clientSecret = builder.Configuration["Authentication:ClientSecret"];
+var authorizeEndpoint = authority.TrimEnd('/') + "/connect/authorize";
 
 // Register JAR signer (HS256 with client secret for demo). For RS256 supply RsaPrivateKeyPem / certificate instead.
 if (!string.IsNullOrWhiteSpace(clientSecret))
@@ -19,16 +20,15 @@ if (!string.IsNullOrWhiteSpace(clientSecret))
         o.Algorithm = SecurityAlgorithms.HmacSha256; // matches default allowed list (RS256,HS256)
         o.ClientSecret = clientSecret;              // must be >=32 bytes for HS256 (demo secret should satisfy)
         o.Issuer = null;                            // defaults to client_id
-        o.Audience = "mrwho";                      // server-side expected audience
+        o.Audience = authorizeEndpoint;             // JAR audience should target the authorization endpoint
     });
 }
 
-// Re-enable PAR client (Tasks 9/10). Auto threshold low so we always push quickly for demo clarity.
-builder.Services.AddMrWhoParClient(o =>
+// PAR client – convenience overload by authority. Auto threshold low so we always push quickly for demo clarity.
+builder.Services.AddMrWhoParClient(authority, opts =>
 {
-    o.ParEndpoint = new Uri(authority.TrimEnd('/') + "/connect/par");
-    o.AutoPushQueryLengthThreshold = 200; // force PAR even for short requests
-    o.AutoJar = true; // ensure JAR built before push
+    opts.AutoPushQueryLengthThreshold = 200; // force PAR even for short requests
+    opts.AutoJar = true; // ensure JAR built before push
 });
 
 var apiBase = new Uri(builder.Configuration["DemoApi:BaseUrl"] ?? "https://localhost:7162/");
@@ -57,13 +57,13 @@ builder.Services.AddMrWhoAuthentication(options =>
     options.SaveTokens = true;
     options.SignedOutCallbackPath = "/signout-callback-oidc";
 
-    // Allow auto PAR push now that endpoint is advertised
+    // Auto PAR and JAR
     options.AutoParPush = true;
-
-    // Enable JAR/JARM
     options.EnableJar = true;
     options.JarOnlyWhenLarge = false; // always create request object; PAR will carry it
-    options.EnableJarm = true;
+
+    // Do not enable JARM by default (stock handler doesn't parse JWT responses)
+    options.EnableJarm = false;
 
     options.Scopes.Clear();
     options.Scopes.Add("openid");

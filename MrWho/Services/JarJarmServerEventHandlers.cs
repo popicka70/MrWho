@@ -93,13 +93,17 @@ internal sealed class RequestConflictAndLimitValidationHandler : IOpenIddictServ
         OpenIddictConstants.Parameters.CodeChallengeMethod,
         "jti","request","request_uri","_jar_validated","_par_resolved",
         "_mrwho_max_params","_par_request_uri","_jar_metrics","mrwho_jarm",
-        "_jar_extra_bytes" // NEW: internal accounting param provided by JAR validator
+        "_jar_extra_bytes",
+        // Microsoft OIDC client telemetry params (ignore for value length/aggregate and counting purposes)
+        "x-client-SKU","x-client-ver"
     };
 
     private static readonly HashSet<string> _internalParams = new(StringComparer.OrdinalIgnoreCase)
     {
         "_query_scope","_jar_scope","_mrwho_max_params","_par_resolved","_par_request_uri","_jar_validated","_jar_metrics","mrwho_jarm",
-        "_jar_extra_bytes" // NEW
+        "_jar_extra_bytes",
+        // Microsoft OIDC client telemetry params should not count against parameter limits
+        "x-client-SKU","x-client-ver"
     };
 
     public RequestConflictAndLimitValidationHandler(IOptions<OidcAdvancedOptions> adv, ILogger<RequestConflictAndLimitValidationHandler> logger, IProtocolMetrics metrics)
