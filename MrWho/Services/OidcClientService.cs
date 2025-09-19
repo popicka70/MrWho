@@ -531,6 +531,18 @@ public partial class OidcClientService : IOidcClientService
         var demo1ConfiguredRedirects = (IEnumerable<string>)(cfgDemo1.RedirectUris ?? Array.Empty<string>());
         var demo1ConfiguredPostLogout = (IEnumerable<string>)(cfgDemo1.PostLogoutRedirectUris ?? Array.Empty<string>());
 
+        // Default dev/demo app URIs used by tests/apps
+        var defaultDemoRedirects = new[]
+        {
+            "https://localhost:7037/signin-oidc",
+            "https://localhost:7037/callback"
+        };
+        var defaultDemoPostLogout = new[]
+        {
+            "https://localhost:7037/",
+            "https://localhost:7037/signout-callback-oidc"
+        };
+
         const string Demo1LongSecret = "PyfrZln6d2ifAbdL_2gr316CERUMyzfpgmxJ1J3xJsWUnfHGakcvjWenB_OwQqnv";
 
         if (demo1Client == null)
@@ -560,30 +572,25 @@ public partial class OidcClientService : IOidcClientService
             _context.Clients.Add(demo1Client);
             await _context.SaveChangesAsync();
 
-            foreach (var uri in demo1ConfiguredRedirects)
+            // Add configured + default demo app redirects
+            foreach (var uri in demo1ConfiguredRedirects.Concat(defaultDemoRedirects).Distinct(StringComparer.OrdinalIgnoreCase))
             {
                 _context.ClientRedirectUris.Add(new ClientRedirectUri { ClientId = demo1Client.Id, Uri = uri });
             }
             // EXTRA: include NuGet demo app redirects
             foreach (var uri in new[] { "https://localhost:64820/signin-oidc", "https://localhost:64820/callback" })
             {
-                if (!demo1ConfiguredRedirects.Contains(uri, StringComparer.OrdinalIgnoreCase))
-                {
-                    _context.ClientRedirectUris.Add(new ClientRedirectUri { ClientId = demo1Client.Id, Uri = uri });
-                }
+                _context.ClientRedirectUris.Add(new ClientRedirectUri { ClientId = demo1Client.Id, Uri = uri });
             }
 
-            foreach (var uri in demo1ConfiguredPostLogout)
+            foreach (var uri in demo1ConfiguredPostLogout.Concat(defaultDemoPostLogout).Distinct(StringComparer.OrdinalIgnoreCase))
             {
                 _context.ClientPostLogoutUris.Add(new ClientPostLogoutUri { ClientId = demo1Client.Id, Uri = uri });
             }
             // EXTRA: include NuGet demo app post-logout redirects
             foreach (var uri in new[] { "https://localhost:64820/", "https://localhost:64820/signout-callback-oidc" })
             {
-                if (!demo1ConfiguredPostLogout.Contains(uri, StringComparer.OrdinalIgnoreCase))
-                {
-                    _context.ClientPostLogoutUris.Add(new ClientPostLogoutUri { ClientId = demo1Client.Id, Uri = uri });
-                }
+                _context.ClientPostLogoutUris.Add(new ClientPostLogoutUri { ClientId = demo1Client.Id, Uri = uri });
             }
 
             foreach (var scope in new[] { StandardScopes.OpenId, StandardScopes.Email, StandardScopes.Profile, StandardScopes.Roles, StandardScopes.OfflineAccess, StandardScopes.ApiRead, StandardScopes.ApiWrite })
@@ -628,9 +635,9 @@ public partial class OidcClientService : IOidcClientService
                 _logger.LogInformation("Updated demo1 client secret to meet HS256 length requirements");
             }
 
-            // Ensure configured redirect/post-logout URIs exist
+            // Ensure configured + default demo redirects exist
             var existingDemo1Redirects = demo1Client.RedirectUris.Select(r => r.Uri).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            foreach (var uri in demo1ConfiguredRedirects)
+            foreach (var uri in demo1ConfiguredRedirects.Concat(defaultDemoRedirects))
             {
                 if (!existingDemo1Redirects.Contains(uri))
                 {
@@ -648,7 +655,7 @@ public partial class OidcClientService : IOidcClientService
                 }
             }
             var existingDemo1PostLogout = demo1Client.PostLogoutUris.Select(r => r.Uri).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            foreach (var uri in demo1ConfiguredPostLogout)
+            foreach (var uri in demo1ConfiguredPostLogout.Concat(defaultDemoPostLogout))
             {
                 if (!existingDemo1PostLogout.Contains(uri))
                 {
@@ -783,6 +790,8 @@ public partial class OidcClientService : IOidcClientService
 
         await SyncClientWithOpenIddictAsync(adminClient!);
         await SyncClientWithOpenIddictAsync(m2mClient!);
+        // Ensure demo1 is always synchronized (fixes invalid_client/invalid_request in tests)
+        await SyncClientWithOpenIddictAsync(demo1Client!);
 
         // Standard service M2M (mrwho_m2m)
         var serviceM2M = await _context.Clients
