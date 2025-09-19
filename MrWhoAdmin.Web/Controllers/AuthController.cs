@@ -51,9 +51,10 @@ public class AuthController : Controller
     /// </summary>
     /// <param name="returnUrl">URL to redirect to after authentication</param>
     /// <param name="force">If true, force a fresh sign-in (prompt=login) at the OP and upstream IdP</param>
+    /// <param name="par">If true, initiate login using PAR (server pushes request and sets request_uri)</param>
     /// <returns>Challenge result</returns>
     [HttpGet("/auth/login")]
-    public IActionResult Login(string? returnUrl = null, bool force = false)
+    public IActionResult Login(string? returnUrl = null, bool force = false, bool par = false)
     {
         var schemes = ResolveSchemes();
         if (schemes == null)
@@ -73,8 +74,12 @@ public class AuthController : Controller
         {
             properties.Items["force"] = "1";
         }
+        if (par)
+        {
+            properties.Items["use_par"] = "1"; // consumed in OIDC OnRedirectToIdentityProvider
+        }
 
-        _logger.LogInformation("Initiating login using scheme {Scheme} (cookie={Cookie})", oidcScheme, cookieScheme);
+        _logger.LogInformation("Initiating login using scheme {Scheme} (cookie={Cookie}, par={Par})", oidcScheme, cookieScheme, par);
         return Challenge(properties, oidcScheme);
     }
 
