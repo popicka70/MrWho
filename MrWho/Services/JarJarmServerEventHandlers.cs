@@ -523,7 +523,8 @@ internal sealed class JarEarlyExtractAndValidateHandler : IOpenIddictServerHandl
         {
             var queryClientId = request.ClientId;
             var jwt = request.Request;
-            var result = await _validator.ValidateAsync(jwt!, queryClientId, context.CancellationToken);
+            var parResolved = request.GetParameter("_par_resolved") is not null;
+            var result = await _validator.ValidateAsync(jwt!, queryClientId, context.CancellationToken, skipReplayCheck: parResolved);
             if (!result.Success)
             {
                 _metrics.IncrementJarRequest("reject", result.Algorithm ?? "unknown");
@@ -693,7 +694,12 @@ internal sealed class ParRequestUriResolutionHandler : IOpenIddictServerHandler<
         }
         catch { }
 
+        // Accept _par_request_uri normalized by early middleware too
         var requestUri = request.GetParameter(OpenIddictConstants.Parameters.RequestUri)?.ToString();
+        if (string.IsNullOrWhiteSpace(requestUri))
+        {
+            requestUri = request.GetParameter("_par_request_uri")?.ToString();
+        }
         if (string.IsNullOrWhiteSpace(requestUri)) return;
 
         try
@@ -910,7 +916,8 @@ internal sealed class JarValidateRequestObjectHandler : IOpenIddictServerHandler
         try
         {
             _logger.LogDebug("[JAR-VALIDATE] Validating inbound request object; len={Len}", raw?.Length);
-            var result = await _validator.ValidateAsync(raw, req.ClientId, context.CancellationToken);
+            var parResolved = req.GetParameter("_par_resolved") is not null;
+            var result = await _validator.ValidateAsync(raw, req.ClientId, context.CancellationToken, skipReplayCheck: parResolved);
             if (!result.Success)
             {
                 _metrics.IncrementJarRequest("reject", result.Algorithm ?? "unknown");

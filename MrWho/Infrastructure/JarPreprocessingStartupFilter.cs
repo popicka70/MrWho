@@ -50,17 +50,14 @@ public sealed class JarPreprocessingStartupFilter : IStartupFilter
                                 dict[kv.Key] = kv.Value.ToString();
                             }
 
-                            // Merge parameters stored at PAR time without re-validating the embedded JAR
+                            // Merge parameters stored at PAR time and keep the embedded JAR so step (2) can validate it.
                             try
                             {
                                 var parsed = JsonSerializer.Deserialize<Dictionary<string, string>>(par.ParametersJson) ?? new();
                                 foreach (var kv in parsed)
                                 {
-                                    if (string.Equals(kv.Key, OpenIddictConstants.Parameters.Request, StringComparison.OrdinalIgnoreCase))
-                                    {
-                                        continue;
-                                    }
-                                    if (!dict.ContainsKey(kv.Key))
+                                    // Prefer existing explicit query values but add missing ones from PAR
+                                    if (!dict.ContainsKey(kv.Key) || string.IsNullOrEmpty(dict[kv.Key]))
                                     {
                                         dict[kv.Key] = kv.Value;
                                     }
@@ -71,13 +68,12 @@ public sealed class JarPreprocessingStartupFilter : IStartupFilter
                                 logger.LogDebug(ex, "[PAR][MW] Failed to parse stored ParametersJson (request_uri={RequestUri})", requestUri);
                             }
 
+                            // Determine whether to keep request_uri param based on client configuration
                             dict["_par_resolved"] = "1";
+                            dict["_par_request_uri"] = requestUri;
 
-                            // Conditionally keep or strip request_uri based on client configuration
                             bool keepRequestUri = false;
-                            string? clientId = null;
-                            dict.TryGetValue(OpenIddictConstants.Parameters.ClientId, out clientId);
-                            if (!string.IsNullOrWhiteSpace(clientId))
+                            if (dict.TryGetValue(OpenIddictConstants.Parameters.ClientId, out var clientId) && !string.IsNullOrWhiteSpace(clientId))
                             {
                                 try
                                 {
@@ -89,18 +85,18 @@ public sealed class JarPreprocessingStartupFilter : IStartupFilter
                                 }
                                 catch (Exception ex)
                                 {
-                                    logger.LogDebug(ex, "[PAR][MW] Failed to load client {ClientId} for request_uri handling", clientId);
+                                    logger.LogDebug(ex, "[PAR][MW] Failed to load client {ClientId} for request_uri retention decision", clientId);
                                 }
                             }
 
                             if (!keepRequestUri)
                             {
                                 dict.Remove(OpenIddictConstants.Parameters.RequestUri);
-                                logger.LogDebug("[PAR][MW] Stripped request_uri from query for client {ClientId} (PAR not required)", clientId ?? "?");
+                                logger.LogDebug("[PAR][MW] Stripped request_uri from query (client ParMode != Required)");
                             }
                             else
                             {
-                                logger.LogDebug("[PAR][MW] Kept request_uri for client {ClientId} (PAR required)", clientId ?? "?");
+                                logger.LogDebug("[PAR][MW] Kept request_uri in query (client ParMode=Required)");
                             }
 
                             ctx.Request.QueryString = QueryString.Create(dict!);
@@ -124,7 +120,8 @@ public sealed class JarPreprocessingStartupFilter : IStartupFilter
                             var queryClientId = ctx.Request.Query[OpenIddictConstants.Parameters.ClientId].ToString();
                             var originalRedirect = ctx.Request.Query[OpenIddictConstants.Parameters.RedirectUri].ToString();
                             var originalScope = ctx.Request.Query[OpenIddictConstants.Parameters.Scope].ToString();
-                            var result = await validator.ValidateAsync(jwt, queryClientId, ctx.RequestAborted);
+                            var parResolved = ctx.Request.Query.ContainsKey("_par_resolved");
+                            var result = await validator.ValidateAsync(jwt, queryClientId, ctx.RequestAborted, skipReplayCheck: parResolved);
                             if (result.Success && result.Parameters != null)
                             {
                                 var dict = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);

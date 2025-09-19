@@ -173,7 +173,8 @@
         try
         {
             var authConfig = Configuration.GetSection("Authentication");
-            Authority = authConfig.GetValue<string>("Authority") ?? "https://localhost:7113/";
+            var rawAuthority = authConfig.GetValue<string>("Authority") ?? "https://localhost:7113"; // allow missing trailing slash
+            Authority = NormalizeBaseUrl(rawAuthority);
             ClientId = authConfig.GetValue<string>("ClientId") ?? "mrwho_admin_web";
             CurrentUrl = Navigation.Uri;
             ExpectedCallback = Navigation.BaseUri + "signin-oidc";
@@ -208,7 +209,8 @@
             using var httpClient = new HttpClient();
             httpClient.Timeout = TimeSpan.FromSeconds(5);
 
-            var response = await httpClient.GetAsync($"{Authority}.well-known/openid-configuration");
+            var discoveryUrl = Combine(Authority, "/.well-known/openid-configuration");
+            var response = await httpClient.GetAsync(discoveryUrl);
             if (response.IsSuccessStatusCode)
             {
                 AuthorityStatus = "success";
@@ -268,7 +270,8 @@
         try
         {
             using var httpClient = new HttpClient();
-            var response = await httpClient.GetAsync($"{Authority}.well-known/openid-configuration");
+            var discoveryUrl = Combine(Authority, "/.well-known/openid-configuration");
+            var response = await httpClient.GetAsync(discoveryUrl);
             var content = await response.Content.ReadAsStringAsync();
             
             DiagnosticsResult += $"Status: {response.StatusCode}\n";
@@ -306,7 +309,8 @@
         try
         {
             using var httpClient = new HttpClient();
-            var response = await httpClient.GetAsync($"{Authority}debug/admin-client-info");
+            var clientInfoUrl = Combine(Authority, "/debug/admin-client-info");
+            var response = await httpClient.GetAsync(clientInfoUrl);
             var content = await response.Content.ReadAsStringAsync();
             
             DiagnosticsResult += $"Status: {response.StatusCode}\n";
@@ -408,5 +412,21 @@
     public void Dispose()
     {
         _disposed = true;
+    }
+
+    // Helpers ------------------------------------------------------------
+    private static string NormalizeBaseUrl(string baseUrl)
+    {
+        // Ensure no trailing slash to simplify Combine()
+        return (baseUrl ?? string.Empty).Trim().TrimEnd('/');
+    }
+
+    private static string Combine(string baseUrl, string path)
+    {
+        if (string.IsNullOrWhiteSpace(baseUrl)) return path;
+        if (string.IsNullOrWhiteSpace(path)) return baseUrl;
+        var left = baseUrl.TrimEnd('/');
+        var right = path.StartsWith("/") ? path : "/" + path;
+        return left + right;
     }
 }

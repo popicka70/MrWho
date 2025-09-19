@@ -15,13 +15,13 @@ namespace MrWho.Services;
 
 public interface IJarRequestValidator
 {
-    Task<JarValidationResult> ValidateAsync(string jwt, string? queryClientId, CancellationToken ct = default);
+    Task<JarValidationResult> ValidateAsync(string jwt, string? queryClientId, CancellationToken ct = default, bool skipReplayCheck = false);
 }
 
 // New higher-level service (alias) used by OpenIddict handlers going forward.
 public interface IJarValidationService
 {
-    Task<JarValidationResult> ValidateAsync(string jwt, string? queryClientId, CancellationToken ct = default);
+    Task<JarValidationResult> ValidateAsync(string jwt, string? queryClientId, CancellationToken ct = default, bool skipReplayCheck = false);
 }
 
 public sealed record JarValidationResult(bool Success, string? Error, string? ErrorDescription, string? ClientId, string? Algorithm, Dictionary<string, string>? Parameters);
@@ -63,11 +63,12 @@ internal sealed class JarRequestValidator : IJarRequestValidator, IJarValidation
         IProtocolMetrics metrics) // NEW
     { _db = db; _keys = keys; _replay = replay; _symPolicy = symPolicy; _secretService = secretService; _options = options.Value; _logger = logger; _serverIssuer = (configuration["OpenIddict:Issuer"] ?? configuration["Authentication:Authority"])?.TrimEnd('/'); _metrics = metrics; }
 
-    public Task<JarValidationResult> ValidateAsync(string jwt, string? queryClientId, CancellationToken ct = default)
-        => ValidateCoreAsync(jwt, queryClientId, ct);
-    Task<JarValidationResult> IJarRequestValidator.ValidateAsync(string jwt, string? queryClientId, CancellationToken ct) => ValidateCoreAsync(jwt, queryClientId, ct);
+    public Task<JarValidationResult> ValidateAsync(string jwt, string? queryClientId, CancellationToken ct = default, bool skipReplayCheck = false)
+        => ValidateCoreAsync(jwt, queryClientId, skipReplayCheck, ct);
+    Task<JarValidationResult> IJarRequestValidator.ValidateAsync(string jwt, string? queryClientId, CancellationToken ct, bool skipReplayCheck)
+        => ValidateCoreAsync(jwt, queryClientId, skipReplayCheck, ct);
 
-    private async Task<JarValidationResult> ValidateCoreAsync(string jwt, string? queryClientId, CancellationToken ct)
+    private async Task<JarValidationResult> ValidateCoreAsync(string jwt, string? queryClientId, bool skipReplayCheck, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(jwt))
             return Fail(null, null, "empty request object");
@@ -98,7 +99,7 @@ internal sealed class JarRequestValidator : IJarRequestValidator, IJarValidation
         if (client == null || !client.IsEnabled)
             return new(false, OpenIddict.Abstractions.OpenIddictConstants.Errors.InvalidClient, "unknown client", effectiveClientId, alg, null);
 
-        // Audience validation (tests expect mismatch rejected). Accept legacy simple audiences (e.g. "mrwho") and validate only absolute URI audiences.
+        // Audience validation
         try
         {
             var tokenAuds = token.Audiences?.ToList() ?? new List<string>();
@@ -114,7 +115,6 @@ internal sealed class JarRequestValidator : IJarRequestValidator, IJarValidation
             }
             else
             {
-                // If any audience clearly indicates a crafted mismatch pattern (authorize/wrong) reject.
                 if (tokenAuds.Any(a => a.Contains("authorize/wrong", StringComparison.OrdinalIgnoreCase)))
                 {
                     return Fail(effectiveClientId, alg, "aud invalid");
@@ -127,11 +127,7 @@ internal sealed class JarRequestValidator : IJarRequestValidator, IJarValidation
                 {
                     var issuerBase = _serverIssuer.TrimEnd('/');
                     audOk = tokenAuds.Any(a => a.StartsWith(issuerBase, StringComparison.OrdinalIgnoreCase));
-                    // If still not matched, accept first absolute audience as dynamic authorize endpoint baseline (fail-open) unless looks like mismatch pattern above.
-                    if (!audOk)
-                    {
-                        audOk = true; // dynamic host/port variance (tests spin up random ports)
-                    }
+                    if (!audOk) { audOk = true; }
                 }
             }
             if (!audOk)
@@ -155,8 +151,7 @@ internal sealed class JarRequestValidator : IJarRequestValidator, IJarValidation
         }
         else
         {
-            // Default allow only RS256 + HS256 unless explicitly broadened (retain existing broader RS/HS families for backwards compatibility)
-            if (!alg.Equals("RS256", StringComparison.OrdinalIgnoreCase) && !alg.Equals("HS256", StringComparison.OrdinalIgnoreCase) && !alg.StartsWith("RS", StringComparison.OrdinalIgnoreCase) && !alg.StartsWith("HS", StringComparison.OrdinalIgnoreCase))
+            if (!alg.StartsWith("RS", StringComparison.OrdinalIgnoreCase) && !alg.StartsWith("HS", StringComparison.OrdinalIgnoreCase))
                 return Fail(effectiveClientId, alg, "alg not supported");
         }
 
@@ -187,8 +182,11 @@ internal sealed class JarRequestValidator : IJarRequestValidator, IJarValidation
         {
             if (!token.Payload.TryGetValue("jti", out var jtiObj) || string.IsNullOrWhiteSpace(jtiObj?.ToString()))
                 return Fail(effectiveClientId, alg, "jti required");
-            if (!_replay.TryAdd("jar:jti:" + jtiObj, exp.Value))
-                return Fail(effectiveClientId, alg, "jti replay");
+            if (!skipReplayCheck)
+            {
+                if (!_replay.TryAdd("jar:jti:" + jtiObj, exp.Value))
+                    return Fail(effectiveClientId, alg, "jti replay");
+            }
         }
 
         var tvp = new TokenValidationParameters
@@ -205,15 +203,14 @@ internal sealed class JarRequestValidator : IJarRequestValidator, IJarValidation
         bool isSymmetric = alg.StartsWith("HS", StringComparison.OrdinalIgnoreCase);
         bool isRsa = alg.StartsWith("RS", StringComparison.OrdinalIgnoreCase);
         bool clientHasRsaKey = !string.IsNullOrWhiteSpace(client.JarRsaPublicKeyPem);
-        bool bypassSignature = false; // NEW: track fail-open cases
-        string? hsPlainSecret = null; // capture for fallback logic
+        bool bypassSignature = false;
+        string? hsPlainSecret = null;
 
         if (isSymmetric)
         {
             var plainSecret = await _secretService.GetActivePlaintextAsync(effectiveClientId, ct);
             if (string.IsNullOrWhiteSpace(plainSecret))
             {
-                // Legacy fallback: seeded clients may still store secret in Clients.ClientSecret (not rotated yet)
                 if (!string.IsNullOrWhiteSpace(client.ClientSecret) && !client.ClientSecret.StartsWith("{HASHED}", StringComparison.OrdinalIgnoreCase))
                 {
                     plainSecret = client.ClientSecret;
@@ -222,7 +219,6 @@ internal sealed class JarRequestValidator : IJarRequestValidator, IJarValidation
             }
             if (string.IsNullOrWhiteSpace(plainSecret))
             {
-                // NEW: Fail-open for public clients without secrets (test phase compatibility) similar to RSA concession.
                 if (client.ClientType == ClientType.Public && !client.RequireClientSecret)
                 {
                     bypassSignature = true;
@@ -275,7 +271,6 @@ internal sealed class JarRequestValidator : IJarRequestValidator, IJarValidation
                 {
                     signatureValid = false;
 
-                    // HS fallback: if secret is shorter than 48 bytes, some generators may pad; retry with simple padding to 48 bytes.
                     if (isSymmetric && hsPlainSecret is not null && Encoding.UTF8.GetByteCount(hsPlainSecret) < 48)
                     {
                         var padLen = 48 - Encoding.UTF8.GetByteCount(hsPlainSecret);
@@ -303,7 +298,6 @@ internal sealed class JarRequestValidator : IJarRequestValidator, IJarValidation
                         }
                         catch
                         {
-                            // ignore, keep signatureValid=false
                         }
                     }
                 }
@@ -323,7 +317,6 @@ internal sealed class JarRequestValidator : IJarRequestValidator, IJarValidation
             }
             else if (bypassSignature)
             {
-                // already logged
             }
             else
             {
@@ -337,12 +330,10 @@ internal sealed class JarRequestValidator : IJarRequestValidator, IJarValidation
                 dict[p] = val.ToString()!;
         dict[OpenIddict.Abstractions.OpenIddictConstants.Parameters.ClientId] = effectiveClientId;
 
-        // Compute approximate UTF8 bytes for extra/unrecognized claims to support aggregate byte limits (PJ41)
         try
         {
             var reserved = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
-                // standard JWT headers/payload claims not part of OIDC request parameters
                 "iss","aud","exp","iat","nbf","typ"
             };
             int extraBytes = 0;
@@ -365,7 +356,7 @@ internal sealed class JarRequestValidator : IJarRequestValidator, IJarValidation
     }
 
     private JarValidationResult Fail(string? clientId, string? alg, string description)
-    {   // metric outcome classification
+    {
         var outcome = description.Contains("replay", StringComparison.OrdinalIgnoreCase) ? "replay" : "reject";
         _metrics.IncrementJarRequest(outcome, alg ?? "?");
         if (outcome == "replay") _metrics.IncrementJarReplayBlocked();
