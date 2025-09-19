@@ -5,6 +5,7 @@ using System.Text;
 using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Extensions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.WebUtilities;
@@ -42,6 +43,7 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
     private readonly IOptions<JarOptions> _jarOptions;
     private readonly ISecurityAuditWriter _audit;
     private readonly IClientSecretService _clientSecretService; // new
+    private readonly IProtocolMetrics _metrics; // NEW: emit validation metrics
     private const string MfaCookiePrefix = ".MrWho.Mfa.";
 
     private static readonly string[] MfaAmrValues = new[] { "mfa", "fido2" };
@@ -62,7 +64,8 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         IJarReplayCache jarReplayCache,
         IOptions<JarOptions> jarOptions,
         ISecurityAuditWriter audit,
-        IClientSecretService clientSecretService) // inject
+        IClientSecretService clientSecretService, // inject
+        IProtocolMetrics metrics) // inject
     {
         _userManager = userManager;
         _signInManager = signInManager;
@@ -78,6 +81,7 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         _jarOptions = jarOptions;
         _audit = audit;
         _clientSecretService = clientSecretService; // assign
+        _metrics = metrics; // assign
     }
 
     public async Task<IResult> HandleAuthorizationRequestAsync(HttpContext context)
@@ -181,6 +185,7 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
                 if (!hasRequestUri)
                 {
                     _logger.LogInformation("Client {ClientId} requires PAR but request_uri is missing", clientId);
+                    _metrics.IncrementValidationEvent("conflict", "par_required");
                     return Results.BadRequest(new { error = OpenIddictConstants.Errors.InvalidRequest, error_description = "PAR required" });
                 }
             }
@@ -203,6 +208,7 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
                 if (jarMode == JarMode.Required && string.IsNullOrEmpty(requestJwt) && !jarAlreadyValidated)
                 {
                     _logger.LogInformation("Client {ClientId} requires JAR but none supplied", clientId);
+                    _metrics.IncrementValidationEvent("conflict", "jar_required");
                     return Results.BadRequest(new
                     {
                         error = OpenIddictConstants.Errors.InvalidRequest,
@@ -218,6 +224,7 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
                     var maxBytes = _jarOptions.Value.MaxRequestObjectBytes;
                     if (maxBytes > 0 && Encoding.UTF8.GetByteCount(requestJwt) > maxBytes)
                     {
+                        _metrics.IncrementValidationEvent("limit", "request_object_size");
                         return Results.BadRequest(new { error = OpenIddictConstants.Errors.InvalidRequestObject, error_description = "request object too large" });
                     }
                     var jarResult = await ValidateAndApplyJarAsync(dbClient, requestJwt, request, context);
@@ -236,6 +243,7 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
                     if (!string.Equals(normQuery, normReq, StringComparison.Ordinal))
                     {
                         _logger.LogInformation("Parameter conflict detected: scope (query='{QueryScope}', effective='{EffectiveScope}')", normQuery, normReq);
+                        _metrics.IncrementValidationEvent("conflict", "scope");
                         return Results.BadRequest(new { error = OpenIddictConstants.Errors.InvalidRequest, error_description = "parameter_conflict:scope" });
                     }
                 }
@@ -268,6 +276,7 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
                 if (paramNames.Count > maxParams)
                 {
                     _logger.LogInformation("limit_exceeded:parameters -> {Count} > {Max}", paramNames.Count, maxParams);
+                    _metrics.IncrementValidationEvent("limit", "parameters");
                     return Results.BadRequest(new { error = OpenIddictConstants.Errors.InvalidRequest, error_description = "limit_exceeded:parameters" });
                 }
             }
@@ -284,6 +293,7 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
                     if (aggregateBytes > maxAgg)
                     {
                         _logger.LogInformation("limit_exceeded:aggregate_bytes -> {Bytes} > {Max}", aggregateBytes, maxAgg);
+                        _metrics.IncrementValidationEvent("limit", "aggregate_bytes");
                         return Results.BadRequest(new { error = OpenIddictConstants.Errors.InvalidRequest, error_description = "limit_exceeded:aggregate_bytes" });
                     }
                 }
