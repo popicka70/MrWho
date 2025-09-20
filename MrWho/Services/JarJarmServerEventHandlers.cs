@@ -334,11 +334,16 @@ internal sealed class JarmResponseModeNormalizationHandler : IOpenIddictServerHa
             request.SetParameter("mrwho_jarm", "1");
             request.ResponseMode = null;
             request.SetParameter(OpenIddictConstants.Parameters.ResponseMode, null);
+            try { context.Transaction!.Properties["mrwho.jarm"] = "1"; } catch { }
             _logger.LogDebug("[JARM-NORM] Normalized response_mode=jwt to mrwho_jarm=1");
             return ValueTask.CompletedTask;
         }
 
-        if (request.GetParameter("mrwho_jarm") is not null) return ValueTask.CompletedTask;
+        if (request.GetParameter("mrwho_jarm") is not null)
+        {
+            try { context.Transaction!.Properties["mrwho.jarm"] = "1"; } catch { }
+            return ValueTask.CompletedTask;
+        }
 
         if (!string.IsNullOrEmpty(request.ClientId))
         {
@@ -351,6 +356,7 @@ internal sealed class JarmResponseModeNormalizationHandler : IOpenIddictServerHa
                 if (required == JarmMode.Required)
                 {
                     request.SetParameter("mrwho_jarm", "1");
+                    try { context.Transaction!.Properties["mrwho.jarm"] = "1"; } catch { }
                     _logger.LogDebug("[JARM-NORM] Enforced mrwho_jarm=1 (client requires JARM) clientId={ClientId}", request.ClientId);
                 }
             }
@@ -368,9 +374,10 @@ internal sealed class JarmAuthorizationResponseHandler : IOpenIddictServerHandle
     private readonly JarOptions _jarOptions;
     private readonly ISecurityAuditWriter _auditWriter;
     private readonly IProtocolMetrics _metrics;
+    private readonly IOptions<OpenIddictServerOptions> _serverOptions;
 
-    public JarmAuthorizationResponseHandler(ILogger<JarmAuthorizationResponseHandler> logger, IKeyManagementService keyService, IOptions<JarOptions> jarOptions, ISecurityAuditWriter auditWriter, IProtocolMetrics metrics)
-    { _logger = logger; _keyService = keyService; _jarOptions = jarOptions.Value; _auditWriter = auditWriter; _metrics = metrics; }
+    public JarmAuthorizationResponseHandler(ILogger<JarmAuthorizationResponseHandler> logger, IKeyManagementService keyService, IOptions<JarOptions> jarOptions, ISecurityAuditWriter auditWriter, IProtocolMetrics metrics, IOptions<OpenIddictServerOptions> serverOptions)
+    { _logger = logger; _keyService = keyService; _jarOptions = jarOptions.Value; _auditWriter = auditWriter; _metrics = metrics; _serverOptions = serverOptions; }
 
     private static void EnsureKeyId(SecurityKey key, ILogger logger)
     {
@@ -445,6 +452,11 @@ internal sealed class JarmAuthorizationResponseHandler : IOpenIddictServerHandle
                         }
                     }
                 }
+                // Extra fallback: use transaction flag set during earlier normalization/extract steps
+                if (!jarmRequested && context.Transaction != null && context.Transaction.Properties.TryGetValue("mrwho.jarm", out var flag) && (flag?.ToString() == "1"))
+                {
+                    jarmRequested = true;
+                }
             }
             catch { }
 
@@ -456,7 +468,12 @@ internal sealed class JarmAuthorizationResponseHandler : IOpenIddictServerHandle
             var response = context.Response;
             if (response is null) return;
 
-            var issuer = response[OpenIddictConstants.Metadata.Issuer]?.ToString()?.TrimEnd('/') ?? string.Empty;
+            // Determine issuer: prefer configured OpenIddict Issuer; fallback to response metadata if available.
+            var issuer = _serverOptions?.Value?.Issuer?.AbsoluteUri?.TrimEnd('/') ?? string.Empty;
+            if (string.IsNullOrEmpty(issuer))
+            {
+                issuer = response[OpenIddictConstants.Metadata.Issuer]?.ToString()?.TrimEnd('/') ?? string.Empty;
+            }
             var clientId = req?.ClientId ?? response[OpenIddictConstants.Parameters.ClientId]?.ToString();
             var now = DateTimeOffset.UtcNow;
             var exp = now.AddSeconds(Math.Clamp(_jarOptions.JarmTokenLifetimeSeconds, 30, 300));
@@ -470,7 +487,16 @@ internal sealed class JarmAuthorizationResponseHandler : IOpenIddictServerHandle
 
             string? codeValue = response[OpenIddictConstants.Parameters.Code]?.ToString();
             if (!string.IsNullOrEmpty(codeValue)) claims[OpenIddictConstants.Parameters.Code] = codeValue;
-            string? stateValue = response[OpenIddictConstants.Parameters.State]?.ToString();
+            // Prefer state from request; fallback to response dictionary
+            string? stateValue = req?.State;
+            if (string.IsNullOrWhiteSpace(stateValue))
+            {
+                try { stateValue = req?.GetParameter(OpenIddictConstants.Parameters.State)?.ToString(); } catch { }
+            }
+            if (string.IsNullOrWhiteSpace(stateValue))
+            {
+                stateValue = response[OpenIddictConstants.Parameters.State]?.ToString();
+            }
             if (!string.IsNullOrEmpty(stateValue)) claims[OpenIddictConstants.Parameters.State] = stateValue;
             string? errorValue = response[OpenIddictConstants.Parameters.Error]?.ToString();
             if (!string.IsNullOrEmpty(errorValue))
@@ -688,9 +714,14 @@ internal sealed class JarmResponseModeExtractHandler : IOpenIddictServerHandler<
             request.SetParameter("mrwho_jarm", "1");
             request.ResponseMode = null;
             request.SetParameter(OpenIddictConstants.Parameters.ResponseMode, null);
+            try { context.Transaction!.Properties["mrwho.jarm"] = "1"; } catch { }
             return ValueTask.CompletedTask;
         }
-        if (request.GetParameter("mrwho_jarm") is not null) return ValueTask.CompletedTask;
+        if (request.GetParameter("mrwho_jarm") is not null)
+        {
+            try { context.Transaction!.Properties["mrwho.jarm"] = "1"; } catch { }
+            return ValueTask.CompletedTask;
+        }
 
         var clientId = request.ClientId;
         if (!string.IsNullOrEmpty(clientId))
@@ -701,6 +732,7 @@ internal sealed class JarmResponseModeExtractHandler : IOpenIddictServerHandler<
                 if (mode == JarmMode.Required)
                 {
                     request.SetParameter("mrwho_jarm", "1");
+                    try { context.Transaction!.Properties["mrwho.jarm"] = "1"; } catch { }
                     _logger.LogDebug("[JARM-EXTRACT] Injected mrwho_jarm=1 for required client {ClientId}", clientId);
                 }
             }
@@ -1118,7 +1150,7 @@ internal sealed class MrWhoShortCircuitValidateHandler : IOpenIddictServerHandle
     public ValueTask HandleAsync(ValidateAuthorizationRequestContext context)
     {
         var req = context.Request;
-        if (req is null) return ValueTask.CompletedTask;
+        if (req == null) return ValueTask.CompletedTask;
         if (req.GetParameter("_jar_validated") is not null)
         {
             req.Request = null;
@@ -1210,7 +1242,8 @@ public static class JarJarmServerEventHandlers
     public static OpenIddictServerHandlerDescriptor ApplyAuthorizationResponseDescriptor { get; } =
         OpenIddictServerHandlerDescriptor.CreateBuilder<ApplyAuthorizationResponseContext>()
             .UseScopedHandler<JarmAuthorizationResponseHandler>()
-            .SetOrder(int.MaxValue)
+            // Run early so OpenIddict can include our 'response' param when it composes the redirect URI.
+            .SetOrder(int.MinValue + 50)
             .SetType(OpenIddictServerHandlerType.Custom)
             .Build();
 

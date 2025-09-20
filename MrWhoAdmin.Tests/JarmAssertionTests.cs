@@ -135,8 +135,9 @@ public class JarmAssertionTests
         var authorizeUrl = $"/connect/authorize?client_id={Uri.EscapeDataString(clientId)}&response_type=code&redirect_uri={Uri.EscapeDataString(redirectUri)}&scope=openid&state={state}&code_challenge={challenge}&code_challenge_method=S256&response_mode=jwt&mrwho_consent=ok";
 
         // Start login with returnUrl = authorizeUrl
-        using var http = CreateServerClient(disableRedirects: false, disableCookies: false);
-        var loginGet = await http.GetAsync($"/connect/login?returnUrl={Uri.EscapeDataString(http.BaseAddress + authorizeUrl.TrimStart('/'))}&clientId={Uri.EscapeDataString(clientId)}");
+        using var http = CreateServerClient(disableRedirects: true, disableCookies: false);
+        var initialLoginUrl = $"/connect/login?returnUrl={Uri.EscapeDataString(http.BaseAddress + authorizeUrl.TrimStart('/'))}&clientId={Uri.EscapeDataString(clientId)}";
+        var loginGet = await http.GetAsync(initialLoginUrl);
         // Follow one redirect if login-short used
         if ((int)loginGet.StatusCode is >= 300 and <= 399 && loginGet.Headers.Location != null)
         {
@@ -156,7 +157,12 @@ public class JarmAssertionTests
             ["Password"] = "Adm1n#2025!G7x",
             ["RememberMe"] = "false"
         };
-        var post = await http.PostAsync($"/connect/login?returnUrl={Uri.EscapeDataString(http.BaseAddress + authorizeUrl.TrimStart('/'))}&clientId={Uri.EscapeDataString(clientId)}", new FormUrlEncodedContent(form));
+        // Post back to the same login endpoint we fetched (supports login-short)
+        var postTarget = loginGet.RequestMessage?.RequestUri?.ToString() ?? initialLoginUrl;
+        if (!postTarget.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+            postTarget = new Uri(http.BaseAddress!, postTarget).ToString();
+        var post = await http.PostAsync(postTarget, new FormUrlEncodedContent(form));
+
         // Expect redirect to authorize first, then to redirect_uri with response param
         Assert.IsTrue((int)post.StatusCode is >= 300 and <= 399, $"Login POST should redirect. Status={(int)post.StatusCode}");
         var next = post.Headers.Location?.ToString() ?? string.Empty;
