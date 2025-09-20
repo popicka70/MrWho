@@ -86,6 +86,16 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
 
     public async Task<IResult> HandleAuthorizationRequestAsync(HttpContext context)
     {
+        // Extra safety: strip any Authorization header to prevent OpenIddict from returning ID2004 (invalid_token)
+        try
+        {
+            if (context.Request.Headers.ContainsKey("Authorization"))
+            {
+                context.Request.Headers.Remove("Authorization");
+            }
+        }
+        catch { }
+
         var request = context.GetOpenIddictServerRequest() ??
                       throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
 
@@ -415,6 +425,105 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
         if (authUser == null)
         {
             _logger.LogDebug("No authenticated user found for client {ClientId}; redirecting to login", clientId);
+
+            // OIDC: when prompt=none and no user session, return login_required error (do NOT redirect to login UI)
+            try
+            {
+                var promptParam = request.Prompt;
+                if (string.IsNullOrWhiteSpace(promptParam))
+                {
+                    var raw = request.GetParameter(OpenIddictConstants.Parameters.Prompt)?.ToString();
+                    promptParam = raw ?? string.Empty;
+                }
+                var prompts = promptParam.Split(new[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                var promptNone = prompts.Any(p => string.Equals(p, "none", StringComparison.OrdinalIgnoreCase));
+                if (promptNone)
+                {
+                    // Decide whether to JARM-package the error
+                    bool wantsJarm = false;
+                    try
+                    {
+                        var hasJarmParam = string.Equals(request.GetParameter("mrwho_jarm")?.ToString(), "1", StringComparison.Ordinal);
+                        var hasJwtMode = string.Equals(request.ResponseMode, "jwt", StringComparison.OrdinalIgnoreCase) ||
+                                         string.Equals(request.GetParameter(OpenIddictConstants.Parameters.ResponseMode)?.ToString(), "jwt", StringComparison.OrdinalIgnoreCase);
+                        wantsJarm = hasJarmParam || hasJwtMode || jarmRequired;
+                    }
+                    catch { }
+
+                    if (wantsJarm)
+                    {
+                        // Build JARM error JWT and redirect directly to redirect_uri?response=...
+                        try
+                        {
+                            var redirectUri = request.RedirectUri;
+                            if (string.IsNullOrWhiteSpace(redirectUri))
+                            {
+                                redirectUri = context.Request.Query.TryGetValue(OpenIddictConstants.Parameters.RedirectUri, out var qRu) ? qRu.ToString() : null;
+                            }
+                            if (!string.IsNullOrWhiteSpace(redirectUri))
+                            {
+                                var (signingKeys, _) = await _keyService.GetActiveKeysAsync();
+                                var signingKey = signingKeys.FirstOrDefault();
+                                if (signingKey != null)
+                                {
+                                    var now = DateTimeOffset.UtcNow;
+                                    var exp = now.AddSeconds(Math.Clamp(_jarOptions.Value.JarmTokenLifetimeSeconds, 30, 300));
+                                    // issuer from request host
+                                    var issuer = $"{context.Request.Scheme}://{context.Request.Host}".TrimEnd('/');
+                                    var stateValue = request.State ?? context.Request.Query[OpenIddictConstants.Parameters.State].ToString();
+
+                                    var headerCreds = new SigningCredentials(signingKey, SecurityAlgorithms.RsaSha256);
+                                    var handler = new JsonWebTokenHandler();
+                                    var payload = new Dictionary<string, object?>
+                                    {
+                                        ["iss"] = issuer,
+                                        ["aud"] = clientId,
+                                        ["iat"] = now.ToUnixTimeSeconds(),
+                                        ["exp"] = exp.ToUnixTimeSeconds(),
+                                        [OpenIddictConstants.Parameters.Error] = OpenIddictConstants.Errors.LoginRequired
+                                    };
+                                    if (!string.IsNullOrEmpty(stateValue)) payload[OpenIddictConstants.Parameters.State] = stateValue;
+
+                                    var descriptor = new SecurityTokenDescriptor
+                                    {
+                                        Issuer = issuer,
+                                        Audience = clientId,
+                                        Expires = exp.UtcDateTime,
+                                        NotBefore = now.UtcDateTime.AddSeconds(-5),
+                                        IssuedAt = now.UtcDateTime,
+                                        Claims = payload.Where(kv => kv.Key is not ("iss" or "aud" or "exp" or "iat")).ToDictionary(k => k.Key, v => v.Value!),
+                                        SigningCredentials = headerCreds
+                                    };
+                                    var jwt = handler.CreateToken(descriptor);
+
+                                    // Build redirect_uri with response=
+                                    var sep = redirectUri.Contains("?") ? "&" : "?";
+                                    var location = redirectUri + sep + "response=" + Uri.EscapeDataString(jwt);
+                                    return Results.Redirect(location);
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "Failed to build direct JARM error response; falling back to standard error response");
+                        }
+                    }
+
+                    _logger.LogDebug("prompt=none detected with no active session -> returning login_required to client {ClientId}", clientId);
+                    var props = new AuthenticationProperties(new Dictionary<string, string?>
+                    {
+                        [OpenIddictServerAspNetCoreConstants.Properties.Error] = OpenIddictConstants.Errors.LoginRequired,
+                        [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = "User is not logged in and prompt=none was specified."
+                    });
+                    // Let OpenIddict produce the proper authorization error response (and JARM packaging, if requested)
+                    return Results.Forbid(props, new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Failed to evaluate prompt parameter for client {ClientId}", clientId);
+            }
+
             var originalAuthorizeUrl = context.Request.GetDisplayUrl();
             // Inject JARM enforcement flag when required OR response_mode=jwt present
             try

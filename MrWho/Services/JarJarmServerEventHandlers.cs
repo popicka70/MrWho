@@ -416,15 +416,48 @@ internal sealed class JarmAuthorizationResponseHandler : IOpenIddictServerHandle
     {
         try
         {
-            var jarmRequested = string.Equals(context.Request?.ResponseMode, "jwt", StringComparison.OrdinalIgnoreCase) ||
-                                 string.Equals(context.Request?.GetParameter("mrwho_jarm").ToString(), "1", StringComparison.Ordinal);
-            if (!jarmRequested) return;
+            // Determine whether JARM is requested using both immediate and transactional requests as fallbacks.
+            var req = context.Request ?? context.Transaction?.Request;
+            bool jarmRequested = false;
+            try
+            {
+                if (req != null)
+                {
+                    jarmRequested = string.Equals(req.ResponseMode, "jwt", StringComparison.OrdinalIgnoreCase)
+                                     || string.Equals(req.GetParameter("mrwho_jarm").ToString(), "1", StringComparison.Ordinal)
+                                     || string.Equals(req.GetParameter(OpenIddictConstants.Parameters.ResponseMode)?.ToString(), "jwt", StringComparison.OrdinalIgnoreCase);
+
+                    // Fallback: if prompt=none was requested, prefer packaging the error as JARM for better client compatibility
+                    if (!jarmRequested)
+                    {
+                        var promptText = req.Prompt;
+                        if (string.IsNullOrWhiteSpace(promptText))
+                        {
+                            promptText = req.GetParameter(OpenIddictConstants.Parameters.Prompt)?.ToString();
+                        }
+                        if (!string.IsNullOrWhiteSpace(promptText))
+                        {
+                            var prompts = promptText.Split(new[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                            if (prompts.Any(p => string.Equals(p, "none", StringComparison.OrdinalIgnoreCase)))
+                            {
+                                jarmRequested = true;
+                            }
+                        }
+                    }
+                }
+            }
+            catch { }
+
+            if (!jarmRequested)
+            {
+                return;
+            }
 
             var response = context.Response;
             if (response is null) return;
 
             var issuer = response[OpenIddictConstants.Metadata.Issuer]?.ToString()?.TrimEnd('/') ?? string.Empty;
-            var clientId = context.Request?.ClientId ?? response[OpenIddictConstants.Parameters.ClientId]?.ToString();
+            var clientId = req?.ClientId ?? response[OpenIddictConstants.Parameters.ClientId]?.ToString();
             var now = DateTimeOffset.UtcNow;
             var exp = now.AddSeconds(Math.Clamp(_jarOptions.JarmTokenLifetimeSeconds, 30, 300));
             var claims = new Dictionary<string, object?>
