@@ -18,6 +18,7 @@ using MrWho.Models;
 using MrWho.Services; // includes IJarReplayCache, JarOptions
 using MrWho.Shared; // Jar/Jarm enums
 using OpenIddict.Abstractions;
+using OpenIddict.Server;
 using OpenIddict.Server.AspNetCore;
 
 namespace MrWho.Handlers;
@@ -468,9 +469,25 @@ public class OidcAuthorizationHandler : IOidcAuthorizationHandler
                                 {
                                     var now = DateTimeOffset.UtcNow;
                                     var exp = now.AddSeconds(Math.Clamp(_jarOptions.Value.JarmTokenLifetimeSeconds, 30, 300));
-                                    // issuer from request host
-                                    var issuer = $"{context.Request.Scheme}://{context.Request.Host}".TrimEnd('/');
-                                    var stateValue = request.State ?? context.Request.Query[OpenIddictConstants.Parameters.State].ToString();
+                                    // issuer from OpenIddict configuration if available, fallback to request host
+                                    string issuer;
+                                    try
+                                    {
+                                        var serverOptions = context.RequestServices.GetService(typeof(IOptions<OpenIddictServerOptions>)) as IOptions<OpenIddictServerOptions>;
+                                        var configuredIssuer = serverOptions?.Value?.Issuer?.AbsoluteUri;
+                                        issuer = !string.IsNullOrWhiteSpace(configuredIssuer)
+                                            ? configuredIssuer!.TrimEnd('/')
+                                            : $"{context.Request.Scheme}://{context.Request.Host}".TrimEnd('/');
+                                    }
+                                    catch
+                                    {
+                                        issuer = $"{context.Request.Scheme}://{context.Request.Host}".TrimEnd('/');
+                                    }
+                                    var stateValue = !string.IsNullOrEmpty(request.State)
+                                        ? request.State
+                                        : context.Request.Query.TryGetValue(OpenIddictConstants.Parameters.State, out var qState)
+                                            ? qState.ToString()
+                                            : null;
 
                                     var headerCreds = new SigningCredentials(signingKey, SecurityAlgorithms.RsaSha256);
                                     var handler = new JsonWebTokenHandler();
