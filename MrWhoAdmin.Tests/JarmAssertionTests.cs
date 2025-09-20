@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Linq;
 using Microsoft.IdentityModel.JsonWebTokens;
 
 namespace MrWhoAdmin.Tests;
@@ -53,7 +54,7 @@ public class JarmAssertionTests
     private static (string verifier, string challenge) CreatePkcePair()
     {
         var bytes = System.Security.Cryptography.RandomNumberGenerator.GetBytes(32);
-        string B64(byte[] b) => Convert.ToBase64String(b).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+        string B64(byte[] b) => Convert.ToBase64String(b).TrimEnd('=')[..].Replace('+', '-').Replace('/', '_');
         var verifier = B64(bytes);
         var hash = System.Security.Cryptography.SHA256.HashData(Encoding.ASCII.GetBytes(verifier));
         var challenge = B64(hash);
@@ -76,7 +77,7 @@ public class JarmAssertionTests
 
     private static DateTime GetIatUtc(JsonWebToken jwt)
     {
-        var iatText = jwt.GetClaim("iat")?.Value;
+        var iatText = jwt.Claims.FirstOrDefault(c => c.Type == "iat")?.Value;
         if (long.TryParse(iatText, out var iatSec))
         {
             return DateTimeOffset.FromUnixTimeSeconds(iatSec).UtcDateTime;
@@ -86,13 +87,16 @@ public class JarmAssertionTests
 
     private static DateTime GetExpUtc(JsonWebToken jwt)
     {
-        var expText = jwt.GetClaim("exp")?.Value;
+        var expText = jwt.Claims.FirstOrDefault(c => c.Type == "exp")?.Value;
         if (long.TryParse(expText, out var expSec))
         {
             return DateTimeOffset.FromUnixTimeSeconds(expSec).UtcDateTime;
         }
         return jwt.ValidTo; // fallback
     }
+
+    private static string? GetClaimValue(JsonWebToken jwt, string type)
+        => jwt.Claims.FirstOrDefault(c => string.Equals(c.Type, type, StringComparison.Ordinal))?.Value;
 
     [TestMethod]
     public async Task JARM_Success_Response_JWT_Has_iss_aud_iat_exp_code_state()
@@ -173,9 +177,9 @@ public class JarmAssertionTests
         var iss = jwt.Issuer?.TrimEnd('/') ?? string.Empty;
         Assert.AreEqual(expectedIssuer, iss, "iss mismatch");
         Assert.AreEqual(clientId, jwt.Audiences.FirstOrDefault(), "aud mismatch");
-        var code = jwt.GetClaim("code")?.Value;
+        var code = GetClaimValue(jwt, "code");
         Assert.IsFalse(string.IsNullOrEmpty(code), "code missing in JARM response");
-        var stateClaim = jwt.GetClaim("state")?.Value;
+        var stateClaim = GetClaimValue(jwt, "state");
         Assert.AreEqual(state, stateClaim, "state mismatch");
         var iatUtc = GetIatUtc(jwt);
         var expUtc = GetExpUtc(jwt);
@@ -233,10 +237,10 @@ public class JarmAssertionTests
         var expectedIssuer = disco.RootElement.GetProperty("issuer").GetString()!.TrimEnd('/');
         Assert.AreEqual(expectedIssuer, (jwt.Issuer ?? string.Empty).TrimEnd('/'), "iss mismatch");
         Assert.AreEqual(clientId, jwt.Audiences.FirstOrDefault(), "aud mismatch");
-        Assert.IsNull(jwt.GetClaim("code"), "code should not be present in error JARM");
-        var err = jwt.GetClaim("error")?.Value;
+        Assert.IsNull(GetClaimValue(jwt, "code"), "code should not be present in error JARM");
+        var err = GetClaimValue(jwt, "error");
         Assert.AreEqual("login_required", err, "Unexpected error code in JARM");
-        Assert.AreEqual(state, jwt.GetClaim("state")?.Value, "state mismatch");
+        Assert.AreEqual(state, GetClaimValue(jwt, "state"), "state mismatch");
         var iatUtc = GetIatUtc(jwt); var expUtc = GetExpUtc(jwt);
         Assert.IsTrue(expUtc > DateTime.UtcNow, "exp should be in the future");
         Assert.IsTrue((expUtc - iatUtc).TotalSeconds is > 30 and <= 300, "Unexpected lifetime");
