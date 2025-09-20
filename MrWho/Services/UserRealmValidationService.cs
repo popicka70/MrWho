@@ -86,11 +86,20 @@ public class UserRealmValidationService : IUserRealmValidationService
                 {
                     var testFlag = Environment.GetEnvironmentVariable("MRWHO_TESTS");
                     var envName = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
-                    var nonProd = !string.Equals(envName, "Production", StringComparison.OrdinalIgnoreCase);
-                    if (string.Equals(testFlag, "1", StringComparison.OrdinalIgnoreCase) || nonProd)
+                    var isTestEnv = string.Equals(testFlag, "1", StringComparison.OrdinalIgnoreCase)
+                                     || string.Equals(envName, "Testing", StringComparison.OrdinalIgnoreCase);
+                    // IMPORTANT: Do not apply this bypass when running unit tests against the in-memory provider
+                    var isInMemory = string.Equals(_context.Database.ProviderName, "Microsoft.EntityFrameworkCore.InMemory", StringComparison.OrdinalIgnoreCase)
+                                     || (_context.Database.ProviderName?.Contains("InMemory", StringComparison.OrdinalIgnoreCase) ?? false);
+                    if (isTestEnv && !isInMemory)
                     {
-                        _logger.LogDebug("Bypassing client assignment for user {User} on client {ClientId} in non-production/test environment", user.UserName, clientId);
-                        return new UserRealmValidationResult { IsValid = true, ClientRealm = client.Realm.Name };
+                        // Only bypass assignment when the user's realm matches the client's realm (or unknown)
+                        var userRealmClaim = (await _userManager.GetClaimsAsync(user)).FirstOrDefault(c => c.Type == "realm")?.Value;
+                        if (string.IsNullOrWhiteSpace(userRealmClaim) || string.Equals(userRealmClaim, client.Realm.Name, StringComparison.OrdinalIgnoreCase))
+                        {
+                            _logger.LogDebug("Bypassing client assignment for user {User} on client {ClientId} in test environment (realm match)", user.UserName, clientId);
+                            return new UserRealmValidationResult { IsValid = true, ClientRealm = client.Realm.Name };
+                        }
                     }
                 }
                 catch { }
