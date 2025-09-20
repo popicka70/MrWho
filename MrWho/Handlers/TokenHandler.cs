@@ -393,6 +393,30 @@ public class TokenHandler : ITokenHandler
 
         var clientId = request.ClientId!;
 
+        // Fast realm mismatch guard: deny when user's realm claim doesn't match target client's realm
+        try
+        {
+            var clientEntity = await _db.Clients.Include(c => c.Realm).AsNoTracking().FirstOrDefaultAsync(c => c.ClientId == clientId);
+            if (clientEntity?.Realm?.Name is string clientRealmName && clientRealmName.Length > 0)
+            {
+                var claims = await _userManager.GetClaimsAsync(user);
+                var userRealm = claims.FirstOrDefault(c => c.Type == "realm")?.Value;
+                if (!string.IsNullOrWhiteSpace(userRealm) && !string.Equals(userRealm, clientRealmName, StringComparison.OrdinalIgnoreCase))
+                {
+                    var forbidProps = new AuthenticationProperties(new Dictionary<string, string?>
+                    {
+                        [OpenIddictServerAspNetCoreConstants.Properties.Error] = Errors.AccessDenied,
+                        [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = "User belongs to a different realm"
+                    });
+                    return Results.Forbid(forbidProps, new[] { OpenIddictServerAspNetCoreDefaults.AuthenticationScheme });
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Realm mismatch guard failed; deferring to service validation");
+        }
+
         // CRITICAL: Validate user can access this client based on realm restrictions
         var realmValidation = await _realmValidationService.ValidateUserRealmAccessAsync(user, clientId);
         if (!realmValidation.IsValid)
@@ -640,7 +664,7 @@ public class TokenHandler : ITokenHandler
             return Results.BadRequest(new { error = Errors.InvalidGrant, error_description = "Missing device_code" });
         }
 
-        var record = await _db.DeviceAuthorizations.FirstOrDefaultAsync(d => d.DeviceCode == deviceCode);
+        var record = await _db.DeviceAuthorizations.FirstOrDefaultAsync(b => b.DeviceCode == deviceCode);
         if (record == null)
         {
             return Results.BadRequest(new { error = Errors.InvalidGrant, error_description = "Invalid device_code" });
