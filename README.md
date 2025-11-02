@@ -176,13 +176,13 @@ docker pull ghcr.io/popicka70/mrwhooidc:latest
 docker pull ghcr.io/popicka70/mrwhooidc:v1.0.0
 ```
 
-### Docker Compose Configurations
+### Docker Compose Variants
 
-Three deployment configurations are available:
+MrWhoOidc provides three deployment configurations using the Docker Compose overlay pattern. Each variant extends the base `docker-compose.yml` with additional features:
 
 #### 1. Basic (Default) - `docker-compose.yml`
 
-Best for: Development, evaluation, small deployments (<1000 users)
+**Best for:** Development, evaluation, small deployments (<1000 users)
 
 ```bash
 docker compose up -d
@@ -194,40 +194,164 @@ docker compose up -d
 - PostgreSQL 16 database
 - TLS/HTTPS support
 - Health checks
+- Minimal resource usage (2GB RAM)
+
+**Use when:** Getting started, testing, small-scale deployments, or when performance/security requirements are minimal.
+
+---
 
 #### 2. High-Performance - `docker-compose.redis.yml`
 
-Best for: Production deployments requiring high performance
+**Best for:** Production deployments requiring high performance (1000-10,000 users)
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.redis.yml up -d
 ```
 
-**Adds:**
+**Adds to basic:**
 
-- Redis caching (30-50% faster response times)
-- 60-80% reduction in database load
-- Distributed session storage
+- **Redis 7.2** caching layer
+  - 30-50% faster response times
+  - 60-80% reduction in database load
+  - Distributed session storage for horizontal scaling
+- RDB persistence with 60-second snapshot interval
+- LRU eviction policy (512MB memory limit)
+- Health checks and monitoring
+
+**Configuration:**
+
+```bash
+# .env additions
+REDIS_ENABLED=true
+REDIS_CONNECTION_STRING=mrwho-redis:6379
+```
+
+**Use when:** High traffic expected, performance is critical, horizontal scaling needed, or reduced database load desired.
+
+**Performance gains:**
+
+- Discovery endpoint: 800ms → 250ms
+- Token validation: 150ms → 50ms
+- Client lookup: 100ms → 20ms
+
+---
 
 #### 3. Production-Hardened - `docker-compose.production.yml`
 
-Best for: Production with security requirements, regulated environments
+**Best for:** Production with security requirements, regulated environments, enterprise deployments
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.production.yml up -d
 ```
 
-**Adds:**
+**Adds to basic:**
 
-- Redis caching
-- Multi-tenant mode
-- Non-root containers
-- Read-only volumes
-- Network isolation
-- Resource limits
-- Enhanced health checks
+- **Redis caching** (all performance benefits from redis.yml)
+- **Security hardening:**
+  - Non-root containers (UID 1000 for app, UID 999 for PostgreSQL)
+  - Read-only root filesystems with tmpfs for writable paths
+  - Linux capability management (drop ALL, add only NET_BIND_SERVICE)
+  - no-new-privileges security option
+- **Multi-tenant mode** enabled
+- **Rate limiting** (100 requests/60s per IP)
+- **Enhanced security headers** (CORS, HSTS, CSP)
+- **Resource limits:**
+  - CPU: 2 cores (burst to 4)
+  - Memory: 2GB (limit 4GB)
+- **Redis authentication** (password-protected)
+- **Audit logging** enabled
+- **Enhanced health checks** (30s interval, 3 retries)
+- **Network isolation** (internal network for database/Redis)
 
-See [docs/docker-compose-examples.md](docs/docker-compose-examples.md) for detailed configuration examples.
+**Configuration:**
+
+```bash
+# .env additions (required)
+REDIS_ENABLED=true
+REDIS_CONNECTION_STRING=mrwho-redis:6379
+REDIS_PASSWORD=your-secure-redis-password
+MULTITENANT_ENABLED=true
+RATE_LIMIT_ENABLED=true
+RATE_LIMIT_REQUESTS_PER_WINDOW=100
+RATE_LIMIT_WINDOW_SECONDS=60
+AUDIT_LOGGING_ENABLED=true
+```
+
+**Use when:** Production deployment, security compliance required, multi-tenant scenarios, regulated industries, or enterprise environments.
+
+**Pre-deployment checklist:**
+
+- [ ] Change all default passwords
+- [ ] Use CA-signed TLS certificate
+- [ ] Configure SMTP for email notifications
+- [ ] Set strong Redis password
+- [ ] Review and adjust resource limits
+- [ ] Configure backup strategy
+- [ ] Set up monitoring/alerting
+- [ ] Review CORS allowed origins
+
+---
+
+#### 4. Development - `docker-compose.dev.yml`
+
+**Best for:** Local development, testing email workflows, debugging
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+```
+
+**Adds to basic:**
+
+- **MailHog** email testing service
+  - Web UI: http://localhost:8025
+  - SMTP: localhost:1025
+  - Captures all outbound emails for inspection
+- Development environment settings:
+  - Detailed error messages
+  - Debug-level logging
+  - Relaxed CORS (allow any origin)
+  - No rate limiting
+  - Sensitive data logging enabled
+  - HTTP allowed (no forced HTTPS redirect)
+
+**Configuration:**
+
+```bash
+# .env additions
+ASPNETCORE_ENVIRONMENT=Development
+MAIL_ENABLED=true
+MAIL_SMTP_HOST=mailhog
+MAIL_SMTP_PORT=1025
+MAIL_FROM_ADDRESS=noreply@localhost
+LOGGING_LEVEL=Debug
+```
+
+**Use when:** Developing applications, testing email flows (password reset, verification), debugging authentication issues, or learning OIDC workflows.
+
+⚠️ **Never use dev configuration in production** - it disables critical security features.
+
+---
+
+### Choosing the Right Variant
+
+| Scenario | Variant | Command |
+|----------|---------|---------|
+| Quick start, evaluation, testing | Basic | `docker compose up -d` |
+| Development with email testing | Dev | `docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d` |
+| Production with high performance | Redis | `docker compose -f docker-compose.yml -f docker-compose.redis.yml up -d` |
+| Production with security hardening | Production | `docker compose -f docker-compose.yml -f docker-compose.production.yml up -d` |
+| Enterprise/regulated environments | Production | `docker compose -f docker-compose.yml -f docker-compose.production.yml up -d` |
+
+**Can I combine variants?** No - variants are mutually exclusive. Choose the one that best matches your requirements.
+
+**Migration path:**
+
+1. Start with **Basic** for evaluation
+2. Move to **Dev** for application development
+3. Deploy **Redis** for production performance
+4. Upgrade to **Production** when security hardening required
+
+See [docs/docker-compose-examples.md](docs/docker-compose-examples.md) for detailed configuration examples and [docs/deployment-guide.md](docs/deployment-guide.md) for production deployment best practices.
 
 ### Essential Environment Variables
 
@@ -381,14 +505,94 @@ For security vulnerabilities, please report privately (see [SECURITY.md](SECURIT
 
 ## 📚 Documentation
 
-- **[Quick Start Guide](docs/quick-start.md)** - Detailed setup walkthrough
+### Quick Navigation
+
+| Guide | Description |
+|-------|-------------|
+| **[Configuration Reference](docs/configuration-reference.md)** | Complete environment variable reference (60+ variables) |
+| **[Troubleshooting Guide](docs/troubleshooting.md)** | Common issues and solutions with diagnostic commands |
+| **[Deployment Guide](docs/deployment-guide.md)** | Production deployment best practices and procedures |
+| **[Upgrade Guide](docs/upgrade-guide.md)** | Version migration, rollback, and compatibility matrix |
+| **[Docker Compose Examples](docs/docker-compose-examples.md)** | Detailed docker-compose configurations for various scenarios |
+| **[Docker Security Best Practices](docs/docker-security-best-practices.md)** | Container security hardening and compliance |
+| **[Admin Guide](docs/admin-guide.md)** | Admin UI usage, client management, and configuration |
+| **[Multi-Tenancy Quick Reference](docs/multitenancy-quick-reference.md)** | Multi-tenant setup and tenant isolation |
+| **[Key Rotation Playbook](docs/key-rotation-playbook.md)** | Signing key rotation procedures |
+
+### By Topic
+
+#### 🚀 Getting Started
+
+- **[Quick Start Guide](#-quick-start)** - Get running in 10 minutes (above)
+- **[Configuration Reference](docs/configuration-reference.md)** - All environment variables explained
+- **[Docker Compose Examples](docs/docker-compose-examples.md)** - Common deployment scenarios
+
+#### 🏭 Production Deployment
+
+- **[Deployment Guide](docs/deployment-guide.md)** - Production deployment checklist and best practices
+- **[Docker Security Best Practices](docs/docker-security-best-practices.md)** - Security hardening
+- **[Upgrade Guide](docs/upgrade-guide.md)** - Version upgrades and rollback procedures
+
+#### 🛠️ Operations & Maintenance
+
+- **[Troubleshooting Guide](docs/troubleshooting.md)** - Diagnose and fix common issues (15+ scenarios)
 - **[Admin Guide](docs/admin-guide.md)** - Admin UI usage and client configuration
-- **[Developer Guide](docs/developer-guide.md)** - Integration and API documentation
-- **[Deployment Guide](docs/deployment-guide.md)** - Production deployment
-- **[Security Best Practices](docs/docker-security-best-practices.md)** - Hardening
-- **[Client Secret Rotation](docs/client-secret-rotation-playbook.md)** - Secret management
-- **[Back-Channel Logout](docs/backchannel-logout-backlog.md)** - Logout implementation
-- **[Architecture](docs/architecture.md)** - System design and components
+- **[Key Rotation Playbook](docs/key-rotation-playbook.md)** - Rotate signing keys safely
+
+#### 🏢 Enterprise Features
+
+- **[Multi-Tenancy Quick Reference](docs/multitenancy-quick-reference.md)** - Multi-tenant configuration
+- **[Client Secret Rotation](docs/client-secret-rotation-playbook.md)** - Zero-downtime secret rotation
+- **[Back-Channel Logout](docs/backchannel-logout-backlog.md)** - Centralized logout implementation
+
+#### 🔌 Integration
+
+- **Demo Applications** - Working examples in `/demos` directory:
+  - [dotnet-mvc-client](demos/dotnet-mvc-client/) - ASP.NET Core MVC integration
+  - [react-client](demos/react-client/) - React SPA with oidc-client-ts
+  - [go-client](demos/go-client/) - Go web application
+- **NuGet Packages** - See [packages/README.md](packages/README.md)
+
+### Common Tasks
+
+<details>
+<summary>🔍 Click to expand common tasks</summary>
+
+#### Initial Setup
+
+1. [Generate TLS certificate](#2-generate-tls-certificate) → See Quick Start above
+2. [Configure environment variables](docs/configuration-reference.md#required-variables) → `cp .env.example .env`
+3. [Start services](#4-start-services) → `docker compose up -d`
+4. [Verify deployment](#5-verify-deployment) → `./scripts/health-check.sh`
+
+#### Client Configuration
+
+1. [Register client in Admin UI](docs/admin-guide.md#client-management) → https://localhost:8443/admin
+2. [Configure redirect URIs](docs/admin-guide.md#redirect-uris) → Required for OIDC flow
+3. [Assign scopes](docs/admin-guide.md#scope-assignment) → Define access permissions
+4. [Generate client secret](docs/admin-guide.md#client-secrets) → Save securely
+
+#### Performance Optimization
+
+1. [Enable Redis caching](#2-high-performance---docker-composeredisyml) → 30-50% faster
+2. [Configure resource limits](docs/docker-compose-examples.md#resource-limits) → CPU/memory tuning
+3. [Monitor performance](docs/troubleshooting.md#performance-issues) → Diagnostic commands
+
+#### Security Hardening
+
+1. [Use production variant](#3-production-hardened---docker-composeproductionyml) → Security features
+2. [Configure TLS properly](docs/deployment-guide.md#tls-configuration) → CA-signed certificate
+3. [Enable rate limiting](docs/configuration-reference.md#security-configuration) → DDoS protection
+4. [Review security checklist](docs/docker-security-best-practices.md) → Best practices
+
+#### Troubleshooting
+
+1. [Check service status](docs/troubleshooting.md#quick-diagnostics) → `docker compose ps`
+2. [View logs](docs/troubleshooting.md#service-status) → `docker compose logs -f`
+3. [Run health check](docs/troubleshooting.md#health-checks) → `./scripts/health-check.sh`
+4. [Search issues](docs/troubleshooting.md#table-of-contents) → 15+ common scenarios
+
+</details>
 
 ## 🔌 Integration
 

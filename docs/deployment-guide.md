@@ -1313,8 +1313,8 @@ docker compose up -d webauth
 
 ## Support
 
-- **GitHub Issues**: [https://github.com/popicka70/MrWhoOidc/issues](https://github.com/popicka70/MrWhoOidc/issues)
-- **Documentation**: [https://github.com/popicka70/MrWhoOidc](https://github.com/popicka70/MrWhoOidc)
+- **GitHub Issues**: [https://github.com/popicka70/mrwhooidc/issues](https://github.com/popicka70/mrwhooidc/issues)
+- **Documentation**: [https://github.com/popicka70/mrwhooidc](https://github.com/popicka70/mrwhooidc)
 
 ---
 

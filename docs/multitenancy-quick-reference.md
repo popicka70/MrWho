@@ -81,7 +81,7 @@ dotnet run --project MrWhoOidc.WebAuth
 
 ### Platform Admin UI
 ```
-MrWhoOidc.WebAuth/Pages/PlatformAdmin/
+Pages/PlatformAdmin/
 ├── Index.cshtml[.cs]           # Dashboard
 └── Tenants/
     ├── Index.cshtml[.cs]       # Tenant list
@@ -91,7 +91,7 @@ MrWhoOidc.WebAuth/Pages/PlatformAdmin/
 
 ### User Self-Service Portal
 ```
-MrWhoOidc.WebAuth/Pages/Account/
+Pages/Account/
 ├── Index.cshtml[.cs]           # Dashboard
 ├── Profile.cshtml[.cs]         # Profile management
 ├── Sessions.cshtml[.cs]        # Active sessions

@@ -632,8 +632,8 @@ Schedule with cron:
 
 ## Support
 
-- **GitHub Issues**: [https://github.com/popicka70/MrWhoOidc/issues](https://github.com/popicka70/MrWhoOidc/issues)
-- **Documentation**: [https://github.com/popicka70/MrWhoOidc](https://github.com/popicka70/MrWhoOidc)
+- **GitHub Issues**: [https://github.com/popicka70/mrwhooidc/issues](https://github.com/popicka70/mrwhooidc/issues)
+- **Documentation**: [https://github.com/popicka70/mrwhooidc](https://github.com/popicka70/mrwhooidc)
 
 **Document Version**: 1.0
 **Last Updated**: 2025-11-02
