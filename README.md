@@ -503,7 +503,127 @@ cat .env | grep -E "POSTGRES_PASSWORD|CERT_PASSWORD|OIDC_PUBLIC_BASE_URL"
 
 For security vulnerabilities, please report privately (see [SECURITY.md](SECURITY.md)).
 
-## 📚 Documentation
+## � Integration & Demos
+
+### Demo Applications
+
+Get started quickly with complete working examples demonstrating MrWhoOidc integration in different technologies:
+
+| Demo | Technology | Client Type | Use Case | Quick Start |
+|------|-----------|-------------|----------|-------------|
+| **[.NET MVC Client](demos/dotnet-mvc-client/)** | ASP.NET Core 9, Razor Pages | Confidential | Server-rendered web apps | [README](demos/dotnet-mvc-client/README.md) |
+| **[React SPA Client](demos/react-client/)** | React 18, TypeScript, Vite | Public | Single-page applications | [README](demos/react-client/README.md) |
+| **[Go Web Client](demos/go-client/)** | Go 1.21+, native libraries | Confidential | Go web apps, microservices | [README](demos/go-client/README.md) |
+
+**Run any demo in under 5 minutes:**
+
+```bash
+# Example: .NET MVC Demo
+cd demos/dotnet-mvc-client
+
+# Start MrWhoOidc and demo together
+docker compose -f ../docker-compose.yml -f docker-compose.demo.yml up -d
+
+# Register client at https://localhost:8443/admin
+# Configure client secret in .env
+# Access demo at https://localhost:5001
+```
+
+See [demos/README.md](demos/README.md) for detailed guides, technology comparisons, and best practices.
+
+### NuGet Packages
+
+Official packages for .NET applications to integrate with MrWhoOidc:
+
+#### MrWhoOidc.Client
+
+OIDC client configuration helpers for discovery, JWKS, token validation.
+
+```bash
+dotnet add package MrWhoOidc.Client
+```
+
+**Basic Usage:**
+
+```csharp
+using MrWhoOidc.Client;
+
+// Register services
+services.AddMrWhoOidcClient(options =>
+{
+    options.Authority = "https://your-oidc-provider.com";
+    options.ClientId = "your-client-id";
+    options.ClientSecret = "your-client-secret";
+});
+
+// Use discovery service
+public class MyService
+{
+    private readonly IDiscoveryService _discoveryService;
+    
+    public MyService(IDiscoveryService discoveryService)
+    {
+        _discoveryService = discoveryService;
+    }
+    
+    public async Task<string> GetAuthorizationUrlAsync()
+    {
+        var discovery = await _discoveryService.GetDiscoveryDocumentAsync();
+        return discovery.AuthorizationEndpoint;
+    }
+}
+```
+
+#### MrWhoOidc.Security
+
+Security utilities for DPoP, PKCE, and JWT validation.
+
+```bash
+dotnet add package MrWhoOidc.Security
+```
+
+**PKCE Example:**
+
+```csharp
+using MrWhoOidc.Security.Pkce;
+
+public class AuthController : ControllerBase
+{
+    private readonly IPkceGenerator _pkceGenerator;
+    
+    public AuthController(IPkceGenerator pkceGenerator)
+    {
+        _pkceGenerator = pkceGenerator;
+    }
+    
+    public IActionResult Login()
+    {
+        // Generate PKCE parameters
+        var codeVerifier = _pkceGenerator.GenerateCodeVerifier();
+        var codeChallenge = _pkceGenerator.GenerateCodeChallenge(codeVerifier);
+        
+        // Store code_verifier in session for token exchange
+        HttpContext.Session.SetString("code_verifier", codeVerifier);
+        
+        // Build authorization URL with code_challenge
+        var authUrl = $"{authority}/authorize?" +
+            $"client_id={clientId}&" +
+            $"response_type=code&" +
+            $"code_challenge={codeChallenge}&" +
+            $"code_challenge_method=S256";
+        
+        return Redirect(authUrl);
+    }
+}
+```
+
+**Package Documentation:**
+
+- **[Package Overview](packages/README.md)**: Installation, usage, version compatibility
+- **[Integration Examples](packages/integration-examples.md)**: Authorization Code Flow, Token Exchange, DPoP, Logout
+- **[NuGet Gallery](https://www.nuget.org/profiles/MrWho)**: Browse all published packages
+
+## �📚 Documentation
 
 ### Quick Navigation
 
