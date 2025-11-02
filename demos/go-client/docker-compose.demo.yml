@@ -1,0 +1,66 @@
+# ============================================================================
+# Go Client Demo - Docker Compose Configuration
+# ============================================================================
+# This file extends the parent docker-compose.yml to add the Go demo client.
+# 
+# Usage:
+#   docker compose -f ../docker-compose.yml -f docker-compose.demo.yml up -d
+#
+# The Go client demonstrates confidential client integration with:
+# - Authorization Code flow with PKCE
+# - Session management
+# - Token refresh
+# - Logout flows
+# ============================================================================
+
+services:
+  go-demo:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mrwho-go-demo
+    hostname: go-demo
+    
+    # Wait for OIDC provider to be healthy
+    depends_on:
+      mrwho-oidc:
+        condition: service_healthy
+    
+    ports:
+      - "5080:5080"
+    
+    environment:
+      # Go client expects config file path
+      - GO_WEB_CONFIG=/app/config.json
+      
+      # Override config values via environment (if app supports)
+      # These match the config.json structure
+      - OIDC_ISSUER=https://mrwho-oidc:8443
+      - OIDC_CLIENT_ID=go-demo
+      # Client secret should be set in .env file or registered in Admin UI
+      - OIDC_CLIENT_SECRET=${GO_DEMO_CLIENT_SECRET:-change-me-in-production}
+      - OIDC_REDIRECT_URI=https://localhost:5080/callback
+      - OIDC_POST_LOGOUT_REDIRECT_URI=https://localhost:5080/
+      - SERVER_PORT=5080
+    
+    networks:
+      - mrwho_edge
+    
+    restart: unless-stopped
+    
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:5080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    
+    labels:
+      - "com.mrwhooidc.demo=go-client"
+      - "com.mrwhooidc.client-type=confidential"
+
+# Use the existing edge network from parent docker-compose.yml
+networks:
+  mrwho_edge:
+    external: true
+    name: mrwho_edge

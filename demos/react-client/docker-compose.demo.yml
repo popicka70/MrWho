@@ -1,0 +1,66 @@
+# ============================================================================
+# React SPA Demo - Docker Compose Extension
+# ============================================================================
+# Extends the base docker-compose.yml to add the React SPA client demo
+# Usage: docker compose -f ../docker-compose.yml -f docker-compose.demo.yml up -d
+# ============================================================================
+
+services:
+  # ============================================================================
+  # React SPA Demo Client
+  # ============================================================================
+  react-demo:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Build-time environment variables for Vite
+        VITE_OIDC_AUTHORITY: ${VITE_OIDC_AUTHORITY:-https://localhost:8443}
+        VITE_OIDC_CLIENT_ID: ${VITE_OIDC_CLIENT_ID:-react-demo}
+        VITE_OIDC_SCOPE: ${VITE_OIDC_SCOPE:-openid profile email}
+        VITE_REDIRECT_URI: ${VITE_REDIRECT_URI:-http://localhost:5173/callback}
+        VITE_POST_LOGOUT_REDIRECT_URI: ${VITE_POST_LOGOUT_REDIRECT_URI:-http://localhost:5173/}
+    container_name: react-demo
+    
+    # Depends on MrWhoOidc being available
+    depends_on:
+      mrwho-oidc:
+        condition: service_healthy
+    
+    # -------------------------------------------------------------------------
+    # Port Mapping
+    # -------------------------------------------------------------------------
+    ports:
+      - "5173:80"  # Map container port 80 to host port 5173
+    
+    # -------------------------------------------------------------------------
+    # Networks
+    # -------------------------------------------------------------------------
+    # React SPA doesn't need backend network access
+    # It runs in browser and communicates directly with OIDC provider
+    networks:
+      - edge
+    
+    # -------------------------------------------------------------------------
+    # Health Check
+    # -------------------------------------------------------------------------
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    # -------------------------------------------------------------------------
+    # Restart Policy
+    # -------------------------------------------------------------------------
+    restart: unless-stopped
+
+# ============================================================================
+# Networks
+# ============================================================================
+# Reuse networks from parent docker-compose.yml
+networks:
+  edge:
+    external: true
+    name: mrwho_edge

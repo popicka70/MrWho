@@ -1,0 +1,82 @@
+# ============================================================================
+# .NET MVC Demo - Docker Compose Extension
+# ============================================================================
+# Extends the base docker-compose.yml to add the .NET MVC client demo
+# Usage: docker compose -f ../docker-compose.yml -f docker-compose.demo.yml up -d
+# ============================================================================
+
+services:
+  # ============================================================================
+  # .NET MVC Demo Client
+  # ============================================================================
+  dotnet-mvc-demo:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dotnet-mvc-demo
+    
+    # Depends on MrWhoOidc being available
+    depends_on:
+      mrwho-oidc:
+        condition: service_healthy
+    
+    # -------------------------------------------------------------------------
+    # Environment Configuration
+    # Load from .env file or set here
+    # -------------------------------------------------------------------------
+    environment:
+      # ASP.NET Core Configuration
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:5001
+      
+      # OIDC Configuration
+      # Use internal Docker network hostname for backend communication
+      MrWhoOidc__Issuer: ${MRWHOOIDC__ISSUER:-https://mrwho-oidc:8443}
+      MrWhoOidc__ClientId: ${MRWHOOIDC__CLIENTID:-dotnet-mvc-demo}
+      MrWhoOidc__ClientSecret: ${MRWHOOIDC__CLIENTSECRET}
+      MrWhoOidc__Scopes__0: openid
+      MrWhoOidc__Scopes__1: profile
+      MrWhoOidc__Scopes__2: email
+      MrWhoOidc__Scopes__3: offline_access
+      MrWhoOidc__UsePkce: true
+      MrWhoOidc__RequireHttpsMetadata: ${MRWHOOIDC__REQUIREHTTPSMETADATA:-false}
+      
+      # Logging
+      Logging__LogLevel__Default: Information
+      Logging__LogLevel__Microsoft.AspNetCore: Warning
+    
+    # -------------------------------------------------------------------------
+    # Port Mapping
+    # -------------------------------------------------------------------------
+    ports:
+      - "5001:5001"  # Demo application HTTP port
+    
+    # -------------------------------------------------------------------------
+    # Networks
+    # -------------------------------------------------------------------------
+    networks:
+      - edge  # Connect to edge network to communicate with mrwho-oidc
+    
+    # -------------------------------------------------------------------------
+    # Health Check
+    # -------------------------------------------------------------------------
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    # -------------------------------------------------------------------------
+    # Restart Policy
+    # -------------------------------------------------------------------------
+    restart: unless-stopped
+
+# ============================================================================
+# Networks
+# ============================================================================
+# Reuse networks from parent docker-compose.yml
+networks:
+  edge:
+    external: true
+    name: mrwho_edge
