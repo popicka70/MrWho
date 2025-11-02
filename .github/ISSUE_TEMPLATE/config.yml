@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Discussions
+    url: https://github.com/popicka70/mrwhooidc/discussions
+    about: Ask questions, share ideas, or discuss MrWhoOidc with the community
+  - name: 📚 Documentation
+    url: https://github.com/popicka70/mrwhooidc/tree/main/docs
+    about: Read the comprehensive documentation including guides and troubleshooting
+  - name: 🛡️ Security Vulnerability
+    url: https://github.com/popicka70/mrwhooidc/security/advisories/new
+    about: Report security vulnerabilities privately (do NOT create public issues for security bugs)
+  - name: ❓ Troubleshooting Guide
+    url: https://github.com/popicka70/mrwhooidc/blob/main/docs/troubleshooting.md
+    about: Check common issues and solutions before creating an issue

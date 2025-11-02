@@ -1,7 +1,7 @@
 # Provider Key Rotation Playbook
 
 **Version**: 1.0  
-**Date**: 2025-10-14  
+**Last Updated**: November 2, 2025  
 **Scope**: Identity Provider signing key rotation for outbound JAR
 
 ---

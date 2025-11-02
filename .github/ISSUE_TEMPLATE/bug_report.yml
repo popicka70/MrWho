@@ -1,0 +1,148 @@
+name: Bug Report
+description: Report a bug or issue with MrWhoOidc
+title: "[Bug]: "
+labels: ["bug", "triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill out the form below to help us investigate and fix the issue.
+
+  - type: checkboxes
+    id: prerequisites
+    attributes:
+      label: Prerequisites
+      description: Please confirm you've completed these steps before submitting
+      options:
+        - label: I have searched existing issues to ensure this isn't a duplicate
+          required: true
+        - label: I have read the [documentation](https://github.com/popicka70/mrwhooidc/tree/main/docs)
+          required: true
+        - label: I have checked the [troubleshooting guide](https://github.com/popicka70/mrwhooidc/blob/main/docs/troubleshooting.md)
+          required: true
+
+  - type: dropdown
+    id: version
+    attributes:
+      label: MrWhoOidc Version
+      description: Which version are you using?
+      options:
+        - "1.0.0"
+        - "Latest (main branch)"
+        - "Other (please specify in description)"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: deployment
+    attributes:
+      label: Deployment Method
+      description: How are you running MrWhoOidc?
+      options:
+        - "Docker Compose (basic)"
+        - "Docker Compose (redis)"
+        - "Docker Compose (production)"
+        - "Custom Docker setup"
+        - "Other (please specify)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of the bug
+      placeholder: "Example: Token endpoint returns 500 error when requesting refresh token..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Detailed steps to reproduce the behavior
+      placeholder: |
+        1. Start MrWhoOidc with docker-compose.yml
+        2. Register a client with client_id=test
+        3. Request authorization code
+        4. Exchange code for tokens
+        5. Attempt to refresh token
+        6. Observe 500 error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What you expected to happen
+      placeholder: "Example: Should receive new access_token and refresh_token in response"
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened
+      placeholder: "Example: Received 500 Internal Server Error with error_description: 'invalid_grant'"
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logs
+      description: Paste relevant log output here (use `docker compose logs mrwho-oidc`)
+      render: shell
+      placeholder: |
+        mrwho-oidc | [2025-11-02 10:15:30] ERROR: ...
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment Details
+      description: |
+        Please provide:
+        - Operating System (Linux/Windows/macOS)
+        - Docker version (docker --version)
+        - Docker Compose version (docker compose version)
+        - PostgreSQL version (if relevant)
+        - Redis version (if using redis deployment)
+      placeholder: |
+        OS: Ubuntu 22.04
+        Docker: 24.0.6
+        Docker Compose: v2.23.0
+        PostgreSQL: 16.1
+        Redis: 7.2.3
+    validations:
+      required: true
+
+  - type: textarea
+    id: config
+    attributes:
+      label: Configuration (Sanitized)
+      description: |
+        Relevant parts of your .env or configuration (REMOVE ALL SECRETS/PASSWORDS)
+      placeholder: |
+        OIDC_PUBLIC_BASE_URL=https://localhost:8443
+        REDIS_ENABLED=true
+        MULTITENANCY_ENABLED=false
+      render: shell
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Any other context, screenshots, or information about the problem
+      placeholder: "Example: This started happening after upgrading from 0.9.0 to 1.0.0"
+
+  - type: checkboxes
+    id: security
+    attributes:
+      label: Security Issue
+      description: Is this a security vulnerability?
+      options:
+        - label: This is a security vulnerability (if yes, please report privately via our [Security Policy](https://github.com/popicka70/mrwhooidc/security/policy) instead)

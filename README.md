@@ -21,7 +21,31 @@
 - **📈 Observability Ready** - Structured logging, health endpoints, and OpenTelemetry support
 - **🐳 Container-Native** - Optimized Docker images with multi-architecture support (amd64, arm64)
 
-## 🚀 Quick Start
+## � Version Compatibility
+
+| Component | Version | Status | Notes |
+|-----------|---------|--------|-------|
+| **MrWhoOidc Server** | 1.0.0 | ✅ Stable | Initial public release |
+| **Docker Image** | `ghcr.io/popicka70/mrwhooidc:latest` | ✅ Production | Multi-arch (amd64, arm64) |
+| **PostgreSQL** | 16.x | ✅ Recommended | Minimum: 14.x |
+| **Redis** | 7.2.x | ✅ Recommended | Optional, for caching |
+| **.NET Runtime** | 9.0 | ✅ Required | Server runtime |
+| **MrWhoOidc.Client** | 0.1.0 | ✅ Stable | .NET 8.0+ |
+| **MrWhoOidc.Security** | 0.1.0 | ✅ Stable | .NET 8.0+ |
+
+**NuGet Package Compatibility:**
+
+- **MrWhoOidc.Client 0.1.0** → Works with MrWhoOidc Server 1.0.0+
+- **MrWhoOidc.Security 0.1.0** → Framework-agnostic, works with any OIDC server
+- Both packages target **.NET 8.0** and are compatible with .NET 8.0, 9.0+
+
+**Docker Image Tags:**
+
+- `latest` - Latest stable release (currently 1.0.0)
+- `1.0.0` - Specific version tag
+- `1.0` - Major.minor tag (receives patch updates)
+
+## �🚀 Quick Start
 
 Get MrWhoOidc up and running in **under 10 minutes**.
 
@@ -392,10 +416,9 @@ Automatic architecture detection - Docker selects the correct image for your pla
 
 - **[Deployment Guide](docs/deployment-guide.md)** - Production deployment best practices
 - **[Docker Security](docs/docker-security-best-practices.md)** - Container security hardening
-- **[Environment Variables](docs/environment-variables.md)** - Complete configuration reference
-- **[Multi-Tenancy](docs/multi-tenancy-guide.md)** - Multi-tenant configuration
-- **[Redis Caching](docs/hybrid-cache-guide.md)** - Performance optimization
-- **[TLS/Certificates](docs/tls-certificate-guide.md)** - Certificate management
+- **[Configuration Reference](docs/configuration-reference.md)** - Complete environment variable reference
+- **[Multi-Tenancy](docs/multitenancy-quick-reference.md)** - Multi-tenant configuration
+- **[Troubleshooting](docs/troubleshooting.md)** - Common issues and solutions
 
 ### Upgrading
 
@@ -662,8 +685,7 @@ public class AuthController : ControllerBase
 #### 🏢 Enterprise Features
 
 - **[Multi-Tenancy Quick Reference](docs/multitenancy-quick-reference.md)** - Multi-tenant configuration
-- **[Client Secret Rotation](docs/client-secret-rotation-playbook.md)** - Zero-downtime secret rotation
-- **[Back-Channel Logout](docs/backchannel-logout-backlog.md)** - Centralized logout implementation
+- **[Docker Security Best Practices](docs/docker-security-best-practices.md)** - Security hardening
 
 #### 🔌 Integration
 

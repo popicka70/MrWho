@@ -196,7 +196,7 @@ Platform-specific notes:
 
 For issues or questions:
 
-- Check main [README.md](../README.md) for general documentation
-- Review [Quick Start Guide](../docs/quick-start.md) for deployment instructions
+- Check main [README.md](../README.md) for general documentation and Quick Start guide
+- Review [Troubleshooting Guide](../docs/troubleshooting.md) for common issues
 - Review logs: `docker-compose logs mrwho-oidc`
 - File issues on GitHub repository
