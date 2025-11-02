@@ -1,0 +1,291 @@
+# ============================================================================
+# MrWhoOidc - Development Configuration with Email Testing
+# ============================================================================
+# Development-optimized configuration with MailHog for email testing
+# Includes: Enhanced logging, email capture, development-friendly settings
+# Suitable for: Local development, email flow testing, integration testing
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+#
+# This file is an OVERLAY - it extends docker-compose.yml
+# ============================================================================
+
+services:
+  # ============================================================================
+  # MrWhoOidc OIDC Provider - Development Configuration Override
+  # ============================================================================
+  mrwho-oidc:
+    # Update service dependencies to include MailHog
+    depends_on:
+      mrwho-postgres:
+        condition: service_healthy
+      mrwho-mailhog:
+        condition: service_started  # MailHog has no health check by default
+    
+    # ============================================================================
+    # Environment Variables - Development Configuration
+    # ============================================================================
+    environment:
+      # -------------------------------------------------------------------------
+      # Development Environment Settings
+      # -------------------------------------------------------------------------
+      
+      # Development mode enables:
+      # - Detailed error pages with stack traces
+      # - Developer exception page
+      # - Detailed logging
+      # - Relaxed security for local testing
+      ASPNETCORE_ENVIRONMENT: Development
+      
+      # -------------------------------------------------------------------------
+      # Email Configuration (MailHog)
+      # -------------------------------------------------------------------------
+      
+      # Enable email functionality for testing
+      Mail__Enabled: ${MAIL_ENABLED:-true}
+      
+      # MailHog SMTP server (captures all emails for testing)
+      # No authentication required for MailHog
+      Mail__SmtpHost: ${MAIL_SMTP_HOST:-mrwho-mailhog}
+      Mail__SmtpPort: ${MAIL_SMTP_PORT:-1025}
+      Mail__UseSsl: ${MAIL_SMTP_USE_SSL:-false}  # MailHog doesn't use SSL
+      
+      # Email sender configuration
+      # Can use any email address for development
+      Mail__FromAddress: ${MAIL_FROM_ADDRESS:-noreply@mrwhooidc.local}
+      Mail__FromName: ${MAIL_FROM_NAME:-MrWhoOidc Development}
+      
+      # No SMTP credentials needed for MailHog
+      Mail__SmtpUsername: ${MAIL_SMTP_USERNAME:-}
+      Mail__SmtpPassword: ${MAIL_SMTP_PASSWORD:-}
+      
+      # -------------------------------------------------------------------------
+      # Development Logging Configuration
+      # -------------------------------------------------------------------------
+      
+      # Enhanced logging for development and debugging
+      # Trace: Most detailed (includes SQL queries, HTTP requests)
+      # Debug: Detailed application flow
+      # Information: General information
+      Logging__LogLevel__Default: ${LOGGING_LEVEL:-Debug}
+      Logging__LogLevel__Microsoft.AspNetCore: ${LOGGING_LEVEL_ASPNETCORE:-Information}
+      Logging__LogLevel__Microsoft.EntityFrameworkCore: ${LOGGING_LEVEL_EF:-Information}
+      Logging__LogLevel__Microsoft.EntityFrameworkCore.Database.Command: ${LOGGING_LEVEL_EF_SQL:-Debug}
+      
+      # Console logging format (human-readable for development)
+      Logging__Console__FormatterName: simple
+      
+      # -------------------------------------------------------------------------
+      # Development Features
+      # -------------------------------------------------------------------------
+      
+      # Enable detailed errors in responses (NEVER use in production)
+      DetailedErrors: ${DETAILED_ERRORS:-true}
+      
+      # Enable browser auto-refresh during development
+      # Useful when making UI changes
+      HotReload__Enabled: ${HOT_RELOAD_ENABLED:-true}
+      
+      # Disable HTTPS redirect for easier local testing
+      # HTTP is acceptable for localhost development
+      ForceHttpsRedirect: ${FORCE_HTTPS_REDIRECT:-false}
+      
+      # -------------------------------------------------------------------------
+      # Development Security (Relaxed)
+      # -------------------------------------------------------------------------
+      
+      # Disable CORS restrictions for development
+      # Allows testing from any origin
+      Cors__AllowAnyOrigin: ${CORS_ALLOW_ANY_ORIGIN:-true}
+      
+      # Disable rate limiting for development
+      # Prevents blocking during testing
+      RateLimit__Enabled: ${RATELIMIT_ENABLED:-false}
+      
+      # Enable detailed audit logs in development
+      AuditLog__Enabled: ${AUDITLOG_ENABLED:-true}
+      AuditLog__IncludeSensitiveData: ${AUDITLOG_INCLUDE_SENSITIVE:-true}  # OK for dev
+      
+      # -------------------------------------------------------------------------
+      # Development Database Settings
+      # -------------------------------------------------------------------------
+      
+      # Include error details in database exceptions
+      # Helps debugging Entity Framework issues
+      ConnectionStrings__authdb: Host=mrwho-postgres;Port=5432;Database=authdb;Username=oidc;Password=${POSTGRES_PASSWORD};Include Error Detail=true
+      
+      # Enable sensitive data logging (e.g., SQL parameter values)
+      # WARNING: Only use in development!
+      EnableSensitiveDataLogging: ${ENABLE_SENSITIVE_DATA_LOGGING:-true}
+
+  # ============================================================================
+  # MailHog Email Testing Service
+  # ============================================================================
+  mrwho-mailhog:
+    # MailHog captures all outgoing emails for inspection
+    # Web UI allows viewing emails without actually sending them
+    image: mailhog/mailhog:latest
+    container_name: mrwho-mailhog
+    
+    # ============================================================================
+    # Port Mapping
+    # ============================================================================
+    ports:
+      # SMTP server port (used by mrwho-oidc)
+      # Not exposed to host (only accessible within Docker network)
+      # - "1025:1025"  # Uncomment if you need external SMTP access
+      
+      # Web UI port (for viewing captured emails)
+      # Access at: http://localhost:8025
+      - "${MAILHOG_UI_PORT:-8025}:8025"
+    
+    # ============================================================================
+    # Environment Variables
+    # ============================================================================
+    environment:
+      # MailHog configuration
+      # Storage: memory (emails cleared on restart)
+      # For persistent storage, add volume mount
+      MH_STORAGE: memory
+      
+      # UI settings
+      MH_UI_WEB_PATH: ${MAILHOG_UI_PATH:-}  # Optional: custom web path
+    
+    # ============================================================================
+    # Optional: Persistent Email Storage
+    # ============================================================================
+    # Uncomment to persist emails across container restarts
+    # volumes:
+    #   - mailhog-data:/mailhog
+    
+    # ============================================================================
+    # Network Configuration
+    # ============================================================================
+    networks:
+      - internal  # Internal network for SMTP
+      - edge      # Edge network for web UI access
+    
+    # ============================================================================
+    # Restart Policy
+    # ============================================================================
+    restart: unless-stopped
+
+  # ============================================================================
+  # PostgreSQL Database - Development Configuration Override
+  # ============================================================================
+  mrwho-postgres:
+    # -------------------------------------------------------------------------
+    # Development Logging
+    # -------------------------------------------------------------------------
+    environment:
+      # Enable detailed PostgreSQL logging for debugging
+      # Logs all SQL statements (useful for development)
+      POSTGRES_LOG_STATEMENT: ${POSTGRES_LOG_STATEMENT:-all}
+      POSTGRES_LOG_MIN_DURATION_STATEMENT: ${POSTGRES_LOG_MIN_DURATION:-0}
+
+# ============================================================================
+# Optional Volumes
+# ============================================================================
+# volumes:
+#   # Uncomment to persist MailHog emails across restarts
+#   mailhog-data:
+#     driver: local
+
+# ============================================================================
+# Development Configuration Notes
+# ============================================================================
+#
+# MailHog Web UI:
+# - Access: http://localhost:8025
+# - View all captured emails
+# - Test email templates and content
+# - No emails are actually sent (all captured)
+#
+# Email Testing Workflows:
+# 1. Trigger email in application (e.g., password reset, verification)
+# 2. Open MailHog UI at http://localhost:8025
+# 3. View captured email with full HTML rendering
+# 4. Inspect email headers and raw content
+# 5. Test email links and functionality
+#
+# Development Features Enabled:
+# ✓ Detailed error messages with stack traces
+# ✓ Debug-level logging (including SQL queries)
+# ✓ Email capture with MailHog
+# ✓ Relaxed CORS (allow any origin)
+# ✓ No rate limiting
+# ✓ Sensitive data logging (SQL parameters)
+# ✓ Database error details
+# ✓ Hot reload support
+# ✓ HTTP allowed (no forced HTTPS)
+# ✓ Detailed audit logs
+#
+# Security Warnings:
+# ⚠️ NEVER use this configuration in production
+# ⚠️ Detailed errors expose sensitive information
+# ⚠️ Relaxed CORS allows any origin
+# ⚠️ No rate limiting (vulnerable to abuse)
+# ⚠️ Sensitive data logged (SQL parameters, PII)
+# ⚠️ HTTP allowed (unencrypted traffic)
+#
+# Common Development Tasks:
+#
+# 1. Test Password Reset Email:
+#    - Go to login page, click "Forgot Password"
+#    - Enter email address
+#    - Check MailHog UI for reset email
+#    - Click reset link to test workflow
+#
+# 2. Test Account Verification Email:
+#    - Register new user account
+#    - Check MailHog UI for verification email
+#    - Click verification link
+#
+# 3. Test Multi-Tenant Emails:
+#    - Configure tenant-specific email templates
+#    - Trigger emails for different tenants
+#    - Verify branding and content in MailHog
+#
+# 4. Debug SQL Queries:
+#    - Enable Logging__LogLevel__Microsoft.EntityFrameworkCore.Database.Command=Debug
+#    - Check logs for executed SQL
+#    - Identify slow queries or N+1 issues
+#
+# 5. Test CORS Configuration:
+#    - Make requests from different origins
+#    - Verify CORS headers in browser DevTools
+#    - Test with different HTTP methods
+#
+# Performance Considerations:
+# - Debug logging impacts performance (slower response times)
+# - SQL query logging can be verbose
+# - MailHog uses memory storage (limited by container memory)
+# - Not suitable for load testing or performance benchmarks
+#
+# Troubleshooting:
+#
+# MailHog UI not accessible:
+# - Check container status: docker compose ps mrwho-mailhog
+# - Verify port mapping: docker compose port mrwho-mailhog 8025
+# - Check logs: docker compose logs mrwho-mailhog
+#
+# Emails not appearing in MailHog:
+# - Verify Mail__Enabled=true
+# - Check Mail__SmtpHost=mrwho-mailhog
+# - Check Mail__SmtpPort=1025
+# - Review application logs for SMTP errors
+#
+# Too much logging:
+# - Reduce log level: LOGGING_LEVEL=Information
+# - Disable SQL logging: LOGGING_LEVEL_EF_SQL=Warning
+# - Disable sensitive data logging: ENABLE_SENSITIVE_DATA_LOGGING=false
+#
+# Tips:
+# - Use MailHog search to filter emails
+# - Download emails as .eml files for archiving
+# - Clear MailHog memory by restarting container
+# - Use MailHog API for automated testing
+# - Configure IDE to use local SMTP (port 1025) for other apps
+#
+# ============================================================================
