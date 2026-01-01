@@ -1,11 +1,11 @@
 # ============================================================================
-# MrWhoOidc - Basic Docker Compose Configuration
+# MrWhoOidc - Demo Docker Compose Configuration
 # ============================================================================
-# Quick Start configuration for evaluation and development
+# Quick Start configuration for demos and evaluation
 # Includes: PostgreSQL database, MrWhoOidc OIDC Provider
-# Performance: Suitable for development and small-scale production (<1000 users)
-# For high-performance deployments, see docker-compose.redis.yml
-# For production-hardened deployments, see docker-compose.production.yml
+# 
+# NOTE: This demo uses port 9443 to avoid conflicts with e2e tests on 8443
+# All secrets have defaults for demo purposes - DO NOT use in production!
 # ============================================================================
 
 services:
@@ -14,7 +14,7 @@ services:
   # ============================================================================
   mrwho-oidc:
     image: ghcr.io/popicka70/mrwhooidc:latest
-    container_name: mrwho-oidc
+    container_name: mrwho-oidc-demo
     
     # Wait for PostgreSQL to be healthy before starting
     depends_on:
@@ -23,124 +23,99 @@ services:
     
     # ============================================================================
     # Environment Variables - Core Configuration
-    # See .env.example for complete documentation of all variables
     # ============================================================================
     environment:
       # -------------------------------------------------------------------------
-      # [REQUIRED] Core Configuration
+      # Core Configuration (with demo defaults)
       # -------------------------------------------------------------------------
       
       # ASP.NET Core Environment (Development, Staging, Production)
-      # Development: Enables detailed error pages, developer exception page
-      # Production: Secure defaults, minimal error details
-      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
+      # Using Development for demo to get detailed error pages
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
       
       # URLs the application listens on
-      # HTTPS (8443) is primary, HTTP (8080) redirects to HTTPS
+      # HTTPS (8443) is primary inside container, mapped to 9443 on host
       ASPNETCORE_URLS: https://+:8443;http://+:8080
+      
+      # Tell ASP.NET Core what the external HTTPS port is for proper redirects
+      ASPNETCORE_HTTPS_PORT: 9443
+      
+      # Security setting - require HTTPS
+      Security__RequireHttps: "true"
       
       # Database Connection String
       # Format: Host=hostname;Port=5432;Database=dbname;Username=user;Password=pass
-      # [REQUIRED] POSTGRES_PASSWORD must be set in .env file
-      ConnectionStrings__authdb: Host=mrwho-postgres;Port=5432;Database=authdb;Username=oidc;Password=${POSTGRES_PASSWORD};Include Error Detail=false
+      ConnectionStrings__authdb: Host=mrwho-postgres;Port=5432;Database=authdb;Username=oidc;Password=${POSTGRES_PASSWORD:-DemoPassword123!};Include Error Detail=true
       
       # -------------------------------------------------------------------------
-      # [REQUIRED] TLS/HTTPS Certificate Configuration
+      # TLS/HTTPS Certificate Configuration (with demo defaults)
       # -------------------------------------------------------------------------
       
       # Path to PFX certificate file inside container
-      # Certificate is mounted from ./certs directory (see volumes section)
+      # Certificate is mounted from MrWhoOidc/certs directory (see volumes section)
       ASPNETCORE_Kestrel__Certificates__Default__Path: /https/aspnetapp.pfx
       
-      # Certificate password
-      # [REQUIRED] Set CERT_PASSWORD in .env file
-      # Generate certificate: ./scripts/generate-cert.sh localhost yourpassword
-      ASPNETCORE_Kestrel__Certificates__Default__Password: ${CERT_PASSWORD}
+      # Certificate password (demo default: changeit)
+      ASPNETCORE_Kestrel__Certificates__Default__Password: ${CERT_PASSWORD:-changeit}
       
       # -------------------------------------------------------------------------
-      # [REQUIRED] OIDC Configuration
+      # OIDC Configuration (with demo defaults)
       # -------------------------------------------------------------------------
       
       # Public base URL where users access the OIDC provider
       # MUST match the URL users use in their browsers
-      # Examples:
-      #   - Local development: https://localhost:8443
-      #   - Production with domain: https://auth.example.com
-      # [REQUIRED] Set OIDC_PUBLIC_BASE_URL in .env file
-      Oidc__PublicBaseUrl: ${OIDC_PUBLIC_BASE_URL}
+      # Demo default uses port 9443 to avoid e2e conflicts
+      Oidc__PublicBaseUrl: ${OIDC_PUBLIC_BASE_URL:-https://localhost:9443}
       
       # -------------------------------------------------------------------------
-      # [OPTIONAL] Multi-Tenancy Configuration
+      # Multi-Tenancy Configuration (Optional)
       # -------------------------------------------------------------------------
       
       # Enable multi-tenant mode for supporting multiple organizations
-      # false: Single tenant mode (simpler, recommended for most deployments)
-      # true: Multi-tenant mode (requires tenant management)
+      # false: Single tenant mode (simpler, recommended for demos)
       MultiTenant__Enabled: ${MULTITENANT_ENABLED:-false}
       
       # Default tenant slug when multi-tenancy is disabled
-      # Used as identifier for the single tenant
       MultiTenant__DefaultTenantSlug: ${MULTITENANT_DEFAULT_TENANT_SLUG:-default}
       
       # -------------------------------------------------------------------------
-      # [OPTIONAL] Redis Caching (Disabled in Basic Configuration)
+      # Redis Caching (Disabled for demo simplicity)
       # -------------------------------------------------------------------------
       
-      # Redis is disabled in this basic configuration
-      # For 30-50% performance improvement, use docker-compose.redis.yml
+      # Redis is disabled in this demo configuration
       Redis__Enabled: false
       
       # -------------------------------------------------------------------------
-      # [OPTIONAL] Email/SMTP Configuration
+      # Logging Configuration (verbose for demo)
       # -------------------------------------------------------------------------
       
-      # Enable email notifications (password reset, account verification, etc.)
-      # Requires SMTP server configuration when enabled
-      Mail__Enabled: ${MAIL_ENABLED:-false}
-      Mail__SmtpHost: ${MAIL_SMTP_HOST}
-      Mail__SmtpPort: ${MAIL_SMTP_PORT:-587}
-      Mail__UseSsl: ${MAIL_SMTP_USE_SSL:-true}
-      Mail__FromAddress: ${MAIL_FROM_ADDRESS}
-      Mail__FromName: ${MAIL_FROM_NAME:-MrWhoOidc}
-      Mail__SmtpUsername: ${MAIL_SMTP_USERNAME}
-      Mail__SmtpPassword: ${MAIL_SMTP_PASSWORD}
-      
-      # -------------------------------------------------------------------------
-      # [OPTIONAL] Logging Configuration
-      # -------------------------------------------------------------------------
-      
-      # Log level for application logs
-      # Trace, Debug, Information, Warning, Error, Critical
-      # Recommendation: Information for production, Debug for troubleshooting
       Logging__LogLevel__Default: ${LOGGING_LEVEL:-Information}
-      Logging__LogLevel__Microsoft.AspNetCore: ${LOGGING_LEVEL_ASPNETCORE:-Warning}
+      Logging__LogLevel__Microsoft.AspNetCore: ${LOGGING_LEVEL_ASPNETCORE:-Information}
       
       # -------------------------------------------------------------------------
-      # [OPTIONAL] Admin UI Configuration
+      # Admin UI Configuration
       # -------------------------------------------------------------------------
       
       # Enable admin UI for managing clients, users, and configuration
-      # Disable in production if using API-based management
       AdminUI__Enabled: ${ADMIN_UI_ENABLED:-true}
       
     # ============================================================================
-    # Port Mapping
+    # Port Mapping - Using 9443 to avoid e2e conflicts
     # ============================================================================
     ports:
-      # HTTPS port (primary endpoint for OIDC)
-      - "${OIDC_HTTPS_PORT:-8443}:8443"
+      # HTTPS port (primary endpoint for OIDC) - mapped to 9443 on host
+      - "${OIDC_HTTPS_PORT:-9443}:8443"
       
-      # HTTP port (redirects to HTTPS)
-      # Mapped to 8081 on host to avoid conflicts with common web servers
-      - "${OIDC_HTTP_PORT:-8081}:8080"
+      # HTTP port (redirects to HTTPS) - mapped to 9080 on host
+      - "${OIDC_HTTP_PORT:-9080}:8080"
     
     # ============================================================================
     # Volume Mounts
     # ============================================================================
     volumes:
-      # Mount TLS certificate directory (read-only)
-      # Certificate must be generated first: ./scripts/generate-cert.sh
-      - ./certs:/https:ro
+      # Mount TLS certificate directory from MrWhoOidc (read-only)
+      # Using shared certs from MrWhoOidc project
+      - ../../MrWhoOidc/certs:/https:ro
     
     # ============================================================================
     # Health Check
@@ -168,7 +143,7 @@ services:
   # ============================================================================
   mrwho-postgres:
     image: postgres:16-alpine
-    container_name: mrwho-postgres
+    container_name: mrwho-postgres-demo
     
     # ============================================================================
     # PostgreSQL Configuration
@@ -180,18 +155,17 @@ services:
       # Database user
       POSTGRES_USER: oidc
       
-      # Database password
-      # [REQUIRED] Set POSTGRES_PASSWORD in .env file
-      # Use strong password in production (min 16 chars, mixed case, numbers, symbols)
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # Database password (demo default for simplicity)
+      # DO NOT use this in production!
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-DemoPassword123!}
     
     # ============================================================================
     # Data Persistence
     # ============================================================================
     volumes:
       # Persist database data across container restarts
-      # Data stored in Docker volume: mrwho-postgres-data
-      - postgres-data:/var/lib/postgresql/data
+      # Using demo-specific volume name to avoid conflicts
+      - demo-postgres-data:/var/lib/postgresql/data
     
     # ============================================================================
     # Health Check
@@ -217,10 +191,10 @@ services:
 # Volumes - Persistent Data Storage
 # ============================================================================
 volumes:
-  # PostgreSQL data volume
+  # PostgreSQL data volume (demo-specific name to avoid conflicts)
   # Data persists across container recreation and system restarts
   # To reset database: docker compose down -v (WARNING: destroys all data)
-  postgres-data:
+  demo-postgres-data:
     driver: local
 
 # ============================================================================
