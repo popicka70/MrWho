@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/tls"
+	"embed"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -24,6 +25,9 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/oauth2"
 )
+
+//go:embed templates/*.html
+var templateFS embed.FS
 
 const (
 	defaultConfigPath  = "config.json"
@@ -166,7 +170,7 @@ func main() {
 			}
 			return string(bytes)
 		},
-	}).Parse(homeTemplate))
+	}).ParseFS(templateFS, "templates/*.html"))
 
 	ttl := 5 * time.Minute
 	if cfg.OBO != nil && strings.TrimSpace(cfg.OBO.CacheLifetime) != "" {
@@ -711,98 +715,3 @@ func pkceCodeChallenge(verifier string) string {
 	hash := sha256.Sum256([]byte(verifier))
 	return base64.RawURLEncoding.EncodeToString(hash[:])
 }
-
-const homeTemplate = `{{define "home"}}
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="utf-8" />
-    <title>MrWhoOidc Go Web Client</title>
-    <style>
-        body { font-family: system-ui, sans-serif; max-width: 960px; margin: 2rem auto; padding: 0 1rem; }
-        header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 1.5rem; }
-        nav a { margin-right: 1rem; }
-        pre { background: #f4f4f4; padding: 1rem; border-radius: 6px; overflow-x: auto; }
-        .card { border: 1px solid #ddd; border-radius: 6px; padding: 1rem; margin-bottom: 1.5rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-        .error { background: #ffecec; border: 1px solid #f5aca6; color: #b30000; padding: 0.75rem; border-radius: 6px; margin-bottom: 1rem; }
-        .actions { margin-bottom: 1.5rem; }
-        button, a.button { padding: 0.5rem 1rem; border-radius: 4px; border: none; background: #2563eb; color: white; text-decoration: none; cursor: pointer; }
-        a.button.secondary { background: #475569; }
-        button { font-size: 1rem; }
-        section h2 { margin-top: 0; }
-        footer { text-align: center; color: #666; margin-top: 3rem; font-size: 0.875rem; }
-    </style>
-</head>
-<body>
-<header>
-    <div>
-        <h1>MrWhoOidc Go Web Client</h1>
-        <div><strong>Issuer:</strong> {{.Issuer}}</div>
-        <div><strong>Client Id:</strong> {{.ClientID}}</div>
-    </div>
-    <nav>
-        <a class="button" href="/login">Sign in</a>
-        <a class="button secondary" href="/logout">Clear session</a>
-    </nav>
-</header>
-
-{{if .Error}}
-<div class="error">{{.Error}}</div>
-{{end}}
-
-<div class="card">
-    <h2>Configuration</h2>
-    <p><strong>Redirect URL:</strong> {{.RedirectURL}}</p>
-    <p><strong>Requested scopes:</strong> {{range $index, $scope := .Scopes}}{{if $index}}, {{end}}{{$scope}}{{end}}</p>
-    {{if .APIBaseURL}}<p><strong>API base URL:</strong> {{.APIBaseURL}} {{if .OBOEnabled}}(OBO enabled){{end}}</p>{{end}}
-</div>
-
-{{if .LoggedIn}}
-<div class="card">
-    <h2>Tokens</h2>
-    <p><strong>Access token expires:</strong> {{.AccessExpiry}}</p>
-    <pre>{{.AccessToken}}</pre>
-    {{if .RefreshToken}}
-    <p><strong>Refresh token</strong></p>
-    <pre>{{.RefreshToken}}</pre>
-    {{end}}
-    <p><strong>ID token (raw)</strong></p>
-    <pre>{{.RawIDToken}}</pre>
-</div>
-
-<div class="card">
-    <h2>ID token claims</h2>
-    <pre>{{.IDTokenJSON}}</pre>
-</div>
-
-{{if .UserInfoJSON}}
-<div class="card">
-    <h2>UserInfo response</h2>
-    <pre>{{.UserInfoJSON}}</pre>
-</div>
-{{end}}
-
-<div class="card">
-    <h2>Call the sample API</h2>
-    <form action="/call-api" method="post" style="display:inline;">
-        <button type="submit">Invoke GET /me</button>
-    </form>
-    {{if .APILastJSON}}
-    <h3>Last API response</h3>
-    <pre>{{.APILastJSON}}</pre>
-    {{end}}
-</div>
-{{else}}
-<div class="card">
-    <h2>Next steps</h2>
-    <p>Use the Sign in button to start the authorization code + PKCE flow against your MrWhoOidc server.</p>
-</div>
-{{end}}
-
-<footer>
-    Last refreshed at {{.LastUpdatedUTC}} UTC
-</footer>
-</body>
-</html>
-{{end}}
-`
