@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -35,15 +36,16 @@ const (
 )
 
 type config struct {
-	Issuer       string     `json:"issuer"`
-	ClientID     string     `json:"client_id"`
-	ClientSecret string     `json:"client_secret"`
-	RedirectURL  string     `json:"redirect_url"`
-	Scopes       []string   `json:"scopes"`
-	UsePKCE      *bool      `json:"use_pkce"`
-	ListenAddr   string     `json:"listen_addr"`
-	APIBaseURL   string     `json:"api_base_url"`
-	OBO          *oboConfig `json:"obo"`
+	Issuer        string     `json:"issuer"`
+	ClientID      string     `json:"client_id"`
+	ClientSecret  string     `json:"client_secret"`
+	RedirectURL   string     `json:"redirect_url"`
+	Scopes        []string   `json:"scopes"`
+	UsePKCE       *bool      `json:"use_pkce"`
+	ListenAddr    string     `json:"listen_addr"`
+	APIBaseURL    string     `json:"api_base_url"`
+	SkipTLSVerify bool       `json:"skip_tls_verify"`
+	OBO           *oboConfig `json:"obo"`
 }
 
 type oboConfig struct {
@@ -124,6 +126,18 @@ func main() {
 
 	ctx := context.Background()
 
+	// Create HTTP client with optional TLS skip for development/Docker environments
+	httpClient := &http.Client{Timeout: 15 * time.Second}
+	if cfg.SkipTLSVerify {
+		logger.Warn("TLS certificate verification is disabled - use only for development!")
+		httpClient.Transport = &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+	}
+
+	// Use custom HTTP client for OIDC discovery
+	ctx = oidc.ClientContext(ctx, httpClient)
+
 	provider, err := oidc.NewProvider(ctx, cfg.Issuer)
 	if err != nil {
 		logger.Error("failed to connect to issuer", slog.Any("error", err))
@@ -176,7 +190,7 @@ func main() {
 		sessionStore:    &sessionStore{sessions: make(map[string]*sessionData)},
 		templates:       templates,
 		logger:          logger,
-		httpClient:      &http.Client{Timeout: 15 * time.Second},
+		httpClient:      httpClient,
 		oboCacheTTL:     ttl,
 		pkceEnabled:     pkceEnabled,
 	}
@@ -644,6 +658,8 @@ func (a *app) exchangeCode(ctx context.Context, code, codeVerifier string) (*oau
 	if a.pkceEnabled && codeVerifier != "" {
 		opts = append(opts, oauth2.SetAuthURLParam("code_verifier", codeVerifier))
 	}
+	// Use custom HTTP client for token exchange (important for TLS skip)
+	ctx = context.WithValue(ctx, oauth2.HTTPClient, a.httpClient)
 	return a.oauth2Config.Exchange(ctx, code, opts...)
 }
 
@@ -651,6 +667,8 @@ func (a *app) fetchUserInfo(ctx context.Context, token *oauth2.Token) (map[strin
 	if token == nil {
 		return nil, nil
 	}
+	// Use custom HTTP client for userinfo endpoint (important for TLS skip)
+	ctx = oidc.ClientContext(ctx, a.httpClient)
 	userInfo, err := a.provider.UserInfo(ctx, oauth2.StaticTokenSource(token))
 	if err != nil {
 		return nil, err

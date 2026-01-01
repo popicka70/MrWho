@@ -251,6 +251,63 @@ services:
       - edge  # Connect to edge network for external access
 
   # ============================================================================
+  # Go Client Demo - Shows OIDC authentication with Go
+  # ============================================================================
+  go-client-demo:
+    build:
+      context: ./go-client
+      dockerfile: Dockerfile
+    container_name: go-client-demo
+    
+    # Wait for OIDC provider to be healthy before starting
+    depends_on:
+      mrwho-oidc:
+        condition: service_healthy
+    
+    # ============================================================================
+    # Environment Configuration
+    # ============================================================================
+    environment:
+      # Point to config file location
+      MRWHO_GO_WEB_CONFIG: /app/config.json
+    
+    # Allow container to resolve localhost to host machine for OIDC discovery
+    extra_hosts:
+      - "localhost:host-gateway"
+    
+    # ============================================================================
+    # Port Mapping
+    # ============================================================================
+    ports:
+      # HTTP port for Go demo app
+      - "5080:5080"
+    
+    # ============================================================================
+    # Volume Mounts - Override config with Docker-specific settings
+    # ============================================================================
+    volumes:
+      - ./go-client/config.docker.json:/app/config.json:ro
+    
+    # ============================================================================
+    # Health Check
+    # ============================================================================
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:5080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    
+    # Restart policy
+    restart: unless-stopped
+    
+    # ============================================================================
+    # Network Configuration
+    # ============================================================================
+    networks:
+      - edge  # Connect to edge network for external access
+
+  # ============================================================================
   # PostgreSQL Database
   # ============================================================================
   mrwho-postgres:

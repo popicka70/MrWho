@@ -73,12 +73,14 @@
           ],
           "clientSecretEnv": "GO_CLIENT_SECRET",
           "allowedLoginRedirectUris": [
-            "http://localhost:8080/callback",
-            "http://localhost:8080/auth/callback"
+            "http://localhost:5080/callback",
+            "https://localhost:5080/callback"
           ],
           "allowedLogoutRedirectUris": [
-            "http://localhost:8080/",
-            "http://localhost:8080/logout"
+            "http://localhost:5080/",
+            "http://localhost:5080/logout",
+            "https://localhost:5080/",
+            "https://localhost:5080/logout"
           ]
         }
       ],
