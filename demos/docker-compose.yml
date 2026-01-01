@@ -134,14 +134,14 @@ services:
       - ./oidc-seed-manifest.json:/seed/oidc-seed-manifest.json:ro
     
     # ============================================================================
-    # Health Check - TCP port check (container doesn't have curl/wget)
+    # Health Check - TCP port check using bash (sh doesn't support /dev/tcp)
     # ============================================================================
     healthcheck:
-      test: ["CMD-SHELL", "cat < /dev/null > /dev/tcp/localhost/8443 || exit 1"]
-      interval: 30s
-      timeout: 10s
+      test: ["CMD", "bash", "-c", "cat < /dev/null > /dev/tcp/localhost/8443"]
+      interval: 10s
+      timeout: 5s
       retries: 5
-      start_period: 60s
+      start_period: 30s
     
     # Restart policy
     restart: unless-stopped
