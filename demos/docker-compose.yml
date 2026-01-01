@@ -251,6 +251,52 @@ services:
       - edge  # Connect to edge network for external access
 
   # ============================================================================
+  # React SPA Demo - Shows OIDC authentication with React + oauth4webapi
+  # ============================================================================
+  react-spa-demo:
+    build:
+      context: ./react-client
+      dockerfile: Dockerfile
+      args:
+        VITE_OIDC_AUTHORITY: https://localhost:9443
+        VITE_OIDC_CLIENT_ID: react-spa-demo
+        VITE_OIDC_SCOPE: openid profile email
+        VITE_REDIRECT_URI: http://localhost:3000/callback
+        VITE_POST_LOGOUT_REDIRECT_URI: http://localhost:3000/
+    container_name: react-spa-demo
+    
+    # Wait for OIDC provider to be healthy before starting
+    depends_on:
+      mrwho-oidc:
+        condition: service_healthy
+    
+    # ============================================================================
+    # Port Mapping
+    # ============================================================================
+    ports:
+      # HTTP port for React SPA (served by nginx)
+      - "3000:80"
+    
+    # ============================================================================
+    # Health Check
+    # ============================================================================
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:80/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    
+    # Restart policy
+    restart: unless-stopped
+    
+    # ============================================================================
+    # Network Configuration
+    # ============================================================================
+    networks:
+      - edge  # Connect to edge network for external access
+
+  # ============================================================================
   # Go Client Demo - Shows OIDC authentication with Go
   # ============================================================================
   go-client-demo:

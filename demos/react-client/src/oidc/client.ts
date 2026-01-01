@@ -22,27 +22,22 @@ export async function getAsAndClient() {
 export async function startLogin() {
   const { as, client } = await getAsAndClient()
 
-  // Pushed Authorization Request (PAR) with PKCE + state + nonce
+  // Standard Authorization Code flow with PKCE + state + nonce
   const codeVerifier = oauth.generateRandomCodeVerifier()
   const codeChallenge = await oauth.calculatePKCECodeChallenge(codeVerifier)
   const state = oauth.generateRandomState()
   const nonce = oauth.generateRandomNonce()
 
-  const par = await oauth.pushedAuthorizationRequest(as, client, new URLSearchParams({
-    client_id: client.client_id,
-    response_type: 'code',
-    redirect_uri: OIDC.redirectUri,
-    scope: OIDC.scope,
-    code_challenge: codeChallenge,
-    code_challenge_method: 'S256',
-    state,
-    nonce,
-  }))
-  const parResponse = await oauth.processPushedAuthorizationResponse(as, client, par)
-
+  // Build authorization URL directly (no PAR)
   const authUrl = new URL(as.authorization_endpoint!)
   authUrl.searchParams.set('client_id', client.client_id)
-  authUrl.searchParams.set('request_uri', parResponse.request_uri)
+  authUrl.searchParams.set('response_type', 'code')
+  authUrl.searchParams.set('redirect_uri', OIDC.redirectUri)
+  authUrl.searchParams.set('scope', OIDC.scope)
+  authUrl.searchParams.set('code_challenge', codeChallenge)
+  authUrl.searchParams.set('code_challenge_method', 'S256')
+  authUrl.searchParams.set('state', state)
+  authUrl.searchParams.set('nonce', nonce)
 
   sessionStorage.setItem('pkce_code_verifier', codeVerifier)
   sessionStorage.setItem('oidc_state', state)
@@ -74,13 +69,16 @@ export async function handleRedirectCallback(search: string) {
   )
 
   const response = await oauth.processAuthorizationCodeOpenIDResponse(as, client, result, expectedNonce)
+  if (oauth.isOAuth2Error(response)) {
+    throw new Error(`Token error: ${response.error}: ${response.error_description}`)
+  }
   let claims = oauth.getValidatedIdTokenClaims(response)
 
   // Optionally call UserInfo if available and we have an access token
   if (response.access_token && as.userinfo_endpoint) {
     try {
       const userInfoRes = await oauth.userInfoRequest(as, client, response.access_token)
-      const userInfo = await oauth.processUserInfoResponse(as, client, claims.sub, userInfoRes)
+      const userInfo = await oauth.processUserInfoResponse(as, client, claims.sub as string, userInfoRes)
       claims = { ...claims, ...userInfo }
     } catch {
       // ignore userinfo errors for demo
