@@ -99,6 +99,20 @@ services:
       # Enable admin UI for managing clients, users, and configuration
       AdminUI__Enabled: ${ADMIN_UI_ENABLED:-true}
       
+      # -------------------------------------------------------------------------
+      # Client/User Seeding Configuration
+      # -------------------------------------------------------------------------
+      
+      # Enable seeding of tenants, clients, and users from manifest file
+      Seeding__Enabled: "true"
+      Seeding__ManifestPath: /seed/oidc-seed-manifest.json
+      Seeding__AllowUpdates: "true"
+      Seeding__OverwriteClientSecrets: "true"
+      
+      # Client secrets from environment (referenced in seed manifest)
+      DOTNET_MVC_CLIENT_SECRET: ${DOTNET_MVC_CLIENT_SECRET:-demo-mvc-client-secret-123}
+      GO_CLIENT_SECRET: ${GO_CLIENT_SECRET:-demo-go-client-secret-123}
+      
     # ============================================================================
     # Port Mapping - Using 9443 to avoid e2e conflicts
     # ============================================================================
@@ -116,16 +130,17 @@ services:
       # Mount TLS certificate directory from MrWhoOidc (read-only)
       # Using shared certs from MrWhoOidc project
       - ../../MrWhoOidc/certs:/https:ro
+      # Mount seed manifest for automatic client/user provisioning
+      - ./oidc-seed-manifest.json:/seed/oidc-seed-manifest.json:ro
     
     # ============================================================================
-    # Health Check
+    # Health Check - TCP port check (container doesn't have curl/wget)
     # ============================================================================
     healthcheck:
-      # Check the /health endpoint every 30 seconds
-      test: ["CMD-SHELL", "curl -f -k https://localhost:8443/health || exit 1"]
+      test: ["CMD-SHELL", "cat < /dev/null > /dev/tcp/localhost/8443 || exit 1"]
       interval: 30s
       timeout: 10s
-      retries: 3
+      retries: 5
       start_period: 60s
     
     # Restart policy
@@ -137,6 +152,103 @@ services:
     networks:
       - edge      # External-facing network (for user/client access)
       - internal  # Internal-only network (for database communication)
+
+  # ============================================================================
+  # .NET MVC Demo Client - Shows OIDC authentication integration
+  # ============================================================================
+  dotnet-mvc-demo:
+    build:
+      # Use broader context to include MrWhoOidc.Client and MrWhoOidc.Security dependencies
+      context: ../..
+      dockerfile: MrWho/demos/dotnet-mvc-client/Dockerfile.demo
+    container_name: dotnet-mvc-demo
+    
+    # Wait for OIDC provider to be healthy before starting
+    depends_on:
+      mrwho-oidc:
+        condition: service_healthy
+    
+    # ============================================================================
+    # Environment Configuration
+    # ============================================================================
+    environment:
+      # ASP.NET Core Configuration
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: https://+:5001;http://+:5000
+      
+      # Tell ASP.NET Core what the external HTTPS port is for proper redirects
+      ASPNETCORE_HTTPS_PORT: 5001
+      
+      # TLS/HTTPS Certificate Configuration
+      ASPNETCORE_Kestrel__Certificates__Default__Path: /https/aspnetapp.pfx
+      ASPNETCORE_Kestrel__Certificates__Default__Password: ${CERT_PASSWORD:-changeit}
+      
+      # -------------------------------------------------------------------------
+      # OIDC Configuration
+      # -------------------------------------------------------------------------
+      # The Issuer URL must be what the BROWSER sees (localhost:9443)
+      # because tokens are validated by the browser redirect flow
+      MrWhoOidc__Issuer: https://localhost:9443
+      
+      # Client credentials (demo defaults - register this client in Admin UI)
+      MrWhoOidc__ClientId: ${DOTNET_MVC_CLIENT_ID:-dotnet-mvc-demo}
+      MrWhoOidc__ClientSecret: ${DOTNET_MVC_CLIENT_SECRET:-demo-mvc-client-secret-123}
+      
+      # OAuth scopes
+      MrWhoOidc__Scopes__0: openid
+      MrWhoOidc__Scopes__1: profile
+      MrWhoOidc__Scopes__2: email
+      MrWhoOidc__Scopes__3: offline_access
+      
+      # Use PKCE for enhanced security
+      MrWhoOidc__UsePkce: "true"
+      
+      # Skip HTTPS metadata validation (demo uses self-signed cert)
+      MrWhoOidc__RequireHttpsMetadata: "false"
+      
+      # Accept any server certificate (for self-signed certs in dev/demo)
+      # WARNING: Never use in production!
+      MrWhoOidc__DangerousAcceptAnyServerCertificateValidator: "true"
+      
+      # Logging
+      Logging__LogLevel__Default: Information
+      Logging__LogLevel__Microsoft.AspNetCore: Warning
+    
+    # Allow container to resolve localhost to host machine for OIDC discovery
+    extra_hosts:
+      - "localhost:host-gateway"
+    
+    # ============================================================================
+    # Volume Mounts - Mount certificates for HTTPS
+    # ============================================================================
+    volumes:
+      - ../../MrWhoOidc/certs:/https:ro
+    
+    # ============================================================================
+    # Port Mapping
+    # ============================================================================
+    ports:
+      - "${DOTNET_MVC_HTTPS_PORT:-5001}:5001"
+      - "${DOTNET_MVC_HTTP_PORT:-5000}:5000"
+    
+    # ============================================================================
+    # Health Check
+    # ============================================================================
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-k", "https://localhost:5001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    # Restart policy
+    restart: unless-stopped
+    
+    # ============================================================================
+    # Network Configuration
+    # ============================================================================
+    networks:
+      - edge  # Connect to edge network for external access
 
   # ============================================================================
   # PostgreSQL Database
