@@ -142,11 +142,7 @@ func main() {
 	// Use custom HTTP client for OIDC discovery
 	ctx = oidc.ClientContext(ctx, httpClient)
 
-	provider, err := oidc.NewProvider(ctx, cfg.Issuer)
-	if err != nil {
-		logger.Error("failed to connect to issuer", slog.Any("error", err))
-		os.Exit(1)
-	}
+	provider := waitForProvider(ctx, cfg.Issuer, logger)
 
 	verifierConfig := &oidc.Config{ClientID: cfg.ClientID}
 	idTokenVerifier := provider.Verifier(verifierConfig)
@@ -214,6 +210,34 @@ func main() {
 	if err := http.ListenAndServe(cfg.ListenAddr, mux); err != nil {
 		logger.Error("server exited", slog.Any("error", err))
 		os.Exit(1)
+	}
+}
+
+func waitForProvider(ctx context.Context, issuer string, logger *slog.Logger) *oidc.Provider {
+	backoff := 1 * time.Second
+	maxBackoff := 30 * time.Second
+
+	for {
+		provider, err := oidc.NewProvider(ctx, issuer)
+		if err == nil {
+			return provider
+		}
+
+		// In Docker Compose, exiting hard causes container restart loops. For demo UX,
+		// keep the process alive and keep retrying until the OIDC provider is ready
+		// (or config is fixed).
+		logger.Error(
+			"failed to connect to issuer; will retry",
+			slog.String("issuer", issuer),
+			slog.Duration("retry_in", backoff),
+			slog.Any("error", err),
+		)
+
+		time.Sleep(backoff)
+		backoff *= 2
+		if backoff > maxBackoff {
+			backoff = maxBackoff
+		}
 	}
 }
 
@@ -449,7 +473,8 @@ func (a *app) handleCallback(w http.ResponseWriter, r *http.Request, sessionID s
 		return
 	}
 
-	idToken, err := a.idTokenVerifier.Verify(r.Context(), rawIDToken)
+	verifyCtx := oidc.ClientContext(r.Context(), a.httpClient)
+	idToken, err := a.idTokenVerifier.Verify(verifyCtx, rawIDToken)
 	if err != nil {
 		a.failSession(session, fmt.Errorf("id token validation failed: %w", err))
 		http.Redirect(w, r, "/", http.StatusFound)

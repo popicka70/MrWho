@@ -160,7 +160,7 @@ services:
   # ============================================================================
   dotnet-mvc-demo:
     build:
-      # Use broader context to include MrWhoOidc.Client and MrWhoOidc.Security dependencies
+      # Use the repo root as build context (includes central props/nuget.config used by the demo)
       context: ../..
       dockerfile: MrWho/demos/dotnet-mvc-client/Dockerfile.demo
     container_name: dotnet-mvc-demo
@@ -411,7 +411,8 @@ services:
 volumes:
   # PostgreSQL data volume (demo-specific name to avoid conflicts)
   # Data persists across container recreation and system restarts
-  # To reset database: docker compose down -v (WARNING: destroys all data)
+  # To reset demo (WARNING: destroys all data):
+  #   pwsh -File ./reset-demo.ps1
   demo-postgres-data:
     driver: local
 

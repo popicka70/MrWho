@@ -1,59 +1,27 @@
 # =============================================================================
 # .NET MVC Demo Client - Dockerfile for demos docker-compose
 # =============================================================================
-# This Dockerfile is used when building from the MrWhoProjects root context
-# to include MrWhoOidc.Client and MrWhoOidc.Security project references.
+# This Dockerfile is used when building from the MrWhoProjects root context.
+# The demo app consumes MrWhoOidc.Client via NuGet (no local project copies).
 # =============================================================================
 
 # Build stage
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 WORKDIR /src
 
-# Copy all required project files first (for restore caching)
+# Central Package Management + NuGet configuration
+COPY MrWho/Directory.Packages.props ./Directory.Packages.props
+COPY MrWho/Directory.Build.props ./Directory.Build.props
+COPY MrWho/nuget.config ./nuget.config
+
+# Copy project file first for restore caching
 COPY MrWho/demos/dotnet-mvc-client/MrWhoOidc.RazorClient.csproj MrWho/demos/dotnet-mvc-client/
-COPY MrWhoOidc/MrWhoOidc.Client/MrWhoOidc.Client.csproj MrWhoOidc/MrWhoOidc.Client/
-COPY MrWhoOidc/MrWhoOidc.Security/MrWhoOidc.Security.csproj MrWhoOidc/MrWhoOidc.Security/
+RUN dotnet restore MrWho/demos/dotnet-mvc-client/MrWhoOidc.RazorClient.csproj
 
-# Update project reference path and framework compatibility
-# The RazorClient csproj expects the client at ../../MrWhoOidc.Client but we have it at MrWhoOidc/MrWhoOidc.Client
-WORKDIR /src/MrWho/demos/dotnet-mvc-client
-RUN sed -i 's|\.\.\\\.\.\\MrWhoOidc\.Client|../../../MrWhoOidc/MrWhoOidc.Client|g' MrWhoOidc.RazorClient.csproj || true
-RUN sed -i 's|\.\./\.\./MrWhoOidc\.Client|../../../MrWhoOidc/MrWhoOidc.Client|g' MrWhoOidc.RazorClient.csproj || true
-
-# Also fix the Security project reference in Client
-WORKDIR /src/MrWhoOidc/MrWhoOidc.Client
-RUN sed -i 's|\.\.\\MrWhoOidc\.Security|../MrWhoOidc.Security|g' MrWhoOidc.Client.csproj || true
-
-# Update target frameworks for compatibility (Client and Security target net10, but SDK is 9.0)
-RUN sed -i 's|<TargetFramework>net10\.0</TargetFramework>|<TargetFramework>net9.0</TargetFramework>|g' MrWhoOidc.Client.csproj || true
-WORKDIR /src/MrWhoOidc/MrWhoOidc.Security
-RUN sed -i 's|<TargetFramework>net10\.0</TargetFramework>|<TargetFramework>net9.0</TargetFramework>|g' MrWhoOidc.Security.csproj || true
-
-# Restore dependencies
-WORKDIR /src/MrWho/demos/dotnet-mvc-client
-RUN dotnet restore
-
-# Copy all source code
-WORKDIR /src
+# Copy source and publish
 COPY MrWho/demos/dotnet-mvc-client/ MrWho/demos/dotnet-mvc-client/
-COPY MrWhoOidc/MrWhoOidc.Client/ MrWhoOidc/MrWhoOidc.Client/
-COPY MrWhoOidc/MrWhoOidc.Security/ MrWhoOidc/MrWhoOidc.Security/
-
-# Re-apply the path fixes after copying actual source
 WORKDIR /src/MrWho/demos/dotnet-mvc-client
-RUN sed -i 's|\.\.\\\.\.\\MrWhoOidc\.Client|../../../MrWhoOidc/MrWhoOidc.Client|g' MrWhoOidc.RazorClient.csproj || true
-RUN sed -i 's|\.\./\.\./MrWhoOidc\.Client|../../../MrWhoOidc/MrWhoOidc.Client|g' MrWhoOidc.RazorClient.csproj || true
-
-WORKDIR /src/MrWhoOidc/MrWhoOidc.Client
-RUN sed -i 's|\.\.\\MrWhoOidc\.Security|../MrWhoOidc.Security|g' MrWhoOidc.Client.csproj || true
-RUN sed -i 's|<TargetFramework>net10\.0</TargetFramework>|<TargetFramework>net9.0</TargetFramework>|g' MrWhoOidc.Client.csproj || true
-
-WORKDIR /src/MrWhoOidc/MrWhoOidc.Security
-RUN sed -i 's|<TargetFramework>net10\.0</TargetFramework>|<TargetFramework>net9.0</TargetFramework>|g' MrWhoOidc.Security.csproj || true
-
-# Build and publish
-WORKDIR /src/MrWho/demos/dotnet-mvc-client
-RUN dotnet publish -c Release -o /app/publish
+RUN dotnet publish -c Release -o /app/publish --no-restore
 
 # Runtime stage
 FROM mcr.microsoft.com/dotnet/aspnet:9.0
