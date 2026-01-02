@@ -70,17 +70,9 @@ services:
       Oidc__PublicBaseUrl: ${OIDC_PUBLIC_BASE_URL}
       
       # -------------------------------------------------------------------------
-      # [OPTIONAL] Multi-Tenancy Configuration
+      # Multi-tenancy
       # -------------------------------------------------------------------------
-      
-      # Enable multi-tenant mode for supporting multiple organizations
-      # false: Single tenant mode (simpler, recommended for most deployments)
-      # true: Multi-tenant mode (requires tenant management)
-      MultiTenant__Enabled: ${MULTITENANT_ENABLED:-false}
-      
-      # Default tenant slug when multi-tenancy is disabled
-      # Used as identifier for the single tenant
-      MultiTenant__DefaultTenantSlug: ${MULTITENANT_DEFAULT_TENANT_SLUG:-default}
+      # Multi-tenancy mode is controlled by the installed platform license (deployment_mode).
       
       # -------------------------------------------------------------------------
       # [OPTIONAL] Redis Caching (Disabled in Basic Configuration)

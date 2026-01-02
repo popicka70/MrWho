@@ -75,15 +75,7 @@ services:
       Oidc__Issuer: ${OIDC_ISSUER:-https://mrwho.local:9443}
       
       # -------------------------------------------------------------------------
-      # Multi-Tenancy Configuration (Optional)
-      # -------------------------------------------------------------------------
-      
-      # Enable multi-tenant mode for supporting multiple organizations
-      # false: Single tenant mode (simpler, recommended for demos)
-      MultiTenant__Enabled: ${MULTITENANT_ENABLED:-false}
-      
-      # Default tenant slug when multi-tenancy is disabled
-      MultiTenant__DefaultTenantSlug: ${MULTITENANT_DEFAULT_TENANT_SLUG:-default}
+      # Multi-tenancy is controlled by the installed platform license (deployment_mode).
       
       # -------------------------------------------------------------------------
       # Redis Caching (Disabled for demo simplicity)

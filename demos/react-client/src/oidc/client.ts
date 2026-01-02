@@ -4,6 +4,12 @@ import { OIDC } from './config'
 let as: oauth.AuthorizationServer
 let client: oauth.Client
 
+const AUTH_CHANGED_EVENT = 'oidc:changed'
+
+function notifyAuthChanged() {
+  window.dispatchEvent(new Event(AUTH_CHANGED_EVENT))
+}
+
 export async function getAsAndClient() {
   if (!as) {
     const issuer = new URL(OIDC.authority)
@@ -28,21 +34,42 @@ export async function startLogin() {
   const state = oauth.generateRandomState()
   const nonce = oauth.generateRandomNonce()
 
-  // Build authorization URL directly (no PAR)
-  const authUrl = new URL(as.authorization_endpoint!)
-  authUrl.searchParams.set('client_id', client.client_id)
-  authUrl.searchParams.set('response_type', 'code')
-  authUrl.searchParams.set('redirect_uri', OIDC.redirectUri)
-  authUrl.searchParams.set('scope', OIDC.scope)
-  authUrl.searchParams.set('code_challenge', codeChallenge)
-  authUrl.searchParams.set('code_challenge_method', 'S256')
-  authUrl.searchParams.set('state', state)
-  authUrl.searchParams.set('nonce', nonce)
+  // Build authorization request parameters (used for PAR or direct authorize redirect)
+  const authParams = new URLSearchParams()
+  authParams.set('client_id', client.client_id)
+  authParams.set('response_type', 'code')
+  authParams.set('redirect_uri', OIDC.redirectUri)
+  authParams.set('scope', OIDC.scope)
+  authParams.set('code_challenge', codeChallenge)
+  authParams.set('code_challenge_method', 'S256')
+  authParams.set('state', state)
+  authParams.set('nonce', nonce)
 
   sessionStorage.setItem('pkce_code_verifier', codeVerifier)
   sessionStorage.setItem('oidc_state', state)
   sessionStorage.setItem('oidc_nonce', nonce)
 
+  // Prefer PAR when advertised by the AS (licensed feature); fall back to direct authorize on failure.
+  if (as.pushed_authorization_request_endpoint) {
+    try {
+      const parRes = await oauth.pushedAuthorizationRequest(as, client, authParams)
+      const par = await oauth.processPushedAuthorizationResponse(as, client, parRes)
+      if (oauth.isOAuth2Error(par)) {
+        throw new Error(`${par.error}: ${par.error_description ?? 'PAR request failed'}`)
+      }
+
+      const authUrl = new URL(as.authorization_endpoint!)
+      authUrl.searchParams.set('client_id', client.client_id)
+      authUrl.searchParams.set('request_uri', par.request_uri)
+      location.assign(authUrl)
+      return
+    } catch {
+      // ignore and fall back to direct authorize
+    }
+  }
+
+  const authUrl = new URL(as.authorization_endpoint!)
+  for (const [k, v] of authParams) authUrl.searchParams.set(k, v)
   location.assign(authUrl)
 }
 
@@ -94,6 +121,7 @@ export async function handleRedirectCallback(search: string) {
   }
   sessionStorage.setItem('oidc_tokens', JSON.stringify(tokens))
   sessionStorage.setItem('oidc_claims', JSON.stringify(claims))
+  notifyAuthChanged()
 
   // Clear transient state
   sessionStorage.removeItem('pkce_code_verifier')
@@ -116,6 +144,7 @@ export function getTokens() {
 export function logoutFrontend() {
   sessionStorage.removeItem('oidc_tokens')
   sessionStorage.removeItem('oidc_claims')
+  notifyAuthChanged()
 }
 
 export async function startFrontChannelLogout() {

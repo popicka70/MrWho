@@ -1,8 +1,15 @@
+import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet } from 'react-router-dom'
 import { getUser, startFrontChannelLogout, startLogin } from '../oidc/client'
 
 export function App() {
-  const user = getUser()
+  const [user, setUser] = useState(() => getUser())
+
+  useEffect(() => {
+    const onAuthChanged = () => setUser(getUser())
+    window.addEventListener('oidc:changed', onAuthChanged)
+    return () => window.removeEventListener('oidc:changed', onAuthChanged)
+  }, [])
 
   return (
     <div className="min-h-screen flex flex-col">

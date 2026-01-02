@@ -42,17 +42,11 @@ services:
       # -------------------------------------------------------------------------
       # Multi-Tenancy Configuration (Production Feature)
       # -------------------------------------------------------------------------
-      
-      # Enable multi-tenant mode for supporting multiple organizations
-      # REQUIRED for multi-organization deployments
-      # Each tenant has isolated data, branding, and configuration
-      MultiTenant__Enabled: ${MULTITENANT_ENABLED:-true}
-      
-      # Default tenant slug (used when tenant cannot be determined)
-      # Should match your primary organization identifier
-      MultiTenant__DefaultTenantSlug: ${MULTITENANT_DEFAULT_TENANT_SLUG:-default}
+
+      # Multi-tenancy mode is controlled by the installed platform license (deployment_mode).
       
       # Tenant resolution strategy
+      # Used only when deployment_mode is multi_tenant.
       # Options: "Host" (subdomain), "Path" (URL path), "Header" (HTTP header)
       # Example Host: tenant1.auth.example.com vs tenant2.auth.example.com
       # Example Path: auth.example.com/tenant1 vs auth.example.com/tenant2
