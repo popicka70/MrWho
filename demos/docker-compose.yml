@@ -13,7 +13,10 @@ services:
   # MrWhoOidc OIDC Provider - Authorization Server
   # ============================================================================
   mrwho-oidc:
-    image: ghcr.io/popicka70/mrwhooidc:latest
+    build:
+      context: ../../MrWhoOidc
+      dockerfile: Dockerfile
+    image: mrwhooidc:local
     container_name: mrwho-oidc-demo
     
     # Wait for PostgreSQL to be healthy before starting
@@ -65,7 +68,11 @@ services:
       # Public base URL where users access the OIDC provider
       # MUST match the URL users use in their browsers
       # Demo default uses port 9443 to avoid e2e conflicts
-      Oidc__PublicBaseUrl: ${OIDC_PUBLIC_BASE_URL:-https://localhost:9443}
+      Oidc__PublicBaseUrl: ${OIDC_PUBLIC_BASE_URL:-https://mrwho.local:9443}
+
+      # Explicit issuer (required for licensing issuer validation)
+      # MUST match one of the seeded license token's allowed_issuers values
+      Oidc__Issuer: ${OIDC_ISSUER:-https://mrwho.local:9443}
       
       # -------------------------------------------------------------------------
       # Multi-Tenancy Configuration (Optional)
@@ -108,6 +115,7 @@ services:
       Seeding__ManifestPath: /seed/oidc-seed-manifest.json
       Seeding__AllowUpdates: "true"
       Seeding__OverwriteClientSecrets: "true"
+      Seeding__OverwriteLicense: "true"
       
       # Client secrets from environment (referenced in seed manifest)
       DOTNET_MVC_CLIENT_SECRET: ${DOTNET_MVC_CLIENT_SECRET:-demo-mvc-client-secret-123}
@@ -132,6 +140,8 @@ services:
       - ../../MrWhoOidc/certs:/https:ro
       # Mount seed manifest for automatic client/user provisioning
       - ./oidc-seed-manifest.json:/seed/oidc-seed-manifest.json:ro
+      # Mount demo license token (enterprise/enterprise+ features)
+      - ./oidc-license.txt:/seed/oidc-license.txt:ro
     
     # ============================================================================
     # Health Check - TCP port check using bash (sh doesn't support /dev/tcp)
@@ -186,9 +196,8 @@ services:
       # -------------------------------------------------------------------------
       # OIDC Configuration
       # -------------------------------------------------------------------------
-      # The Issuer URL must be what the BROWSER sees (localhost:9443)
-      # because tokens are validated by the browser redirect flow
-      MrWhoOidc__Issuer: https://localhost:9443
+      # The Issuer URL must be what the BROWSER sees
+      MrWhoOidc__Issuer: https://mrwho.local:9443
       
       # Client credentials (demo defaults - register this client in Admin UI)
       MrWhoOidc__ClientId: ${DOTNET_MVC_CLIENT_ID:-dotnet-mvc-demo}
@@ -217,6 +226,7 @@ services:
     # Allow container to resolve localhost to host machine for OIDC discovery
     extra_hosts:
       - "localhost:host-gateway"
+      - "mrwho.local:host-gateway"
     
     # ============================================================================
     # Volume Mounts - Mount certificates for HTTPS
@@ -258,7 +268,7 @@ services:
       context: ./react-client
       dockerfile: Dockerfile
       args:
-        VITE_OIDC_AUTHORITY: https://localhost:9443
+        VITE_OIDC_AUTHORITY: https://mrwho.local:9443
         VITE_OIDC_CLIENT_ID: react-spa-demo
         VITE_OIDC_SCOPE: openid profile email
         VITE_REDIRECT_URI: http://localhost:3000/callback
@@ -320,6 +330,7 @@ services:
     # Allow container to resolve localhost to host machine for OIDC discovery
     extra_hosts:
       - "localhost:host-gateway"
+      - "mrwho.local:host-gateway"
     
     # ============================================================================
     # Port Mapping

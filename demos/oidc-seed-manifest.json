@@ -1,5 +1,12 @@
 {
-  "version": 1,
+  "version": 2,
+  "licenses": [
+    {
+      "scope": "platform",
+      "licenseTokenPath": "/seed/oidc-license.txt",
+      "notes": "Demo license installed via seed manifest"
+    }
+  ],
   "scopes": [],
   "tenants": [
     {
