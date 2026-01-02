@@ -1,3 +1,15 @@
+# Build outputs
+**/bin/
+**/obj/
+**/out/
+
+# NuGet packages
+*.nupkg
+*.snupkg
+
+# Test results
+**/TestResults/
+
 # Git
 .git/
 

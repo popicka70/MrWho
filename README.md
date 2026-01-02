@@ -1,6 +1,8 @@
 # MrWhoOidc - OpenID Connect Identity Provider
 
 [![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=for-the-badge&logo=docker&logoColor=white)](https://github.com/popicka70/mrwhooidc/pkgs/container/mrwhooidc)
+[![NuGet](https://img.shields.io/nuget/v/MrWhoOidc.Client.svg?style=for-the-badge&logo=nuget&label=MrWhoOidc.Client)](https://www.nuget.org/packages/MrWhoOidc.Client/)
+[![NuGet](https://img.shields.io/nuget/v/MrWhoOidc.Security.svg?style=for-the-badge&logo=nuget&label=MrWhoOidc.Security)](https://www.nuget.org/packages/MrWhoOidc.Security/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
 [![.NET 9](https://img.shields.io/badge/.NET-9-512BD4?style=for-the-badge&logo=dotnet)](https://dotnet.microsoft.com/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-316192?style=for-the-badge&logo=postgresql)](https://www.postgresql.org/)

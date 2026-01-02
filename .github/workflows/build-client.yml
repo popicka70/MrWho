@@ -1,0 +1,54 @@
+name: build-client
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'Directory.Build.props'
+      - 'Directory.Packages.props'
+      - 'MrWhoOidc.Client.sln'
+      - '.github/workflows/build-client.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'Directory.Build.props'
+      - 'Directory.Packages.props'
+      - 'MrWhoOidc.Client.sln'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+
+      - name: Restore
+        run: dotnet restore ./MrWhoOidc.Client.sln
+
+      - name: Build
+        run: dotnet build ./MrWhoOidc.Client.sln -c Release --no-restore
+
+      - name: Pack
+        run: dotnet pack ./MrWhoOidc.Client.sln -c Release --no-build -o ./artifacts
+
+      - name: Upload NuGet artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuget-packages
+          path: ./artifacts/*.*nupkg
+          retention-days: 7
