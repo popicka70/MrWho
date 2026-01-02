@@ -19,9 +19,17 @@
             <p><strong>Message:</strong> @Model.ApiResponse.Message</p>
             <p><strong>Subject (User):</strong> @Model.ApiResponse.Subject</p>
             <p><strong>Name:</strong> @Model.ApiResponse.Name</p>
+                <p><strong>Email:</strong> @Model.ApiResponse.Email</p>
             <p><strong>Actor (Client):</strong> @Model.ApiResponse.Actor</p>
             <p><strong>Audience:</strong> @Model.ApiResponse.Audience</p>
             <p><strong>Scopes:</strong> @string.Join(", ", Model.ApiResponse.Scopes ?? [])</p>
+
+                @if (Model.UserInfoJson is not null)
+                {
+                    <hr />
+                    <p><strong>UserInfo (raw):</strong></p>
+                    <pre class="mb-0">@Model.UserInfoJson</pre>
+                }
         </div>
     </div>
 }

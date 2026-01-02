@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Text.Json;
 using Microsoft.Extensions.Logging;
 
 namespace MrWhoOidc.RazorClient.Services;
@@ -34,5 +35,6 @@ public sealed class OboApiClient
         string? Audience,
         IEnumerable<string>? Scopes,
         string? IssuedAt,
-        string? ExpiresAt);
+        string? ExpiresAt,
+        JsonElement? UserInfo);
 }

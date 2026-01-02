@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using System.Text.Json;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using MrWhoOidc.Client.DependencyInjection;
@@ -50,6 +51,22 @@ builder.Services.AddOptions<JwtBearerOptions>(JwtBearerDefaults.AuthenticationSc
         };
     });
 
+// Register HTTP client for UserInfo endpoint calls
+builder.Services.AddHttpClient("UserInfoClient")
+    .ConfigurePrimaryHttpMessageHandler(sp =>
+    {
+        var config = sp.GetRequiredService<IConfiguration>();
+        var acceptAny = config.GetValue<bool>("MrWhoOidc:DangerousAcceptAnyServerCertificateValidator");
+        if (acceptAny)
+        {
+            return new HttpClientHandler
+            {
+                ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+            };
+        }
+        return new HttpClientHandler();
+    });
+
 builder.Services.AddHealthChecks();
 
 var app = builder.Build();
@@ -61,7 +78,7 @@ app.UseAuthorization();
 app.MapHealthChecks("/health");
 
 // GET /me - Returns information about the token subject and actor
-app.MapGet("/me", (ClaimsPrincipal user) =>
+app.MapGet("/me", async (ClaimsPrincipal user, HttpContext context, IHttpClientFactory httpClientFactory, IOptionsMonitor<MrWhoOidcClientOptions> optionsMonitor, ILogger<Program> logger) =>
 {
     // Extract subject claims
     var subject = user.FindFirst("sub")?.Value;
@@ -88,6 +105,49 @@ app.MapGet("/me", (ClaimsPrincipal user) =>
             actorClientId = actClaim;
         }
     }
+
+    // Call UserInfo endpoint to get more details (since access token might be minimal)
+    JsonElement? userInfo = null;
+    var accessToken = await context.GetTokenAsync("access_token");
+    if (!string.IsNullOrEmpty(accessToken))
+    {
+        var clientOptions = optionsMonitor.CurrentValue;
+        var userInfoEndpoint = $"{clientOptions.Issuer?.TrimEnd('/')}/userinfo";
+        
+        var client = httpClientFactory.CreateClient("UserInfoClient");
+        
+        var request = new HttpRequestMessage(HttpMethod.Get, userInfoEndpoint);
+        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+        
+        try 
+        {
+            logger.LogInformation("Calling UserInfo endpoint: {Endpoint}", userInfoEndpoint);
+            var response = await client.SendAsync(request);
+            if (response.IsSuccessStatusCode)
+            {
+                userInfo = await response.Content.ReadFromJsonAsync<JsonElement>();
+                logger.LogInformation("UserInfo response: {UserInfo}", userInfo);
+                
+                // Enrich local variables if missing from token
+                if (string.IsNullOrEmpty(name) && userInfo.Value.TryGetProperty("name", out var nameProp))
+                {
+                    name = nameProp.GetString();
+                }
+                if (string.IsNullOrEmpty(email) && userInfo.Value.TryGetProperty("email", out var emailProp))
+                {
+                    email = emailProp.GetString();
+                }
+            }
+            else
+            {
+                logger.LogWarning("UserInfo endpoint returned status code: {StatusCode}", response.StatusCode);
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to call UserInfo endpoint");
+        }
+    }
     
     return Results.Ok(new
     {
@@ -99,7 +159,8 @@ app.MapGet("/me", (ClaimsPrincipal user) =>
         audience = user.FindFirst("aud")?.Value,
         scopes = user.FindFirst("scope")?.Value?.Split(' ', StringSplitOptions.RemoveEmptyEntries),
         issuedAt = user.FindFirst("iat")?.Value,
-        expiresAt = user.FindFirst("exp")?.Value
+        expiresAt = user.FindFirst("exp")?.Value,
+        userInfo // Include full user info for visibility
     });
 }).RequireAuthorization();
 
