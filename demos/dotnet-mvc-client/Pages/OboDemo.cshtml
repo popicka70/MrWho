@@ -1,0 +1,32 @@
+@page
+@model MrWhoOidc.RazorClient.Pages.OboDemoModel
+@{
+    ViewData["Title"] = "OBO Demo";
+}
+
+<h1>On-Behalf-Of Demo</h1>
+<p>Click the button to call the OBO Demo API on your behalf.</p>
+
+<form method="post" asp-page-handler="CallApi">
+    <button type="submit" class="btn btn-primary">Call API On My Behalf</button>
+</form>
+
+@if (Model.ApiResponse is not null)
+{
+    <div class="card mt-4">
+        <div class="card-header">API Response</div>
+        <div class="card-body">
+            <p><strong>Message:</strong> @Model.ApiResponse.Message</p>
+            <p><strong>Subject (User):</strong> @Model.ApiResponse.Subject</p>
+            <p><strong>Name:</strong> @Model.ApiResponse.Name</p>
+            <p><strong>Actor (Client):</strong> @Model.ApiResponse.Actor</p>
+            <p><strong>Audience:</strong> @Model.ApiResponse.Audience</p>
+            <p><strong>Scopes:</strong> @string.Join(", ", Model.ApiResponse.Scopes ?? [])</p>
+        </div>
+    </div>
+}
+
+@if (Model.ErrorMessage is not null)
+{
+    <div class="alert alert-danger mt-4">@Model.ErrorMessage</div>
+}

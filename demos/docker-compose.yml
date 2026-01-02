@@ -73,6 +73,14 @@ services:
       # Explicit issuer (required for licensing issuer validation)
       # MUST match one of the seeded license token's allowed_issuers values
       Oidc__Issuer: ${OIDC_ISSUER:-https://mrwho.local:9443}
+
+      # -------------------------------------------------------------------------
+      # Auth Configuration
+      # -------------------------------------------------------------------------
+      
+      # Allow 'obo-demo-api' as a valid audience for token exchange
+      Auth__ApiAudiences__0: api
+      Auth__ApiAudiences__1: obo-demo-api
       
       # -------------------------------------------------------------------------
       # Multi-tenancy is controlled by the installed platform license (deployment_mode).
@@ -112,6 +120,7 @@ services:
       # Client secrets from environment (referenced in seed manifest)
       DOTNET_MVC_CLIENT_SECRET: ${DOTNET_MVC_CLIENT_SECRET:-demo-mvc-client-secret-123}
       GO_CLIENT_SECRET: ${GO_CLIENT_SECRET:-demo-go-client-secret-123}
+      OBO_DEMO_API_SECRET: ${OBO_DEMO_API_SECRET:-demo-obo-api-secret-123}
       
     # ============================================================================
     # Port Mapping - Using 9443 to avoid e2e conflicts
@@ -214,6 +223,12 @@ services:
       # Logging
       Logging__LogLevel__Default: Information
       Logging__LogLevel__Microsoft.AspNetCore: Warning
+
+      # OBO Configuration
+      MrWhoOidc__OnBehalfOf__obo-demo-api__Scope: "openid profile email api.read"
+      MrWhoOidc__OnBehalfOf__obo-demo-api__Audience: "obo-demo-api"
+      MrWhoOidc__OnBehalfOf__obo-demo-api__CacheLifetime: "00:05:00"
+      OboApi__BaseAddress: "https://obo-demo-api:7200"
     
     # Allow container to resolve localhost to host machine for OIDC discovery
     extra_hosts:
@@ -251,6 +266,55 @@ services:
     # ============================================================================
     networks:
       - edge  # Connect to edge network for external access
+
+  # ============================================================================
+  # OBO Demo API - Demonstrates On-Behalf-Of token validation
+  # ============================================================================
+  obo-demo-api:
+    build:
+      context: ../..
+      dockerfile: MrWho/demos/obo-demo-api/Dockerfile
+    container_name: obo-demo-api
+    
+    depends_on:
+      mrwho-oidc:
+        condition: service_healthy
+    
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: https://+:7200;http://+:7199
+      ASPNETCORE_HTTPS_PORT: 7200
+      ASPNETCORE_Kestrel__Certificates__Default__Path: /https/aspnetapp.pfx
+      ASPNETCORE_Kestrel__Certificates__Default__Password: ${CERT_PASSWORD:-changeit}
+      MrWhoOidc__Issuer: https://mrwho.local:9443
+      MrWhoOidc__Audience: obo-demo-api
+      MrWhoOidc__ClientId: obo-demo-api
+      MrWhoOidc__ClientSecret: ${OBO_DEMO_API_SECRET:-demo-obo-api-secret-123}
+      MrWhoOidc__RequireHttpsMetadata: "false"
+      MrWhoOidc__DangerousAcceptAnyServerCertificateValidator: "true"
+    
+    extra_hosts:
+      - "localhost:host-gateway"
+      - "mrwho.local:host-gateway"
+    
+    volumes:
+      - ../../MrWhoOidc/certs:/https:ro
+    
+    ports:
+      - "7200:7200"
+      - "7199:7199"
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-k", "https://localhost:7200/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    
+    restart: unless-stopped
+    
+    networks:
+      - edge
 
   # ============================================================================
   # React SPA Demo - Shows OIDC authentication with React + oauth4webapi
