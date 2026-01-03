@@ -288,6 +288,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_URLS: https://+:7200;http://+:7199
       ASPNETCORE_HTTPS_PORT: 7200
+      DisableHttpsRedirection: "true"
       ASPNETCORE_Kestrel__Certificates__Default__Path: /https/aspnetapp.pfx
       ASPNETCORE_Kestrel__Certificates__Default__Password: ${CERT_PASSWORD:-changeit}
       MrWhoOidc__Issuer: https://mrwho.local:9443
@@ -337,7 +338,7 @@ services:
       MRWHOOIDC__ISSUER: https://mrwho.local:9443
       MRWHOOIDC__CLIENTID: kotlin-spring-demo
       MRWHOOIDC__CLIENTSECRET: ${KOTLIN_SPRING_CLIENT_SECRET:-demo-kotlin-client-secret-123}
-      DEMO_API__BASE_URL: https://obo-demo-api:7200
+      DEMO_API__BASE_URL: http://obo-demo-api:7199
       DEMO_API__AUDIENCE: obo-demo-api
 
       # Reduce noise

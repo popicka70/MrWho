@@ -25,12 +25,15 @@
 
     <div class="row">
         <form method="post" action="/token-comparison/call-obo">
+            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
             <button class="btn" type="submit">Call OBO</button>
         </form>
         <form method="post" action="/token-comparison/call-m2m">
+            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
             <button class="btn" type="submit">Call M2M</button>
         </form>
         <form method="post" action="/token-comparison/call-both">
+            <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
             <button class="btn" type="submit">Call Both</button>
         </form>
     </div>

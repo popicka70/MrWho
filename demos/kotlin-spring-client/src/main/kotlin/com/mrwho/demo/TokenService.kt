@@ -1,6 +1,7 @@
 package com.mrwho.demo
 
 import com.fasterxml.jackson.databind.JsonNode
+import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient
@@ -10,6 +11,7 @@ import org.springframework.stereotype.Service
 import org.springframework.util.LinkedMultiValueMap
 import org.springframework.web.reactive.function.BodyInserters
 import org.springframework.web.reactive.function.client.WebClient
+import java.util.Base64
 
 @Service
 class TokenService(
@@ -18,6 +20,12 @@ class TokenService(
     private val webClient: WebClient,
     private val demo: DemoProperties
 ) {
+
+    private fun basicAuthorizationHeaderValue(): String {
+        val raw = "${clientId()}:${clientSecret()}"
+        val encoded = Base64.getEncoder().encodeToString(raw.toByteArray(Charsets.US_ASCII))
+        return "Basic $encoded"
+    }
 
     fun getUserAccessToken(principalName: String): String {
         val client = authorizedClientService.loadAuthorizedClient<OAuth2AuthorizedClient>("mrwho", principalName)
@@ -51,16 +59,24 @@ class TokenService(
         val form = LinkedMultiValueMap<String, String>().apply {
             add("grant_type", "client_credentials")
             add("client_id", clientId())
-            add("client_secret", clientSecret())
             add("audience", demo.apiAudience)
         }
 
         val json = webClient.post()
             .uri(tokenEndpoint())
+            .header(HttpHeaders.AUTHORIZATION, basicAuthorizationHeaderValue())
             .contentType(MediaType.APPLICATION_FORM_URLENCODED)
             .body(BodyInserters.fromFormData(form))
-            .retrieve()
-            .bodyToMono(JsonNode::class.java)
+            .exchangeToMono { resp ->
+                if (resp.statusCode().is2xxSuccessful) {
+                    resp.bodyToMono(JsonNode::class.java)
+                } else {
+                    resp.bodyToMono(String::class.java).defaultIfEmpty("")
+                        .map { body ->
+                            throw IllegalStateException("Token endpoint error (${resp.rawStatusCode()}): $body")
+                        }
+                }
+            }
             .block()
             ?: throw IllegalStateException("Empty token response")
 
@@ -73,20 +89,28 @@ class TokenService(
         val form = LinkedMultiValueMap<String, String>().apply {
             add("grant_type", "urn:ietf:params:oauth:grant-type:token-exchange")
             add("client_id", clientId())
-            add("client_secret", clientSecret())
             add("subject_token", userAccessToken)
             add("subject_token_type", "urn:ietf:params:oauth:token-type:access_token")
             add("audience", demo.apiAudience)
-            add("scope", "api.read")
+            add("scope", "openid profile email api.read")
             add("requested_token_type", "urn:ietf:params:oauth:token-type:access_token")
         }
 
         val json = webClient.post()
             .uri(tokenEndpoint())
+            .header(HttpHeaders.AUTHORIZATION, basicAuthorizationHeaderValue())
             .contentType(MediaType.APPLICATION_FORM_URLENCODED)
             .body(BodyInserters.fromFormData(form))
-            .retrieve()
-            .bodyToMono(JsonNode::class.java)
+            .exchangeToMono { resp ->
+                if (resp.statusCode().is2xxSuccessful) {
+                    resp.bodyToMono(JsonNode::class.java)
+                } else {
+                    resp.bodyToMono(String::class.java).defaultIfEmpty("")
+                        .map { body ->
+                            throw IllegalStateException("Token exchange error (${resp.rawStatusCode()}): $body")
+                        }
+                }
+            }
             .block()
             ?: throw IllegalStateException("Empty token exchange response")
 

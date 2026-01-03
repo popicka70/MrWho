@@ -71,7 +71,10 @@ builder.Services.AddHealthChecks();
 
 var app = builder.Build();
 
-app.UseHttpsRedirection();
+if (!app.Configuration.GetValue("DisableHttpsRedirection", false))
+{
+    app.UseHttpsRedirection();
+}
 app.UseAuthentication();
 app.UseAuthorization();
 

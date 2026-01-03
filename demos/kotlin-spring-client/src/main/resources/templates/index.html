@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -22,7 +22,10 @@
         <p>Signed in as: <strong th:text="${principalName}">user</strong></p>
         <div class="row">
             <a class="cta" href="/token-comparison">Open Token Comparison</a>
-            <a class="cta" href="/logout">Sign out</a>
+            <form method="post" action="/logout" style="margin: 0;">
+                <input type="hidden" th:if="${_csrf}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                <button class="cta" type="submit">Sign out</button>
+            </form>
         </div>
     </div>
 

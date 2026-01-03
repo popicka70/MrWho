@@ -13,12 +13,30 @@ class ApiService(
 ) {
 
     fun callIdentity(accessToken: String): Pair<IdentityResponse, String> {
+        val url = "${demo.apiBaseUrl.trimEnd('/')}/identity"
         val json = webClient.get()
-            .uri("${demo.apiBaseUrl.trimEnd('/')}/identity")
+            .uri(url)
             .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
-            .retrieve()
-            .bodyToMono(String::class.java)
+            .exchangeToMono { resp ->
+                when {
+                    resp.statusCode().is2xxSuccessful -> resp.bodyToMono(String::class.java)
+                    resp.statusCode().is3xxRedirection -> {
+                        val location = resp.headers().asHttpHeaders().getFirst(HttpHeaders.LOCATION)
+                        resp.bodyToMono(String::class.java).defaultIfEmpty("")
+                            .map { body ->
+                                throw IllegalStateException(
+                                    "Identity endpoint redirect (${resp.rawStatusCode()}) to ${location ?: "(no Location)"}. Body: $body"
+                                )
+                            }
+                    }
+                    else -> resp.bodyToMono(String::class.java).defaultIfEmpty("")
+                        .map { body ->
+                            throw IllegalStateException("Identity endpoint error (${resp.rawStatusCode()}): $body")
+                        }
+                }
+            }
             .block()
+            ?.takeIf { it.isNotBlank() }
             ?: throw IllegalStateException("Empty identity response")
 
         val parsed = objectMapper.readValue(json, IdentityResponse::class.java)

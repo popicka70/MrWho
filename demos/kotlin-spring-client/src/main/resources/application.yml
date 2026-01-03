@@ -30,6 +30,7 @@ spring:
               - profile
               - email
               - offline_access
+              - api.read
         provider:
           mrwho:
             issuer-uri: ${MRWHOOIDC__ISSUER:https://mrwho.local:9443}
