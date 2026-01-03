@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OBO vs M2M</title>
+    <style>
+        body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 2rem; }
+        .row { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+        .btn { padding: 0.5rem 0.75rem; border: 1px solid #333; border-radius: 6px; background: #fff; cursor: pointer; }
+        .card { border: 1px solid #ddd; border-radius: 8px; padding: 1rem; max-width: 980px; }
+        pre { background: #f6f6f6; padding: 0.75rem; border-radius: 6px; overflow: auto; }
+        .error { color: #b00020; }
+        a { text-decoration: none; }
+    </style>
+</head>
+<body>
+<div class="card">
+    <div class="row" style="justify-content: space-between; align-items: center;">
+        <h1 style="margin: 0;">OBO vs M2M</h1>
+        <a href="/">Home</a>
+    </div>
+
+    <p>This calls the same API endpoint (<code>/identity</code>) using tokens acquired via different OAuth grant types.</p>
+
+    <div class="row">
+        <form method="post" action="/token-comparison/call-obo">
+            <button class="btn" type="submit">Call OBO</button>
+        </form>
+        <form method="post" action="/token-comparison/call-m2m">
+            <button class="btn" type="submit">Call M2M</button>
+        </form>
+        <form method="post" action="/token-comparison/call-both">
+            <button class="btn" type="submit">Call Both</button>
+        </form>
+    </div>
+
+    <div th:if="${result.error}" class="error">
+        <p th:text="${result.error}">Error</p>
+    </div>
+
+    <div th:if="${result.oboJson}">
+        <h2>OBO Response</h2>
+        <pre th:text="${result.oboJson}"></pre>
+    </div>
+
+    <div th:if="${result.m2mJson}">
+        <h2>M2M Response</h2>
+        <pre th:text="${result.m2mJson}"></pre>
+    </div>
+</div>
+</body>
+</html>

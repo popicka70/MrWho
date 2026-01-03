@@ -121,6 +121,7 @@ services:
       DOTNET_MVC_CLIENT_SECRET: ${DOTNET_MVC_CLIENT_SECRET:-demo-mvc-client-secret-123}
       GO_CLIENT_SECRET: ${GO_CLIENT_SECRET:-demo-go-client-secret-123}
       OBO_DEMO_API_SECRET: ${OBO_DEMO_API_SECRET:-demo-obo-api-secret-123}
+      KOTLIN_SPRING_CLIENT_SECRET: ${KOTLIN_SPRING_CLIENT_SECRET:-demo-kotlin-client-secret-123}
       
     # ============================================================================
     # Port Mapping - Using 9443 to avoid e2e conflicts
@@ -316,6 +317,47 @@ services:
     
     restart: unless-stopped
     
+    networks:
+      - edge
+
+  # ============================================================================
+  # Kotlin Spring Boot Demo - Shows OIDC integration outside of .NET
+  # ============================================================================
+  kotlin-spring-demo:
+    build:
+      context: ../..
+      dockerfile: MrWho/demos/kotlin-spring-client/Dockerfile
+    container_name: kotlin-spring-demo
+
+    depends_on:
+      mrwho-oidc:
+        condition: service_healthy
+
+    environment:
+      MRWHOOIDC__ISSUER: https://mrwho.local:9443
+      MRWHOOIDC__CLIENTID: kotlin-spring-demo
+      MRWHOOIDC__CLIENTSECRET: ${KOTLIN_SPRING_CLIENT_SECRET:-demo-kotlin-client-secret-123}
+      DEMO_API__BASE_URL: https://obo-demo-api:7200
+      DEMO_API__AUDIENCE: obo-demo-api
+
+      # Reduce noise
+      LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_SECURITY: INFO
+
+    extra_hosts:
+      - "mrwho.local:host-gateway"
+
+    ports:
+      - "5090:5090"
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5090/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+    restart: unless-stopped
+
     networks:
       - edge
 

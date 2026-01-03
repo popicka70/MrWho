@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MrWhoOidc Kotlin Demo</title>
+    <style>
+        body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; margin: 2rem; }
+        a, button { font-size: 1rem; }
+        .card { border: 1px solid #ddd; border-radius: 8px; padding: 1rem; max-width: 820px; }
+        .row { display: flex; gap: 1rem; flex-wrap: wrap; }
+        .muted { color: #666; }
+        .cta { display: inline-block; padding: 0.5rem 0.75rem; border: 1px solid #333; border-radius: 6px; text-decoration: none; }
+    </style>
+</head>
+<body>
+<div class="card">
+    <h1>MrWhoOidc Kotlin + Spring Boot Demo</h1>
+    <p class="muted">Interactive OIDC login + OBO token exchange + M2M client_credentials</p>
+
+    <div th:if="${isAuthenticated}">
+        <p>Signed in as: <strong th:text="${principalName}">user</strong></p>
+        <div class="row">
+            <a class="cta" href="/token-comparison">Open Token Comparison</a>
+            <a class="cta" href="/logout">Sign out</a>
+        </div>
+    </div>
+
+    <div th:unless="${isAuthenticated}">
+        <p>Not signed in.</p>
+        <div class="row">
+            <a class="cta" href="/oauth2/authorization/mrwho">Sign in</a>
+        </div>
+    </div>
+</div>
+</body>
+</html>

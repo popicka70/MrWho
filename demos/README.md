@@ -7,6 +7,7 @@ This directory contains three complete demo applications showcasing different in
 | Demo | Technology | Client Type | Use Case | Documentation |
 |------|-----------|-------------|----------|---------------|
 | **[.NET MVC Client](./dotnet-mvc-client/)** | ASP.NET Core 9, Razor Pages | Confidential | Traditional server-rendered web applications | [README](./dotnet-mvc-client/README.md) |
+| **[Kotlin Spring Client](./kotlin-spring-client/)** | Kotlin, Spring Boot | Confidential | Non-.NET server-rendered web apps + OBO/M2M | [README](./kotlin-spring-client/README.md) |
 | **[React SPA Client](./react-client/)** | React 18, Vite, TypeScript | Public | Single-page applications (SPAs), browser-based authentication | [README](./react-client/README.md) |
 | **[Go Web Client](./go-client/)** | Go 1.21+, net/http | Confidential | Native Go web applications, microservices | [README](./go-client/README.md) |
 

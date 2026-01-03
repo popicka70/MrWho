@@ -1,0 +1,35 @@
+server:
+  port: 5090
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+demo:
+  # The API is the existing obo-demo-api service (same /identity endpoint for OBO vs M2M)
+  apiBaseUrl: ${DEMO_API__BASE_URL:https://localhost:7200}
+  apiAudience: ${DEMO_API__AUDIENCE:obo-demo-api}
+
+spring:
+  thymeleaf:
+    cache: false
+  security:
+    oauth2:
+      client:
+        registration:
+          mrwho:
+            provider: mrwho
+            client-id: ${MRWHOOIDC__CLIENTID:kotlin-spring-demo}
+            client-secret: ${MRWHOOIDC__CLIENTSECRET:demo-kotlin-client-secret-123}
+            authorization-grant-type: authorization_code
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+            scope:
+              - openid
+              - profile
+              - email
+              - offline_access
+        provider:
+          mrwho:
+            issuer-uri: ${MRWHOOIDC__ISSUER:https://mrwho.local:9443}
