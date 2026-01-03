@@ -56,7 +56,7 @@ This is the fastest way to see the demo in action.- `/Auth/Callback` exchanges t
 
 ### 1. Clone the Repository- The home page reads cached discovery metadata and displays the stored tokens/claims to prove the flow succeeded.
 
-- The secure page injects `TestApiClient`, which relies on the `IMrWhoOnBehalfOfManager` helper to exchange the signed-in user's access token for one targeted at the downstream API. The resulting access token is attached automatically to the outgoing HTTP request.
+- The on-behalf-of demo page injects `OboApiClient`, which relies on the `IMrWhoOnBehalfOfManager` helper to exchange the signed-in user's access token for one targeted at the downstream API. The resulting access token is attached automatically to the outgoing HTTP request.
 
 ```bash
 

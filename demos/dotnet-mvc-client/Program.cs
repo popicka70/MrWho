@@ -9,40 +9,6 @@ builder.Services.AddRazorPages();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddMrWhoOidcClient(builder.Configuration, "MrWhoOidc");
 
-builder.Services.AddHttpClient<TestApiClient>((sp, client) =>
-    {
-        var configuration = sp.GetRequiredService<IConfiguration>();
-        var baseAddress = configuration["TestApi:BaseAddress"];
-        if (!string.IsNullOrWhiteSpace(baseAddress) && Uri.TryCreate(baseAddress, UriKind.Absolute, out var uri))
-        {
-            client.BaseAddress = uri;
-        }
-    })
-    .ConfigurePrimaryHttpMessageHandler(sp =>
-    {
-        var config = sp.GetRequiredService<IConfiguration>();
-        var acceptAny = config.GetValue<bool>("MrWhoOidc:DangerousAcceptAnyServerCertificateValidator");
-        if (acceptAny)
-        {
-            return new HttpClientHandler
-            {
-                ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
-            };
-        }
-        return new HttpClientHandler();
-    })
-    .AddMrWhoOnBehalfOfTokenHandler("examples-api", async (sp, ct) =>
-    {
-        var accessor = sp.GetRequiredService<IHttpContextAccessor>();
-        var context = accessor.HttpContext;
-        if (context is null)
-        {
-            return null;
-        }
-
-        return await context.GetTokenAsync("access_token");
-    });
-
 builder.Services.AddHttpClient<OboApiClient>((sp, client) =>
     {
         var config = sp.GetRequiredService<IConfiguration>();
