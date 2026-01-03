@@ -229,6 +229,9 @@ services:
       MrWhoOidc__OnBehalfOf__obo-demo-api__Audience: "obo-demo-api"
       MrWhoOidc__OnBehalfOf__obo-demo-api__CacheLifetime: "00:05:00"
       OboApi__BaseAddress: "https://obo-demo-api:7200"
+
+      # M2M Configuration
+      M2MApi__BaseAddress: "https://obo-demo-api:7200"
     
     # Allow container to resolve localhost to host machine for OIDC discovery
     extra_hosts:

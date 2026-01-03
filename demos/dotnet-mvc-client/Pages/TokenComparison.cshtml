@@ -1,0 +1,235 @@
+@page
+@model MrWhoOidc.RazorClient.Pages.TokenComparisonModel
+@{
+    ViewData["Title"] = "OBO vs M2M Token Comparison";
+}
+
+<h1>OBO vs M2M Token Comparison</h1>
+<p class="lead">
+    Compare how the same API responds to tokens acquired via different OAuth flows.
+</p>
+
+<div class="row mb-4">
+    <div class="col">
+        <form method="post">
+            <button type="submit" asp-page-handler="CallBoth" class="btn btn-primary btn-lg">
+                <i class="bi bi-play"></i> Call API with Both Flows
+            </button>
+            <button type="submit" asp-page-handler="CallObo" class="btn btn-outline-secondary">
+                <i class="bi bi-person"></i> OBO Only
+            </button>
+            <button type="submit" asp-page-handler="CallM2M" class="btn btn-outline-secondary">
+                <i class="bi bi-robot"></i> M2M Only
+            </button>
+        </form>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(Model.ErrorMessage))
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <strong>Error:</strong> @Model.ErrorMessage
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+<div class="row">
+    <!-- OBO Response -->
+    <div class="col-lg-6 mb-4">
+        <div class="card @(Model.OboResponse?.Type == "user" ? "border-success" : "")">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-person-fill"></i> On-Behalf-Of (User Context)
+                </h5>
+            </div>
+            <div class="card-body">
+                @if (Model.OboResponse is not null)
+                {
+                    <dl class="row">
+                        <dt class="col-sm-4">Type</dt>
+                        <dd class="col-sm-8"><span class="badge bg-success">@Model.OboResponse.Type</span></dd>
+
+                        <dt class="col-sm-4">Subject (User ID)</dt>
+                        <dd class="col-sm-8"><code>@Model.OboResponse.Subject</code></dd>
+
+                        <dt class="col-sm-4">User Name</dt>
+                        <dd class="col-sm-8">@(Model.OboResponse.Name ?? "—")</dd>
+
+                        <dt class="col-sm-4">Email</dt>
+                        <dd class="col-sm-8">@(Model.OboResponse.Email ?? "—")</dd>
+
+                        <dt class="col-sm-4">Actor (Client)</dt>
+                        <dd class="col-sm-8"><code>@(Model.OboResponse.Actor ?? "—")</code></dd>
+
+                        <dt class="col-sm-4">Audience</dt>
+                        <dd class="col-sm-8"><code>@(Model.OboResponse.Audience ?? "—")</code></dd>
+
+                        <dt class="col-sm-4">Scopes</dt>
+                        <dd class="col-sm-8">
+                            @if (Model.OboResponse.Scopes?.Any() == true)
+                            {
+                                <code>@string.Join(", ", Model.OboResponse.Scopes)</code>
+                            }
+                            else
+                            {
+                                <span class="text-muted">None</span>
+                            }
+                        </dd>
+                    </dl>
+
+                    <details class="mt-3">
+                        <summary class="cursor-pointer">Raw JSON Response</summary>
+                        <pre class="bg-light p-2 mt-2"><code>@Model.OboJson</code></pre>
+                    </details>
+                }
+                else
+                {
+                    <p class="text-muted text-center py-4">
+                        <i class="bi bi-inbox"></i><br>
+                        Click a button above to call the API.
+                    </p>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- M2M Response -->
+    <div class="col-lg-6 mb-4">
+        <div class="card @(Model.M2MResponse?.Type == "machine" ? "border-primary" : "")">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">
+                    <i class="bi bi-robot"></i> Machine-to-Machine (App Context)
+                </h5>
+            </div>
+            <div class="card-body">
+                @if (Model.M2MResponse is not null)
+                {
+                    <dl class="row">
+                        <dt class="col-sm-4">Type</dt>
+                        <dd class="col-sm-8"><span class="badge bg-primary">@Model.M2MResponse.Type</span></dd>
+
+                        <dt class="col-sm-4">Client ID</dt>
+                        <dd class="col-sm-8"><code>@(Model.M2MResponse.ClientId ?? "—")</code></dd>
+
+                        <dt class="col-sm-4">Subject</dt>
+                        <dd class="col-sm-8"><code>@(Model.M2MResponse.Subject ?? "—")</code></dd>
+
+                        <dt class="col-sm-4">Audience</dt>
+                        <dd class="col-sm-8"><code>@(Model.M2MResponse.Audience ?? "—")</code></dd>
+
+                        <dt class="col-sm-4">Scopes</dt>
+                        <dd class="col-sm-8">
+                            @if (Model.M2MResponse.Scopes?.Any() == true)
+                            {
+                                <code>@string.Join(", ", Model.M2MResponse.Scopes)</code>
+                            }
+                            else
+                            {
+                                <span class="text-muted">None</span>
+                            }
+                        </dd>
+                    </dl>
+
+                    <details class="mt-3">
+                        <summary class="cursor-pointer">Raw JSON Response</summary>
+                        <pre class="bg-light p-2 mt-2"><code>@Model.M2MJson</code></pre>
+                    </details>
+                }
+                else
+                {
+                    <p class="text-muted text-center py-4">
+                        <i class="bi bi-inbox"></i><br>
+                        Click a button above to call the API.
+                    </p>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-5">
+    <div class="col-12">
+        <h3>Key Differences Explained</h3>
+        <div class="table-responsive">
+            <table class="table table-bordered table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th>Aspect</th>
+                        <th class="text-success"><i class="bi bi-person-fill"></i> OBO (On-Behalf-Of)</th>
+                        <th class="text-primary"><i class="bi bi-robot"></i> M2M (Client Credentials)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <th>Grant Type</th>
+                        <td><code>urn:ietf:params:oauth:grant-type:token-exchange</code></td>
+                        <td><code>client_credentials</code></td>
+                    </tr>
+                    <tr>
+                        <th>Identity</th>
+                        <td>Delegated user identity</td>
+                        <td>Application/machine identity</td>
+                    </tr>
+                    <tr>
+                        <th>Subject Claim (<code>sub</code>)</th>
+                        <td>User's unique ID</td>
+                        <td>Client ID (application)</td>
+                    </tr>
+                    <tr>
+                        <th>Actor Claim (<code>act</code>)</th>
+                        <td><span class="badge bg-success">Present</span></td>
+                        <td><span class="badge bg-secondary">Not present</span></td>
+                    </tr>
+                    <tr>
+                        <th>User Information</th>
+                        <td><span class="badge bg-success">Available</span> (name, email, etc.)</td>
+                        <td><span class="badge bg-secondary">Not available</span></td>
+                    </tr>
+                    <tr>
+                        <th>User Context</th>
+                        <td>
+                            <span class="badge bg-success">Yes</span><br>
+                            <small class="text-muted">API knows who initiated the request</small>
+                        </td>
+                        <td>
+                            <span class="badge bg-secondary">No</span><br>
+                            <small class="text-muted">API knows only the application</small>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Use Cases</th>
+                        <td>
+                            <small>
+                                • User clicks "Export Data"<br>
+                                • API needs audit trail of user<br>
+                                • User-initiated delegated actions
+                            </small>
+                        </td>
+                        <td>
+                            <small>
+                                • Scheduled cleanup jobs<br>
+                                • Service-to-service calls<br>
+                                • System operations
+                            </small>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th>Requires User</th>
+                        <td><span class="badge bg-warning">Yes</span> Logged-in session</td>
+                        <td><span class="badge bg-secondary">No</span> Background operation</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+details > summary {
+    cursor: pointer;
+    user-select: none;
+}
+details > summary:hover {
+    text-decoration: underline;
+}
+</style>

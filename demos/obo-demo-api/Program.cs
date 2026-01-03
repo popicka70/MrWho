@@ -77,22 +77,58 @@ app.UseAuthorization();
 
 app.MapHealthChecks("/health");
 
-// GET /me - Returns information about the token subject and actor
-app.MapGet("/me", async (ClaimsPrincipal user, HttpContext context, IHttpClientFactory httpClientFactory, IOptionsMonitor<MrWhoOidcClientOptions> optionsMonitor, ILogger<Program> logger) =>
+// Helper function to fetch user info from IdP
+async Task<JsonElement?> FetchUserInfoAsync(string accessToken, 
+    MrWhoOidcClientOptions clientOptions, 
+    IHttpClientFactory httpClientFactory, 
+    ILogger logger)
 {
-    // Extract subject claims
-    var subject = user.FindFirst("sub")?.Value;
-    var name = user.FindFirst("name")?.Value;
-    var email = user.FindFirst("email")?.Value;
+    var userInfoEndpoint = $"{clientOptions.Issuer?.TrimEnd('/')}/userinfo";
+    var client = httpClientFactory.CreateClient("UserInfoClient");
     
-    // Extract actor claim (populated by OBO)
+    var request = new HttpRequestMessage(HttpMethod.Get, userInfoEndpoint);
+    request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+    
+    try 
+    {
+        logger.LogInformation("Calling UserInfo endpoint: {Endpoint}", userInfoEndpoint);
+        var response = await client.SendAsync(request);
+        if (response.IsSuccessStatusCode)
+        {
+            var userInfo = await response.Content.ReadFromJsonAsync<JsonElement>();
+            logger.LogInformation("UserInfo response retrieved");
+            return userInfo;
+        }
+        logger.LogWarning("UserInfo endpoint returned status code: {StatusCode}", response.StatusCode);
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Failed to call UserInfo endpoint");
+    }
+    return null;
+}
+
+// GET /identity - Unified endpoint that returns info based on call type (OBO vs M2M)
+app.MapGet("/identity", async (ClaimsPrincipal user, HttpContext context, 
+    IHttpClientFactory httpClientFactory, 
+    IOptionsMonitor<MrWhoOidcClientOptions> optionsMonitor, 
+    ILogger<Program> logger) =>
+{
+    var subject = user.FindFirst("sub")?.Value;
+    var audience = user.FindFirst("aud")?.Value;
+    var scopes = user.FindFirst("scope")?.Value?.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+    var issuedAt = user.FindFirst("iat")?.Value;
+    var expiresAt = user.FindFirst("exp")?.Value;
+    
+    // Check for actor claim to determine call type
     var actClaim = user.FindFirst("act")?.Value;
-    string? actorClientId = null;
+    
     if (!string.IsNullOrEmpty(actClaim))
     {
+        // --- OBO CALL: Token has an actor ---
+        string? actorClientId = null;
         try 
         {
-            // Parse {"sub": "dotnet-mvc-demo"} from act claim
             using var doc = JsonDocument.Parse(actClaim);
             if (doc.RootElement.TryGetProperty("sub", out var subProp))
             {
@@ -101,67 +137,72 @@ app.MapGet("/me", async (ClaimsPrincipal user, HttpContext context, IHttpClientF
         }
         catch
         {
-            // Fallback if not JSON
             actorClientId = actClaim;
         }
-    }
 
-    // Call UserInfo endpoint to get more details (since access token might be minimal)
-    JsonElement? userInfo = null;
-    var accessToken = await context.GetTokenAsync("access_token");
-    if (!string.IsNullOrEmpty(accessToken))
-    {
-        var clientOptions = optionsMonitor.CurrentValue;
-        var userInfoEndpoint = $"{clientOptions.Issuer?.TrimEnd('/')}/userinfo";
-        
-        var client = httpClientFactory.CreateClient("UserInfoClient");
-        
-        var request = new HttpRequestMessage(HttpMethod.Get, userInfoEndpoint);
-        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
-        
-        try 
+        // Fetch user info from IdP
+        JsonElement? userInfo = null;
+        var accessToken = await context.GetTokenAsync("access_token");
+        if (!string.IsNullOrEmpty(accessToken))
         {
-            logger.LogInformation("Calling UserInfo endpoint: {Endpoint}", userInfoEndpoint);
-            var response = await client.SendAsync(request);
-            if (response.IsSuccessStatusCode)
-            {
-                userInfo = await response.Content.ReadFromJsonAsync<JsonElement>();
-                logger.LogInformation("UserInfo response: {UserInfo}", userInfo);
-                
-                // Enrich local variables if missing from token
-                if (string.IsNullOrEmpty(name) && userInfo.Value.TryGetProperty("name", out var nameProp))
-                {
-                    name = nameProp.GetString();
-                }
-                if (string.IsNullOrEmpty(email) && userInfo.Value.TryGetProperty("email", out var emailProp))
-                {
-                    email = emailProp.GetString();
-                }
-            }
-            else
-            {
-                logger.LogWarning("UserInfo endpoint returned status code: {StatusCode}", response.StatusCode);
-            }
+            userInfo = await FetchUserInfoAsync(accessToken, optionsMonitor.CurrentValue, 
+                httpClientFactory, logger);
         }
-        catch (Exception ex)
+
+        var name = user.FindFirst("name")?.Value;
+        var email = user.FindFirst("email")?.Value;
+        
+        // Enrich from userInfo if missing
+        if (userInfo.HasValue)
         {
-            logger.LogError(ex, "Failed to call UserInfo endpoint");
+            if (string.IsNullOrEmpty(name) && userInfo.Value.TryGetProperty("name", out var n))
+                name = n.GetString();
+            if (string.IsNullOrEmpty(email) && userInfo.Value.TryGetProperty("email", out var e))
+                email = e.GetString();
         }
+
+        return Results.Ok(new
+        {
+            type = "user",
+            message = "Called on behalf of user (OBO flow)",
+            subject,
+            name,
+            email,
+            actor = actorClientId,
+            audience,
+            scopes,
+            issuedAt,
+            expiresAt,
+            userInfo
+        });
     }
-    
-    return Results.Ok(new
+    else
     {
-        message = "Called on behalf of user",
-        subject,
-        name,
-        email,
-        actor = actorClientId,
-        audience = user.FindFirst("aud")?.Value,
-        scopes = user.FindFirst("scope")?.Value?.Split(' ', StringSplitOptions.RemoveEmptyEntries),
-        issuedAt = user.FindFirst("iat")?.Value,
-        expiresAt = user.FindFirst("exp")?.Value,
-        userInfo // Include full user info for visibility
-    });
+        // --- M2M CALL: No actor, subject is the client ---
+        var clientId = user.FindFirst("client_id")?.Value 
+                    ?? user.FindFirst("azp")?.Value 
+                    ?? subject;
+        
+        return Results.Ok(new
+        {
+            type = "machine",
+            message = "Called as machine identity (M2M / Client Credentials flow)",
+            clientId,
+            subject,
+            audience,
+            scopes,
+            issuedAt,
+            expiresAt
+        });
+    }
+}).RequireAuthorization();
+
+// GET /me - Backward compatibility alias
+app.MapGet("/me", async (HttpContext context) =>
+{
+    // Redirect to /identity
+    context.Response.Redirect("/identity");
+    return Results.Empty;
 }).RequireAuthorization();
 
 app.Run();

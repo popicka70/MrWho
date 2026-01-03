@@ -21,7 +21,7 @@ public class OboDemoModel : PageModel
     {
         try
         {
-            ApiResponse = await _oboApi.GetProfileAsync();
+            ApiResponse = await _oboApi.GetIdentityAsync();
             if (ApiResponse is null)
                 ErrorMessage = "API returned no response";
 

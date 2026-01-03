@@ -37,6 +37,12 @@
             "offline_access",
             "api.read"
           ],
+          "allowedGrantTypes": [
+            "authorization_code",
+            "refresh_token",
+            "urn:ietf:params:oauth:grant-type:token-exchange",
+            "client_credentials"
+          ],
           "clientSecretEnv": "DOTNET_MVC_CLIENT_SECRET",
           "allowedLoginRedirectUris": [
             "https://localhost:5001/Auth/Callback",

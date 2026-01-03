@@ -15,9 +15,13 @@ public sealed class OboApiClient
         _logger = logger;
     }
 
-    public async Task<OboApiResponse?> GetProfileAsync(CancellationToken ct = default)
+    /// <summary>
+    /// Calls GET /identity on the demo API and returns the response.
+    /// The returned identity will have type="user" and show the OBO (on-behalf-of) flow was used.
+    /// </summary>
+    public async Task<OboApiResponse?> GetIdentityAsync(CancellationToken ct = default)
     {
-        using var response = await _httpClient.GetAsync("me", ct);
+        using var response = await _httpClient.GetAsync("identity", ct);
         if (!response.IsSuccessStatusCode)
         {
             _logger.LogWarning("OBO API call failed: {StatusCode}", response.StatusCode);
@@ -26,7 +30,15 @@ public sealed class OboApiClient
         return await response.Content.ReadFromJsonAsync<OboApiResponse>(ct);
     }
 
+    /// <summary>
+    /// Backward compatibility method - calls GetIdentityAsync.
+    /// </summary>
+    [Obsolete("Use GetIdentityAsync instead")]
+    public Task<OboApiResponse?> GetProfileAsync(CancellationToken ct = default) =>
+        GetIdentityAsync(ct);
+
     public sealed record OboApiResponse(
+        string? Type,
         string? Message,
         string? Subject,
         string? Name,
