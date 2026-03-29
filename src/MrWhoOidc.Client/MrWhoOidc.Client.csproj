@@ -1,10 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net8.0;net9.0</TargetFrameworks>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <PackageId>MrWhoOidc.Client</PackageId>
-    <PackageVersion>0.1.0</PackageVersion>
+    <PackageVersion>2.0.1</PackageVersion>
     <Description>Client configuration helpers for integrating with the MrWhoOidc authorization server.</Description>
     <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
     <PackageTags>oidc oauth2 mrwho token-client discovery jwks</PackageTags>

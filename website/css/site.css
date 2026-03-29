@@ -1,0 +1,247 @@
+:root {
+  --ink: #172033;
+  --muted: #5d6678;
+  --line: rgba(23, 32, 51, 0.12);
+  --canvas: #f4efe7;
+  --panel: rgba(255, 255, 255, 0.78);
+  --brand: #0d5c63;
+  --brand-deep: #0a3f44;
+  --accent: #c97b2c;
+  --shadow: 0 24px 70px rgba(23, 32, 51, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at top left, rgba(201, 123, 44, 0.18), transparent 32%),
+    linear-gradient(160deg, #f8f4ee 0%, #efe5d7 48%, #e5efe8 100%);
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image: linear-gradient(rgba(23, 32, 51, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(23, 32, 51, 0.03) 1px, transparent 1px);
+  background-size: 24px 24px;
+  pointer-events: none;
+}
+
+.site-shell {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 32px 20px 56px;
+  position: relative;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 48px;
+}
+
+.brand,
+.nav-links a,
+.button,
+.footer a {
+  text-decoration: none;
+}
+
+.brand {
+  color: var(--brand-deep);
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.nav-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+}
+
+.nav-links a {
+  color: var(--muted);
+  padding-bottom: 3px;
+  border-bottom: 2px solid transparent;
+}
+
+.nav-links a.active,
+.nav-links a:hover {
+  color: var(--brand-deep);
+  border-bottom-color: var(--accent);
+}
+
+.hero,
+.page-header,
+.panel {
+  position: relative;
+  z-index: 1;
+}
+
+.hero {
+  min-height: 70vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.hero-copy,
+.page-header,
+.panel {
+  background: var(--panel);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+}
+
+.hero-copy,
+.page-header {
+  border-radius: 28px;
+  padding: 40px;
+}
+
+.hero-copy h1,
+.page-header h1 {
+  font-size: clamp(2.6rem, 6vw, 5.2rem);
+  line-height: 0.95;
+  margin: 0 0 20px;
+  max-width: 11ch;
+}
+
+.eyebrow,
+.section-label {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--brand);
+  font-size: 0.82rem;
+}
+
+.lead,
+.panel p {
+  font-size: 1.1rem;
+  line-height: 1.7;
+  max-width: 62ch;
+}
+
+.cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 28px;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 14px 22px;
+  font-weight: 700;
+}
+
+.button.primary {
+  background: var(--brand-deep);
+  color: #fff;
+}
+
+.button.secondary {
+  background: transparent;
+  color: var(--brand-deep);
+  border: 1px solid var(--brand-deep);
+}
+
+main {
+  margin-top: 28px;
+}
+
+.stack {
+  display: grid;
+  gap: 24px;
+}
+
+.panel {
+  border-radius: 24px;
+  padding: 32px;
+}
+
+.panel.split {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 28px;
+}
+
+.panel.accent {
+  background: linear-gradient(140deg, rgba(13, 92, 99, 0.92), rgba(10, 63, 68, 0.92));
+  color: #f7f2ea;
+}
+
+.panel.accent .section-label,
+.panel.accent h2,
+.panel.accent p {
+  color: inherit;
+}
+
+.feature-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.feature-grid article {
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 20px;
+}
+
+.compact article h3,
+.feature-grid h2 {
+  margin-top: 0;
+}
+
+.prose-panel p:first-child {
+  margin-top: 0;
+}
+
+.footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding-top: 22px;
+  color: var(--muted);
+}
+
+.footer a {
+  color: var(--brand-deep);
+}
+
+@media (max-width: 780px) {
+  .topbar,
+  .panel.split,
+  .feature-grid,
+  .footer {
+    grid-template-columns: 1fr;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .hero-copy,
+  .page-header,
+  .panel {
+    padding: 24px;
+  }
+
+  .hero-copy h1,
+  .page-header h1 {
+    max-width: none;
+  }
+}

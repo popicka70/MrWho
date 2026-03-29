@@ -77,11 +77,11 @@ We welcome:
 
 ### Prerequisites
 
-- **.NET 9 SDK** - [Download](https://dotnet.microsoft.com/download/dotnet/9.0)
+- **.NET 10 SDK**
 - **Docker** 20.10+ and **Docker Compose** V2+
-- **PostgreSQL** 14+ (for local development) or use Docker
+- **PostgreSQL** 16+ if you are not using Docker
 - **Git** for version control
-- **Visual Studio 2022**, **VS Code**, or **Rider** (recommended IDEs)
+- **Visual Studio 2022**, **VS Code**, or **Rider**
 
 ### Clone and Build
 
@@ -102,50 +102,32 @@ dotnet test
 
 ### Local Development
 
-#### Option 1: Docker Compose (Easiest)
+For the public repo itself, the usual contribution workflows are:
 
 ```bash
-# Generate TLS certificate
-./scripts/generate-cert.sh localhost changeit
-
-# Configure environment
-cp .env.example .env
-# Edit .env with your settings
-
-# Start services
-docker compose up -d
-
-# View logs
-docker compose logs -f mrwho-oidc
+# update docs / packages / demos in this repo
+dotnet build ./MrWhoOidc.Client.sln
 ```
 
-#### Option 2: Local .NET Development
+If you are validating deployment examples, use the Docker Compose assets in this repository:
 
 ```bash
-# Start PostgreSQL (via Docker or local installation)
-docker run --name mrwho-postgres -e POSTGRES_PASSWORD=yourpassword -p 5432:5432 -d postgres:16
-
-# Set connection string
-export ConnectionStrings__authdb="Host=localhost;Database=mrwhooidc;Username=postgres;Password=yourpassword"
-
-# Run migrations
-dotnet ef database update --project MrWhoOidc.Auth --startup-project MrWhoOidc.WebAuth
-
-# Run the application
-dotnet run --project MrWhoOidc.WebAuth
+./scripts/generate-cert.sh localhost changeit
+cp .env.example .env
+docker compose up -d
 ```
 
 ### Project Structure
 
 ```
-MrWhoOidc/
-├── MrWhoOidc.Auth/           # Core OIDC domain logic
-├── MrWhoOidc.WebAuth/         # HTTP surface (APIs, Razor Pages)
-├── MrWhoOidc.ApiService/      # Sample downstream API
-├── MrWhoOidc.Security/        # Security helpers (DPoP, PKCE)
-├── MrWhoOidc.ServiceDefaults/ # Logging/telemetry defaults
-├── MrWhoOidc.UnitTests/       # Test suite
-└── docs/                      # Documentation
+MrWho/
+├── docs/                      # public operational and integration documentation
+├── demos/                     # demo applications and sample API
+├── src/MrWhoOidc.Client/      # public .NET client package
+├── src/MrWhoOidc.Security/    # public .NET security helpers
+├── scripts/                   # certificate generation and health tooling
+├── docker-compose*.yml        # public deployment assets
+└── website/                   # static GitHub Pages site
 ```
 
 ## Coding Standards
@@ -169,11 +151,10 @@ MrWhoOidc/
    - HTTP endpoints/UI → `MrWhoOidc.WebAuth`
    - Security utilities → `MrWhoOidc.Security`
 
-3. **Database**
-   - Target **.NET 9**
-   - Use **PostgreSQL** via Aspire (named connection "authdb")
-   - Never hardcode connection strings
-   - Use **EF Core migrations** for schema changes
+3. **Public repo quality**
+   - Keep docs aligned with the currently shipping product line
+   - Do not leave internal planning notes in long-lived public docs
+   - Prefer runnable, copy-paste-safe examples over aspirational examples
 
 4. **Security**
    - Use **Argon2id or BCrypt** for password hashing
@@ -190,10 +171,7 @@ MrWhoOidc/
 ### Code Formatting
 
 ```bash
-# Format code before committing
 dotnet format
-
-# Check for formatting issues
 dotnet format --verify-no-changes
 ```
 

@@ -1,5 +1,10 @@
 # MrWhoOidc.Security
 
-Security utilities used by the MrWhoOidc client libraries.
+Security helpers used by the public MrWhoOidc client libraries.
 
-This package currently includes DPoP (Demonstrating Proof-of-Possession) helpers.
+Current scope includes DPoP helpers and JWT-related integration utilities used by `MrWhoOidc.Client`.
+
+Targets:
+
+- `net8.0`
+- `net10.0`

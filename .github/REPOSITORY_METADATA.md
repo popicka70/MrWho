@@ -3,7 +3,7 @@
 ## Repository Description
 
 ```
-Production-ready OpenID Connect (OIDC) Identity Provider built on .NET 9. Deploy in minutes with Docker Compose. Multi-tenant, high-performance, standards-compliant.
+Public documentation, deployment assets, examples, and .NET client libraries for the MrWhoOidc OpenID Connect platform.
 ```
 
 ## Topics/Tags
@@ -29,11 +29,15 @@ jwt
 dotnet9
 identity
 security
+webauthn
+ciba
+device-flow
+dotnet10
 ```
 
 ## About Section
 
-**Website**: (To be added after deployment)
+**Website**: GitHub Pages site from the `website/` folder
 
 **Topics**: oidc, openid-connect, oauth2, identity-provider, authorization-server, authentication, dotnet, csharp, aspnetcore, docker, docker-compose, postgresql, redis, multi-tenant, security
 
@@ -41,7 +45,7 @@ security
 
 ### General
 
-- **Description**: Production-ready OpenID Connect (OIDC) Identity Provider built on .NET 9. Deploy in minutes with Docker Compose. Multi-tenant, high-performance, standards-compliant.
+- **Description**: Public documentation, deployment assets, examples, and .NET client libraries for the MrWhoOidc OpenID Connect platform.
 - **Website**: (Optional - add after deploying documentation site)
 - **Topics**: (See above - max 20 topics)
 - **Include in the home page**: ✅ Checked
@@ -83,7 +87,7 @@ Recommended size: 1280×640px
 Suggested content:
 - MrWhoOidc logo/name
 - Tagline: "Production-Ready OpenID Connect Identity Provider"
-- Key features: ".NET 9", "Docker", "Multi-Tenant", "High Performance"
+- Key features: ".NET 10", "Docker", "Multi-Tenant", "WebAuthn", "CIBA"
 - QR code to repository (optional)
 
 ## README Badges
@@ -91,7 +95,7 @@ Suggested content:
 Already included in README.md:
 - Docker badge
 - License badge (MIT)
-- .NET 9 badge
+- .NET 10 badge
 - PostgreSQL badge
 - Multi-Arch badge
 
@@ -104,7 +108,7 @@ Suggested additional badges:
 
 ### Pre-Release Checklist
 
-- [x] Version 1.0.0 tagged
+- [x] Public docs refreshed for the .NET 10 / 2.x line
 - [x] CHANGELOG.md created
 - [x] README.md complete with Quick Start
 - [x] LICENSE file present
@@ -119,7 +123,7 @@ Suggested additional badges:
 
 ### Release Announcement
 
-**Title**: MrWhoOidc 1.0.0 - Production-Ready OpenID Connect Identity Provider
+**Title**: MrWhoOidc - Public Docs, Deployment Assets, and Client Libraries
 
 **Body**:
 ```
@@ -127,7 +131,7 @@ We're excited to announce the first public release of MrWhoOidc!
 
 🎉 **What's New**
 
-MrWhoOidc is a production-ready OpenID Connect (OIDC) and OAuth 2.0 authorization server built on .NET 9. Get up and running in under 10 minutes with Docker Compose.
+MrWhoOidc is an OpenID Connect and OAuth 2.0 platform with public deployment guidance, working demos, .NET client packages, and current docs for advanced flows like DPoP, JARM, device authorization, CIBA, WebAuthn, and multi-tenant administration.
 
 ✨ **Key Features**
 
@@ -164,7 +168,7 @@ See [CHANGELOG.md](CHANGELOG.md) for known limitations and future roadmap.
 
 📦 **Docker Images**
 
-Available at `ghcr.io/popicka70/mrwhooidc:1.0.0` (amd64, arm64)
+Available at `ghcr.io/popicka70/mrwhooidc:latest` (amd64, arm64)
 
 ---
 

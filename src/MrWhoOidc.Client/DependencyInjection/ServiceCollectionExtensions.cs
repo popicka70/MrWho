@@ -68,7 +68,7 @@ public static class ServiceCollectionExtensions
             {
                 http.BaseAddress = issuer;
             }
-            http.DefaultRequestHeaders.UserAgent.ParseAdd("MrWhoOidc.Client/0.1.0");
+            http.DefaultRequestHeaders.UserAgent.ParseAdd("MrWhoOidc.Client/2.0.1");
             logger.LogDebug("Configured HttpClient for MrWhoOidc client with timeout {Timeout}", http.Timeout);
         });
 

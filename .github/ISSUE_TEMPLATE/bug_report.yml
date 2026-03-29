@@ -29,7 +29,8 @@ body:
       label: MrWhoOidc Version
       description: Which version are you using?
       options:
-        - "1.0.0"
+        - "2.x"
+        - "1.x"
         - "Latest (main branch)"
         - "Other (please specify in description)"
     validations:
@@ -129,7 +130,7 @@ body:
       placeholder: |
         OIDC_PUBLIC_BASE_URL=https://localhost:8443
         REDIS_ENABLED=true
-        MULTITENANCY_ENABLED=false
+        BOOTSTRAP_TOKEN=
       render: shell
 
   - type: textarea
@@ -137,7 +138,7 @@ body:
     attributes:
       label: Additional Context
       description: Any other context, screenshots, or information about the problem
-      placeholder: "Example: This started happening after upgrading from 0.9.0 to 1.0.0"
+      placeholder: "Example: This started happening after upgrading from 1.x to 2.x"
 
   - type: checkboxes
     id: security

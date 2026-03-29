@@ -6,7 +6,8 @@ We release patches for security vulnerabilities for the following versions:
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 1.0.x   | :white_check_mark: |
+| 2.x     | :white_check_mark: |
+| 1.x     | best effort only   |
 
 ## Reporting a Vulnerability
 
@@ -157,5 +158,5 @@ Thank you for helping keep MrWhoOidc and our users safe!
 
 ---
 
-**Last Updated**: November 2, 2025  
-**Version**: 1.0.0
+**Last Updated**: March 29, 2026  
+**Version**: 2.x public documentation line
