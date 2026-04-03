@@ -66,8 +66,8 @@ Once the issuer is running, follow the README inside the specific demo directory
 
 Before running any demo, register the client in **MrWhoOidc Admin UI**:
 
-1. Navigate to <https://localhost:8443/admin>
-2. Login with admin credentials (default: `admin@example.com` / `Admin123!`)
+1. Navigate to <https://localhost:8443/admin/clients>
+2. Login with the admin credentials you created during bootstrap
 3. Go to **Clients** → **Create Client**
 4. Fill in the form based on demo requirements (see each README)
 5. Save and copy the **client secret** (confidential clients only)

@@ -4,14 +4,15 @@
 # MrWhoOidc Health Check Script
 # ============================================================================
 # Verifies that the MrWhoOidc deployment is healthy and operational
-# Usage: ./scripts/health-check.sh [base_url]
-# Example: ./scripts/health-check.sh https://localhost:8443
+# Usage: ./scripts/health-check.sh [base_url] [tenant_slug]
+# Example: ./scripts/health-check.sh https://localhost:8443 default
 # ============================================================================
 
 set -e
 
 # Configuration
 BASE_URL="${1:-https://localhost:8443}"
+TENANT_SLUG="${2:-${MRWHO_TENANT_SLUG:-default}}"
 TIMEOUT=10
 MAX_RETRIES=3
 
@@ -43,10 +44,16 @@ check_endpoint() {
     local url="$1"
     local expected_status="${2:-200}"
     local description="$3"
+    local follow_redirects="${4:-false}"
     
     print_info "Checking $description..."
-    
-    local response_code=$(curl -k -s -o /dev/null -w "%{http_code}" --connect-timeout "$TIMEOUT" "$url" || echo "000")
+
+    local curl_args=(-k -s -o /dev/null -w "%{http_code}" --connect-timeout "$TIMEOUT")
+    if [ "$follow_redirects" = "true" ]; then
+        curl_args+=(-L)
+    fi
+
+    local response_code=$(curl "${curl_args[@]}" "$url" || echo "000")
     
     if [ "$response_code" = "$expected_status" ]; then
         print_success "$description returned HTTP $response_code"
@@ -132,28 +139,13 @@ main() {
     echo "MrWhoOidc Health Check"
     echo "============================================================================"
     echo "Base URL: $BASE_URL"
+    echo "Tenant Slug: $TENANT_SLUG"
     echo "Timeout: ${TIMEOUT}s"
     echo ""
     
     local failed_checks=0
     
-    # Check 1: OpenID Discovery Endpoint
-    if check_json_endpoint "$BASE_URL/.well-known/openid-configuration" "issuer" "OpenID Discovery"; then
-        :
-    else
-        ((failed_checks++))
-    fi
-    echo ""
-    
-    # Check 2: JWKS Endpoint
-    if check_json_endpoint "$BASE_URL/jwks" "keys" "JWKS Endpoint"; then
-        :
-    else
-        ((failed_checks++))
-    fi
-    echo ""
-    
-    # Check 3: Health Endpoint
+    # Check 1: Root Health Endpoint
     if check_endpoint "$BASE_URL/health" "200" "Health Endpoint"; then
         :
     else
@@ -161,8 +153,25 @@ main() {
     fi
     echo ""
     
-    # Check 4: Admin UI (should return HTML)
-    if check_endpoint "$BASE_URL/admin" "200" "Admin UI"; then
+    # Check 2: Tenant OpenID Discovery Endpoint
+    if check_json_endpoint "$BASE_URL/t/$TENANT_SLUG/.well-known/openid-configuration" "issuer" "Tenant OpenID Discovery"; then
+        :
+    else
+        print_warning "Tenant discovery usually requires a completed bootstrap for slug '$TENANT_SLUG'."
+        ((failed_checks++))
+    fi
+    echo ""
+
+    # Check 3: JWKS Endpoint
+    if check_json_endpoint "$BASE_URL/jwks" "keys" "JWKS Endpoint"; then
+        :
+    else
+        ((failed_checks++))
+    fi
+    echo ""
+    
+    # Check 4: Admin UI (follow login redirect if authentication is required)
+    if check_endpoint "$BASE_URL/admin/clients" "200" "Admin UI" "true"; then
         :
     else
         print_warning "Admin UI check failed - may require authentication"
@@ -186,8 +195,8 @@ main() {
         echo "Your MrWhoOidc deployment is healthy and operational."
         echo ""
         echo "Next steps:"
-        echo "  - Access admin UI: $BASE_URL/admin"
-        echo "  - View OpenID configuration: $BASE_URL/.well-known/openid-configuration"
+        echo "  - Access admin UI: $BASE_URL/admin/clients"
+        echo "  - View tenant OpenID configuration: $BASE_URL/t/$TENANT_SLUG/.well-known/openid-configuration"
         echo "  - Configure your first OIDC client in the admin UI"
         echo ""
         exit 0

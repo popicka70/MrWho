@@ -31,13 +31,13 @@ services:
       Redis__ConnectionString: ${REDIS_CONNECTION_STRING:-redis:6379,abortConnect=false}
 
       Mail__Enabled: ${MAIL_ENABLED:-false}
-      Mail__SmtpHost: ${MAIL_SMTP_HOST}
+      Mail__SmtpHost: ${MAIL_SMTP_HOST:-}
       Mail__SmtpPort: ${MAIL_SMTP_PORT:-587}
       Mail__UseSsl: ${MAIL_SMTP_USE_SSL:-true}
-      Mail__FromAddress: ${MAIL_FROM_ADDRESS}
+      Mail__FromAddress: ${MAIL_FROM_ADDRESS:-}
       Mail__FromName: ${MAIL_FROM_NAME:-MrWhoOidc}
-      Mail__SmtpUsername: ${MAIL_SMTP_USERNAME}
-      Mail__SmtpPassword: ${MAIL_SMTP_PASSWORD}
+      Mail__SmtpUsername: ${MAIL_SMTP_USERNAME:-}
+      Mail__SmtpPassword: ${MAIL_SMTP_PASSWORD:-}
 
       Logging__LogLevel__Default: ${LOGGING_LEVEL:-Information}
       Logging__LogLevel__Microsoft.AspNetCore: ${LOGGING_LEVEL_ASPNETCORE:-Warning}

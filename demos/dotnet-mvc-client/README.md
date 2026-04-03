@@ -137,7 +137,7 @@ else
 
 ## Next Steps
 
-- **Explore Admin UI**: Manage clients, users, scopes at https://localhost:8443/admin
+- **Explore Admin UI**: Manage clients, users, scopes at https://localhost:8443/admin/clients
 - **Read Documentation**: See [MrWhoOidc docs](../../docs/) for advanced configuration
 - **Try Other Demos**: Check out React SPA and Go client demos
 - **Deploy to Production**: Review [deployment guide](../../docs/deployment-guide.md)

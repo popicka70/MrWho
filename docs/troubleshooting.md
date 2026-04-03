@@ -35,6 +35,7 @@ docker compose logs --tail=50 mrwho-oidc
 
 # 4. Verify network connectivity
 docker compose exec mrwho-oidc curl -k https://localhost:8443/health
+docker compose exec mrwho-oidc curl -k https://localhost:8443/t/default/.well-known/openid-configuration
 
 # 5. Check disk space
 df -h
@@ -422,7 +423,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
 cat .env | grep OIDC_PUBLIC_BASE_URL
 
 # 2. Verify discovery endpoint issuer
-curl -k https://localhost:8443/.well-known/openid-configuration | jq .issuer
+curl -k https://localhost:8443/t/default/.well-known/openid-configuration | jq .issuer
 
 # 3. Ensure URLs match exactly (protocol, domain, port)
 # If accessing via https://localhost:8443
@@ -438,7 +439,7 @@ echo "OIDC_PUBLIC_BASE_URL=https://your-actual-url" >> .env
 docker compose restart mrwho-oidc
 
 # 6. Verify fix
-curl -k https://your-actual-url/.well-known/openid-configuration | jq .issuer
+curl -k https://your-actual-url/t/default/.well-known/openid-configuration | jq .issuer
 ```
 
 ### Issue 12: Admin UI Login Fails
@@ -610,7 +611,7 @@ docker compose logs --since 10m mrwho-oidc
 
 # Manual health checks
 curl -k https://localhost:8443/health
-curl -k https://localhost:8443/.well-known/openid-configuration
+curl -k https://localhost:8443/t/default/.well-known/openid-configuration
 curl -k https://localhost:8443/jwks
 
 # Check from inside container

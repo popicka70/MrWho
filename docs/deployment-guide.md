@@ -103,6 +103,12 @@ curl -k -X POST https://localhost:8443/bootstrap \
 
 After the initial bootstrap succeeds, remove `BOOTSTRAP_TOKEN`.
 
+Post-bootstrap smoke tests for a fresh local install:
+
+- discovery: `https://localhost:8443/t/default/.well-known/openid-configuration`
+- admin UI: `https://localhost:8443/admin/clients`
+- health: `https://localhost:8443/health`
+
 ## Reverse Proxy Notes
 
 If you deploy behind a cloud load balancer or reverse proxy, review the forwarded-header variables in `.env.example`.

@@ -49,6 +49,8 @@ MrWhoOidc currently focuses on a standards-based OIDC and OAuth 2.0 identity ser
 - a TLS certificate in `certs/aspnetapp.pfx` for local testing
 - 4 GB RAM minimum for a comfortable local environment
 
+The base `docker-compose.yml` path is production-oriented. On an empty database it does not auto-seed a tenant or admin user; the first usable local instance requires an explicit bootstrap.
+
 ### Local Container Startup
 
 ```bash
@@ -60,8 +62,22 @@ chmod +x scripts/generate-cert.sh
 
 cp .env.example .env
 # edit POSTGRES_PASSWORD, CERT_PASSWORD, OIDC_PUBLIC_BASE_URL
+# on a fresh local database, also set BOOTSTRAP_TOKEN to a temporary value
 
 docker compose up -d
+
+curl -k -X POST https://localhost:8443/bootstrap \
+	-H 'Content-Type: application/json' \
+	-H 'X-Bootstrap-Token: your-temporary-bootstrap-token' \
+	-d '{
+		"tenantSlug": "default",
+		"tenantName": "Default Tenant",
+		"adminEmail": "admin@example.com",
+		"adminPassword": "ChangeMeNow123!",
+		"adminName": "Administrator"
+	}'
+
+# remove BOOTSTRAP_TOKEN from .env after the bootstrap succeeds
 ```
 
 Optional overlays:
@@ -79,9 +95,11 @@ docker compose -f docker-compose.yml -f docker-compose.production.yml up -d
 
 Default endpoints:
 
-- discovery: `https://localhost:8443/.well-known/openid-configuration`
-- admin UI: `https://localhost:8443/admin`
+- discovery: `https://localhost:8443/t/default/.well-known/openid-configuration`
+- admin UI: `https://localhost:8443/admin/clients`
 - health: `https://localhost:8443/health`
+
+Use the tenant-scoped discovery document for first-run smoke tests. Root discovery depends on a default tenant already existing.
 
 For fresh production-style databases, set `BOOTSTRAP_TOKEN` and follow [docs/deployment-guide.md](docs/deployment-guide.md).
 
