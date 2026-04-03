@@ -11,6 +11,8 @@ This guide covers the public Docker-based deployment assets in this repository.
 - PostgreSQL storage capacity appropriate for your environment
 - a TLS certificate mounted as `certs/aspnetapp.pfx`
 
+The command examples below use `docker compose`. If your host still uses the legacy standalone binary, replace it with `docker-compose`. A first local run typically takes 3-5 minutes, depending on image pulls and startup time.
+
 ## Quick Start
 
 ```bash
@@ -51,6 +53,8 @@ curl -k -I https://localhost:8443/admin/clients
 curl -k https://localhost:8443/t/default/jwks
 bash ./scripts/health-check.sh https://localhost:8443 default
 ```
+
+Expected discovery output includes fields such as `issuer`, `authorization_endpoint`, `token_endpoint`, and `jwks_uri`.
 
 ## Deployment Modes
 

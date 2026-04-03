@@ -49,6 +49,8 @@ MrWhoOidc currently focuses on a standards-based OIDC and OAuth 2.0 identity ser
 - a TLS certificate in `certs/aspnetapp.pfx` for local testing
 - 4 GB RAM minimum for a comfortable local environment
 
+The examples below use `docker compose`. If your environment still exposes the legacy `docker-compose` binary, replace the command name accordingly. First run is typically 3-5 minutes, depending on image pulls and container startup time.
+
 The base `docker-compose.yml` path is production-oriented. On an empty database it does not auto-seed a tenant or admin user; the first usable local instance requires an explicit bootstrap.
 
 ### Local Container Startup
@@ -87,6 +89,8 @@ curl -k -I https://localhost:8443/admin/clients
 curl -k https://localhost:8443/t/default/jwks
 bash ./scripts/health-check.sh https://localhost:8443 default
 ```
+
+Expected discovery output includes fields such as `issuer`, `authorization_endpoint`, `token_endpoint`, and `jwks_uri`.
 
 Expected first-run behavior:
 
