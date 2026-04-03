@@ -31,11 +31,11 @@ docker compose ps
 docker compose logs --tail=50 mrwho-oidc
 
 # 3. Run health check
-./scripts/health-check.sh
+bash ./scripts/health-check.sh https://localhost:8443 default
 
 # 4. Verify network connectivity
-docker compose exec mrwho-oidc curl -k https://localhost:8443/health
 docker compose exec mrwho-oidc curl -k https://localhost:8443/t/default/.well-known/openid-configuration
+docker compose exec mrwho-oidc curl -k https://localhost:8443/t/default/jwks
 
 # 5. Check disk space
 df -h
@@ -607,15 +607,16 @@ docker compose logs --since 10m mrwho-oidc
 
 ```bash
 # Run included health check script
-./scripts/health-check.sh
+bash ./scripts/health-check.sh https://localhost:8443 default
 
 # Manual health checks
-curl -k https://localhost:8443/health
 curl -k https://localhost:8443/t/default/.well-known/openid-configuration
+curl -k -I https://localhost:8443/admin/clients
+curl -k https://localhost:8443/t/default/jwks
 curl -k https://localhost:8443/jwks
 
 # Check from inside container
-docker compose exec mrwho-oidc curl -k https://localhost:8443/health
+docker compose exec mrwho-oidc curl -k https://localhost:8443/t/default/.well-known/openid-configuration
 ```
 
 ### Database Diagnostics

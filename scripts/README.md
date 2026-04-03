@@ -11,7 +11,7 @@ Generates self-signed TLS certificates for development and testing.
 **Usage:**
 
 ```bash
-./scripts/generate-cert.sh [domain] [password]
+bash ./scripts/generate-cert.sh [domain] [password]
 ```
 
 **Arguments:**
@@ -23,10 +23,10 @@ Generates self-signed TLS certificates for development and testing.
 
 ```bash
 # Generate certificate for localhost
-./scripts/generate-cert.sh
+bash ./scripts/generate-cert.sh
 
 # Generate certificate for custom domain
-./scripts/generate-cert.sh myapp.local mypassword123
+bash ./scripts/generate-cert.sh myapp.local mypassword123
 ```
 
 **Output:**
@@ -71,35 +71,36 @@ sudo update-ca-certificates
 
 ### health-check.sh
 
-Validates that MrWhoOidc deployment is healthy and operational.
+Validates that a post-bootstrap MrWhoOidc deployment is healthy and operational.
 
 **Usage:**
 
 ```bash
-./scripts/health-check.sh [base-url]
+bash ./scripts/health-check.sh [base-url] [tenant-slug]
 ```
 
 **Arguments:**
 
-- `base-url` - Base URL of MrWhoOidc instance (default: `http://localhost:8080`)
+- `base-url` - Base URL of MrWhoOidc instance (default: `https://localhost:8443`)
+- `tenant-slug` - Tenant slug to validate after bootstrap (default: `default`)
 
 **Example:**
 
 ```bash
 # Check default local deployment
-./scripts/health-check.sh
+bash ./scripts/health-check.sh
 
 # Check custom deployment
-./scripts/health-check.sh https://auth.example.com default
+bash ./scripts/health-check.sh https://auth.example.com default
 ```
 
 **Health Checks Performed:**
 
-1. **Tenant Discovery Endpoint** - Validates `/t/{tenantSlug}/.well-known/openid-configuration` responds with valid JSON containing required OIDC metadata
-2. **JWKS Endpoint** - Validates `/jwks` returns valid JSON Web Key Set with at least one signing key
-3. **Health Endpoint** - Validates `/health` returns HTTP 200 status
-4. **Admin UI** - Validates `/admin/clients` is accessible (HTTP 200 or 302 redirect to login)
-5. **Docker Containers** - Validates all expected containers are running (mrwho-oidc, mrwho-postgres, optionally mrwho-redis)
+1. **Root JWKS Endpoint** - Validates `/jwks` returns valid JSON Web Key Set with at least one signing key
+2. **Tenant Discovery Endpoint** - Validates `/t/{tenantSlug}/.well-known/openid-configuration` responds with valid JSON containing an issuer
+3. **Tenant JWKS Endpoint** - Validates `/t/{tenantSlug}/jwks` returns valid JSON Web Key Set for the tenant context
+4. **Admin UI** - Validates `/admin/clients` resolves to the login page or admin experience when redirects are followed
+5. **Docker Containers** - Validates the expected compose services are running (`mrwho-oidc`, `mrwho-postgres`, optionally `mrwho-redis`)
 
 **Exit Codes:**
 
@@ -108,14 +109,14 @@ Validates that MrWhoOidc deployment is healthy and operational.
 
 **Output:**
 
-Colored output with check marks (✓) for passed checks and crosses (✗) for failed checks. Failed checks include troubleshooting guidance.
+Colored output with check marks for passed checks and crosses for failed checks. Failed checks include troubleshooting guidance.
 
 **Requirements:**
 
 - `curl` installed and available in PATH
-- `jq` installed for JSON validation
 - `docker` installed for container checks
 - Network access to MrWhoOidc deployment
+- A bootstrap already completed for the tenant slug being checked
 
 **Troubleshooting:**
 
@@ -132,7 +133,7 @@ If health checks fail, the script provides specific troubleshooting steps:
 
 ```bash
 # 1. Generate TLS certificate
-./scripts/generate-cert.sh localhost changeit
+bash ./scripts/generate-cert.sh localhost changeit
 
 # 2. Update .env with certificate password
 echo "CERT_PASSWORD=changeit" >> .env
@@ -140,11 +141,23 @@ echo "CERT_PASSWORD=changeit" >> .env
 # 3. Start containers
 docker compose up -d
 
-# 4. Wait for initialization (30-60 seconds)
-sleep 60
+# 4. Bootstrap the first tenant on a fresh database
+curl -k -X POST https://localhost:8443/bootstrap \
+	-H "Content-Type: application/json" \
+	-H "X-Bootstrap-Token: ${BOOTSTRAP_TOKEN}" \
+	-d '{
+		"tenantSlug": "default",
+		"tenantName": "Default Tenant",
+		"adminEmail": "admin@example.com",
+		"adminPassword": "ChangeMeNow123!",
+		"adminName": "Administrator"
+	}'
 
-# 5. Verify deployment
-./scripts/health-check.sh
+# 5. Remove BOOTSTRAP_TOKEN from .env and re-apply
+docker compose up -d
+
+# 6. Verify deployment
+bash ./scripts/health-check.sh https://localhost:8443 default
 ```
 
 ### Production Deployment
@@ -154,10 +167,10 @@ sleep 60
 # 2. Place certificate in certs/aspnetapp.pfx
 # 3. Update .env with production settings
 # 4. Start containers
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.yml -f docker-compose.production.yml up -d
 
 # 5. Verify deployment
-./scripts/health-check.sh https://auth.example.com
+bash ./scripts/health-check.sh https://auth.example.com default
 ```
 
 ### Development with Custom Domain
@@ -167,16 +180,16 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 echo "127.0.0.1 myapp.local" | sudo tee -a /etc/hosts
 
 # 2. Generate certificate for custom domain
-./scripts/generate-cert.sh myapp.local changeit
+bash ./scripts/generate-cert.sh myapp.local changeit
 
 # 3. Update .env with custom domain
-echo "OIDC_ISSUER=https://myapp.local:8443" >> .env
+echo "OIDC_PUBLIC_BASE_URL=https://myapp.local:8443" >> .env
 
 # 4. Start containers
 docker compose up -d
 
 # 5. Verify deployment
-./scripts/health-check.sh https://myapp.local:8443
+bash ./scripts/health-check.sh https://myapp.local:8443 default
 ```
 
 ## Script Requirements
@@ -184,7 +197,8 @@ docker compose up -d
 Both scripts require:
 
 - Bash shell (Linux, macOS, Git Bash on Windows, WSL)
-- Execute permissions: `chmod +x scripts/*.sh`
+- OpenSSL for certificate generation
+- Curl for deployment verification
 
 Platform-specific notes:
 

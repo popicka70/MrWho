@@ -3,12 +3,12 @@
 # ============================================================================
 # MrWhoOidc Health Check Script
 # ============================================================================
-# Verifies that the MrWhoOidc deployment is healthy and operational
-# Usage: ./scripts/health-check.sh [base_url] [tenant_slug]
-# Example: ./scripts/health-check.sh https://localhost:8443 default
+# Verifies that a post-bootstrap MrWhoOidc deployment is healthy and operational
+# Usage: bash ./scripts/health-check.sh [base_url] [tenant_slug]
+# Example: bash ./scripts/health-check.sh https://localhost:8443 default
 # ============================================================================
 
-set -e
+set -uo pipefail
 
 # Configuration
 BASE_URL="${1:-https://localhost:8443}"
@@ -97,36 +97,44 @@ check_docker_containers() {
         print_warning "No docker-compose deployment found - skipping container checks"
         return 0
     fi
-    
-    local containers=$(docker compose ps --format json 2>/dev/null || echo "[]")
-    
-    if [ "$containers" = "[]" ]; then
+
+    local services
+    services=$(docker compose config --services 2>/dev/null || true)
+
+    if [ -z "$services" ]; then
         print_warning "No containers running"
         return 1
     fi
-    
-    # Check webauth container
-    if docker compose ps webauth | grep -q "running"; then
-        print_success "webauth container is running"
-    else
-        print_error "webauth container is not running"
-        return 1
-    fi
-    
-    # Check postgres container
-    if docker compose ps postgres | grep -q "healthy\|running"; then
-        print_success "postgres container is healthy"
-    else
-        print_error "postgres container is not healthy"
-        return 1
-    fi
-    
-    # Check redis container (optional)
-    if docker compose ps redis &> /dev/null; then
-        if docker compose ps redis | grep -q "healthy\|running"; then
-            print_success "redis container is healthy (optional)"
+
+    if echo "$services" | grep -qx "mrwho-oidc"; then
+        if docker compose ps mrwho-oidc | grep -qiE "running|healthy"; then
+            print_success "mrwho-oidc container is running"
         else
-            print_warning "redis container is not healthy (optional - may not be enabled)"
+            print_error "mrwho-oidc container is not running"
+            return 1
+        fi
+    else
+        print_warning "mrwho-oidc service not found in current compose configuration"
+        return 1
+    fi
+
+    if echo "$services" | grep -qx "mrwho-postgres"; then
+        if docker compose ps mrwho-postgres | grep -qiE "running|healthy"; then
+            print_success "mrwho-postgres container is healthy"
+        else
+            print_error "mrwho-postgres container is not healthy"
+            return 1
+        fi
+    else
+        print_warning "mrwho-postgres service not found in current compose configuration"
+        return 1
+    fi
+
+    if echo "$services" | grep -qx "mrwho-redis"; then
+        if docker compose ps mrwho-redis | grep -qiE "running|healthy"; then
+            print_success "mrwho-redis container is healthy (optional)"
+        else
+            print_warning "mrwho-redis container is not healthy (optional - may not be enabled)"
         fi
     fi
     
@@ -141,15 +149,16 @@ main() {
     echo "Base URL: $BASE_URL"
     echo "Tenant Slug: $TENANT_SLUG"
     echo "Timeout: ${TIMEOUT}s"
+    echo "Checks are intended for a post-bootstrap deployment."
     echo ""
     
     local failed_checks=0
     
-    # Check 1: Root Health Endpoint
-    if check_endpoint "$BASE_URL/health" "200" "Health Endpoint"; then
+    # Check 1: Root JWKS Endpoint
+    if check_json_endpoint "$BASE_URL/jwks" "keys" "Root JWKS Endpoint"; then
         :
     else
-        ((failed_checks++))
+        failed_checks=$((failed_checks + 1))
     fi
     echo ""
     
@@ -158,23 +167,24 @@ main() {
         :
     else
         print_warning "Tenant discovery usually requires a completed bootstrap for slug '$TENANT_SLUG'."
-        ((failed_checks++))
+        failed_checks=$((failed_checks + 1))
     fi
     echo ""
 
-    # Check 3: JWKS Endpoint
-    if check_json_endpoint "$BASE_URL/jwks" "keys" "JWKS Endpoint"; then
+    # Check 3: Tenant JWKS Endpoint
+    if check_json_endpoint "$BASE_URL/t/$TENANT_SLUG/jwks" "keys" "Tenant JWKS Endpoint"; then
         :
     else
-        ((failed_checks++))
+        failed_checks=$((failed_checks + 1))
     fi
     echo ""
     
     # Check 4: Admin UI (follow login redirect if authentication is required)
-    if check_endpoint "$BASE_URL/admin/clients" "200" "Admin UI" "true"; then
+    if check_endpoint "$BASE_URL/admin/clients" "200" "Admin UI (redirect resolved)" "true"; then
         :
     else
-        print_warning "Admin UI check failed - may require authentication"
+        print_error "Admin UI did not resolve to the login page or admin experience"
+        failed_checks=$((failed_checks + 1))
     fi
     echo ""
     
@@ -182,7 +192,7 @@ main() {
     if check_docker_containers; then
         :
     else
-        ((failed_checks++))
+        failed_checks=$((failed_checks + 1))
     fi
     echo ""
     
@@ -197,6 +207,7 @@ main() {
         echo "Next steps:"
         echo "  - Access admin UI: $BASE_URL/admin/clients"
         echo "  - View tenant OpenID configuration: $BASE_URL/t/$TENANT_SLUG/.well-known/openid-configuration"
+        echo "  - Use tenant JWKS: $BASE_URL/t/$TENANT_SLUG/jwks"
         echo "  - Configure your first OIDC client in the admin UI"
         echo ""
         exit 0
@@ -207,7 +218,7 @@ main() {
         echo "Troubleshooting:"
         echo "  - Check container logs: docker compose logs"
         echo "  - Verify environment variables in .env file"
-        echo "  - Ensure PostgreSQL is healthy: docker compose ps postgres"
+        echo "  - Ensure PostgreSQL is healthy: docker compose ps mrwho-postgres"
         echo "  - Check deployment guide: /docs/deployment-guide.md"
         echo ""
         exit 1

@@ -17,21 +17,39 @@ This guide covers the public Docker-based deployment assets in this repository.
 git clone https://github.com/popicka70/MrWho.git
 cd MrWho
 
-./scripts/generate-cert.sh localhost changeit
+bash ./scripts/generate-cert.sh localhost changeit
 cp .env.example .env
 
 # edit at minimum:
 # POSTGRES_PASSWORD
 # CERT_PASSWORD
 # OIDC_PUBLIC_BASE_URL
+# BOOTSTRAP_TOKEN on a fresh empty database
 
+docker compose up -d
+
+curl -k -X POST https://localhost:8443/bootstrap \
+  -H "Content-Type: application/json" \
+  -H "X-Bootstrap-Token: ${BOOTSTRAP_TOKEN}" \
+  -d '{
+    "tenantSlug": "default",
+    "tenantName": "Default Tenant",
+    "adminEmail": "admin@example.com",
+    "adminPassword": "ChangeMeNow123!",
+    "adminName": "Administrator"
+  }'
+
+# remove BOOTSTRAP_TOKEN from .env after bootstrap, then re-apply
 docker compose up -d
 ```
 
 Check the deployment:
 
 ```bash
-./scripts/health-check.sh https://localhost:8443
+curl -k https://localhost:8443/t/default/.well-known/openid-configuration
+curl -k -I https://localhost:8443/admin/clients
+curl -k https://localhost:8443/t/default/jwks
+bash ./scripts/health-check.sh https://localhost:8443 default
 ```
 
 ## Deployment Modes
@@ -101,13 +119,16 @@ curl -k -X POST https://localhost:8443/bootstrap \
   }'
 ```
 
-After the initial bootstrap succeeds, remove `BOOTSTRAP_TOKEN`.
+After the initial bootstrap succeeds, remove `BOOTSTRAP_TOKEN` from `.env` and re-apply the containers so bootstrap is no longer exposed.
 
 Post-bootstrap smoke tests for a fresh local install:
 
 - discovery: `https://localhost:8443/t/default/.well-known/openid-configuration`
 - admin UI: `https://localhost:8443/admin/clients`
-- health: `https://localhost:8443/health`
+- tenant JWKS: `https://localhost:8443/t/default/jwks`
+- root JWKS: `https://localhost:8443/jwks`
+
+Anonymous requests to `https://localhost:8443/admin/clients` should redirect to the tenant login page before an administrator signs in.
 
 ## Reverse Proxy Notes
 
@@ -140,8 +161,8 @@ See `multitenancy-quick-reference.md`.
 After deployment, verify:
 
 - discovery document resolves correctly
-- admin UI loads over HTTPS
-- health endpoint returns success
+- admin UI loads over HTTPS and resolves to login for anonymous users
+- tenant JWKS resolves correctly
 - tokens issued by the server contain the expected issuer and audience values
 - mail delivery works if `MAIL_ENABLED=true`
 - Redis is reachable when enabled

@@ -57,15 +57,15 @@ The base `docker-compose.yml` path is production-oriented. On an empty database 
 git clone https://github.com/popicka70/MrWho.git
 cd MrWho
 
-chmod +x scripts/generate-cert.sh
-./scripts/generate-cert.sh localhost changeit
+bash ./scripts/generate-cert.sh localhost changeit
 
 cp .env.example .env
-# edit POSTGRES_PASSWORD, CERT_PASSWORD, OIDC_PUBLIC_BASE_URL
+# edit POSTGRES_PASSWORD, CERT_PASSWORD, and OIDC_PUBLIC_BASE_URL
 # on a fresh local database, also set BOOTSTRAP_TOKEN to a temporary value
 
 docker compose up -d
 
+# bootstrap the first tenant and admin user on an empty database
 curl -k -X POST https://localhost:8443/bootstrap \
 	-H 'Content-Type: application/json' \
 	-H 'X-Bootstrap-Token: your-temporary-bootstrap-token' \
@@ -77,8 +77,22 @@ curl -k -X POST https://localhost:8443/bootstrap \
 		"adminName": "Administrator"
 	}'
 
-# remove BOOTSTRAP_TOKEN from .env after the bootstrap succeeds
+# remove BOOTSTRAP_TOKEN from .env after the bootstrap succeeds,
+# then re-apply the containers
+docker compose up -d
+
+# post-bootstrap smoke tests
+curl -k https://localhost:8443/t/default/.well-known/openid-configuration
+curl -k -I https://localhost:8443/admin/clients
+curl -k https://localhost:8443/t/default/jwks
+bash ./scripts/health-check.sh https://localhost:8443 default
 ```
+
+Expected first-run behavior:
+
+- `https://localhost:8443/admin/clients` redirects anonymous users to the tenant login page.
+- The tenant-scoped discovery document is the primary local smoke test.
+- Remove `BOOTSTRAP_TOKEN` after the initial bootstrap so `POST /bootstrap` is no longer available.
 
 Optional overlays:
 
@@ -97,7 +111,8 @@ Default endpoints:
 
 - discovery: `https://localhost:8443/t/default/.well-known/openid-configuration`
 - admin UI: `https://localhost:8443/admin/clients`
-- health: `https://localhost:8443/health`
+- tenant JWKS: `https://localhost:8443/t/default/jwks`
+- root JWKS: `https://localhost:8443/jwks`
 
 Use the tenant-scoped discovery document for first-run smoke tests. Root discovery depends on a default tenant already existing.
 
