@@ -49,11 +49,9 @@ The Go demo uses a JSON configuration file instead of environment variables.
    docker compose up -d
    ```
 
-2. Access Admin UI: https://localhost:8443/admin
+2. Access Admin UI: https://localhost:8443/admin/clients
 
-3. Login with default credentials:
-   - Username: `admin`
-   - Password: `Admin123!`
+3. Login with the admin credentials created during bootstrap.
 
 4. Navigate to **Client Management** → **Create Client**
 

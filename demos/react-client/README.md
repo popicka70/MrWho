@@ -78,7 +78,7 @@ docker compose -f ../docker-compose.yml -f docker-compose.demo.yml logs -f react
 
 ### 3. Register the Client
 
-1. Open the Admin UI at <https://localhost:8443/admin>
+1. Open the Admin UI at <https://localhost:8443/admin/clients>
 2. Navigate to **Clients** → **Create Client**
 3. Fill in the form:
    - **Client ID**: `react-spa-demo`
@@ -361,7 +361,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 ## Next Steps
 
-- **Explore Admin UI**: Manage clients, users, scopes at <https://localhost:8443/admin>
+- **Explore Admin UI**: Manage clients, users, scopes at <https://localhost:8443/admin/clients>
 - **Read Documentation**: See [MrWhoOidc docs](../../docs/) for advanced configuration
 - **Try Other Demos**: Check out .NET MVC and Go client demos
 - **Deploy to Production**: Review [deployment guide](../../docs/deployment-guide.md) for SPA deployment patterns

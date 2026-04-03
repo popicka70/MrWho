@@ -21,7 +21,7 @@ This playbook provides step-by-step procedures for rotating Identity Provider si
 
 ## Prerequisites
 
-- [ ] Admin access to MrWhoOidc Admin UI (`/admin`)
+- [ ] Admin access to MrWhoOidc Admin UI (`/admin/clients`)
 - [ ] Access to upstream IdP configuration (if manual key registration required)
 - [ ] Understanding of upstream IdP's JWKS caching behavior (TTL, cache-control headers)
 - [ ] Monitoring/alerting configured for key expiry warnings (`oidc.keys.expiry_warning`)

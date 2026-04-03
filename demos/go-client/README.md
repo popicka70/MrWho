@@ -46,7 +46,7 @@ docker compose -f ../docker-compose.yml -f docker-compose.demo.yml logs -f go-de
 
 ### 3. Register the Client
 
-1. Open the Admin UI at <https://localhost:8443/admin>
+1. Open the Admin UI at <https://localhost:8443/admin/clients>
 2. Navigate to **Clients** → **Create Client**
 3. Fill in the form:
    - **Client ID**: `go-demo`
@@ -436,7 +436,7 @@ func handleCallback(w http.ResponseWriter, r *http.Request) {
 
 ## Next Steps
 
-- **Explore Admin UI**: Manage clients, users, scopes at <https://localhost:8443/admin>
+- **Explore Admin UI**: Manage clients, users, scopes at <https://localhost:8443/admin/clients>
 - **Read Documentation**: See [MrWhoOidc docs](../../docs/) and [CONFIG.md](./CONFIG.md)
 - **Try Other Demos**: Check out .NET MVC and React SPA demos
 - **Deploy to Production**: Review [deployment guide](../../docs/deployment-guide.md)

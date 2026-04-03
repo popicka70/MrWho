@@ -90,15 +90,15 @@ Validates that MrWhoOidc deployment is healthy and operational.
 ./scripts/health-check.sh
 
 # Check custom deployment
-./scripts/health-check.sh https://auth.example.com
+./scripts/health-check.sh https://auth.example.com default
 ```
 
 **Health Checks Performed:**
 
-1. **OpenID Discovery Endpoint** - Validates `/.well-known/openid-configuration` responds with valid JSON containing required OIDC metadata
+1. **Tenant Discovery Endpoint** - Validates `/t/{tenantSlug}/.well-known/openid-configuration` responds with valid JSON containing required OIDC metadata
 2. **JWKS Endpoint** - Validates `/jwks` returns valid JSON Web Key Set with at least one signing key
 3. **Health Endpoint** - Validates `/health` returns HTTP 200 status
-4. **Admin UI** - Validates `/admin` is accessible (HTTP 200 or 302 redirect to login)
+4. **Admin UI** - Validates `/admin/clients` is accessible (HTTP 200 or 302 redirect to login)
 5. **Docker Containers** - Validates all expected containers are running (mrwho-oidc, mrwho-postgres, optionally mrwho-redis)
 
 **Exit Codes:**
