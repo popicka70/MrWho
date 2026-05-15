@@ -13,6 +13,8 @@ This guide covers the public Docker-based deployment assets in this repository.
 
 The command examples below use `docker compose`. If your host still uses the legacy standalone binary, replace it with `docker-compose`. A first local run typically takes 3-5 minutes, depending on image pulls and startup time.
 
+This guide is for the published Docker image path in the `MrWho` repository. Do not clone `MrWhoOidc` and do not replace `docker compose up -d` with `docker compose -f docker-compose.yml up -d --build` while following this guide.
+
 ## Quick Start
 
 ```bash
@@ -27,6 +29,9 @@ cp .env.example .env
 # CERT_PASSWORD
 # OIDC_PUBLIC_BASE_URL
 # BOOTSTRAP_TOKEN on a fresh empty database
+
+grep -q 'ghcr.io/popicka70/mrwhooidc:latest' docker-compose.yml && echo "published image compose file confirmed"
+docker compose config | grep ghcr.io/popicka70/mrwhooidc:latest
 
 docker compose up -d
 
@@ -44,6 +49,8 @@ curl -k -X POST https://localhost:8443/bootstrap \
 # remove BOOTSTRAP_TOKEN from .env after bootstrap, then re-apply
 docker compose up -d
 ```
+
+If the image verification commands do not print `ghcr.io/popicka70/mrwhooidc:latest`, stop because you are not using the published Docker image compose path.
 
 Check the deployment:
 

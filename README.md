@@ -53,6 +53,8 @@ The examples below use `docker compose`. If your environment still exposes the l
 
 The base `docker-compose.yml` path is production-oriented. On an empty database it does not auto-seed a tenant or admin user; the first usable local instance requires an explicit bootstrap.
 
+This is the default published-image path. Do not clone `MrWhoOidc` and do not use `docker compose -f docker-compose.yml up -d --build` for this flow.
+
 ### Local Container Startup
 
 ```bash
@@ -64,6 +66,10 @@ bash ./scripts/generate-cert.sh localhost changeit
 cp .env.example .env
 # edit POSTGRES_PASSWORD, CERT_PASSWORD, and OIDC_PUBLIC_BASE_URL
 # on a fresh local database, also set BOOTSTRAP_TOKEN to a temporary value
+
+grep -q 'ghcr.io/popicka70/mrwhooidc:latest' docker-compose.yml && echo "published image compose file confirmed"
+
+docker compose config | grep ghcr.io/popicka70/mrwhooidc:latest
 
 docker compose up -d
 
@@ -89,6 +95,8 @@ curl -k -I https://localhost:8443/admin/clients
 curl -k https://localhost:8443/t/default/jwks
 bash ./scripts/health-check.sh https://localhost:8443 default
 ```
+
+If either verification command above does not print `ghcr.io/popicka70/mrwhooidc:latest`, stop because you are no longer following the published Docker image path.
 
 Expected discovery output includes fields such as `issuer`, `authorization_endpoint`, `token_endpoint`, and `jwks_uri`.
 
