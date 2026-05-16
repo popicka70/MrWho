@@ -29,8 +29,8 @@
           not merely announced.
         </p>
         <div class="cta-row">
-          <a class="button primary" href="https://github.com/popicka70/MrWho">Public repository</a>
-          <a class="button secondary" href="../README.md">Docs and deployment assets</a>
+          <a class="button primary" href="https://github.com/popicka70/MrWho/blob/master/docs/deployment-guide.md">Prebuilt Docker install</a>
+          <a class="button secondary" href="https://github.com/popicka70/MrWho">Public repository</a>
         </div>
       </section>
     </header>
@@ -67,6 +67,11 @@
         <p>
           The public repo is structured around three things: deployment guidance, integration examples,
           and operator-facing documentation. The goal is to shorten the path from evaluation to a working environment.
+        </p>
+        <p>
+          Default first run: clone <strong>MrWho</strong> into a persistent folder, generate the local TLS certificate,
+          set <strong>POSTGRES_PASSWORD</strong> and a temporary <strong>BOOTSTRAP_TOKEN</strong>, then bootstrap the
+          default tenant and verify tenant-scoped discovery.
         </p>
       </section>
     </main>

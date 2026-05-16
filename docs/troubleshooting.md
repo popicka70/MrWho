@@ -141,6 +141,12 @@ ls -la certs/aspnetapp.pfx
 # If missing, regenerate:
 ./scripts/generate-cert.sh localhost changeit
 
+# Current startup log for a missing Docker-mounted certificate:
+# Configured HTTPS certificate file '/https/aspnetapp.pfx' was not found
+
+# Linux/macOS: ensure the mounted PFX stays readable by the container user
+chmod 644 certs/aspnetapp.pfx
+
 # 4. Permission issues
 chmod 644 certs/aspnetapp.pfx
 chmod 755 scripts/*.sh
@@ -169,6 +175,9 @@ docker compose config | grep -A5 volumes
 
 # 3. Regenerate certificate
 ./scripts/generate-cert.sh localhost changeit
+
+# Linux/macOS: keep the mounted PFX readable by the container user
+chmod 644 certs/aspnetapp.pfx
 
 # 4. Verify CERT_PASSWORD matches
 cat .env | grep CERT_PASSWORD

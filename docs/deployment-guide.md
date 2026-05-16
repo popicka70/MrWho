@@ -1,6 +1,6 @@
 # MrWhoOidc Deployment Guide
 
-Last updated: 2026-03-29
+Last updated: 2026-05-16
 
 This guide covers the public Docker-based deployment assets in this repository.
 
@@ -18,17 +18,21 @@ This guide is for the published Docker image path in the `MrWho` repository. Do 
 ## Quick Start
 
 ```bash
+mkdir -p "$HOME/src"
+cd "$HOME/src"
+
 git clone https://github.com/popicka70/MrWho.git
 cd MrWho
 
 bash ./scripts/generate-cert.sh localhost changeit
+chmod 644 ./certs/aspnetapp.pfx
 cp .env.example .env
 
-# edit at minimum:
+# for the stock local path, edit at minimum:
 # POSTGRES_PASSWORD
-# CERT_PASSWORD
-# OIDC_PUBLIC_BASE_URL
 # BOOTSTRAP_TOKEN on a fresh empty database
+# CERT_PASSWORD=changeit and OIDC_PUBLIC_BASE_URL=https://localhost:8443 already match the generated certificate and default local ports
+# leave MAIL_* empty unless you plan to enable SMTP
 # if you are reusing an existing local Docker volume and changed POSTGRES_PASSWORD,
 # either keep the original password or reset the local database state first:
 # docker compose down -v --remove-orphans
@@ -37,6 +41,9 @@ grep -q 'ghcr.io/popicka70/mrwhooidc:latest' docker-compose.yml && echo "publish
 docker compose config | grep ghcr.io/popicka70/mrwhooidc:latest
 
 docker compose up -d
+
+# if the first bootstrap curl fails with a TLS or socket error,
+# wait 5-10 seconds for HTTPS startup and retry the same request
 
 curl -k -X POST https://localhost:8443/bootstrap \
   -H "Content-Type: application/json" \
@@ -55,6 +62,8 @@ docker compose up -d
 
 If the image verification commands do not print `ghcr.io/popicka70/mrwhooidc:latest`, stop because you are not using the published Docker image compose path.
 
+If `MrWho` already exists locally and you want a clean first-run test, clone into a different persistent directory or intentionally clean the existing checkout first so you do not mix old `.env`, `certs/`, or Docker state into the evaluation.
+
 Check the deployment:
 
 ```bash
@@ -65,6 +74,8 @@ bash ./scripts/health-check.sh https://localhost:8443 default
 ```
 
 Expected discovery output includes fields such as `issuer`, `authorization_endpoint`, `token_endpoint`, and `jwks_uri`.
+
+If you open `https://localhost:8443/admin` in a browser before trusting the generated local certificate, expect the normal self-signed certificate warning.
 
 ## Deployment Modes
 
@@ -145,6 +156,8 @@ Post-bootstrap smoke tests for a fresh local install:
 Anonymous requests to `https://localhost:8443/admin/clients` should redirect to the tenant login page before an administrator signs in.
 
 If `mrwho-oidc` logs show `password authentication failed for user "oidc"` and PostgreSQL logs say the database directory already exists or initialization was skipped, the local PostgreSQL volume was created with different credentials. PostgreSQL only applies `POSTGRES_PASSWORD` when the data directory is first initialized. Either restore the previous password in `.env` or reset the local Docker state with `docker compose down -v --remove-orphans`, then start again.
+
+If `mrwho-oidc` logs show `Configured HTTPS certificate file '/https/aspnetapp.pfx' was not found`, the container never saw the expected TLS certificate mount. Regenerate it with `bash ./scripts/generate-cert.sh localhost changeit`, run `chmod 644 ./certs/aspnetapp.pfx` on Linux/macOS, confirm `./certs:/https:ro` is still present in `docker-compose.yml`, then restart the stack.
 
 ## Reverse Proxy Notes
 
