@@ -266,9 +266,13 @@ docker compose logs -f mrwho-postgres
 docker compose exec mrwho-postgres psql -U oidc -d authdb -c "SELECT 1;"
 # Should output: 1
 
-# 6. If password wrong, reset:
-docker compose down -v  # WARNING: Destroys all data
-# Update .env with correct POSTGRES_PASSWORD
+# 6. If mrwho-oidc logs show `password authentication failed for user "oidc"`
+#    and PostgreSQL logs say the database directory already exists or initialization was skipped,
+#    you are reusing a local volume that was created with different credentials.
+#    PostgreSQL only applies POSTGRES_PASSWORD when the data directory is first initialized.
+#    Either restore the original password in .env or reset local state:
+docker compose down -v --remove-orphans  # WARNING: Destroys all local data
+# Update .env with the password you want to keep
 docker compose up -d
 ```
 

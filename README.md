@@ -66,6 +66,9 @@ bash ./scripts/generate-cert.sh localhost changeit
 cp .env.example .env
 # edit POSTGRES_PASSWORD, CERT_PASSWORD, and OIDC_PUBLIC_BASE_URL
 # on a fresh local database, also set BOOTSTRAP_TOKEN to a temporary value
+# if you are reusing an existing local Docker volume and changed POSTGRES_PASSWORD,
+# either keep the original password or reset the local database state first:
+# docker compose down -v --remove-orphans
 
 grep -q 'ghcr.io/popicka70/mrwhooidc:latest' docker-compose.yml && echo "published image compose file confirmed"
 
@@ -105,6 +108,7 @@ Expected first-run behavior:
 - `https://localhost:8443/admin/clients` redirects anonymous users to the tenant login page.
 - The tenant-scoped discovery document is the primary local smoke test.
 - Remove `BOOTSTRAP_TOKEN` after the initial bootstrap so `POST /bootstrap` is no longer available.
+- If `mrwho-oidc` logs show `password authentication failed for user "oidc"` and PostgreSQL says it is skipping initialization, you are reusing an older local database volume. Restore the previous password or run `docker compose down -v --remove-orphans`, then start again.
 
 Optional overlays:
 

@@ -29,6 +29,9 @@ cp .env.example .env
 # CERT_PASSWORD
 # OIDC_PUBLIC_BASE_URL
 # BOOTSTRAP_TOKEN on a fresh empty database
+# if you are reusing an existing local Docker volume and changed POSTGRES_PASSWORD,
+# either keep the original password or reset the local database state first:
+# docker compose down -v --remove-orphans
 
 grep -q 'ghcr.io/popicka70/mrwhooidc:latest' docker-compose.yml && echo "published image compose file confirmed"
 docker compose config | grep ghcr.io/popicka70/mrwhooidc:latest
@@ -140,6 +143,8 @@ Post-bootstrap smoke tests for a fresh local install:
 - root JWKS: `https://localhost:8443/jwks`
 
 Anonymous requests to `https://localhost:8443/admin/clients` should redirect to the tenant login page before an administrator signs in.
+
+If `mrwho-oidc` logs show `password authentication failed for user "oidc"` and PostgreSQL logs say the database directory already exists or initialization was skipped, the local PostgreSQL volume was created with different credentials. PostgreSQL only applies `POSTGRES_PASSWORD` when the data directory is first initialized. Either restore the previous password in `.env` or reset the local Docker state with `docker compose down -v --remove-orphans`, then start again.
 
 ## Reverse Proxy Notes
 
