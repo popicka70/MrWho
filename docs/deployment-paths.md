@@ -22,6 +22,7 @@ Use the `MrWhoOidc` repository only when you need to build from source, modify c
 | Path | Use this when | Primary command | What next |
 |---|---|---|---|
 | Prebuilt Setup | You want the smallest working local or evaluation install | `docker compose up -d` | Bootstrap, verify, then pick Redis, production, or demos |
+| Proxy TLS Termination | Public HTTPS is terminated by your reverse proxy or load balancer and you do not want a local PFX in the backend container | `docker compose -f docker-compose.tls-termination.yml up -d` | Validate through the public proxy URL, then add Redis or production hardening if needed |
 | Prebuilt + Redis | You want Redis-backed distributed features and lower database load | `docker compose -f docker-compose.yml -f docker-compose.redis.yml up -d` | Validate Redis-backed deployment, then consider production hardening |
 | Prebuilt + Production | You want the hardened baseline | `docker compose -f docker-compose.yml -f docker-compose.production.yml up -d` | Finish TLS, secrets, reverse proxy, and monitoring work |
 | Prebuilt + Examples | You want real client integrations after bootstrap | Start the issuer once, then follow a demo README | Choose a demo by stack and flow |
@@ -42,6 +43,39 @@ This path gives you:
 - the standard bootstrap flow for a fresh production-style database
 
 Start here before you add Redis, try demos, or move toward production hardening.
+
+Primary references:
+
+- [deployment-guide.md](deployment-guide.md)
+- [docker-compose-examples.md](docker-compose-examples.md)
+
+## Proxy TLS Termination
+
+Use this path when a reverse proxy or load balancer presents the public HTTPS endpoint and the backend container should run on HTTP only.
+
+```bash
+docker compose -f docker-compose.tls-termination.yml up -d
+```
+
+This path is a good fit when you want:
+
+- public HTTPS handled upstream
+- forwarded headers to drive the correct request scheme and host inside the app
+- no local `certs/aspnetapp.pfx` mounted into the backend container
+
+Key rules for this path:
+
+- set `OIDC_PUBLIC_BASE_URL` to the public `https://...` URL seen by clients
+- configure `FORWARDED_HEADERS_KNOWN_PROXY_*` or `FORWARDED_HEADERS_KNOWN_NETWORK_*` whenever possible
+- use `FORWARDED_HEADERS_UNSAFE_TRUST_ALL=true` only as a last resort on controlled infrastructure
+- validate through the public proxy URL, not by treating the backend HTTP port as a public endpoint
+
+You can still compose this path with the existing overlays:
+
+```bash
+docker compose -f docker-compose.tls-termination.yml -f docker-compose.redis.yml up -d
+docker compose -f docker-compose.tls-termination.yml -f docker-compose.production.yml up -d
+```
 
 Primary references:
 

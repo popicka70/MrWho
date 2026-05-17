@@ -1,6 +1,6 @@
 # MrWhoOidc Configuration Reference
 
-Last updated: 2026-03-29
+Last updated: 2026-05-17
 
 This document summarizes the environment variables and configuration keys used by the public Docker deployment assets.
 
@@ -10,7 +10,9 @@ This document summarizes the environment variables and configuration keys used b
 |---|---|---|
 | `POSTGRES_PASSWORD` | yes | password for the bundled PostgreSQL container |
 | `OIDC_PUBLIC_BASE_URL` | yes | public base URL exposed to users and clients |
-| `CERT_PASSWORD` | yes | password for the TLS PFX mounted into the container |
+| `CERT_PASSWORD` | conditional | password for the TLS PFX mounted by `docker-compose.yml`; not used by `docker-compose.tls-termination.yml` |
+
+When you terminate TLS at an upstream reverse proxy and use `docker-compose.tls-termination.yml`, keep `OIDC_PUBLIC_BASE_URL` on the public `https://...` URL and leave certificate handling to the proxy.
 
 ## Bootstrap
 
@@ -64,6 +66,8 @@ Redis is recommended for production and larger environments.
 | `FORWARDED_HEADERS_ALLOWED_HOST_0..2` | empty | allowed forwarded hosts |
 | `FORWARDED_HEADERS_KNOWN_PROXY_0..2` | empty | trusted proxy IPs |
 | `FORWARDED_HEADERS_KNOWN_NETWORK_0..1` | empty | trusted proxy CIDR ranges |
+
+For `docker-compose.tls-termination.yml`, these settings are central to the deployment. Prefer `KNOWN_PROXY_*` or `KNOWN_NETWORK_*` over `FORWARDED_HEADERS_UNSAFE_TRUST_ALL=true`, and keep `OIDC_PUBLIC_BASE_URL` aligned with the public HTTPS URL exposed by the proxy.
 
 ## Native Configuration Keys
 

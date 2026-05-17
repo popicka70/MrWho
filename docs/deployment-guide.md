@@ -11,7 +11,7 @@ If you are still deciding between the base install, Redis, production hardening,
 - Docker Engine 20.10+
 - Docker Compose V2+
 - PostgreSQL storage capacity appropriate for your environment
-- a TLS certificate mounted as `certs/aspnetapp.pfx`
+- either a TLS certificate mounted as `certs/aspnetapp.pfx` or a reverse proxy / load balancer that terminates TLS upstream
 
 The command examples below use `docker compose`. If your host still uses the legacy standalone binary, replace it with `docker-compose`. A first local run typically takes 3-5 minutes, depending on image pulls and startup time.
 
@@ -94,6 +94,23 @@ Includes:
 - MrWhoOidc server
 - PostgreSQL
 
+This base expects the backend container itself to serve HTTPS with a mounted PFX.
+
+### TLS Termination Base
+
+```bash
+docker compose -f docker-compose.tls-termination.yml up -d
+```
+
+Includes:
+
+- MrWhoOidc server listening on HTTP only inside the container
+- PostgreSQL
+- forwarded-header support for a reverse proxy or load balancer that presents public HTTPS
+- no local certificate mount in the backend container
+
+Use this when the public `https://...` endpoint lives at the proxy and the backend should stay on private HTTP.
+
 ### Development Overlay
 
 ```bash
@@ -117,6 +134,8 @@ Adds:
 - Redis-backed distributed features
 - lower load on PostgreSQL under repeated token and metadata workloads
 
+You can compose this overlay on top of either `docker-compose.yml` or `docker-compose.tls-termination.yml`.
+
 ### Production Overlay
 
 ```bash
@@ -130,6 +149,45 @@ Adds:
 - non-root container users
 - capability reduction and resource limits
 - JSON console logging
+
+You can compose this overlay on top of either `docker-compose.yml` or `docker-compose.tls-termination.yml`.
+
+## TLS Termination Without Local Certificate
+
+When a reverse proxy or cloud load balancer terminates TLS before traffic reaches the container, use the dedicated base file instead of the default `docker-compose.yml` path:
+
+```bash
+docker compose -f docker-compose.tls-termination.yml up -d
+```
+
+This deployment mode changes the backend assumptions:
+
+- Kestrel listens on HTTP only at `:8080`
+- the public URL must still be configured as `https://...` via `OIDC_PUBLIC_BASE_URL`
+- the proxy must forward `X-Forwarded-Proto`, `X-Forwarded-Host`, and client IP information
+- no `certs/aspnetapp.pfx` mount and no `CERT_PASSWORD` are required for this file
+
+Recommended `.env` choices for this path:
+
+- `OIDC_PUBLIC_BASE_URL=https://auth.example.com`
+- `FORWARDED_HEADERS_KNOWN_PROXY_*` or `FORWARDED_HEADERS_KNOWN_NETWORK_*` set to trusted proxy values
+- `FORWARDED_HEADERS_ENFORCE_HOST_ALLOW_LIST=true` when practical
+- `FORWARDED_HEADERS_ALLOWED_HOST_0=auth.example.com` when practical
+
+Use `FORWARDED_HEADERS_UNSAFE_TRUST_ALL=true` only when proxy IP ranges are not stable and the backend is not directly reachable by clients.
+
+You can still layer the existing overlays on top of this base:
+
+```bash
+docker compose -f docker-compose.tls-termination.yml -f docker-compose.redis.yml up -d
+docker compose -f docker-compose.tls-termination.yml -f docker-compose.production.yml up -d
+```
+
+Validation for this mode is different from the local PFX path:
+
+- validate through the public HTTPS URL exposed by the proxy
+- do not treat direct backend HTTP requests as a full end-to-end test of the deployment
+- confirm discovery and redirect URLs resolve to the public HTTPS host, not to backend HTTP addresses
 
 ## First-Time Bootstrap
 
@@ -163,6 +221,8 @@ If `mrwho-oidc` logs show `password authentication failed for user "oidc"` and P
 
 If `mrwho-oidc` logs show `Configured HTTPS certificate file '/https/aspnetapp.pfx' was not found`, the container never saw the expected TLS certificate mount. Regenerate it with `bash ./scripts/generate-cert.sh localhost changeit`, run `chmod 644 ./certs/aspnetapp.pfx` on Linux/macOS, confirm `./certs:/https:ro` is still present in `docker-compose.yml`, then restart the stack.
 
+If you intentionally deployed with `docker-compose.tls-termination.yml`, this certificate warning should not apply because that base does not configure a local PFX.
+
 ## Reverse Proxy Notes
 
 If you deploy behind a cloud load balancer or reverse proxy, review the forwarded-header variables in `.env.example`.
@@ -172,6 +232,7 @@ The safest approach is:
 - keep `FORWARDED_HEADERS_UNSAFE_TRUST_ALL=false`
 - provide known proxies or networks explicitly when possible
 - ensure `OIDC_PUBLIC_BASE_URL` matches the externally visible HTTPS URL
+- use `docker-compose.tls-termination.yml` when TLS ends at the proxy and the backend should not hold a local certificate
 
 ## Multi-Tenancy
 
@@ -181,7 +242,7 @@ See `multitenancy-quick-reference.md`.
 
 ## Recommended Production Baseline
 
-- CA-signed certificate
+- CA-signed certificate on the app itself, or trusted TLS termination at an upstream proxy
 - Redis enabled
 - strong `POSTGRES_PASSWORD`
 - `BOOTSTRAP_TOKEN` removed after initial use
@@ -199,3 +260,4 @@ After deployment, verify:
 - tokens issued by the server contain the expected issuer and audience values
 - mail delivery works if `MAIL_ENABLED=true`
 - Redis is reachable when enabled
+- proxy-terminated deployments emit public `https://...` URLs rather than backend `http://...` URLs
