@@ -1,8 +1,10 @@
 # MrWhoOidc Deployment Guide
 
-Last updated: 2026-05-16
+Last updated: 2026-05-17
 
 This guide covers the public Docker-based deployment assets in this repository.
+
+If you are still deciding between the base install, Redis, production hardening, examples, or the separate source-build track, start with [deployment-paths.md](deployment-paths.md) first.
 
 ## Prerequisites
 
@@ -78,6 +80,8 @@ Expected discovery output includes fields such as `issuer`, `authorization_endpo
 If you open `https://localhost:8443/admin` in a browser before trusting the generated local certificate, expect the normal self-signed certificate warning.
 
 ## Deployment Modes
+
+For a scenario chooser with `use this when` guidance, see [deployment-paths.md](deployment-paths.md).
 
 ### Base
 

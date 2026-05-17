@@ -2,6 +2,18 @@
 
 This folder contains the public integration demos for MrWhoOidc.
 
+## Start Here
+
+Do not begin with the demos if the issuer is not already running.
+
+The recommended order is:
+
+1. Complete the base deployment path from [../docs/deployment-paths.md](../docs/deployment-paths.md).
+2. Bootstrap and verify the issuer.
+3. Return here and choose the demo that matches your stack and flow.
+
+If you need Redis-backed distributed features before you test demos, use the Redis path in [../docs/deployment-paths.md](../docs/deployment-paths.md) and keep following the published-image workflow in this repository.
+
 ## Available Demos
 
 | Demo | Stack | Scenario |
@@ -17,6 +29,15 @@ This folder contains the public integration demos for MrWhoOidc.
 - Start with [dotnet-mvc-client](./dotnet-mvc-client/) if you want the clearest end-to-end .NET example.
 - Start with [react-client](./react-client/) if you need a browser-only SPA reference.
 - Start with [obo-demo-api](./obo-demo-api/) if you are validating access tokens on a downstream API.
+
+## Choose A Demo By Goal
+
+| Goal | Recommended Demo | Why |
+|---|---|---|
+| Confidential web app | [dotnet-mvc-client](./dotnet-mvc-client/) | Fastest way to understand the full sign-in and downstream API flow |
+| Browser-only SPA | [react-client](./react-client/) | Best starting point for PKCE and PAR in a frontend-only client |
+| Downstream API validation | [obo-demo-api](./obo-demo-api/) | Clearest path for access token validation and OBO vs M2M comparison |
+| Non-.NET confidential client | [go-client](./go-client/) or [kotlin-spring-client](./kotlin-spring-client/) | Better fit when your application stack is not .NET |
 
 ## Local Workflow
 
@@ -134,8 +155,8 @@ Before running any demo, register the client in **MrWhoOidc Admin UI**:
 # Check status
 docker ps | grep mrwho-oidc
 
-# Start MrWhoOidc
-cd MrWhoOidc/MrWho
+# Start MrWhoOidc from the deployment repository root
+cd /path/to/MrWho
 docker compose up -d
 ```
 
