@@ -58,14 +58,22 @@ This is the default published-image path. Do not clone `MrWhoOidc` and do not us
 ### Local Container Startup
 
 ```bash
+mkdir -p "$HOME/src"
+cd "$HOME/src"
+
 git clone https://github.com/popicka70/MrWho.git
 cd MrWho
 
 bash ./scripts/generate-cert.sh localhost changeit
+chmod 644 ./certs/aspnetapp.pfx
+test -f ./certs/aspnetapp.pfx && echo "certificate ready"
 
 cp .env.example .env
-# edit POSTGRES_PASSWORD, CERT_PASSWORD, and OIDC_PUBLIC_BASE_URL
-# on a fresh local database, also set BOOTSTRAP_TOKEN to a temporary value
+# for the stock local path, edit at minimum:
+# POSTGRES_PASSWORD
+# BOOTSTRAP_TOKEN on a fresh local database
+# CERT_PASSWORD=changeit and OIDC_PUBLIC_BASE_URL=https://localhost:8443 already match the generated certificate and default local ports
+# leave MAIL_* empty unless you plan to enable SMTP
 # if you are reusing an existing local Docker volume and changed POSTGRES_PASSWORD,
 # either keep the original password or reset the local database state first:
 # docker compose down -v --remove-orphans
@@ -75,6 +83,9 @@ grep -q 'ghcr.io/popicka70/mrwhooidc:latest' docker-compose.yml && echo "publish
 docker compose config | grep ghcr.io/popicka70/mrwhooidc:latest
 
 docker compose up -d
+
+# if the first bootstrap curl fails with a TLS or socket error,
+# wait 5-10 seconds for HTTPS startup and retry the same request
 
 # bootstrap the first tenant and admin user on an empty database
 curl -k -X POST https://localhost:8443/bootstrap \
@@ -108,7 +119,9 @@ Expected first-run behavior:
 - `https://localhost:8443/admin/clients` redirects anonymous users to the tenant login page.
 - The tenant-scoped discovery document is the primary local smoke test.
 - Remove `BOOTSTRAP_TOKEN` after the initial bootstrap so `POST /bootstrap` is no longer available.
+- The first browser visit to `https://localhost:8443/admin` shows a self-signed certificate warning until you trust the generated local certificate.
 - If `mrwho-oidc` logs show `password authentication failed for user "oidc"` and PostgreSQL says it is skipping initialization, you are reusing an older local database volume. Restore the previous password or run `docker compose down -v --remove-orphans`, then start again.
+- If `mrwho-oidc` logs show `Configured HTTPS certificate file '/https/aspnetapp.pfx' was not found`, rerun `bash ./scripts/generate-cert.sh localhost changeit`, then `chmod 644 ./certs/aspnetapp.pfx`, and restart the stack.
 
 Optional overlays:
 

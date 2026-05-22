@@ -1,0 +1,86 @@
+services:
+  mrwho-oidc:
+    image: ghcr.io/popicka70/mrwhooidc:latest
+    container_name: mrwho-oidc
+    depends_on:
+      mrwho-postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__authdb: Host=mrwho-postgres;Port=5432;Database=authdb;Username=oidc;Password=${POSTGRES_PASSWORD};Include Error Detail=false
+      Oidc__PublicBaseUrl: ${OIDC_PUBLIC_BASE_URL}
+
+      ForwardedHeaders__Enabled: ${FORWARDED_HEADERS_ENABLED:-true}
+      ForwardedHeaders__RequireHeaderSymmetry: ${FORWARDED_HEADERS_REQUIRE_HEADER_SYMMETRY:-false}
+      ForwardedHeaders__ForwardLimit: ${FORWARDED_HEADERS_FORWARD_LIMIT:-1}
+      ForwardedHeaders__UnsafeTrustAll: ${FORWARDED_HEADERS_UNSAFE_TRUST_ALL:-false}
+      ForwardedHeaders__EnforceHostAllowList: ${FORWARDED_HEADERS_ENFORCE_HOST_ALLOW_LIST:-false}
+      ForwardedHeaders__AllowedHosts__0: ${FORWARDED_HEADERS_ALLOWED_HOST_0:-}
+      ForwardedHeaders__AllowedHosts__1: ${FORWARDED_HEADERS_ALLOWED_HOST_1:-}
+      ForwardedHeaders__AllowedHosts__2: ${FORWARDED_HEADERS_ALLOWED_HOST_2:-}
+      ForwardedHeaders__KnownProxies__0: ${FORWARDED_HEADERS_KNOWN_PROXY_0:-}
+      ForwardedHeaders__KnownProxies__1: ${FORWARDED_HEADERS_KNOWN_PROXY_1:-}
+      ForwardedHeaders__KnownProxies__2: ${FORWARDED_HEADERS_KNOWN_PROXY_2:-}
+      ForwardedHeaders__KnownNetworks__0: ${FORWARDED_HEADERS_KNOWN_NETWORK_0:-}
+      ForwardedHeaders__KnownNetworks__1: ${FORWARDED_HEADERS_KNOWN_NETWORK_1:-}
+
+      Redis__Enabled: false
+      Redis__ConnectionString: ${REDIS_CONNECTION_STRING:-redis:6379,abortConnect=false}
+
+      Mail__Enabled: ${MAIL_ENABLED:-false}
+      Mail__SmtpHost: ${MAIL_SMTP_HOST:-}
+      Mail__SmtpPort: ${MAIL_SMTP_PORT:-587}
+      Mail__UseSsl: ${MAIL_SMTP_USE_SSL:-true}
+      Mail__FromAddress: ${MAIL_FROM_ADDRESS:-}
+      Mail__FromName: ${MAIL_FROM_NAME:-MrWhoOidc}
+      Mail__SmtpUsername: ${MAIL_SMTP_USERNAME:-}
+      Mail__SmtpPassword: ${MAIL_SMTP_PASSWORD:-}
+
+      Logging__LogLevel__Default: ${LOGGING_LEVEL:-Information}
+      Logging__LogLevel__Microsoft.AspNetCore: ${LOGGING_LEVEL_ASPNETCORE:-Warning}
+
+      Bootstrap__Token: ${BOOTSTRAP_TOKEN:-}
+
+    ports:
+      - "${OIDC_HTTP_PORT:-8081}:8080"
+
+    restart: unless-stopped
+
+    networks:
+      - edge
+      - internal
+
+  mrwho-postgres:
+    image: postgres:16-alpine
+    container_name: mrwho-postgres
+    environment:
+      POSTGRES_DB: authdb
+      POSTGRES_USER: oidc
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+    restart: unless-stopped
+
+    networks:
+      - internal
+
+volumes:
+  postgres-data:
+    driver: local
+
+networks:
+  edge:
+    driver: bridge
+  internal:
+    driver: bridge
+    internal: true
